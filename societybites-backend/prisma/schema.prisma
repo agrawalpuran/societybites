@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  name      String?
+  role      String   @default("buyer")
+  createdAt DateTime @default(now())
+
+  societyId String?
+  flatId    String?
+
+  society Society? @relation(fields: [societyId], references: [id])
+  flat    Flat?    @relation(fields: [flatId], references: [id])
+
+  listings Listing[]
+  orders   Order[]  @relation("BuyerOrders")
+  reviews  Review[]
+}
+
+model Society {
+  id    String @id @default(uuid())
+  name  String
+  city  String
+
+  users    User[]
+  blocks   Block[]
+  flats    Flat[]
+  listings Listing[]
+  orders   Order[]
+}
+
+model Block {
+  id        String @id @default(uuid())
+  name      String
+  societyId String
+
+  society Society @relation(fields: [societyId], references: [id])
+}
+
+model Flat {
+  id         String @id @default(uuid())
+  flatNumber String
+  block      String
+  floor      Int
+  unit       String
+  societyId  String
+
+  society Society @relation(fields: [societyId], references: [id])
+  users   User[]
+
+  @@unique([societyId, flatNumber])
+}
+
+model Listing {
+  id             String    @id @default(uuid())
+  sellerId       String
+  societyId      String
+  name           String
+  description    String?
+  price          Float
+  quantity       Int       @default(1)
+  availableAt    DateTime?
+  pickupLocation String    @default("My Home (Verified)")
+  imageUrl       String?
+  status         String    @default("active")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  seller     User        @relation(fields: [sellerId], references: [id])
+  society    Society     @relation(fields: [societyId], references: [id])
+  orderItems OrderItem[]
+  reviews    Review[]
+}
+
+model Order {
+  id             String   @id @default(uuid())
+  orderNumber    String   @unique
+  buyerId        String
+  societyId      String
+  status         String   @default("ordered")
+  paymentMethod  String   @default("upi")
+  subtotal       Float
+  communityFee   Float    @default(10)
+  total          Float
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  buyer   User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  society Society     @relation(fields: [societyId], references: [id])
+  items   OrderItem[]
+  reviews Review[]
+}
+
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String
+  listingId String
+  quantity  Int
+  unitPrice Float
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id])
+}
+
+model Review {
+  id              String   @id @default(uuid())
+  orderId         String
+  listingId       String
+  reviewerId      String
+  rating          Int
+  comment         String?
+  tags            String[]
+  wouldOrderAgain Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  order    Order   @relation(fields: [orderId], references: [id])
+  listing  Listing @relation(fields: [listingId], references: [id])
+  reviewer User    @relation(fields: [reviewerId], references: [id])
+
+  @@unique([orderId, reviewerId])
+}
