@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'profile_screen.dart';
 import '../widgets/app_header.dart';
+import '../widgets/listing_image.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
@@ -384,13 +385,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 icon: Icons.shopping_bag_rounded,
                 label: 'Orders',
                 isActive: true,
-                onTap: () {},
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('This feature is coming soon')),
+                  );
+                },
               ),
               _BottomNavItem(
                 icon: Icons.grid_view_rounded,
                 label: 'Dashboard',
                 isActive: false,
-                onTap: () {},
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('This feature is coming soon')),
+                  );
+                },
               ),
               _BottomNavItem(
                 icon: Icons.person_rounded,
@@ -464,11 +473,14 @@ class _OrderItemCard extends StatelessWidget {
             width: double.infinity,
             height: 140,
             decoration: BoxDecoration(
-              color: item.food.bgColor,
               borderRadius: BorderRadius.circular(18),
             ),
-            child: Icon(item.food.icon,
-                size: 64, color: const Color(0xFF6A7774).withAlpha(150)),
+            child: ListingImage(
+              food: item.food,
+              height: 140,
+              borderRadius: 18,
+              iconSize: 64,
+            ),
           ),
           const SizedBox(height: 14),
           Align(

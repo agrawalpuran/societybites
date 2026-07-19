@@ -36,7 +36,7 @@ class _AppHeaderState extends State<AppHeader> {
     final userId = await SessionService.getUserId();
     if (userId != null && (name == null || flatNumber == null)) {
       try {
-        final profile = await ApiService.getUser(userId);
+        final profile = await ApiService.getMe();
         await SessionService.cacheProfileFromApi(profile);
         name = await SessionService.getUserName();
         flatNumber = await SessionService.getFlatNumber();

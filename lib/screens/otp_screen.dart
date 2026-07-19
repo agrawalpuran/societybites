@@ -111,28 +111,42 @@ Future<void> _verifyOtp() async {
 
   Future<void> _completeLogin() async {
     try {
-      final user = await ApiService.loginUser(widget.phoneNumber);
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        throw Exception('Firebase user not found after verification');
+      }
+
+      final idToken = await firebaseUser.getIdToken();
+      if (idToken == null) {
+        throw Exception('Could not retrieve Firebase ID token');
+      }
+
+      final result = await ApiService.firebaseLogin(idToken);
+
+      final token = result['token'] as String;
+      final user = Map<String, dynamic>.from(result['user'] as Map);
+
+      await SessionService.saveToken(token);
       await SessionService.saveUser(
         userId: user['id'] as String,
-        phone: widget.phoneNumber,
+        phone: user['phone'] as String,
       );
 
-      final profile = await ApiService.getUser(user['id'] as String);
-      final hasFlat = profile['flatId'] != null && profile['societyId'] != null;
+      final hasFlat = user['flatId'] != null && user['societyId'] != null;
 
-      if (profile['societyId'] != null && profile['flatId'] != null) {
-        final society = profile['society'] as Map<String, dynamic>?;
-        final flat = profile['flat'] as Map<String, dynamic>?;
+      if (user['societyId'] != null && user['flatId'] != null) {
+        final society = user['society'] as Map<String, dynamic>?;
+        final flat = user['flat'] as Map<String, dynamic>?;
         await SessionService.saveSociety(
-          societyId: profile['societyId'] as String,
+          societyId: user['societyId'] as String,
           societyName: society?['name'] as String? ??
               SessionService.defaultSocietyName,
-          flatId: profile['flatId'] as String,
+          flatId: user['flatId'] as String,
           flatNumber: flat?['flatNumber'] as String?,
         );
       }
 
-      await SessionService.cacheProfileFromApi(profile);
+      await SessionService.cacheProfileFromApi(user);
 
       if (!mounted) return;
 

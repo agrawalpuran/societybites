@@ -76,24 +76,27 @@ class _HeroSection extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0E5A47),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'BESTSELLER',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
+                  if (food.reviewCount >= 5 && food.rating >= 4.5)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0E5A47),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'BESTSELLER',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -108,7 +111,9 @@ class _HeroSection extends StatelessWidget {
                             size: 15, color: Colors.amber),
                         const SizedBox(width: 3),
                         Text(
-                          '${food.rating} (124)',
+                          food.rating > 0
+                              ? '${food.rating}'
+                              : 'New',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -369,15 +374,12 @@ class _StorySection extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: const [
-                _Tag('Vegetarian'),
-                _Tag('Spicy Medium'),
-                _Tag('Homemade Butter'),
-              ],
-            ),
+            if (food.tags.isNotEmpty)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: food.tags.map((t) => _Tag(t)).toList(),
+              ),
           ],
         ),
       ),
@@ -522,7 +524,7 @@ class _ReviewCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                review.name,
+                review.displayName,
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,

@@ -1,14 +1,21 @@
 const ORDER_STATUS_TO_STEP = {
-  ordered: 0,
-  preparing: 1,
-  ready: 2,
-  completed: 3,
+  pending: 0,
+  accepted: 1,
+  preparing: 2,
+  ready: 3,
+  picked_up: 4,
+  completed: 5,
   cancelled: -1,
 };
 
 function serializeListing(listing) {
   const seller = listing.seller || {};
   const flat = seller.flat;
+  const reviews = listing.reviews || [];
+  const reviewCount = reviews.length;
+  const avgRating = reviewCount > 0
+    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+    : 0;
 
   return {
     id: listing.id,
@@ -19,11 +26,17 @@ function serializeListing(listing) {
     availableAt: listing.availableAt,
     pickupLocation: listing.pickupLocation,
     imageUrl: listing.imageUrl,
+    weightUnit: listing.weightUnit,
+    weightValue: listing.weightValue,
+    tags: listing.tags || [],
+    category: listing.category || null,
     status: listing.status,
     societyId: listing.societyId,
     sellerId: listing.sellerId,
     sellerName: seller.name || "Neighbor",
     block: flat ? `Block ${flat.block}` : null,
+    avgRating: Math.round(avgRating * 10) / 10,
+    reviewCount,
     createdAt: listing.createdAt,
     updatedAt: listing.updatedAt,
   };
@@ -45,24 +58,42 @@ function serializeOrder(order) {
     status: order.status,
     statusStep: ORDER_STATUS_TO_STEP[order.status] ?? 0,
     paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus || "pending",
+    buyerMarkedPaidAt: order.buyerMarkedPaidAt || null,
+    sellerConfirmedPaidAt: order.sellerConfirmedPaidAt || null,
+    upiTransactionRef: order.upiTransactionRef || null,
     subtotal: order.subtotal,
     communityFee: order.communityFee,
     total: order.total,
     societyId: order.societyId,
     buyerId: order.buyerId,
     items,
+    timeline: {
+      createdAt: order.createdAt,
+      acceptedAt: order.acceptedAt || null,
+      preparingAt: order.preparingAt || null,
+      readyAt: order.readyAt || null,
+      pickedUpAt: order.pickedUpAt || null,
+      completedAt: order.completedAt || null,
+      cancelledAt: order.cancelledAt || null,
+    },
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
   };
 }
 
 function serializeReview(review) {
+  const reviewer = review.reviewer || {};
+  const flat = reviewer.flat;
+
   return {
     id: review.id,
     orderId: review.orderId,
     listingId: review.listingId,
     reviewerId: review.reviewerId,
-    name: review.reviewer?.name || "Neighbor",
+    name: reviewer.name || "Neighbor",
+    flatNumber: flat?.flatNumber || null,
+    block: flat?.block || null,
     rating: review.rating,
     comment: review.comment,
     tags: review.tags,

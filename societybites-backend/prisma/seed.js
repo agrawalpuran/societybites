@@ -37,11 +37,12 @@ async function main() {
 
   await prisma.society.upsert({
     where: { id: SOCIETY_ID },
-    update: { name: "Prestige Notting Hill", city: "Bangalore" },
+    update: { name: "Prestige Notting Hill", city: "Bangalore", inviteCode: "PRESTIGE2026" },
     create: {
       id: SOCIETY_ID,
       name: "Prestige Notting Hill",
       city: "Bangalore",
+      inviteCode: "PRESTIGE2026",
       blocks: {
         create: [
           { name: "A" },

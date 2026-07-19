@@ -6,9 +6,21 @@ import 'package:http/http.dart' as http;
 
 import 'session_service.dart';
 
+class TokenExpiredException implements Exception {
+  final String message;
+  TokenExpiredException(this.message);
+  @override
+  String toString() => message;
+}
+
 class ApiService {
   static String get baseUrl {
-    if (kIsWeb) return 'http://127.0.0.1:3000';
+    if (kIsWeb) {
+      final host = Uri.base.host;
+      final port = 3000;
+      final scheme = Uri.base.scheme;
+      return '$scheme://$host:$port';
+    }
     if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:3000';
     return 'http://127.0.0.1:3000';
   }
@@ -32,10 +44,10 @@ class ApiService {
   }
 
   static Future<Map<String, String>> _authHeaders() async {
-    final userId = await SessionService.getUserId();
+    final token = await SessionService.getToken();
     return {
       'Content-Type': 'application/json',
-      if (userId != null) 'x-user-id': userId,
+      if (token != null) 'Authorization': 'Bearer $token',
     };
   }
 
@@ -49,14 +61,19 @@ class ApiService {
     final message = body is Map && body['error'] != null
         ? body['error'].toString()
         : response.body;
+
+    if (response.statusCode == 401 && body is Map && body['code'] == 'TOKEN_EXPIRED') {
+      throw TokenExpiredException(message);
+    }
+
     throw Exception(message);
   }
 
-  static Future<Map<String, dynamic>> loginUser(String phone) async {
+  static Future<Map<String, dynamic>> firebaseLogin(String firebaseToken) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/auth/login'),
+      Uri.parse('$baseUrl/auth/firebase-login'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'phone': phone}),
+      body: jsonEncode({'firebaseToken': firebaseToken}),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -65,8 +82,11 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<Map<String, dynamic>> getUser(String userId) async {
-    final response = await http.get(Uri.parse('$baseUrl/auth/users/$userId'));
+  static Future<Map<String, dynamic>> getMe() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/auth/me'),
+      headers: await _authHeaders(),
+    );
 
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
@@ -74,15 +94,14 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<Map<String, dynamic>> updateUserProfile(
-    String userId, {
+  static Future<Map<String, dynamic>> updateMyProfile({
     String? name,
     String? role,
     String? societyId,
     String? flatId,
   }) async {
     final response = await http.patch(
-      Uri.parse('$baseUrl/auth/users/$userId/profile'),
+      Uri.parse('$baseUrl/auth/me/profile'),
       headers: await _authHeaders(),
       body: jsonEncode({
         if (name != null) 'name': name,
@@ -92,6 +111,28 @@ class ApiService {
       }),
     );
 
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      if (data['token'] != null) {
+        await SessionService.saveToken(data['token'] as String);
+      }
+      return Map<String, dynamic>.from(data['user'] as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> joinSociety({
+    required String inviteCode,
+    required String flatNumber,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/societies/join'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'inviteCode': inviteCode,
+        'flatNumber': flatNumber,
+      }),
+    );
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
     }
@@ -144,6 +185,10 @@ class ApiService {
     DateTime? availableAt,
     String? pickupLocation,
     String? imageUrl,
+    String? weightUnit,
+    String? weightValue,
+    List<String>? tags,
+    String? category,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/listings'),
@@ -158,6 +203,10 @@ class ApiService {
         if (availableAt != null) 'availableAt': availableAt.toIso8601String(),
         if (pickupLocation != null) 'pickupLocation': pickupLocation,
         if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
+        if (weightUnit != null && weightUnit.isNotEmpty) 'weightUnit': weightUnit,
+        if (weightValue != null && weightValue.isNotEmpty) 'weightValue': weightValue,
+        if (tags != null && tags.isNotEmpty) 'tags': tags,
+        if (category != null && category.isNotEmpty) 'category': category,
       }),
     );
 
@@ -218,6 +267,10 @@ class ApiService {
     String? pickupLocation,
     String? imageUrl,
     String? status,
+    String? weightUnit,
+    String? weightValue,
+    List<String>? tags,
+    String? category,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/listings/$listingId'),
@@ -231,6 +284,10 @@ class ApiService {
         if (pickupLocation != null) 'pickupLocation': pickupLocation,
         if (imageUrl != null) 'imageUrl': imageUrl,
         if (status != null) 'status': status,
+        if (weightUnit != null) 'weightUnit': weightUnit,
+        if (weightValue != null) 'weightValue': weightValue,
+        if (tags != null) 'tags': tags,
+        if (category != null) 'category': category,
       }),
     );
 
@@ -285,6 +342,18 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> getSellerStats() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/orders/seller/stats'),
+      headers: await _authHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<List<Map<String, dynamic>>> getListingReviews(
     String listingId,
   ) async {
@@ -321,6 +390,287 @@ class ApiService {
 
     if (response.statusCode == 201) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> markOrderPaid({
+    required String orderId,
+    String? upiTransactionRef,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/payments/$orderId/mark-paid'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        if (upiTransactionRef != null) 'upiTransactionRef': upiTransactionRef,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> confirmPayment({
+    required String orderId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/payments/$orderId/confirm'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getPaymentStatus({
+    required String orderId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/payments/$orderId'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  // ─── Admin APIs ───────────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> getAdminDashboard() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/dashboard'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminUsers({
+    String? search,
+    String? role,
+    int page = 1,
+  }) async {
+    final query = <String, String>{'page': '$page'};
+    if (search != null && search.isNotEmpty) query['search'] = search;
+    if (role != null && role.isNotEmpty) query['role'] = role;
+    final uri =
+        Uri.parse('$baseUrl/admin/users').replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      if (data is Map && data['users'] != null) {
+        return (data['users'] as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+      return (data as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateAdminUser(
+    String userId, {
+    String? role,
+    bool? suspended,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/users/$userId'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        if (role != null) 'role': role,
+        if (suspended != null) 'suspended': suspended,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminSocieties() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/societies'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response) as List;
+      return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> createAdminSociety({
+    required String name,
+    required String city,
+    required String inviteCode,
+    String? address,
+    String? state,
+    String? pincode,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/societies'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'name': name,
+        'city': city,
+        'inviteCode': inviteCode,
+        if (address != null) 'address': address,
+        if (state != null) 'state': state,
+        if (pincode != null) 'pincode': pincode,
+      }),
+    );
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateAdminSociety(
+    String societyId, {
+    String? name,
+    String? city,
+    String? address,
+    String? state,
+    String? pincode,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/societies/$societyId'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        if (name != null) 'name': name,
+        if (city != null) 'city': city,
+        if (address != null) 'address': address,
+        if (state != null) 'state': state,
+        if (pincode != null) 'pincode': pincode,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> regenerateInviteCode(
+    String societyId,
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/societies/$societyId/regenerate-code'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminListings({
+    String? search,
+    int page = 1,
+  }) async {
+    final query = <String, String>{'page': '$page'};
+    if (search != null && search.isNotEmpty) query['search'] = search;
+    final uri =
+        Uri.parse('$baseUrl/admin/listings').replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      if (data is Map && data['listings'] != null) {
+        return (data['listings'] as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+      return (data as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateAdminListing(
+    String listingId, {
+    String? status,
+    bool? featured,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/listings/$listingId'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        if (status != null) 'status': status,
+        if (featured != null) 'featured': featured,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminOrders({
+    String? status,
+    int page = 1,
+  }) async {
+    final query = <String, String>{'page': '$page'};
+    if (status != null && status.isNotEmpty) query['status'] = status;
+    final uri =
+        Uri.parse('$baseUrl/admin/orders').replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      if (data is Map && data['orders'] != null) {
+        return (data['orders'] as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+      return (data as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminReviews({
+    int page = 1,
+  }) async {
+    final uri = Uri.parse('$baseUrl/admin/reviews')
+        .replace(queryParameters: {'page': '$page'});
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      if (data is Map && data['reviews'] != null) {
+        return (data['reviews'] as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+      return (data as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminAuditLog({
+    int page = 1,
+  }) async {
+    final uri = Uri.parse('$baseUrl/admin/audit-log')
+        .replace(queryParameters: {'page': '$page'});
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      if (data is Map && data['logs'] != null) {
+        return (data['logs'] as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+      return (data as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     }
     _throwFromResponse(response);
   }

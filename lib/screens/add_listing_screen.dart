@@ -20,8 +20,12 @@ class _AddListingScreenState extends State<AddListingScreen> {
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
   final _qtyController = TextEditingController(text: '1');
+  final _weightPerUnitController = TextEditingController();
   final _descController = TextEditingController();
   String _pickup = 'My Home (Verified)';
+  String _weightUnit = 'portions';
+  String? _category;
+  List<String> _selectedTags = [];
   DateTime? _dateTime;
   bool _isSubmitting = false;
   Uint8List? _imageBytes;
@@ -40,6 +44,15 @@ class _AddListingScreenState extends State<AddListingScreen> {
       _priceController.text = listing.price.toStringAsFixed(0);
       _descController.text = listing.description;
       _existingImageUrl = listing.imageUrl;
+      _qtyController.text = listing.quantity.toString();
+      if (listing.weightValue != null) {
+        _weightPerUnitController.text = listing.weightValue!;
+      }
+      if (listing.weightUnit != null && listing.weightUnit!.isNotEmpty) {
+        _weightUnit = listing.weightUnit!;
+      }
+      _selectedTags = List<String>.from(listing.tags);
+      _category = listing.category;
     }
   }
 
@@ -48,6 +61,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
     _nameController.dispose();
     _priceController.dispose();
     _qtyController.dispose();
+    _weightPerUnitController.dispose();
     _descController.dispose();
     super.dispose();
   }
@@ -123,6 +137,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
           availableAt: _dateTime,
           pickupLocation: _pickup,
           imageUrl: imageUrl,
+          weightUnit: _weightUnit,
+          weightValue: _weightPerUnitController.text.trim(),
+          tags: _selectedTags,
+          category: _category,
         );
       } else {
         await ApiService.createListing(
@@ -134,6 +152,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
           availableAt: _dateTime,
           pickupLocation: _pickup,
           imageUrl: imageUrl,
+          weightUnit: _weightUnit,
+          weightValue: _weightPerUnitController.text.trim(),
+          tags: _selectedTags,
+          category: _category,
         );
       }
 
@@ -273,6 +295,80 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       ),
                       const SizedBox(height: 18),
                       _buildField(
+                        label: 'WEIGHT PER PORTION',
+                        child: TextFormField(
+                          controller: _weightPerUnitController,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'[\d.]')),
+                          ],
+                          decoration: _inputDeco('e.g. 250'),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      _buildField(
+                        label: 'UNIT / WEIGHT TYPE',
+                        child: Container(
+                          height: 52,
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border:
+                                Border.all(color: const Color(0xFFE0E5E3)),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _weightUnit,
+                              isExpanded: true,
+                              icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                                  color: Color(0xFF8A9491)),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF3A4644),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'portions',
+                                  child: Text('Portions / Servings'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'grams',
+                                  child: Text('Grams (g)'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'kg',
+                                  child: Text('Kilograms (kg)'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'ml',
+                                  child: Text('Millilitres (ml)'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'litres',
+                                  child: Text('Litres (L)'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'pieces',
+                                  child: Text('Pieces'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'packs',
+                                  child: Text('Packs'),
+                                ),
+                              ],
+                              onChanged: (v) {
+                                if (v != null) setState(() => _weightUnit = v);
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      _buildField(
                         label: 'DATE/TIME AVAILABLE',
                         child: GestureDetector(
                           onTap: _pickDateTime,
@@ -376,6 +472,61 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 18),
+                      _buildField(
+                        label: 'CATEGORY',
+                        child: Container(
+                          height: 52,
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border:
+                                Border.all(color: const Color(0xFFE0E5E3)),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _category,
+                              isExpanded: true,
+                              hint: const Text(
+                                'Select a category',
+                                style: TextStyle(
+                                  color: Color(0xFFADB5B2),
+                                  fontSize: 15,
+                                ),
+                              ),
+                              icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                                  color: Color(0xFF8A9491)),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF3A4644),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              items: const [
+                                DropdownMenuItem(value: 'Breakfast', child: Text('Breakfast')),
+                                DropdownMenuItem(value: 'Lunch', child: Text('Lunch')),
+                                DropdownMenuItem(value: 'Dinner', child: Text('Dinner')),
+                                DropdownMenuItem(value: 'Snacks', child: Text('Snacks')),
+                                DropdownMenuItem(value: 'Desserts', child: Text('Desserts')),
+                                DropdownMenuItem(value: 'Beverages', child: Text('Beverages')),
+                                DropdownMenuItem(value: 'Healthy', child: Text('Healthy')),
+                                DropdownMenuItem(value: 'Jain', child: Text('Jain')),
+                                DropdownMenuItem(value: 'Kids', child: Text('Kids')),
+                                DropdownMenuItem(value: 'Homemade Specials', child: Text('Homemade Specials')),
+                              ],
+                              onChanged: (v) {
+                                setState(() => _category = v);
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      _buildField(
+                        label: 'FOOD TAGS',
+                        child: _buildTagChips(),
+                      ),
                       const SizedBox(height: 28),
                       SizedBox(
                         width: double.infinity,
@@ -416,6 +567,62 @@ class _AddListingScreenState extends State<AddListingScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  static const _availableTags = [
+    'Vegetarian',
+    'Non-Vegetarian',
+    'Egg',
+    'Vegan',
+    'Mild',
+    'Medium Spicy',
+    'Spicy',
+    'Extra Spicy',
+    'Homemade',
+    'No Preservatives',
+    'Organic',
+    'Sugar Free',
+    'Gluten Free',
+    'Fresh',
+    'Slow Cooked',
+  ];
+
+  Widget _buildTagChips() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _availableTags.map((tag) {
+        final isSelected = _selectedTags.contains(tag);
+        return FilterChip(
+          label: Text(tag),
+          selected: isSelected,
+          onSelected: (selected) {
+            setState(() {
+              if (selected) {
+                _selectedTags.add(tag);
+              } else {
+                _selectedTags.remove(tag);
+              }
+            });
+          },
+          selectedColor: const Color(0xFFD6F0E4),
+          checkmarkColor: const Color(0xFF0E5A47),
+          backgroundColor: const Color(0xFFF5F7F6),
+          side: BorderSide(
+            color: isSelected
+                ? const Color(0xFF0E5A47)
+                : const Color(0xFFE0E5E3),
+          ),
+          labelStyle: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isSelected
+                ? const Color(0xFF0E5A47)
+                : const Color(0xFF3A4644),
+          ),
+        );
+      }).toList(),
     );
   }
 

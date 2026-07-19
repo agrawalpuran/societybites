@@ -22,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String? _error;
   String _searchQuery = '';
+  String? _selectedCategory;
 
   @override
   void initState() {
@@ -42,14 +43,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<FoodItem> get _filteredListings {
-    if (_searchQuery.isEmpty) return _listings;
-    final q = _searchQuery.toLowerCase();
-    return _listings.where((food) {
-      return food.name.toLowerCase().contains(q) ||
-          food.sellerName.toLowerCase().contains(q) ||
-          food.description.toLowerCase().contains(q) ||
-          food.block.toLowerCase().contains(q);
-    }).toList();
+    var results = _listings;
+
+    if (_selectedCategory != null && _selectedCategory != 'All') {
+      results = results
+          .where((food) => food.category == _selectedCategory)
+          .toList();
+    }
+
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      results = results.where((food) {
+        return food.name.toLowerCase().contains(q) ||
+            food.sellerName.toLowerCase().contains(q) ||
+            food.description.toLowerCase().contains(q) ||
+            food.block.toLowerCase().contains(q) ||
+            food.tags.any((tag) => tag.toLowerCase().contains(q));
+      }).toList();
+    }
+
+    return results;
   }
 
   List<Seller> get _sellers => sellersFromListings(_filteredListings);
@@ -79,8 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _listings = [];
         _error =
-            'Could not load listings from the server. '
-            'Make sure the backend is running (npm run dev), then pull to refresh.\n\n$e';
+            'Could not load listings. Please check your internet connection and try again.';
         _isLoading = false;
       });
     }
@@ -94,6 +106,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _addToCart(FoodItem food) {
+    final currentInCart = _cart
+        .where((c) => c.food.id == food.id)
+        .fold<int>(0, (sum, c) => sum + c.quantity);
+    if (currentInCart >= food.quantity) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Only ${food.quantity} available for ${food.name}'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: const Color(0xFFD94F4F),
+        ),
+      );
+      return;
+    }
     setState(() {
       final existing = _cart.indexWhere((c) => c.food.id == food.id);
       if (existing != -1) {
@@ -111,6 +139,24 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
+  }
+
+  void _removeFromCart(FoodItem food) {
+    setState(() {
+      final existing = _cart.indexWhere((c) => c.food.id == food.id);
+      if (existing != -1) {
+        if (_cart[existing].quantity > 1) {
+          _cart[existing].quantity--;
+        } else {
+          _cart.removeAt(existing);
+        }
+      }
+    });
+  }
+
+  int _cartQtyFor(FoodItem food) {
+    final idx = _cart.indexWhere((c) => c.food.id == food.id);
+    return idx != -1 ? _cart[idx].quantity : 0;
   }
 
   void _openDetail(FoodItem food) {
@@ -183,6 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               SliverToBoxAdapter(child: _buildSearchBar()),
+              SliverToBoxAdapter(child: _buildCategoryChips()),
               if (_sellers.isNotEmpty)
                 SliverToBoxAdapter(child: _buildSellersSection()),
               if (_specials.isNotEmpty)
@@ -211,13 +258,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
               },
               backgroundColor: const Color(0xFF0E5A47),
-              icon: const Icon(Icons.shopping_bag_rounded, size: 20),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.shopping_bag_rounded, size: 20, color: Colors.white),
               label: Text(
-                '${_cart.fold<int>(0, (sum, c) => sum + c.quantity)} items',
-                style: const TextStyle(fontWeight: FontWeight.w700),
+                '${_cart.fold<int>(0, (sum, c) => sum + c.quantity)} items  •  ₹${_cart.fold<double>(0, (sum, c) => sum + c.total).toStringAsFixed(0)}',
+                style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
               ),
             )
           : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
@@ -281,6 +330,72 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: Color(0xFF3A4644), size: 20),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  static const _categories = [
+    'All',
+    'Breakfast',
+    'Lunch',
+    'Dinner',
+    'Snacks',
+    'Desserts',
+    'Beverages',
+    'Healthy',
+    'Jain',
+    'Kids',
+    'Homemade Specials',
+  ];
+
+  Widget _buildCategoryChips() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 0),
+      child: SizedBox(
+        height: 38,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: _categories.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (_, i) {
+            final cat = _categories[i];
+            final isSelected =
+                (_selectedCategory == null && cat == 'All') ||
+                _selectedCategory == cat;
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedCategory = cat == 'All' ? null : cat;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFF0E5A47)
+                      : const Color(0xFFF5F7F6),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF0E5A47)
+                        : const Color(0xFFE0E5E3),
+                  ),
+                ),
+                child: Text(
+                  cat,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected
+                        ? Colors.white
+                        : const Color(0xFF3A4644),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -373,7 +488,9 @@ class _HomeScreenState extends State<HomeScreen> {
             separatorBuilder: (context, index) => const SizedBox(width: 14),
             itemBuilder: (_, i) => _SpecialCard(
               food: _specials[i],
+              cartQty: _cartQtyFor(_specials[i]),
               onAdd: () => _addToCart(_specials[i]),
+              onRemove: () => _removeFromCart(_specials[i]),
               onTap: () => _openDetail(_specials[i]),
             ),
           ),
@@ -418,7 +535,9 @@ class _HomeScreenState extends State<HomeScreen> {
       delegate: SliverChildBuilderDelegate(
         (context, i) => _AvailableItemTile(
           food: _available[i],
+          cartQty: _cartQtyFor(_available[i]),
           onAdd: () => _addToCart(_available[i]),
+          onRemove: () => _removeFromCart(_available[i]),
           onTap: () => _openDetail(_available[i]),
         ),
         childCount: _available.length,
@@ -470,12 +589,16 @@ class _SellerChip extends StatelessWidget {
 class _SpecialCard extends StatelessWidget {
   const _SpecialCard({
     required this.food,
+    required this.cartQty,
     required this.onAdd,
+    required this.onRemove,
     required this.onTap,
   });
 
   final FoodItem food;
+  final int cartQty;
   final VoidCallback onAdd;
+  final VoidCallback onRemove;
   final VoidCallback onTap;
 
   @override
@@ -510,7 +633,7 @@ class _SpecialCard extends StatelessWidget {
                         color: isDark ? Colors.amber : Colors.amber.shade700),
                     const SizedBox(width: 3),
                     Text(
-                      food.rating.toString(),
+                      food.rating > 0 ? food.rating.toString() : 'New',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -572,25 +695,76 @@ class _SpecialCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  GestureDetector(
-                    onTap: onAdd,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0E5A47),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        'Add',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
+                  food.quantity <= 0
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD94F4F),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'SOLD OUT',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        )
+                      : cartQty == 0
+                          ? GestureDetector(
+                              onTap: onAdd,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0E5A47),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'Add',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0E5A47),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  GestureDetector(
+                                    onTap: onRemove,
+                                    child: const Icon(Icons.remove, size: 18, color: Colors.white),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    child: Text(
+                                      '$cartQty',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: onAdd,
+                                    child: const Icon(Icons.add, size: 18, color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ),
                 ],
               ),
             ),
@@ -604,12 +778,16 @@ class _SpecialCard extends StatelessWidget {
 class _AvailableItemTile extends StatelessWidget {
   const _AvailableItemTile({
     required this.food,
+    required this.cartQty,
     required this.onAdd,
+    required this.onRemove,
     required this.onTap,
   });
 
   final FoodItem food;
+  final int cartQty;
   final VoidCallback onAdd;
+  final VoidCallback onRemove;
   final VoidCallback onTap;
 
   @override
@@ -677,7 +855,7 @@ class _AvailableItemTile extends StatelessWidget {
                           size: 14, color: Colors.amber),
                       const SizedBox(width: 2),
                       Text(
-                        food.rating.toString(),
+                        food.rating > 0 ? food.rating.toString() : 'New',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -714,17 +892,76 @@ class _AvailableItemTile extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      GestureDetector(
-                        onTap: onTap,
-                        child: const Text(
-                          'View Details',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF0E5A47),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
+                      food.quantity <= 0
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD94F4F),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'SOLD OUT',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            )
+                          : cartQty == 0
+                              ? GestureDetector(
+                                  onTap: onAdd,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0E5A47),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Text(
+                                      'Add',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0E5A47),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      GestureDetector(
+                                        onTap: onRemove,
+                                        child: const Icon(Icons.remove, size: 16, color: Colors.white),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                                        child: Text(
+                                          '$cartQty',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: onAdd,
+                                        child: const Icon(Icons.add, size: 16, color: Colors.white),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                     ],
                   ),
                 ],

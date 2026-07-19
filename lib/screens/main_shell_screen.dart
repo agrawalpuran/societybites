@@ -17,6 +17,7 @@ class MainShellScreen extends StatefulWidget {
 
 class _MainShellScreenState extends State<MainShellScreen> {
   late int _navIndex;
+  final _ordersKey = GlobalKey<OrdersScreenState>();
 
   @override
   void initState() {
@@ -26,6 +27,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
   void _selectTab(int index) {
     setState(() => _navIndex = index);
+    if (index == 1) {
+      _ordersKey.currentState?.refresh();
+    }
   }
 
   @override
@@ -35,7 +39,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
         index: _navIndex,
         children: [
           const HomeScreen(),
-          OrdersScreen(onExploreHome: () => _selectTab(0)),
+          OrdersScreen(key: _ordersKey, onExploreHome: () => _selectTab(0)),
           const SellerDashboardScreen(),
           ProfileScreen(onSelectTab: _selectTab),
         ],

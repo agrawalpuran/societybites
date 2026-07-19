@@ -9,6 +9,7 @@ class SessionService {
   static const _flatIdKey = 'flat_id';
   static const _flatNumberKey = 'flat_number';
   static const _roleKey = 'user_role';
+  static const _jwtKey = 'auth_token';
 
   static const defaultSocietyId = 'prestige-notting-hill';
   static const defaultSocietyName = 'Prestige Notting Hill';
@@ -118,6 +119,16 @@ class SessionService {
         societyId != null &&
         flatId != null &&
         flatId.isNotEmpty;
+  }
+
+  static Future<void> saveToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_jwtKey, token);
+  }
+
+  static Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_jwtKey);
   }
 
   static Future<void> clear() async {

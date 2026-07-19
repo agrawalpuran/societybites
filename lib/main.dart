@@ -33,6 +33,11 @@ class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
   Future<Widget> _resolveStartScreen() async {
+    final token = await SessionService.getToken();
+    if (token == null) {
+      return const LoginScreen();
+    }
+
     if (await SessionService.isOnboarded()) {
       return const MainShellScreen();
     }

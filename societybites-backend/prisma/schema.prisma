@@ -8,11 +8,16 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  phone     String   @unique
-  name      String?
-  role      String   @default("buyer")
-  createdAt DateTime @default(now())
+  id              String   @id @default(uuid())
+  phone           String   @unique
+  name            String?
+  role            String   @default("buyer")
+  profilePhotoUrl String?
+  upiId           String?
+  upiDisplayName  String?
+  paymentEnabled  Boolean  @default(false)
+  suspended       Boolean  @default(false)
+  createdAt       DateTime @default(now())
 
   societyId String?
   flatId    String?
@@ -20,15 +25,22 @@ model User {
   society Society? @relation(fields: [societyId], references: [id])
   flat    Flat?    @relation(fields: [flatId], references: [id])
 
-  listings Listing[]
-  orders   Order[]  @relation("BuyerOrders")
-  reviews  Review[]
+  listings  Listing[]
+  orders    Order[]    @relation("BuyerOrders")
+  reviews   Review[]
+  auditLogs AuditLog[] @relation("AdminLogs")
 }
 
 model Society {
-  id    String @id @default(uuid())
-  name  String
-  city  String
+  id         String  @id @default(uuid())
+  name       String
+  city       String
+  inviteCode String  @unique
+  address    String?
+  state      String?
+  pincode    String?
+  logoUrl    String?
+  status     String  @default("active")
 
   users    User[]
   blocks   Block[]
@@ -67,10 +79,15 @@ model Listing {
   description    String?
   price          Float
   quantity       Int       @default(1)
+  weightUnit     String?
+  weightValue    String?
+  tags           String[]  @default([])
+  category       String?
   availableAt    DateTime?
   pickupLocation String    @default("My Home (Verified)")
   imageUrl       String?
   status         String    @default("active")
+  featured       Boolean   @default(false)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -78,25 +95,41 @@ model Listing {
   society    Society     @relation(fields: [societyId], references: [id])
   orderItems OrderItem[]
   reviews    Review[]
+
+  @@index([societyId, status])
+  @@index([sellerId])
 }
 
 model Order {
-  id             String   @id @default(uuid())
-  orderNumber    String   @unique
+  id             String    @id @default(uuid())
+  orderNumber    String    @unique
   buyerId        String
   societyId      String
-  status         String   @default("ordered")
-  paymentMethod  String   @default("upi")
+  status         String    @default("pending")
+  paymentMethod  String    @default("upi")
   subtotal       Float
-  communityFee   Float    @default(10)
+  communityFee   Float     @default(10)
   total          Float
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  acceptedAt     DateTime?
+  preparingAt    DateTime?
+  readyAt        DateTime?
+  pickedUpAt     DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+  paymentStatus          String    @default("pending")
+  buyerMarkedPaidAt      DateTime?
+  sellerConfirmedPaidAt  DateTime?
+  upiTransactionRef      String?
 
   buyer   User        @relation("BuyerOrders", fields: [buyerId], references: [id])
   society Society     @relation(fields: [societyId], references: [id])
   items   OrderItem[]
   reviews Review[]
+
+  @@index([buyerId, createdAt])
+  @@index([societyId, status])
 }
 
 model OrderItem {
@@ -108,6 +141,9 @@ model OrderItem {
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   listing Listing @relation(fields: [listingId], references: [id])
+
+  @@index([orderId])
+  @@index([listingId])
 }
 
 model Review {
@@ -119,11 +155,24 @@ model Review {
   comment         String?
   tags            String[]
   wouldOrderAgain Boolean  @default(true)
+  hidden          Boolean  @default(false)
   createdAt       DateTime @default(now())
 
   order    Order   @relation(fields: [orderId], references: [id])
   listing  Listing @relation(fields: [listingId], references: [id])
   reviewer User    @relation(fields: [reviewerId], references: [id])
 
+  @@index([listingId])
   @@unique([orderId, reviewerId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  adminId   String
+  action    String
+  target    String?
+  details   String?
+  createdAt DateTime @default(now())
+
+  admin User @relation("AdminLogs", fields: [adminId], references: [id])
 }

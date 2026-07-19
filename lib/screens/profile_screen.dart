@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../widgets/app_header.dart';
+import 'admin/admin_shell_screen.dart';
+import 'legal_screen.dart';
 import 'login_screen.dart';
 import 'orders_screen.dart';
 import 'seller_dashboard_screen.dart';
@@ -45,7 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final userId = await SessionService.getUserId();
     if (userId != null) {
       try {
-        final profile = await ApiService.getUser(userId);
+        final profile = await ApiService.getMe();
         await SessionService.cacheProfileFromApi(profile);
         _name = profile['name'] as String? ?? _name;
         _role = profile['role'] as String? ?? _role;
@@ -140,9 +142,133 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature — coming soon')),
+  Future<void> _editProfile() async {
+    final nameController = TextEditingController(text: _name ?? '');
+    final newName = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            24,
+            24,
+            24 + MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Edit Profile',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF101617),
+                ),
+              ),
+              const SizedBox(height: 18),
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Name',
+                  filled: true,
+                  fillColor: const Color(0xFFF5F7F6),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFF0E5A47)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () =>
+                      Navigator.pop(ctx, nameController.text.trim()),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0E5A47),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Save',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (newName == null || newName.isEmpty || !mounted) return;
+
+    try {
+      await ApiService.updateMyProfile(name: newName);
+      await _loadProfile();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update profile: $e')),
+      );
+    }
+  }
+
+  void _openLegal(String title, String content) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LegalScreen(title: title, content: content),
+      ),
+    );
+  }
+
+  void _showAbout() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'SocietyBites',
+          style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0E5A47)),
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Version 1.0.0', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF3A4644))),
+            SizedBox(height: 12),
+            Text(
+              'A hyperlocal food marketplace for gated communities.',
+              style: TextStyle(color: Color(0xFF6A7774), height: 1.4),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close', style: TextStyle(color: Color(0xFF0E5A47))),
+          ),
+        ],
+      ),
     );
   }
 
@@ -199,6 +325,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 10),
                           _MenuTile(
+                            icon: Icons.edit_rounded,
+                            title: 'Edit Profile',
+                            subtitle: 'Update your display name',
+                            onTap: _editProfile,
+                          ),
+                          _MenuTile(
                             icon: Icons.receipt_long_rounded,
                             title: 'My Orders',
                             subtitle: 'Track active and past orders',
@@ -223,6 +355,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             subtitle: 'List food and manage orders',
                             onTap: _openSellerDashboard,
                           ),
+                          if (_role == 'super_admin')
+                            _MenuTile(
+                              icon: Icons.admin_panel_settings_rounded,
+                              title: 'Admin Portal',
+                              subtitle: 'Manage platform settings',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const AdminShellScreen(),
+                                  ),
+                                );
+                              },
+                            ),
                           const SizedBox(height: 20),
                           const Text(
                             'SUPPORT',
@@ -238,17 +384,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             icon: Icons.help_outline_rounded,
                             title: 'Help Center',
                             subtitle: 'FAQs and community support',
-                            onTap: () => _showComingSoon('Help Center'),
+                            onTap: () => _openLegal('Help Center',
+                              'SocietyBites Help Center\n\n'
+                              'Need help? We\'re here for you.\n\n'
+                              'Common Questions:\n'
+                              '• How do I place an order? Browse listings on the home screen, add items to your cart, and checkout.\n'
+                              '• How do I become a seller? Go to Profile > Seller Dashboard and add your first listing.\n'
+                              '• How do payments work? Buyers pay via UPI or cash on pickup. Sellers receive payments directly.\n'
+                              '• How do I change my society? Society cannot be changed after joining. Contact support for assistance.\n\n'
+                              'Still need help?\n'
+                              'Email us at support@societybites.in\n'
+                              'We typically respond within 24 hours.',
+                            ),
                           ),
                           _MenuTile(
                             icon: Icons.privacy_tip_outlined,
                             title: 'Privacy Policy',
-                            onTap: () => _showComingSoon('Privacy Policy'),
+                            onTap: () => _openLegal('Privacy Policy',
+                              'SocietyBites Privacy Policy\n\n'
+                              'Last updated: July 2026\n\n'
+                              'SocietyBites collects and processes the following information:\n'
+                              '• Phone number (for authentication)\n'
+                              '• Name (for identification within your society)\n'
+                              '• Flat and block number (for delivery coordination)\n'
+                              '• UPI ID (for sellers, to receive payments)\n'
+                              '• Order history\n\n'
+                              'Your data is:\n'
+                              '• Never sold to third parties\n'
+                              '• Only shared within your apartment society\n'
+                              '• Stored securely on encrypted servers\n'
+                              '• Deleted upon request\n\n'
+                              'For questions: support@societybites.in',
+                            ),
                           ),
                           _MenuTile(
                             icon: Icons.description_outlined,
                             title: 'Terms of Service',
-                            onTap: () => _showComingSoon('Terms of Service'),
+                            onTap: () => _openLegal('Terms of Service',
+                              'SocietyBites Terms of Service\n\n'
+                              'Last updated: July 2026\n\n'
+                              'By using SocietyBites, you agree to:\n'
+                              '• Provide accurate information about your residence\n'
+                              '• Not misuse the platform for commercial resale\n'
+                              '• Maintain food safety and hygiene standards (sellers)\n'
+                              '• Complete payments for accepted orders (buyers)\n'
+                              '• Not share your account credentials\n\n'
+                              'SocietyBites is a community platform. We reserve the right to suspend accounts that violate community guidelines.\n\n'
+                              'For disputes: support@societybites.in',
+                            ),
+                          ),
+                          _MenuTile(
+                            icon: Icons.info_outline_rounded,
+                            title: 'About',
+                            subtitle: 'App version and info',
+                            onTap: _showAbout,
                           ),
                           const SizedBox(height: 28),
                           SizedBox(
@@ -358,6 +547,18 @@ class _ProfileCard extends StatelessWidget {
                     if (societyName != null) _Chip(label: societyName!),
                   ],
                 ),
+                if (societyName != null) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Society cannot be changed after joining',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF8A9491),
+                      fontWeight: FontWeight.w500,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

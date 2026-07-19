@@ -30,8 +30,15 @@ class FoodItem {
   final String description;
   final String? imageUrl;
   final String? imageCacheKey;
+  final int quantity;
+  final String? weightUnit;
+  final String? weightValue;
+  final List<String> tags;
+  final String? category;
+  final int reviewCount;
   final IconData icon;
   final Color bgColor;
+  final String? sellerUpiId;
 
   const FoodItem({
     required this.id,
@@ -45,8 +52,15 @@ class FoodItem {
     required this.description,
     this.imageUrl,
     this.imageCacheKey,
+    this.quantity = 1,
+    this.weightUnit,
+    this.weightValue,
+    this.tags = const [],
+    this.category,
+    this.reviewCount = 0,
     required this.icon,
     required this.bgColor,
+    this.sellerUpiId,
   });
 
   static const _icons = [
@@ -83,13 +97,20 @@ class FoodItem {
       sellerName: (json['sellerName'] as String?) ?? 'Neighbor',
       block: (json['block'] as String?) ?? 'Block ?',
       price: (json['price'] as num).toDouble(),
-      rating: 4.8,
+      rating: (json['avgRating'] as num?)?.toDouble() ?? 0,
       pickupTime: _formatPickupTime(availableAt),
       description: (json['description'] as String?) ?? '',
       imageUrl: json['imageUrl'] as String?,
       imageCacheKey: json['updatedAt'] as String?,
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      weightUnit: json['weightUnit'] as String?,
+      weightValue: json['weightValue'] as String?,
+      tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      category: json['category'] as String?,
+      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
       icon: _icons[hash % _icons.length],
       bgColor: _colors[hash % _colors.length],
+      sellerUpiId: json['sellerUpiId'] as String?,
     );
   }
 
@@ -114,20 +135,34 @@ class CartItem {
 
 class Review {
   final String name;
+  final String? flatNumber;
+  final String? block;
   final double rating;
   final String comment;
   final List<String> tags;
 
   const Review({
     required this.name,
+    this.flatNumber,
+    this.block,
     required this.rating,
     required this.comment,
     required this.tags,
   });
 
+  String get displayName {
+    final parts = <String>[name];
+    if (flatNumber != null && flatNumber!.isNotEmpty) {
+      parts.add('Flat $flatNumber');
+    }
+    return parts.join(', ');
+  }
+
   factory Review.fromJson(Map<String, dynamic> json) {
     return Review(
       name: (json['name'] as String?) ?? 'Neighbor',
+      flatNumber: json['flatNumber'] as String?,
+      block: json['block'] as String?,
       rating: (json['rating'] as num).toDouble(),
       comment: (json['comment'] as String?) ?? '',
       tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
@@ -172,22 +207,26 @@ class Order {
   final String orderId;
   final List<OrderLineItem> items;
   final String date;
+  final String status;
   final int statusStep;
   final double orderTotal;
   final double subtotal;
   final double communityFee;
   final String? paymentMethod;
+  final String paymentStatus;
 
   const Order({
     required this.id,
     required this.orderId,
     required this.items,
     required this.date,
+    required this.status,
     required this.statusStep,
     required this.orderTotal,
     required this.subtotal,
     required this.communityFee,
     this.paymentMethod,
+    this.paymentStatus = 'pending',
   });
 
   FoodItem get food =>
@@ -250,11 +289,13 @@ class Order {
       orderId: (json['orderId'] as String?) ?? (json['orderNumber'] as String),
       items: items,
       date: date,
+      status: (json['status'] as String?) ?? 'pending',
       statusStep: (json['statusStep'] as num?)?.toInt() ?? 0,
       orderTotal: apiTotal ?? computedSubtotal,
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? computedSubtotal,
       communityFee: (json['communityFee'] as num?)?.toDouble() ?? 0,
       paymentMethod: json['paymentMethod'] as String?,
+      paymentStatus: (json['paymentStatus'] as String?) ?? 'pending',
     );
   }
 
@@ -271,7 +312,7 @@ class Order {
   }
 }
 
-Seller sellerFromListing(FoodItem food, {double rating = 4.8}) {
+Seller sellerFromListing(FoodItem food, {double? rating}) {
   final hash = food.sellerId.hashCode.abs();
   const avatarIcons = [
     Icons.person,
@@ -292,7 +333,7 @@ Seller sellerFromListing(FoodItem food, {double rating = 4.8}) {
     id: food.sellerId,
     name: food.sellerName,
     block: food.block,
-    rating: rating,
+    rating: rating ?? food.rating,
     avatarIcon: avatarIcons[hash % avatarIcons.length],
     avatarColor: avatarColors[hash % avatarColors.length],
   );

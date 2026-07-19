@@ -17,11 +17,21 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
   List<Order> _activeOrders = [];
   bool _isLoading = true;
   String? _error;
+  Map<String, dynamic> _stats = {};
 
   @override
   void initState() {
     super.initState();
     _loadOrders();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    try {
+      final stats = await ApiService.getSellerStats();
+      if (!mounted) return;
+      setState(() => _stats = stats);
+    } catch (_) {}
   }
 
   Future<void> _loadOrders() async {
@@ -38,7 +48,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
       setState(() {
         _activeOrders =
-            parsed.where((o) => o.statusStep >= 0 && o.statusStep < 3).toList();
+            parsed.where((o) => o.status != 'completed' && o.status != 'cancelled').toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -78,12 +88,20 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   String _statusLabel(String status) {
     switch (status) {
+      case 'pending':
+        return 'Pending';
+      case 'accepted':
+        return 'Accepted';
       case 'preparing':
         return 'Preparing';
       case 'ready':
         return 'Ready for pickup';
+      case 'picked_up':
+        return 'Picked up';
       case 'completed':
         return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
       default:
         return status;
     }
@@ -186,13 +204,16 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
       child: Column(
         children: [
-          _OrdersStatCard(count: _activeOrders.length),
+          _OrdersStatCard(
+            count: _activeOrders.length,
+            activeListings: (_stats['activeListings'] as num?)?.toInt(),
+          ),
           const SizedBox(height: 12),
           Row(
-            children: const [
-              Expanded(child: _EarningsCard()),
-              SizedBox(width: 12),
-              Expanded(child: _SatisfactionCard()),
+            children: [
+              Expanded(child: _EarningsCard(amount: (_stats['todayRevenue'] as num?)?.toDouble() ?? 0)),
+              const SizedBox(width: 12),
+              Expanded(child: _SatisfactionCard(rating: (_stats['avgRating'] as num?)?.toDouble() ?? 0)),
             ],
           ),
         ],
@@ -300,7 +321,11 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
             SizedBox(
               height: 44,
               child: OutlinedButton(
-                onPressed: () {},
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('This feature is coming soon')),
+                  );
+                },
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF0E5A47), width: 1.5),
                   shape: RoundedRectangleBorder(
@@ -391,9 +416,10 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
 }
 
 class _OrdersStatCard extends StatelessWidget {
-  const _OrdersStatCard({required this.count});
+  const _OrdersStatCard({required this.count, this.activeListings});
 
   final int count;
+  final int? activeListings;
 
   @override
   Widget build(BuildContext context) {
@@ -461,9 +487,11 @@ class _OrdersStatCard extends StatelessWidget {
                     color: const Color(0xFFE0F0EA),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Text(
-                    '+20%',
-                    style: TextStyle(
+                  child: Text(
+                    activeListings != null
+                        ? '$activeListings listed'
+                        : '0 listed',
+                    style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFF0E5A47),
@@ -480,7 +508,9 @@ class _OrdersStatCard extends StatelessWidget {
 }
 
 class _EarningsCard extends StatelessWidget {
-  const _EarningsCard();
+  const _EarningsCard({this.amount = 0});
+
+  final double amount;
 
   @override
   Widget build(BuildContext context) {
@@ -527,9 +557,9 @@ class _EarningsCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          const Text(
-            '₹1,200',
-            style: TextStyle(
+          Text(
+            '₹${amount.toStringAsFixed(0)}',
+            style: const TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w800,
               color: Color(0xFF101617),
@@ -550,7 +580,9 @@ class _EarningsCard extends StatelessWidget {
 }
 
 class _SatisfactionCard extends StatelessWidget {
-  const _SatisfactionCard();
+  const _SatisfactionCard({this.rating = 0});
+
+  final double rating;
 
   @override
   Widget build(BuildContext context) {
@@ -578,16 +610,16 @@ class _SatisfactionCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
-            children: const [
+            children: [
               Text(
-                '4.9',
-                style: TextStyle(
+                rating > 0 ? rating.toString() : '—',
+                style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF101617),
                 ),
               ),
-              Text(
+              const Text(
                 '/5',
                 style: TextStyle(
                   fontSize: 16,
@@ -626,6 +658,7 @@ class _ActiveOrderCard extends StatefulWidget {
 
 class _ActiveOrderCardState extends State<_ActiveOrderCard> {
   bool _isUpdating = false;
+  bool _isConfirmingPayment = false;
 
   Future<void> _handleAction(String nextStatus) async {
     setState(() => _isUpdating = true);
@@ -638,12 +671,28 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
     }
   }
 
+  Future<void> _confirmPayment() async {
+    setState(() => _isConfirmingPayment = true);
+    try {
+      await ApiService.confirmPayment(orderId: widget.order.id);
+      await widget.onAction(widget.order, widget.order.status);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not confirm payment: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isConfirmingPayment = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
-    final isPrep = order.statusStep == 1;
-    final isOrdered = order.statusStep == 0;
-    final isReady = order.statusStep == 2;
+    final isPending = order.status == 'pending';
+    final isAccepted = order.status == 'accepted';
+    final isPrep = order.status == 'preparing';
+    final isReady = order.status == 'ready';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -711,11 +760,13 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                 child: Text(
                   isPrep
                       ? 'IN PREP'
-                      : isOrdered
-                          ? 'RECEIVED'
-                          : isReady
-                              ? 'READY'
-                              : 'ACTIVE',
+                      : isPending
+                          ? 'NEW'
+                          : isAccepted
+                              ? 'ACCEPTED'
+                              : isReady
+                                  ? 'READY'
+                                  : 'ACTIVE',
                   style: TextStyle(
                     fontSize: 11,
                     letterSpacing: 0.6,
@@ -726,8 +777,41 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
+              _PaymentBadge(paymentStatus: order.paymentStatus),
             ],
           ),
+          if (order.paymentStatus == 'buyer_marked_paid') ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: ElevatedButton.icon(
+                onPressed: _isConfirmingPayment ? null : _confirmPayment,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE85D04),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                icon: _isConfirmingPayment
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.check_circle_rounded, size: 18),
+                label: Text(
+                  _isConfirmingPayment ? 'Confirming...' : 'Confirm Payment',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [
@@ -740,8 +824,10 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                         : () {
                             if (isPrep) {
                               _handleAction('ready');
-                            } else if (isOrdered) {
+                            } else if (isAccepted) {
                               _handleAction('preparing');
+                            } else if (isPending) {
+                              _handleAction('accepted');
                             }
                           },
                     style: ElevatedButton.styleFrom(
@@ -765,7 +851,9 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                                 ? 'Awaiting pickup'
                                 : isPrep
                                     ? 'Mark Ready'
-                                    : 'Accept Order',
+                                    : isAccepted
+                                        ? 'Start Preparing'
+                                        : 'Accept Order',
                             style: const TextStyle(
                                 fontWeight: FontWeight.w700, fontSize: 13),
                           ),
@@ -787,6 +875,53 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PaymentBadge extends StatelessWidget {
+  const _PaymentBadge({required this.paymentStatus});
+
+  final String paymentStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    String label;
+    Color textColor;
+    Color bgColor;
+
+    switch (paymentStatus) {
+      case 'seller_confirmed':
+        label = 'PAID ✓';
+        textColor = const Color(0xFF0E5A47);
+        bgColor = const Color(0xFFE8F5EE);
+        break;
+      case 'buyer_marked_paid':
+        label = 'BUYER PAID';
+        textColor = const Color(0xFFB8860B);
+        bgColor = const Color(0xFFFFF8E8);
+        break;
+      default:
+        label = 'UNPAID';
+        textColor = const Color(0xFFD94F4F);
+        bgColor = const Color(0xFFFFF0F0);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          letterSpacing: 0.6,
+          fontWeight: FontWeight.w700,
+          color: textColor,
+        ),
       ),
     );
   }

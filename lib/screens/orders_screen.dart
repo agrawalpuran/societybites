@@ -5,6 +5,7 @@ import '../models/data.dart';
 import '../services/api_service.dart';
 import 'feedback_screen.dart';
 import 'food_detail_screen.dart';
+import 'payment_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key, this.onExploreHome});
@@ -13,10 +14,10 @@ class OrdersScreen extends StatefulWidget {
   final VoidCallback? onExploreHome;
 
   @override
-  State<OrdersScreen> createState() => _OrdersScreenState();
+  OrdersScreenState createState() => OrdersScreenState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen>
+class OrdersScreenState extends State<OrdersScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Order> _activeOrders = [];
@@ -32,6 +33,8 @@ class _OrdersScreenState extends State<OrdersScreen>
     _loadOrders();
   }
 
+  void refresh() => _loadOrders();
+
   Future<void> _loadOrders() async {
     setState(() {
       _isLoading = true;
@@ -46,8 +49,8 @@ class _OrdersScreenState extends State<OrdersScreen>
 
       setState(() {
         _activeOrders =
-            parsed.where((o) => o.statusStep >= 0 && o.statusStep < 3).toList();
-        _pastOrders = parsed.where((o) => o.statusStep >= 3).toList();
+            parsed.where((o) => o.status != 'completed' && o.status != 'cancelled').toList();
+        _pastOrders = parsed.where((o) => o.status == 'completed' || o.status == 'cancelled').toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -199,7 +202,40 @@ class _ActiveOrderCard extends StatelessWidget {
   final Order order;
   final Future<void> Function() onRefresh;
 
-  static const _steps = ['Ordered', 'Preparing', 'Ready', 'Completed'];
+  static const _steps = ['Pending', 'Accepted', 'Preparing', 'Ready', 'Picked Up', 'Done'];
+
+  String get _paymentLabel {
+    switch (order.paymentStatus) {
+      case 'buyer_marked_paid':
+        return 'Awaiting Seller Confirmation';
+      case 'seller_confirmed':
+        return 'Payment Confirmed ✓';
+      default:
+        return 'Payment Pending';
+    }
+  }
+
+  Color get _paymentColor {
+    switch (order.paymentStatus) {
+      case 'seller_confirmed':
+        return const Color(0xFF0E5A47);
+      case 'buyer_marked_paid':
+        return const Color(0xFFB8860B);
+      default:
+        return const Color(0xFFD94F4F);
+    }
+  }
+
+  Color get _paymentBg {
+    switch (order.paymentStatus) {
+      case 'seller_confirmed':
+        return const Color(0xFFE8F5EE);
+      case 'buyer_marked_paid':
+        return const Color(0xFFFFF8E8);
+      default:
+        return const Color(0xFFFFF0F0);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +272,22 @@ class _ActiveOrderCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: _paymentBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              _paymentLabel,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: _paymentColor,
+              ),
+            ),
+          ),
           const SizedBox(height: 14),
           OrderItemsList(items: order.items),
           const SizedBox(height: 12),
@@ -243,11 +295,43 @@ class _ActiveOrderCard extends StatelessWidget {
           const SizedBox(height: 20),
           _StatusTracker(currentStep: order.statusStep, steps: _steps),
           const SizedBox(height: 18),
+          if (order.status == 'accepted' && order.paymentStatus == 'pending') ...[
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PaymentScreen(order: order),
+                    ),
+                  );
+                  if (result == true) await onRefresh();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE85D04),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+                icon: const Icon(Icons.payment_rounded, size: 18),
+                label: const Text('Pay Now',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           SizedBox(
             width: double.infinity,
             height: 48,
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('This feature is coming soon')),
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0E5A47),
                 foregroundColor: Colors.white,
@@ -261,7 +345,7 @@ class _ActiveOrderCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          if (order.statusStep == 2) ...[
+          if (order.status == 'ready') ...[
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -270,7 +354,7 @@ class _ActiveOrderCard extends StatelessWidget {
                   try {
                     await ApiService.updateOrderStatus(
                       orderId: order.id,
-                      status: 'completed',
+                      status: 'picked_up',
                     );
                     await onRefresh();
                   } catch (e) {
@@ -299,7 +383,11 @@ class _ActiveOrderCard extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('This feature is coming soon')),
+                );
+              },
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFFD4DBD8)),
                 shape: RoundedRectangleBorder(

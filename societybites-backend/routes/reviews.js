@@ -10,8 +10,8 @@ router.get(
   "/listing/:listingId",
   asyncHandler(async (req, res) => {
     const reviews = await prisma.review.findMany({
-      where: { listingId: req.params.listingId },
-      include: { reviewer: true },
+      where: { listingId: req.params.listingId, hidden: false },
+      include: { reviewer: { include: { flat: true } } },
       orderBy: { createdAt: "desc" },
     });
 
@@ -75,7 +75,7 @@ router.post(
         tags: Array.isArray(tags) ? tags : [],
         wouldOrderAgain: Boolean(wouldOrderAgain),
       },
-      include: { reviewer: true },
+      include: { reviewer: { include: { flat: true } } },
     });
 
     res.status(201).json(serializeReview(review));

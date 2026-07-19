@@ -1,16 +1,33 @@
 const prisma = require("../lib/prisma");
+const { verifyToken } = require("../lib/jwt");
 
 async function requireUser(req, res, next) {
-  const userId = req.header("x-user-id");
+  const authHeader = req.header("Authorization");
 
-  if (!userId) {
-    return res.status(401).json({ error: "Missing x-user-id header" });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing or invalid Authorization header" });
   }
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const token = authHeader.slice(7);
+
+  let payload;
+  try {
+    payload = verifyToken(token);
+  } catch (err) {
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({ error: "Token expired", code: "TOKEN_EXPIRED" });
+    }
+    return res.status(401).json({ error: "Invalid token" });
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: payload.userId } });
 
   if (!user) {
-    return res.status(401).json({ error: "Invalid user" });
+    return res.status(401).json({ error: "User not found" });
+  }
+
+  if (user.suspended) {
+    return res.status(403).json({ error: "Account suspended" });
   }
 
   req.user = user;
