@@ -76,6 +76,9 @@ async function main() {
       role: "seller",
       societyId: SOCIETY_ID,
       flatId: flat3062.id,
+      upiId: "anita.sharma@oksbi",
+      upiDisplayName: "Anita Sharma",
+      paymentEnabled: true,
     },
     create: {
       phone: SELLER_PHONE,
@@ -83,6 +86,9 @@ async function main() {
       role: "seller",
       societyId: SOCIETY_ID,
       flatId: flat3062.id,
+      upiId: "anita.sharma@oksbi",
+      upiDisplayName: "Anita Sharma",
+      paymentEnabled: true,
     },
   });
 

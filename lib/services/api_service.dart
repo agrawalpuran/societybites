@@ -99,6 +99,9 @@ class ApiService {
     String? role,
     String? societyId,
     String? flatId,
+    String? upiId,
+    String? upiDisplayName,
+    bool? paymentEnabled,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/auth/me/profile'),
@@ -108,6 +111,9 @@ class ApiService {
         if (role != null) 'role': role,
         if (societyId != null) 'societyId': societyId,
         if (flatId != null) 'flatId': flatId,
+        if (upiId != null) 'upiId': upiId,
+        if (upiDisplayName != null) 'upiDisplayName': upiDisplayName,
+        if (paymentEnabled != null) 'paymentEnabled': paymentEnabled,
       }),
     );
 

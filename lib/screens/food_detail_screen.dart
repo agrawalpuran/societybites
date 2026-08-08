@@ -300,7 +300,7 @@ class _SellerCard extends StatelessWidget {
                   ],
                 ),
                 Text(
-                  'Unit 402, ${food.block}',
+                  food.locationLabel,
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF6A7774),

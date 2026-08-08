@@ -27,6 +27,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _role;
   String? _societyName;
   String? _flatNumber;
+  String? _upiId;
+  String? _upiDisplayName;
   bool _isLoading = true;
 
   @override
@@ -52,6 +54,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _name = profile['name'] as String? ?? _name;
         _role = profile['role'] as String? ?? _role;
         _phone = profile['phone'] as String? ?? _phone;
+        _upiId = profile['upiId'] as String? ?? _upiId;
+        _upiDisplayName =
+            profile['upiDisplayName'] as String? ?? _upiDisplayName;
         final society = profile['society'] as Map<String, dynamic>?;
         final flat = profile['flat'] as Map<String, dynamic>?;
         _societyName = society?['name'] as String? ?? _societyName;
@@ -223,11 +228,230 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     try {
       await ApiService.updateMyProfile(name: newName);
+      await SessionService.saveUserName(newName);
       await _loadProfile();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update profile: $e')),
+      );
+    }
+  }
+
+  Future<void> _editUpi({bool afterEnableSelling = false}) async {
+    final upiController = TextEditingController(text: _upiId ?? '');
+    final nameController =
+        TextEditingController(text: _upiDisplayName ?? _name ?? '');
+    String? errorText;
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                24,
+                24,
+                24,
+                24 + MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    afterEnableSelling
+                        ? 'Add UPI to receive payments'
+                        : 'UPI for Payments',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF101617),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    afterEnableSelling
+                        ? 'Selling is on. Add your UPI ID so buyers can pay you for orders.'
+                        : 'Buyers will pay this UPI ID when they order your food.',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6A7774),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  TextField(
+                    controller: upiController,
+                    autofocus: true,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'UPI ID',
+                      hintText: 'yourname@oksbi',
+                      errorText: errorText,
+                      filled: true,
+                      fillColor: const Color(0xFFF5F7F6),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFF0E5A47)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: 'Display name on UPI (optional)',
+                      filled: true,
+                      fillColor: const Color(0xFFF5F7F6),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFF0E5A47)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final upi = upiController.text.trim();
+                        if (upi.isEmpty || !upi.contains('@')) {
+                          setSheetState(() {
+                            errorText =
+                                'Enter a valid UPI ID (e.g. name@oksbi)';
+                          });
+                          return;
+                        }
+                        Navigator.pop(ctx, true);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0E5A47),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Save UPI',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (saved != true || !mounted) {
+      upiController.dispose();
+      nameController.dispose();
+      return;
+    }
+
+    final upi = upiController.text.trim();
+    final displayName = nameController.text.trim();
+    upiController.dispose();
+    nameController.dispose();
+
+    try {
+      await ApiService.updateMyProfile(
+        upiId: upi,
+        upiDisplayName: displayName.isEmpty ? null : displayName,
+      );
+      await _loadProfile();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            afterEnableSelling
+                ? 'You can sell now — add a listing from Dashboard'
+                : 'UPI ID saved',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save UPI: $e')),
+      );
+    }
+  }
+
+  Future<void> _enableSelling() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Start selling?'),
+        content: const Text(
+          'You will be able to list homemade food for neighbors in your society. '
+          'You will need a UPI ID so buyers can pay you directly.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Not now'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF0E5A47),
+            ),
+            child: const Text('Enable selling'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ApiService.updateMyProfile(role: 'seller');
+      await _loadProfile();
+      if (!mounted) return;
+
+      final needsUpi = _upiId == null || _upiId!.isEmpty;
+      if (needsUpi) {
+        await _editUpi(afterEnableSelling: true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Selling enabled — open Dashboard to add a listing'),
+            backgroundColor: Color(0xFF0E5A47),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not enable selling: $e')),
       );
     }
   }
@@ -331,6 +555,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             onTap: _editProfile,
                           ),
                           _MenuTile(
+                            icon: Icons.account_balance_wallet_rounded,
+                            title: 'UPI for Payments',
+                            subtitle: (_upiId != null && _upiId!.isNotEmpty)
+                                ? _upiId!
+                                : 'Add UPI ID so buyers can pay you',
+                            onTap: () => _editUpi(),
+                          ),
+                          if (_role == 'buyer' || _role == null)
+                            _MenuTile(
+                              icon: Icons.storefront_rounded,
+                              title: 'Start Selling',
+                              subtitle: 'List food for neighbors in your society',
+                              onTap: _enableSelling,
+                            ),
+                          _MenuTile(
                             icon: Icons.receipt_long_rounded,
                             title: 'My Orders',
                             subtitle: 'Track active and past orders',
@@ -389,7 +628,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               'Need help? We\'re here for you.\n\n'
                               'Common Questions:\n'
                               '• How do I place an order? Browse listings on the home screen, add items to your cart, and checkout.\n'
-                              '• How do I become a seller? Go to Profile > Seller Dashboard and add your first listing.\n'
+                              '• How do I become a seller? Go to Profile → Start Selling, add your UPI ID, then create a listing from Dashboard.\n'
                               '• How do payments work? Buyers pay via UPI or cash on pickup. Sellers receive payments directly.\n'
                               '• How do I change my society? Society cannot be changed after joining. Contact support for assistance.\n\n'
                               'Still need help?\n'

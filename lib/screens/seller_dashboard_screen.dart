@@ -3,6 +3,7 @@ import '../widgets/app_header.dart';
 import '../widgets/order_items_list.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
+import '../services/seller_onboarding.dart';
 import 'add_listing_screen.dart';
 import 'my_listings_screen.dart';
 
@@ -15,9 +16,12 @@ class SellerDashboardScreen extends StatefulWidget {
 
 class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
   List<Order> _activeOrders = [];
+  List<Order> _pastOrders = [];
   bool _isLoading = true;
   String? _error;
   Map<String, dynamic> _stats = {};
+  /// 0 = Active, 1 = Past
+  int _ordersTab = 0;
 
   @override
   void initState() {
@@ -47,10 +51,15 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
       if (!mounted) return;
 
       setState(() {
-        _activeOrders =
-            parsed.where((o) => o.status != 'completed' && o.status != 'cancelled').toList();
+        _activeOrders = parsed
+            .where((o) => o.status != 'completed' && o.status != 'cancelled')
+            .toList();
+        _pastOrders = parsed
+            .where((o) => o.status == 'completed' || o.status == 'cancelled')
+            .toList();
         _isLoading = false;
       });
+      _loadStats();
     } catch (e) {
       if (!mounted) return;
 
@@ -141,7 +150,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                     ),
                   ),
                 ),
-              SliverToBoxAdapter(child: _buildActiveOrders(context)),
+              SliverToBoxAdapter(child: _buildOrdersSection(context)),
               SliverToBoxAdapter(child: _buildExpandCard()),
               SliverToBoxAdapter(child: _buildAddListingCta(context)),
               const SliverToBoxAdapter(child: SizedBox(height: 30)),
@@ -152,49 +161,139 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
     );
   }
 
+  Widget _buildOrdersSection(BuildContext context) {
+    final showingPast = _ordersTab == 1;
+    final orders = showingPast ? _pastOrders : _activeOrders;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Orders',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF101617),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Active sales and completed history for your kitchen.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6A7774),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F2F1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _OrdersSegment(
+                    label: 'Active (${_activeOrders.length})',
+                    selected: !showingPast,
+                    onTap: () => setState(() => _ordersTab = 0),
+                  ),
+                ),
+                Expanded(
+                  child: _OrdersSegment(
+                    label: 'Past (${_pastOrders.length})',
+                    selected: showingPast,
+                    onTap: () => setState(() => _ordersTab = 1),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (orders.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F7F4),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFD4E8DF)),
+              ),
+              child: Text(
+                showingPast
+                    ? 'No past orders yet.\n\n'
+                        'Completed and cancelled sales will appear here.'
+                    : 'No active orders yet.\n\n'
+                        'When neighbors order your food, they show up here.',
+                style: const TextStyle(
+                  color: Color(0xFF3A4644),
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            )
+          else if (showingPast)
+            ...orders.map((order) => _SellerPastOrderCard(order: order))
+          else
+            ...orders.map(
+              (order) => _ActiveOrderCard(
+                order: order,
+                onAction: _updateStatus,
+                onPaymentConfirmed: _loadOrders,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeader(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const AppHeader(),
         const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFE5D6),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: const Text(
-              'SELLER OVERVIEW',
-              style: TextStyle(
-                fontSize: 10,
-                letterSpacing: 1.3,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF4E2A20),
-              ),
-            ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFE5D6),
+            borderRadius: BorderRadius.circular(999),
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'Good morning,\nChef.',
+          child: const Text(
+            'SELLER OVERVIEW',
             style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF101617),
-              height: 1.15,
+              fontSize: 10,
+              letterSpacing: 1.3,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF4E2A20),
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            "Your community kitchen is buzzing.\nHere's what's happening in your\nneighborhood today.",
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF6A7774),
-              fontWeight: FontWeight.w500,
-              height: 1.45,
-            ),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'Good morning,\nChef.',
+          style: TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF101617),
+            height: 1.15,
           ),
-          const SizedBox(height: 4),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          "Your community kitchen is buzzing.\nHere's what's happening in your\nneighborhood today.",
+          style: TextStyle(
+            fontSize: 14,
+            color: Color(0xFF6A7774),
+            fontWeight: FontWeight.w500,
+            height: 1.45,
+          ),
+        ),
+        const SizedBox(height: 4),
       ],
     );
   }
@@ -211,71 +310,19 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _EarningsCard(amount: (_stats['todayRevenue'] as num?)?.toDouble() ?? 0)),
+              Expanded(
+                child: _EarningsCard(
+                  amount: (_stats['todayRevenue'] as num?)?.toDouble() ?? 0,
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _SatisfactionCard(rating: (_stats['avgRating'] as num?)?.toDouble() ?? 0)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActiveOrders(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: const [
-              Text(
-                'Active Orders',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF101617),
-                ),
-              ),
-              Spacer(),
-              Text(
-                'View History',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF6A7774),
+              Expanded(
+                child: _SatisfactionCard(
+                  rating: (_stats['avgRating'] as num?)?.toDouble() ?? 0,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          if (_activeOrders.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F7F4),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFD4E8DF)),
-              ),
-              child: const Text(
-                'No active orders yet.\n\n'
-                'Seller mode uses the same login as buyer. Add a listing, '
-                'then orders for your food will appear here.',
-                style: TextStyle(
-                  color: Color(0xFF3A4644),
-                  height: 1.45,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            )
-          else
-            ..._activeOrders.map(
-              (order) => _ActiveOrderCard(
-                order: order,
-                onAction: _updateStatus,
-              ),
-            ),
         ],
       ),
     );
@@ -386,6 +433,10 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
             height: 58,
             child: ElevatedButton.icon(
               onPressed: () async {
+                final canList =
+                    await SellerOnboarding.ensureCanCreateListing(context);
+                if (!canList || !context.mounted) return;
+
                 final created = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(builder: (_) => const AddListingScreen()),
@@ -647,10 +698,12 @@ class _ActiveOrderCard extends StatefulWidget {
   const _ActiveOrderCard({
     required this.order,
     required this.onAction,
+    required this.onPaymentConfirmed,
   });
 
   final Order order;
   final Future<void> Function(Order order, String nextStatus) onAction;
+  final Future<void> Function() onPaymentConfirmed;
 
   @override
   State<_ActiveOrderCard> createState() => _ActiveOrderCardState();
@@ -674,8 +727,16 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
   Future<void> _confirmPayment() async {
     setState(() => _isConfirmingPayment = true);
     try {
+      // Confirm already moves the order to preparing + seller_confirmed.
       await ApiService.confirmPayment(orderId: widget.order.id);
-      await widget.onAction(widget.order, widget.order.status);
+      await widget.onPaymentConfirmed();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment confirmed — order is now preparing'),
+          backgroundColor: Color(0xFF0E5A47),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -693,6 +754,8 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
     final isAccepted = order.status == 'accepted';
     final isPrep = order.status == 'preparing';
     final isReady = order.status == 'ready';
+    final isPickedUp = order.status == 'picked_up';
+    final hasSellerAction = isPending || isAccepted || isPrep;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -752,7 +815,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: isPrep
+                  color: isPrep || isPickedUp
                       ? const Color(0xFFE8F5EE)
                       : const Color(0xFFEDE8F5),
                   borderRadius: BorderRadius.circular(8),
@@ -766,12 +829,14 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                               ? 'ACCEPTED'
                               : isReady
                                   ? 'READY'
-                                  : 'ACTIVE',
+                                  : isPickedUp
+                                      ? 'PICKED UP'
+                                      : 'ACTIVE',
                   style: TextStyle(
                     fontSize: 11,
                     letterSpacing: 0.6,
                     fontWeight: FontWeight.w700,
-                    color: isPrep
+                    color: isPrep || isPickedUp
                         ? const Color(0xFF0E5A47)
                         : const Color(0xFF5A3E8A),
                   ),
@@ -819,7 +884,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                 child: SizedBox(
                   height: 42,
                   child: ElevatedButton(
-                    onPressed: _isUpdating || isReady
+                    onPressed: _isUpdating || !hasSellerAction
                         ? null
                         : () {
                             if (isPrep) {
@@ -833,6 +898,8 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0E5A47),
                       foregroundColor: Colors.white,
+                      disabledBackgroundColor: const Color(0xFFE8EDEB),
+                      disabledForegroundColor: const Color(0xFF6A7774),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
@@ -849,11 +916,13 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                         : Text(
                             isReady
                                 ? 'Awaiting pickup'
-                                : isPrep
-                                    ? 'Mark Ready'
-                                    : isAccepted
-                                        ? 'Start Preparing'
-                                        : 'Accept Order',
+                                : isPickedUp
+                                    ? 'Waiting for buyer to complete'
+                                    : isPrep
+                                        ? 'Mark Ready'
+                                        : isAccepted
+                                            ? 'Start Preparing'
+                                            : 'Accept Order',
                             style: const TextStyle(
                                 fontWeight: FontWeight.w700, fontSize: 13),
                           ),
@@ -922,6 +991,148 @@ class _PaymentBadge extends StatelessWidget {
           fontWeight: FontWeight.w700,
           color: textColor,
         ),
+      ),
+    );
+  }
+}
+
+class _OrdersSegment extends StatelessWidget {
+  const _OrdersSegment({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(3),
+      child: Material(
+        color: selected ? const Color(0xFF0E5A47) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: selected ? Colors.white : const Color(0xFF6A7774),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SellerPastOrderCard extends StatelessWidget {
+  const _SellerPastOrderCard({required this.order});
+
+  final Order order;
+
+  @override
+  Widget build(BuildContext context) {
+    final isCancelled = order.status == 'cancelled';
+    final statusLabel = isCancelled ? 'CANCELLED' : 'COMPLETED';
+    final statusColor =
+        isCancelled ? const Color(0xFFD94F4F) : const Color(0xFF0E5A47);
+    final statusBg =
+        isCancelled ? const Color(0xFFFFF0F0) : const Color(0xFFE8F5EE);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFEAEFED)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.itemsSummary,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF101617),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${order.orderId} • ${order.date}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF8A9491),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '₹${order.total.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF101617),
+                ),
+              ),
+            ],
+          ),
+          if (order.items.length > 1) ...[
+            const SizedBox(height: 10),
+            OrderItemsList(items: order.items, compact: true),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 0.6,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _PaymentBadge(paymentStatus: order.paymentStatus),
+              const Spacer(),
+              Text(
+                (order.paymentMethod ?? 'upi').toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF8A9491),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

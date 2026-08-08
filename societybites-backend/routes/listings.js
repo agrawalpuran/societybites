@@ -87,6 +87,21 @@ router.post(
       });
     }
 
+    const role = req.user.role || "buyer";
+    if (!["seller", "super_admin"].includes(role)) {
+      return res.status(403).json({
+        error: "Enable selling in Profile before creating listings",
+        code: "SELLER_REQUIRED",
+      });
+    }
+
+    if (!req.user.upiId || !String(req.user.upiId).trim()) {
+      return res.status(400).json({
+        error: "Add a UPI ID in Profile before creating listings",
+        code: "UPI_REQUIRED",
+      });
+    }
+
     if (!name || price === undefined) {
       return res.status(400).json({
         error: "name and price are required",

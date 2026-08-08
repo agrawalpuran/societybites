@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../services/api_service.dart';
+import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
@@ -101,6 +102,11 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
   }
 
   Future<void> _openEditor([FoodItem? listing]) async {
+    if (listing == null) {
+      final canList = await SellerOnboarding.ensureCanCreateListing(context);
+      if (!canList || !mounted) return;
+    }
+
     final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(

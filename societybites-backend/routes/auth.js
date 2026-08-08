@@ -80,7 +80,16 @@ router.patch(
   "/me/profile",
   requireUser,
   asyncHandler(async (req, res) => {
-    const { name, role, societyId, flatId, profilePhotoUrl, upiId } = req.body;
+    const {
+      name,
+      role,
+      societyId,
+      flatId,
+      profilePhotoUrl,
+      upiId,
+      upiDisplayName,
+      paymentEnabled,
+    } = req.body;
 
     const data = {};
     if (name !== undefined) data.name = name;
@@ -88,7 +97,28 @@ router.patch(
     if (societyId !== undefined) data.societyId = societyId;
     if (flatId !== undefined) data.flatId = flatId;
     if (profilePhotoUrl !== undefined) data.profilePhotoUrl = profilePhotoUrl;
-    if (upiId !== undefined) data.upiId = upiId;
+    if (upiId !== undefined) {
+      const trimmed = typeof upiId === "string" ? upiId.trim() : upiId;
+      if (trimmed === "" || trimmed === null) {
+        data.upiId = null;
+        data.paymentEnabled = false;
+      } else {
+        if (!String(trimmed).includes("@")) {
+          return res.status(400).json({ error: "UPI ID must look like name@bank" });
+        }
+        data.upiId = String(trimmed);
+        data.paymentEnabled = true;
+      }
+    }
+    if (upiDisplayName !== undefined) {
+      data.upiDisplayName =
+        typeof upiDisplayName === "string" && upiDisplayName.trim()
+          ? upiDisplayName.trim()
+          : null;
+    }
+    if (paymentEnabled !== undefined && upiId === undefined) {
+      data.paymentEnabled = Boolean(paymentEnabled);
+    }
 
     const user = await prisma.user.update({
       where: { id: req.user.id },

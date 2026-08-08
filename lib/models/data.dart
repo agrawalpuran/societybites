@@ -24,6 +24,8 @@ class FoodItem {
   final String sellerId;
   final String sellerName;
   final String block;
+  final String? flatNumber;
+  final String? pickupLocation;
   final double price;
   final double rating;
   final String pickupTime;
@@ -46,6 +48,8 @@ class FoodItem {
     required this.sellerId,
     required this.sellerName,
     required this.block,
+    this.flatNumber,
+    this.pickupLocation,
     required this.price,
     required this.rating,
     required this.pickupTime,
@@ -62,6 +66,24 @@ class FoodItem {
     required this.bgColor,
     this.sellerUpiId,
   });
+
+  /// Human-readable pickup / seller location for cards and detail.
+  String get locationLabel {
+    final parts = <String>[];
+    if (flatNumber != null && flatNumber!.isNotEmpty) {
+      parts.add('Flat $flatNumber');
+    }
+    if (block.isNotEmpty && block != 'Block ?') {
+      parts.add(block);
+    }
+    if (parts.isEmpty &&
+        pickupLocation != null &&
+        pickupLocation!.isNotEmpty) {
+      return pickupLocation!;
+    }
+    if (parts.isEmpty) return 'Pickup at seller home';
+    return parts.join(', ');
+  }
 
   static const _icons = [
     Icons.rice_bowl,
@@ -96,6 +118,8 @@ class FoodItem {
       sellerId: json['sellerId'] as String,
       sellerName: (json['sellerName'] as String?) ?? 'Neighbor',
       block: (json['block'] as String?) ?? 'Block ?',
+      flatNumber: json['flatNumber'] as String?,
+      pickupLocation: json['pickupLocation'] as String?,
       price: (json['price'] as num).toDouble(),
       rating: (json['avgRating'] as num?)?.toDouble() ?? 0,
       pickupTime: _formatPickupTime(availableAt),
@@ -214,6 +238,7 @@ class Order {
   final double communityFee;
   final String? paymentMethod;
   final String paymentStatus;
+  final bool hasReview;
 
   const Order({
     required this.id,
@@ -227,6 +252,7 @@ class Order {
     required this.communityFee,
     this.paymentMethod,
     this.paymentStatus = 'pending',
+    this.hasReview = false,
   });
 
   FoodItem get food =>
@@ -296,6 +322,7 @@ class Order {
       communityFee: (json['communityFee'] as num?)?.toDouble() ?? 0,
       paymentMethod: json['paymentMethod'] as String?,
       paymentStatus: (json['paymentStatus'] as String?) ?? 'pending',
+      hasReview: json['hasReview'] == true,
     );
   }
 

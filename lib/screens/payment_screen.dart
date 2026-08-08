@@ -16,13 +16,22 @@ class PaymentScreen extends StatefulWidget {
 
 class _PaymentScreenState extends State<PaymentScreen> {
   bool _isMarking = false;
+  bool _isLoadingUpi = true;
+  String? _sellerUpiId;
+  String? _sellerUpiDisplayName;
+  String? _loadError;
 
-  String? get _sellerUpiId {
-    if (widget.order.items.isEmpty) return null;
-    return widget.order.items.first.food.sellerUpiId;
+  bool get _hasUpi => _sellerUpiId != null && _sellerUpiId!.trim().isNotEmpty;
+
+  bool get _isCashOrder =>
+      (widget.order.paymentMethod ?? 'upi').toLowerCase() == 'cash';
+
+  String get _sellerName {
+    if (_sellerUpiDisplayName != null && _sellerUpiDisplayName!.isNotEmpty) {
+      return _sellerUpiDisplayName!;
+    }
+    return widget.order.sellerLabel;
   }
-
-  String get _sellerName => widget.order.sellerLabel;
 
   String get _amount => widget.order.orderTotal.toStringAsFixed(2);
 
@@ -38,10 +47,53 @@ class _PaymentScreenState extends State<PaymentScreen> {
         '&am=$_amount&cu=INR&tn=SocietyBites Order ${widget.order.orderId}';
   }
 
+  @override
+  void initState() {
+    super.initState();
+    // Prefer UPI embedded on order items (set when listings were loaded).
+    if (widget.order.items.isNotEmpty) {
+      _sellerUpiId = widget.order.items.first.food.sellerUpiId;
+    }
+    _loadPaymentInfo();
+  }
+
+  Future<void> _loadPaymentInfo() async {
+    setState(() {
+      _isLoadingUpi = true;
+      _loadError = null;
+    });
+
+    try {
+      final data = await ApiService.getPaymentStatus(orderId: widget.order.id);
+      if (!mounted) return;
+
+      final apiUpi = data['sellerUpiId'] as String?;
+      setState(() {
+        if (apiUpi != null && apiUpi.trim().isNotEmpty) {
+          _sellerUpiId = apiUpi.trim();
+        }
+        _sellerUpiDisplayName = data['sellerUpiDisplayName'] as String?;
+        _isLoadingUpi = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingUpi = false;
+        // Keep any UPI already known from the order; only surface error if none.
+        if (!_hasUpi) {
+          _loadError = e.toString();
+        }
+      });
+    }
+  }
+
   Future<void> _launchUpiApp() async {
+    if (!_hasUpi) return;
+
     final uri = Uri.parse(_upiDeepLink);
     try {
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final launched =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -53,7 +105,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not open UPI app. Please scan the QR code instead.'),
+          content:
+              Text('Could not open UPI app. Please scan the QR code instead.'),
         ),
       );
     }
@@ -102,15 +155,40 @@ class _PaymentScreenState extends State<PaymentScreen> {
           children: [
             _buildOrderSummary(),
             const SizedBox(height: 28),
-            if (_sellerUpiId != null && _sellerUpiId!.isNotEmpty) ...[
+            if (_isLoadingUpi)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
+              )
+            else if (_hasUpi) ...[
               _buildQrSection(),
               const SizedBox(height: 24),
               _buildUpiButton(),
               const SizedBox(height: 16),
-            ] else
+              _buildMarkPaidButton(
+                label: "I've Paid via UPI",
+              ),
+            ] else ...[
               _buildNoUpiMessage(),
-            const SizedBox(height: 12),
-            _buildMarkPaidButton(),
+              if (_loadError != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Could not refresh seller UPI: $_loadError',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFD94F4F),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              const SizedBox(height: 16),
+              // Cash / offline fallback — still let buyer notify seller.
+              _buildMarkPaidButton(
+                label: _isCashOrder
+                    ? "I've arranged cash payment"
+                    : "I've paid / will pay at pickup",
+              ),
+            ],
             const SizedBox(height: 30),
           ],
         ),
@@ -155,7 +233,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Seller',
+                'Pay to',
                 style: TextStyle(
                   fontSize: 13,
                   color: Color(0xFF6A7774),
@@ -172,26 +250,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          const Divider(color: Color(0xFFEAEFED)),
-          const SizedBox(height: 14),
+          const Divider(height: 28, color: Color(0xFFEAEFED)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Total Amount',
+                'Amount',
                 style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w700,
                   color: Color(0xFF101617),
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               Text(
-                '₹${widget.order.orderTotal.toStringAsFixed(0)}',
+                '₹$_amount',
                 style: const TextStyle(
                   fontSize: 22,
-                  fontWeight: FontWeight.w800,
                   color: Color(0xFF0E5A47),
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
@@ -281,20 +357,45 @@ class _PaymentScreenState extends State<PaymentScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE8DFC0)),
       ),
-      child: const Text(
-        'Seller has not set up UPI payment yet. '
-        'Please pay in cash upon pickup and mark as paid below.',
-        style: TextStyle(
-          fontSize: 13,
-          color: Color(0xFF7A5A20),
-          fontWeight: FontWeight.w500,
-          height: 1.4,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded,
+                  color: Color(0xFFB8860B), size: 22),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'UPI not available yet',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF7A5A20),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            _isCashOrder
+                ? 'This order is set to cash. Pay the seller at pickup, then tap below so they can confirm.'
+                : 'This seller has not added a UPI ID, so QR / UPI pay cannot be shown. '
+                    'Contact them or pay at pickup, then tap below after you have paid.',
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF7A5A20),
+              fontWeight: FontWeight.w500,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildMarkPaidButton() {
+  Widget _buildMarkPaidButton({required String label}) {
     return SizedBox(
       width: double.infinity,
       height: 52,
@@ -315,9 +416,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   color: Color(0xFF0E5A47),
                 ),
               )
-            : const Text(
-                "I've Paid",
-                style: TextStyle(
+            : Text(
+                label,
+                style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
                   color: Color(0xFF0E5A47),

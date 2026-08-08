@@ -34,7 +34,10 @@ function serializeListing(listing) {
     societyId: listing.societyId,
     sellerId: listing.sellerId,
     sellerName: seller.name || "Neighbor",
+    sellerUpiId: seller.upiId || null,
+    sellerUpiDisplayName: seller.upiDisplayName || null,
     block: flat ? `Block ${flat.block}` : null,
+    flatNumber: flat?.flatNumber || null,
     avgRating: Math.round(avgRating * 10) / 10,
     reviewCount,
     createdAt: listing.createdAt,
@@ -67,6 +70,7 @@ function serializeOrder(order) {
     total: order.total,
     societyId: order.societyId,
     buyerId: order.buyerId,
+    hasReview: Array.isArray(order.reviews) && order.reviews.length > 0,
     items,
     timeline: {
       createdAt: order.createdAt,

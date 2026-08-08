@@ -498,7 +498,7 @@ class _OrderItemCard extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Freshly made by ${item.food.sellerName} in ${item.food.block}',
+              'Freshly made by ${item.food.sellerName} · ${item.food.locationLabel}',
               style: const TextStyle(
                 fontSize: 14,
                 color: Color(0xFF6A7774),

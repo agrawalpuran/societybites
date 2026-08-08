@@ -106,6 +106,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _addToCart(FoodItem food) {
+    if (_cart.isNotEmpty) {
+      final cartSellerId = _cart.first.food.sellerId;
+      if (food.sellerId != cartSellerId) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Cart only allows one seller. Clear items from ${_cart.first.food.sellerName} first, or checkout separately.',
+            ),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: const Color(0xFFD94F4F),
+          ),
+        );
+        return;
+      }
+    }
+
     final currentInCart = _cart
         .where((c) => c.food.id == food.id)
         .fold<int>(0, (sum, c) => sum + c.quantity);
@@ -116,7 +136,8 @@ class _HomeScreenState extends State<HomeScreen> {
           content: Text('Only ${food.quantity} available for ${food.name}'),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           backgroundColor: const Color(0xFFD94F4F),
         ),
       );
@@ -672,7 +693,7 @@ class _SpecialCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
               child: Text(
-                'By ${food.sellerName} • ${food.block}',
+                'By ${food.sellerName} • ${food.locationLabel}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -843,7 +864,7 @@ class _AvailableItemTile extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        '${food.sellerName}, ${food.block}',
+                        '${food.sellerName}, ${food.locationLabel}',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF6A7774),

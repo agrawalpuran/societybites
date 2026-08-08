@@ -43,6 +43,7 @@ const orderInclude = {
       },
     },
   },
+  reviews: { select: { id: true } },
 };
 
 router.get(
@@ -294,6 +295,13 @@ router.post(
       }
 
       preparedItems.push({ listing, quantity });
+    }
+
+    const sellerIds = new Set(preparedItems.map(({ listing }) => listing.sellerId));
+    if (sellerIds.size > 1) {
+      return res.status(400).json({
+        error: "All items in an order must be from the same seller",
+      });
     }
 
     const subtotal = preparedItems.reduce(
