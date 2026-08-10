@@ -33,6 +33,8 @@ model Society {
   name       String
   city       String
   inviteCode String    @unique
+  /// UI label for building subdivision: "Block" or "Wing"
+  unitLabel  String    @default("Block")
   address    String?
   state      String?
   pincode    String?
@@ -80,6 +82,7 @@ model Listing {
   availableAt    DateTime?
   pickupLocation String      @default("My Home (Verified)")
   imageUrl       String?
+  /// active | paused | sold_out | inactive
   status         String      @default("active")
   featured       Boolean     @default(false)
   createdAt      DateTime    @default(now())
@@ -101,7 +104,8 @@ model Order {
   status                String      @default("pending")
   paymentMethod         String      @default("upi")
   subtotal              Float
-  communityFee          Float       @default(10)
+  /// Stored fee amount charged on this order (platform fee).
+  communityFee          Float       @default(0)
   total                 Float
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
@@ -164,4 +168,11 @@ model AuditLog {
   details   String?
   createdAt DateTime @default(now())
   admin     User     @relation("AdminLogs", fields: [adminId], references: [id])
+}
+
+/// Key/value platform config (e.g. platform_fee).
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

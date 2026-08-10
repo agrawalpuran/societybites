@@ -113,6 +113,13 @@ class _AddListingScreenState extends State<AddListingScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate() || _isSubmitting) return;
 
+    if (_category == null || _category!.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a category.')),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {

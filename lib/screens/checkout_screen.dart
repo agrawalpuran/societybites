@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'profile_screen.dart';
+import 'main_shell_screen.dart';
+import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
 import '../models/data.dart';
@@ -20,34 +21,73 @@ enum PaymentMethod { upi, cash }
 class _CheckoutScreenState extends State<CheckoutScreen> {
   late List<CartItem> _items;
   PaymentMethod _payment = PaymentMethod.upi;
-  static const double _communityFee = 10;
+  double _platformFee = 0;
   bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
-    _items = widget.cartItems;
+    _items = List<CartItem>.from(widget.cartItems);
+    _loadPlatformFee();
+  }
+
+  Future<void> _loadPlatformFee() async {
+    try {
+      final fee = await ApiService.getPlatformFee();
+      if (!mounted) return;
+      setState(() => _platformFee = fee);
+    } catch (_) {
+      // Keep default 0 if settings unavailable.
+    }
   }
 
   double get _subtotal =>
       _items.fold<double>(0, (sum, item) => sum + item.total);
 
-  double get _grandTotal => _subtotal + _communityFee;
+  double get _grandTotal => _subtotal + _platformFee;
 
   int get _totalQuantity =>
       _items.fold<int>(0, (sum, item) => sum + item.quantity);
 
+  bool get _canConfirm =>
+      !_isSubmitting && _items.isNotEmpty && _totalQuantity > 0;
+
+  void _goToShell(int index) {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MainShellScreen(initialIndex: index),
+      ),
+      (_) => false,
+    );
+  }
+
   void _updateQuantity(int index, int delta) {
+    var becameEmpty = false;
     setState(() {
-      _items[index].quantity += delta;
-      if (_items[index].quantity <= 0) {
-        _items.removeAt(index);
+      final next = List<CartItem>.from(_items);
+      next[index].quantity += delta;
+      if (next[index].quantity <= 0) {
+        next.removeAt(index);
       }
+      _items = next.where((item) => item.quantity > 0).toList();
+      becameEmpty = _items.isEmpty;
     });
+
+    // Never leave the user on an empty checkout screen without shell nav.
+    if (becameEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Your cart is empty')),
+        );
+        _goToShell(0);
+      });
+    }
   }
 
   Future<void> _confirmOrder() async {
-    if (_isSubmitting || _items.isEmpty) return;
+    if (!_canConfirm) return;
 
     setState(() => _isSubmitting = true);
 
@@ -109,7 +149,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: _items.isEmpty
                   ? const Center(
                       child: Text(
-                        'Your cart is empty.',
+                        'Returning to Home…',
                         style: TextStyle(
                           fontSize: 16,
                           color: Color(0xFF8A9491),
@@ -160,7 +200,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: _items.isNotEmpty ? _buildBottomBar() : null,
+      bottomNavigationBar: AppBottomNav(
+        selectedIndex: 0,
+        onTap: _goToShell,
+      ),
     );
   }
 
@@ -268,19 +311,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Row(
             children: [
               const Text(
-                'Community Fee',
+                'Platform Fee',
                 style: TextStyle(
                   fontSize: 15,
                   color: Color(0xFF5A4A3A),
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(width: 4),
-              const Icon(Icons.info_outline_rounded,
-                  size: 15, color: Color(0xFF8A7A6A)),
               const Spacer(),
               Text(
-                '₹${_communityFee.toStringAsFixed(0)}',
+                '₹${_platformFee.toStringAsFixed(0)}',
                 style: const TextStyle(
                   fontSize: 15,
                   color: Color(0xFF3A2A1A),
@@ -320,10 +360,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               SizedBox(
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _confirmOrder,
+                  onPressed: _canConfirm ? _confirmOrder : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0E5A47),
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFFB5C4BF),
+                    disabledForegroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(18),
                     ),
@@ -353,70 +395,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBottomBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(12),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _BottomNavItem(
-                icon: Icons.home_rounded,
-                label: 'Home',
-                isActive: false,
-                onTap: () => Navigator.pop(context),
-              ),
-              _BottomNavItem(
-                icon: Icons.shopping_bag_rounded,
-                label: 'Orders',
-                isActive: true,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('This feature is coming soon')),
-                  );
-                },
-              ),
-              _BottomNavItem(
-                icon: Icons.grid_view_rounded,
-                label: 'Dashboard',
-                isActive: false,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('This feature is coming soon')),
-                  );
-                },
-              ),
-              _BottomNavItem(
-                icon: Icons.person_rounded,
-                label: 'Profile',
-                isActive: false,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ProfileScreen(),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -700,56 +678,6 @@ class _BillRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _BottomNavItem extends StatelessWidget {
-  const _BottomNavItem({
-    required this.icon,
-    required this.label,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF0E5A47) : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isActive ? Colors.white : const Color(0xFF8A9491),
-            ),
-            if (isActive) ...[
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }

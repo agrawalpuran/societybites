@@ -127,16 +127,40 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<List<Map<String, dynamic>>> getSocieties() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/societies'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      if (data is List) {
+        return data
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+      return [];
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> joinSociety({
-    required String inviteCode,
+    required String societyId,
     required String flatNumber,
+    required String block,
+    required String firstName,
+    String? lastName,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/societies/join'),
       headers: await _authHeaders(),
       body: jsonEncode({
-        'inviteCode': inviteCode,
+        'societyId': societyId,
         'flatNumber': flatNumber,
+        'block': block,
+        'firstName': firstName,
+        if (lastName != null && lastName.trim().isNotEmpty)
+          'lastName': lastName.trim(),
       }),
     );
     if (response.statusCode == 200) {
@@ -165,11 +189,15 @@ class ApiService {
     required String societyId,
     String? sellerId,
     String? search,
+    String? status,
   }) async {
     final query = <String, String>{'societyId': societyId};
     if (sellerId != null) query['sellerId'] = sellerId;
     if (search != null && search.trim().isNotEmpty) {
       query['search'] = search.trim();
+    }
+    if (status != null && status.isNotEmpty) {
+      query['status'] = status;
     }
 
     final uri = Uri.parse('$baseUrl/listings').replace(queryParameters: query);
@@ -315,6 +343,30 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> pauseListing(String listingId) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/listings/$listingId/pause'),
+      headers: await _authHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> resumeListing(String listingId) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/listings/$listingId/resume'),
+      headers: await _authHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<List<Map<String, dynamic>>> getOrders({
     String role = 'buyer',
     String? status,
@@ -444,6 +496,40 @@ class ApiService {
   }
 
   // ─── Admin APIs ───────────────────────────────────────────────────────
+
+  static Future<double> getPlatformFee() async {
+    final response = await http.get(Uri.parse('$baseUrl/settings'));
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return (data['platformFee'] as num?)?.toDouble() ?? 0;
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<double> getAdminPlatformFee() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/settings'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return (data['platformFee'] as num?)?.toDouble() ?? 0;
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<double> updateAdminPlatformFee(double platformFee) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/settings'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'platformFee': platformFee}),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return (data['platformFee'] as num?)?.toDouble() ?? platformFee;
+    }
+    _throwFromResponse(response);
+  }
 
   static Future<Map<String, dynamic>> getAdminDashboard() async {
     final response = await http.get(

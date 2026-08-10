@@ -543,4 +543,40 @@ router.get(
   })
 );
 
+// GET /admin/settings
+router.get(
+  "/settings",
+  asyncHandler(async (_req, res) => {
+    const { getPlatformFee } = require("../lib/platformFee");
+    const platformFee = await getPlatformFee();
+    res.json({ platformFee });
+  })
+);
+
+// PATCH /admin/settings
+router.patch(
+  "/settings",
+  asyncHandler(async (req, res) => {
+    const { setPlatformFee } = require("../lib/platformFee");
+    const { platformFee } = req.body;
+
+    if (platformFee === undefined || platformFee === null) {
+      return res.status(400).json({ error: "platformFee is required" });
+    }
+
+    const value = await setPlatformFee(platformFee);
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user.id,
+        action: "UPDATE_PLATFORM_FEE",
+        target: "settings",
+        details: JSON.stringify({ platformFee: value }),
+      },
+    });
+
+    res.json({ platformFee: value });
+  })
+);
+
 module.exports = router;

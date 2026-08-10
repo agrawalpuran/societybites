@@ -37,6 +37,7 @@ class FoodItem {
   final String? weightValue;
   final List<String> tags;
   final String? category;
+  final String status;
   final int reviewCount;
   final IconData icon;
   final Color bgColor;
@@ -61,11 +62,15 @@ class FoodItem {
     this.weightValue,
     this.tags = const [],
     this.category,
+    this.status = 'active',
     this.reviewCount = 0,
     required this.icon,
     required this.bgColor,
     this.sellerUpiId,
   });
+
+  bool get isPaused => status == 'paused';
+  bool get isActive => status == 'active';
 
   /// Human-readable pickup / seller location for cards and detail.
   String get locationLabel {
@@ -131,6 +136,7 @@ class FoodItem {
       weightValue: json['weightValue'] as String?,
       tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
       category: json['category'] as String?,
+      status: (json['status'] as String?) ?? 'active',
       reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
       icon: _icons[hash % _icons.length],
       bgColor: _colors[hash % _colors.length],

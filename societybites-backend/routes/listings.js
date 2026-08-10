@@ -26,11 +26,21 @@ router.get(
 
     const searchTerm = search ? String(search).trim() : "";
 
+    let statusFilter;
+    if (status === "all") {
+      // Seller management view: exclude soft-deleted (inactive) only
+      statusFilter = { status: { in: ["active", "paused", "sold_out"] } };
+    } else if (status) {
+      statusFilter = { status: String(status) };
+    } else {
+      statusFilter = { status: "active" };
+    }
+
     const listings = await prisma.listing.findMany({
       where: {
         societyId: String(societyId),
         ...(sellerId && { sellerId: String(sellerId) }),
-        ...(status && { status: String(status) }),
+        ...statusFilter,
         ...(category && { category: String(category) }),
         ...(searchTerm && {
           OR: [
@@ -186,6 +196,82 @@ router.patch(
     const updated = await prisma.listing.update({
       where: { id: req.params.id },
       data,
+      include: listingInclude,
+    });
+
+    res.json(serializeListing(updated));
+  })
+);
+
+router.patch(
+  "/:id/pause",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!listing) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    if (listing.sellerId !== req.user.id) {
+      return res.status(403).json({ error: "Not allowed to pause this listing" });
+    }
+
+    if (listing.status === "paused") {
+      return res.status(400).json({ error: "Listing is already paused" });
+    }
+
+    if (listing.status === "inactive") {
+      return res.status(400).json({ error: "Cannot pause a removed listing" });
+    }
+
+    if (listing.status !== "active" && listing.status !== "sold_out") {
+      return res.status(400).json({
+        error: `Cannot pause a listing with status "${listing.status}"`,
+      });
+    }
+
+    const updated = await prisma.listing.update({
+      where: { id: listing.id },
+      data: { status: "paused" },
+      include: listingInclude,
+    });
+
+    res.json(serializeListing(updated));
+  })
+);
+
+router.patch(
+  "/:id/resume",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!listing) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    if (listing.sellerId !== req.user.id) {
+      return res.status(403).json({ error: "Not allowed to resume this listing" });
+    }
+
+    if (listing.status === "active") {
+      return res.status(400).json({ error: "Listing is already active" });
+    }
+
+    if (listing.status !== "paused") {
+      return res.status(400).json({
+        error: `Cannot resume a listing with status "${listing.status}"`,
+      });
+    }
+
+    const updated = await prisma.listing.update({
+      where: { id: listing.id },
+      data: { status: "active" },
       include: listingInclude,
     });
 

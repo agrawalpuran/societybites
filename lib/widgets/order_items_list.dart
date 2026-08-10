@@ -118,7 +118,7 @@ class OrderTotalRow extends StatelessWidget {
             Row(
               children: [
                 const Text(
-                  'Community fee',
+                  'Platform fee',
                   style: TextStyle(
                     fontSize: 13,
                     color: Color(0xFF6A7774),

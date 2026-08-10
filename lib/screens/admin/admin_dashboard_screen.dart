@@ -11,6 +11,7 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Map<String, dynamic>? _stats;
+  double _platformFee = 0;
   bool _isLoading = true;
   String? _error;
 
@@ -26,10 +27,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _error = null;
     });
     try {
-      final data = await ApiService.getAdminDashboard();
+      final results = await Future.wait([
+        ApiService.getAdminDashboard(),
+        ApiService.getAdminPlatformFee(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _stats = data;
+        _stats = results[0] as Map<String, dynamic>;
+        _platformFee = results[1] as double;
         _isLoading = false;
       });
     } catch (e) {
@@ -38,6 +43,61 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _editPlatformFee() async {
+    final controller = TextEditingController(
+      text: _platformFee.toStringAsFixed(
+        _platformFee == _platformFee.roundToDouble() ? 0 : 2,
+      ),
+    );
+    final saved = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Platform Fee'),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            labelText: 'Amount (₹)',
+            hintText: '0',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final value = double.tryParse(controller.text.trim());
+              if (value == null || value < 0) return;
+              Navigator.pop(ctx, value);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (saved == null || !mounted) return;
+
+    try {
+      final updated = await ApiService.updateAdminPlatformFee(saved);
+      if (!mounted) return;
+      setState(() => _platformFee = updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Platform fee set to ₹${updated.toStringAsFixed(0)}'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update fee: $e')),
+      );
     }
   }
 
@@ -99,6 +159,80 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             ),
             const SizedBox(height: 20),
+            _SectionTitle(title: 'SETTINGS'),
+            const SizedBox(height: 10),
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                onTap: _editPlatformFee,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFEAEFED)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0E5A47).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.payments_outlined,
+                          size: 18,
+                          color: Color(0xFF0E5A47),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Platform Fee',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: Color(0xFF101617),
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Charged on every order at checkout',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6A7774),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '₹${_platformFee.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0E5A47),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.edit_outlined,
+                        size: 18,
+                        color: Color(0xFF8A9491),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
             _SectionTitle(title: 'USERS'),
             const SizedBox(height: 10),
             _StatsGrid(cards: [

@@ -5,10 +5,9 @@ const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser } = require("../middleware/requireUser");
 const { generateOrderNumber } = require("../utils/orderNumber");
 const { serializeOrder } = require("../utils/listingSerializer");
+const { getPlatformFee } = require("../lib/platformFee");
 
 const router = express.Router();
-
-const COMMUNITY_FEE = 10;
 
 const VALID_STATUSES = ["pending", "accepted", "preparing", "ready", "picked_up", "completed", "cancelled"];
 
@@ -308,7 +307,8 @@ router.post(
       (sum, { listing, quantity }) => sum + listing.price * quantity,
       0
     );
-    const total = subtotal + COMMUNITY_FEE;
+    const platformFee = await getPlatformFee();
+    const total = subtotal + platformFee;
 
     const order = await prisma.$transaction(async (tx) => {
       for (const { listing, quantity } of preparedItems) {
@@ -344,7 +344,7 @@ router.post(
           status: "pending",
           paymentMethod,
           subtotal,
-          communityFee: COMMUNITY_FEE,
+          communityFee: platformFee,
           total,
           items: {
             create: preparedItems.map(({ listing, quantity }) => ({

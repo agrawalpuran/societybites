@@ -5,12 +5,32 @@ const { requireUser } = require("../middleware/requireUser");
 
 const router = express.Router();
 
+function parseFloorUnit(flatNumber) {
+  const digits = String(flatNumber).replace(/\D/g, "");
+  if (digits.length >= 4) {
+    return {
+      floor: parseInt(digits.substring(1, 3), 10) || 0,
+      unit: digits.slice(-1),
+    };
+  }
+  if (digits.length >= 2) {
+    return {
+      floor: parseInt(digits.slice(0, -1), 10) || 0,
+      unit: digits.slice(-1),
+    };
+  }
+  return { floor: 0, unit: String(flatNumber).trim() || "1" };
+}
+
 router.get(
   "/",
   asyncHandler(async (_req, res) => {
     const societies = await prisma.society.findMany({
       where: { status: "active" },
       orderBy: { name: "asc" },
+      include: {
+        blocks: { orderBy: { name: "asc" } },
+      },
     });
     res.json(societies);
   })
@@ -38,47 +58,62 @@ router.post(
   "/join",
   requireUser,
   asyncHandler(async (req, res) => {
-    const { inviteCode, flatNumber } = req.body;
+    const { societyId, inviteCode, flatNumber, block, firstName, lastName } =
+      req.body;
 
-    if (!inviteCode || !flatNumber) {
-      return res.status(400).json({ error: "inviteCode and flatNumber are required" });
+    if (!firstName || !String(firstName).trim()) {
+      return res.status(400).json({ error: "First name is required" });
     }
 
-    const society = await prisma.society.findFirst({
-      where: { inviteCode: { equals: inviteCode, mode: "insensitive" } },
-    });
+    if (!flatNumber || !String(flatNumber).trim()) {
+      return res.status(400).json({ error: "flatNumber is required" });
+    }
+
+    if (!block || !String(block).trim()) {
+      return res.status(400).json({ error: "block is required" });
+    }
+
+    if (!societyId && !inviteCode) {
+      return res.status(400).json({ error: "societyId or inviteCode is required" });
+    }
+
+    const fullName = [String(firstName).trim(), String(lastName || "").trim()]
+      .filter(Boolean)
+      .join(" ");
+
+    if (req.user.societyId) {
+      return res.status(400).json({ error: "You are already a member of a society" });
+    }
+
+    let society = null;
+
+    if (societyId) {
+      society = await prisma.society.findUnique({ where: { id: societyId } });
+    } else if (inviteCode) {
+      society = await prisma.society.findFirst({
+        where: { inviteCode: { equals: inviteCode, mode: "insensitive" } },
+      });
+    }
 
     if (!society) {
-      return res.status(400).json({ error: "Invalid invite code" });
+      return res.status(400).json({
+        error: societyId ? "Society not found" : "Invalid invite code",
+      });
     }
 
     if (society.status !== "active") {
       return res.status(400).json({ error: "This society is not accepting new members" });
     }
 
-    if (req.user.societyId) {
-      return res.status(400).json({ error: "You are already a member of a society" });
-    }
-
-    const digits = String(flatNumber);
-
-    if (digits.length !== 4) {
-      return res.status(400).json({ error: "Flat number must be 4 digits" });
-    }
-
-    const blockMap = { 1: "A", 2: "B", 3: "C", 4: "D", 5: "E" };
-    const blockDigit = parseInt(digits[0], 10);
-    const block = blockMap[blockDigit];
-
-    if (!block) {
-      return res.status(400).json({ error: "Invalid block digit" });
-    }
+    const flatDigits = String(flatNumber).trim();
+    const blockValue = String(block).trim();
+    const { floor, unit } = parseFloorUnit(flatDigits);
 
     let flat = await prisma.flat.findUnique({
       where: {
         societyId_flatNumber: {
           societyId: society.id,
-          flatNumber: digits,
+          flatNumber: flatDigits,
         },
       },
     });
@@ -87,17 +122,22 @@ router.post(
       flat = await prisma.flat.create({
         data: {
           societyId: society.id,
-          flatNumber: digits,
-          block,
-          floor: parseInt(digits.substring(1, 3), 10),
-          unit: digits[3],
+          flatNumber: flatDigits,
+          block: blockValue,
+          floor,
+          unit,
         },
+      });
+    } else if (flat.block !== blockValue) {
+      flat = await prisma.flat.update({
+        where: { id: flat.id },
+        data: { block: blockValue },
       });
     }
 
     const user = await prisma.user.update({
       where: { id: req.user.id },
-      data: { societyId: society.id, flatId: flat.id },
+      data: { societyId: society.id, flatId: flat.id, name: fullName },
       include: { society: true, flat: true },
     });
 
@@ -109,7 +149,7 @@ router.post(
   "/:id/validate-flat",
   requireUser,
   asyncHandler(async (req, res) => {
-    const { flatNumber } = req.body;
+    const { flatNumber, block } = req.body;
 
     if (!flatNumber) {
       return res.status(400).json({ error: "flatNumber is required" });
@@ -127,37 +167,31 @@ router.post(
       return res.status(404).json({ error: "Society not found" });
     }
 
+    const flatDigits = String(flatNumber).trim();
+
     let flat = await prisma.flat.findUnique({
       where: {
         societyId_flatNumber: {
           societyId: req.params.id,
-          flatNumber: String(flatNumber),
+          flatNumber: flatDigits,
         },
       },
     });
 
     if (!flat) {
-      const blockMap = { 1: "A", 2: "B", 3: "C", 4: "D", 5: "E" };
-      const digits = String(flatNumber);
-
-      if (digits.length !== 4) {
-        return res.status(400).json({ error: "Flat number must be 4 digits" });
-      }
-
-      const blockDigit = parseInt(digits[0], 10);
-      const block = blockMap[blockDigit];
-
-      if (!block) {
-        return res.status(400).json({ error: "Invalid block digit" });
-      }
+      const blockValue =
+        block && String(block).trim()
+          ? String(block).trim()
+          : "A";
+      const { floor, unit } = parseFloorUnit(flatDigits);
 
       flat = await prisma.flat.create({
         data: {
           societyId: req.params.id,
-          flatNumber: digits,
-          block,
-          floor: parseInt(digits.substring(1, 3), 10),
-          unit: digits[3],
+          flatNumber: flatDigits,
+          block: blockValue,
+          floor,
+          unit,
         },
       });
     }

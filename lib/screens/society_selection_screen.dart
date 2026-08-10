@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'main_shell_screen.dart';
 import '../widgets/app_header.dart';
 import '../services/api_service.dart';
@@ -13,24 +12,104 @@ class SocietySelectionScreen extends StatefulWidget {
 }
 
 class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
-  final TextEditingController _inviteCodeController = TextEditingController();
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _flatController = TextEditingController();
+  final TextEditingController _customBlockController = TextEditingController();
+
+  List<Map<String, dynamic>> _societies = [];
+  Map<String, dynamic>? _selectedSociety;
+  String? _selectedBlock;
   String? _error;
+  bool _isLoading = true;
   bool _isJoining = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadSocieties();
+  }
+
+  @override
   void dispose() {
-    _inviteCodeController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _flatController.dispose();
+    _customBlockController.dispose();
     super.dispose();
   }
 
+  List<String> get _blockOptions {
+    final blocks = _selectedSociety?['blocks'];
+    if (blocks is! List) return const [];
+    return blocks
+        .map((b) => (b is Map ? b['name'] : null)?.toString().trim() ?? '')
+        .where((n) => n.isNotEmpty)
+        .toList();
+  }
+
+  String get _unitLabel {
+    final label = _selectedSociety?['unitLabel']?.toString().trim();
+    if (label == null || label.isEmpty) return 'Block';
+    return label;
+  }
+
+  String get _resolvedBlock {
+    if (_blockOptions.isNotEmpty) {
+      return (_selectedBlock ?? '').trim();
+    }
+    return _customBlockController.text.trim();
+  }
+
   bool get _isValid =>
-      _inviteCodeController.text.trim().isNotEmpty &&
+      _firstNameController.text.trim().isNotEmpty &&
+      _selectedSociety != null &&
+      _resolvedBlock.isNotEmpty &&
       _flatController.text.trim().isNotEmpty;
 
+  Future<void> _loadSocieties() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final list = await ApiService.getSocieties();
+      if (!mounted) return;
+      setState(() {
+        _societies = list;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = _cleanError(e);
+      });
+    }
+  }
+
+  String _cleanError(Object e) {
+    var message = e.toString();
+    if (message.startsWith('Exception: ')) {
+      message = message.substring('Exception: '.length);
+    }
+    return message;
+  }
+
+  void _onSocietyChanged(Map<String, dynamic>? society) {
+    setState(() {
+      _selectedSociety = society;
+      _selectedBlock = null;
+      _customBlockController.clear();
+      final options = _blockOptions;
+      if (options.isNotEmpty) {
+        _selectedBlock = options.first;
+      }
+    });
+  }
+
   Future<void> _joinSociety() async {
-    if (!_isValid || _isJoining) return;
+    if (!_isValid || _isJoining || _selectedSociety == null) return;
 
     setState(() {
       _error = null;
@@ -38,12 +117,18 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
     });
 
     try {
-      final code = _inviteCodeController.text.trim();
+      final societyId = _selectedSociety!['id'] as String;
       final flat = _flatController.text.trim();
+      final block = _resolvedBlock;
+      final firstName = _firstNameController.text.trim();
+      final lastName = _lastNameController.text.trim();
 
       final response = await ApiService.joinSociety(
-        inviteCode: code,
+        societyId: societyId,
         flatNumber: flat,
+        block: block,
+        firstName: firstName,
+        lastName: lastName.isEmpty ? null : lastName,
       );
 
       final society = response['society'] as Map<String, dynamic>?;
@@ -52,8 +137,9 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
       await SessionService.saveSociety(
         societyId: society?['id'] as String? ??
             response['societyId'] as String? ??
-            SessionService.defaultSocietyId,
+            societyId,
         societyName: society?['name'] as String? ??
+            _selectedSociety!['name'] as String? ??
             SessionService.defaultSocietyName,
         flatId: flatData?['id'] as String? ??
             response['flatId'] as String? ??
@@ -72,12 +158,7 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-
-      String message = e.toString();
-      if (message.startsWith('Exception: ')) {
-        message = message.substring('Exception: '.length);
-      }
-      setState(() => _error = message);
+      setState(() => _error = _cleanError(e));
     } finally {
       if (mounted) {
         setState(() => _isJoining = false);
@@ -159,8 +240,8 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
                         ),
                         const SizedBox(height: 10),
                         const Text(
-                          'Enter the invite code shared by your\n'
-                          'apartment community',
+                          'Enter your name, select your community, then\n'
+                          'add your block/wing and flat number.',
                           style: TextStyle(
                             fontSize: 15,
                             color: Color(0xFF4A5A57),
@@ -169,11 +250,32 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
                           ),
                         ),
                         const SizedBox(height: 32),
-                        _InputCard(
-                          inviteCodeController: _inviteCodeController,
-                          flatController: _flatController,
-                          onChanged: () => setState(() {}),
-                        ),
+                        if (_isLoading)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 40),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: Color(0xFF0E5A47),
+                              ),
+                            ),
+                          )
+                        else
+                          _InputCard(
+                            firstNameController: _firstNameController,
+                            lastNameController: _lastNameController,
+                            societies: _societies,
+                            selectedSociety: _selectedSociety,
+                            onSocietyChanged: _onSocietyChanged,
+                            blockOptions: _blockOptions,
+                            selectedBlock: _selectedBlock,
+                            onBlockChanged: (value) {
+                              setState(() => _selectedBlock = value);
+                            },
+                            customBlockController: _customBlockController,
+                            flatController: _flatController,
+                            unitLabel: _unitLabel,
+                            onChanged: () => setState(() {}),
+                          ),
                         const SizedBox(height: 16),
                         if (_error != null) ...[
                           Container(
@@ -207,6 +309,11 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
                                     ),
                                   ),
                                 ),
+                                if (!_isLoading)
+                                  TextButton(
+                                    onPressed: _loadSocieties,
+                                    child: const Text('Retry'),
+                                  ),
                               ],
                             ),
                           ),
@@ -277,13 +384,31 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
 
 class _InputCard extends StatelessWidget {
   const _InputCard({
-    required this.inviteCodeController,
+    required this.firstNameController,
+    required this.lastNameController,
+    required this.societies,
+    required this.selectedSociety,
+    required this.onSocietyChanged,
+    required this.blockOptions,
+    required this.selectedBlock,
+    required this.onBlockChanged,
+    required this.customBlockController,
     required this.flatController,
+    required this.unitLabel,
     required this.onChanged,
   });
 
-  final TextEditingController inviteCodeController;
+  final TextEditingController firstNameController;
+  final TextEditingController lastNameController;
+  final List<Map<String, dynamic>> societies;
+  final Map<String, dynamic>? selectedSociety;
+  final ValueChanged<Map<String, dynamic>?> onSocietyChanged;
+  final List<String> blockOptions;
+  final String? selectedBlock;
+  final ValueChanged<String?> onBlockChanged;
+  final TextEditingController customBlockController;
   final TextEditingController flatController;
+  final String unitLabel;
   final VoidCallback onChanged;
 
   @override
@@ -308,7 +433,7 @@ class _InputCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
-                  Icons.vpn_key_rounded,
+                  Icons.apartment_rounded,
                   color: Color(0xFF0E5A47),
                   size: 20,
                 ),
@@ -318,7 +443,7 @@ class _InputCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Society Details',
+                    'Your Details',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -327,7 +452,7 @@ class _InputCard extends StatelessWidget {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    'Ask your community admin for the code',
+                    'Name and your society location',
                     style: TextStyle(
                       fontSize: 13,
                       color: Color(0xFF7A8885),
@@ -340,7 +465,7 @@ class _InputCard extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           const Text(
-            'Invite Code',
+            'First Name *',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -348,43 +473,31 @@ class _InputCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Container(
-            height: 56,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F7F6),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE6EBE9)),
-            ),
-            child: TextField(
-              controller: inviteCodeController,
-              textCapitalization: TextCapitalization.characters,
-              inputFormatters: [UpperCaseTextFormatter()],
-              onChanged: (_) => onChanged(),
-              style: const TextStyle(
-                fontSize: 18,
-                color: Color(0xFF223531),
-                fontWeight: FontWeight.w700,
-                letterSpacing: 2,
-              ),
-              decoration: const InputDecoration(
-                hintText: 'e.g. PRESTIGE2026',
-                hintStyle: TextStyle(
-                  color: Color(0xFFBCC4C1),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 1,
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 14,
-                ),
-              ),
-            ),
+          _TextFieldBox(
+            controller: firstNameController,
+            hintText: 'e.g. Anita',
+            textCapitalization: TextCapitalization.words,
+            onChanged: (_) => onChanged(),
           ),
           const SizedBox(height: 18),
           const Text(
-            'Flat Number',
+            'Last Name (optional)',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF4A5A57),
+            ),
+          ),
+          const SizedBox(height: 6),
+          _TextFieldBox(
+            controller: lastNameController,
+            hintText: 'e.g. Sharma',
+            textCapitalization: TextCapitalization.words,
+            onChanged: (_) => onChanged(),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'Society',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -394,51 +507,195 @@ class _InputCard extends StatelessWidget {
           const SizedBox(height: 6),
           Container(
             height: 56,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
               color: const Color(0xFFF5F7F6),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFE6EBE9)),
             ),
-            child: TextField(
-              controller: flatController,
-              onChanged: (_) => onChanged(),
-              style: const TextStyle(
-                fontSize: 18,
-                color: Color(0xFF223531),
-                fontWeight: FontWeight.w700,
-                letterSpacing: 2,
-              ),
-              decoration: const InputDecoration(
-                hintText: 'e.g. 3062',
-                hintStyle: TextStyle(
-                  color: Color(0xFFBCC4C1),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 1,
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: selectedSociety?['id'] as String?,
+                hint: const Text(
+                  'Select your society',
+                  style: TextStyle(
+                    color: Color(0xFFBCC4C1),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 14,
+                icon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: Color(0xFF0E5A47),
                 ),
+                items: societies.map((s) {
+                  final id = s['id'] as String;
+                  final name = s['name']?.toString() ?? 'Society';
+                  final city = s['city']?.toString();
+                  return DropdownMenuItem<String>(
+                    value: id,
+                    child: Text(
+                      city == null || city.isEmpty ? name : '$name · $city',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF223531),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (id) {
+                  if (id == null) {
+                    onSocietyChanged(null);
+                    return;
+                  }
+                  Map<String, dynamic>? match;
+                  for (final s in societies) {
+                    if (s['id'] == id) {
+                      match = s;
+                      break;
+                    }
+                  }
+                  onSocietyChanged(match);
+                },
               ),
             ),
           ),
+          if (selectedSociety != null) ...[
+            const SizedBox(height: 18),
+            Text(
+              unitLabel,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF4A5A57),
+              ),
+            ),
+            const SizedBox(height: 6),
+            if (blockOptions.isNotEmpty)
+              Container(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F7F6),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE6EBE9)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: selectedBlock != null &&
+                            blockOptions.contains(selectedBlock)
+                        ? selectedBlock
+                        : null,
+                    hint: Text(
+                      'Select $unitLabel',
+                      style: const TextStyle(
+                        color: Color(0xFFBCC4C1),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Color(0xFF0E5A47),
+                    ),
+                    items: blockOptions
+                        .map(
+                          (b) => DropdownMenuItem<String>(
+                            value: b,
+                            child: Text(
+                              '$unitLabel $b',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Color(0xFF223531),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: onBlockChanged,
+                  ),
+                ),
+              )
+            else
+              _TextFieldBox(
+                controller: customBlockController,
+                hintText: unitLabel == 'Wing' ? 'e.g. East' : 'e.g. C',
+                onChanged: (_) => onChanged(),
+              ),
+            const SizedBox(height: 18),
+            const Text(
+              'Flat Number',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF4A5A57),
+              ),
+            ),
+            const SizedBox(height: 6),
+            _TextFieldBox(
+              controller: flatController,
+              hintText: 'e.g. 3062',
+              onChanged: (_) => onChanged(),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class UpperCaseTextFormatter extends TextInputFormatter {
+class _TextFieldBox extends StatelessWidget {
+  const _TextFieldBox({
+    required this.controller,
+    required this.hintText,
+    required this.onChanged,
+    this.textCapitalization = TextCapitalization.none,
+  });
+
+  final TextEditingController controller;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+  final TextCapitalization textCapitalization;
+
   @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    return TextEditingValue(
-      text: newValue.text.toUpperCase(),
-      selection: newValue.selection,
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F7F6),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE6EBE9)),
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        textCapitalization: textCapitalization,
+        style: const TextStyle(
+          fontSize: 18,
+          color: Color(0xFF223531),
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: const TextStyle(
+            color: Color(0xFFBCC4C1),
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.5,
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 14,
+          ),
+        ),
+      ),
     );
   }
 }

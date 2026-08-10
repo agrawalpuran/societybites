@@ -67,6 +67,7 @@ function serializeOrder(order) {
     upiTransactionRef: order.upiTransactionRef || null,
     subtotal: order.subtotal,
     communityFee: order.communityFee,
+    platformFee: order.communityFee,
     total: order.total,
     societyId: order.societyId,
     buyerId: order.buyerId,

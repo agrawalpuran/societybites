@@ -31,28 +31,63 @@ async function resetTestData(sellerId, buyerId) {
   await prisma.listing.deleteMany({ where: { sellerId } });
 }
 
+async function ensureSociety({ id, name, city, inviteCode, unitLabel, blockNames }) {
+  const society = await prisma.society.upsert({
+    where: { id },
+    update: { name, city, inviteCode, unitLabel, status: "active" },
+    create: {
+      id,
+      name,
+      city,
+      inviteCode,
+      unitLabel,
+      status: "active",
+    },
+  });
+
+  for (const blockName of blockNames) {
+    const existing = await prisma.block.findFirst({
+      where: { societyId: society.id, name: blockName },
+    });
+    if (!existing) {
+      await prisma.block.create({
+        data: { societyId: society.id, name: blockName },
+      });
+    }
+  }
+
+  return society;
+}
+
 async function main() {
   const pickupTime = new Date();
   pickupTime.setHours(19, 0, 0, 0);
 
-  await prisma.society.upsert({
-    where: { id: SOCIETY_ID },
-    update: { name: "Prestige Notting Hill", city: "Bangalore", inviteCode: "PRESTIGE2026" },
-    create: {
-      id: SOCIETY_ID,
-      name: "Prestige Notting Hill",
-      city: "Bangalore",
-      inviteCode: "PRESTIGE2026",
-      blocks: {
-        create: [
-          { name: "A" },
-          { name: "B" },
-          { name: "C" },
-          { name: "D" },
-          { name: "E" },
-        ],
-      },
-    },
+  await ensureSociety({
+    id: SOCIETY_ID,
+    name: "Prestige Notting Hill",
+    city: "Bangalore",
+    inviteCode: "PRESTIGE2026",
+    unitLabel: "Block",
+    blockNames: ["A", "B", "C", "D", "E"],
+  });
+
+  await ensureSociety({
+    id: "brigade-gateway",
+    name: "Brigade Gateway",
+    city: "Bangalore",
+    inviteCode: "BRIGADE2026",
+    unitLabel: "Wing",
+    blockNames: ["East", "West", "North"],
+  });
+
+  await ensureSociety({
+    id: "sobha-dream-acres",
+    name: "Sobha Dream Acres",
+    city: "Bangalore",
+    inviteCode: "SOBHA2026",
+    unitLabel: "Block",
+    blockNames: ["A", "B", "C", "D"],
   });
 
   const flat3062 = await prisma.flat.upsert({
@@ -120,6 +155,8 @@ async function main() {
       price: 180,
       quantity: 6,
       imageUrl: "/uploads/dal-makhani.jpg",
+      category: "Dinner",
+      tags: ["Homestyle", "North Indian"],
     },
     {
       id: LISTING_IDS.chapati,
@@ -129,6 +166,8 @@ async function main() {
       price: 80,
       quantity: 10,
       imageUrl: "/uploads/chapati.jpg",
+      category: "Breakfast",
+      tags: ["Fresh", "Healthy"],
     },
     {
       id: LISTING_IDS.biryani,
@@ -138,6 +177,8 @@ async function main() {
       price: 220,
       quantity: 4,
       imageUrl: "/uploads/chicken-biryani.jpg",
+      category: "Dinner",
+      tags: ["Spicy", "Non-Veg"],
     },
     {
       id: LISTING_IDS.paneer,
@@ -147,6 +188,8 @@ async function main() {
       price: 200,
       quantity: 5,
       imageUrl: "/uploads/paneer-butter-masala.jpg",
+      category: "Lunch",
+      tags: ["Veg", "North Indian"],
     },
     {
       id: LISTING_IDS.lemonRice,
@@ -156,6 +199,8 @@ async function main() {
       price: 120,
       quantity: 3,
       imageUrl: "/uploads/lemon-rice.jpg",
+      category: "Lunch",
+      tags: ["South Indian", "Light"],
     },
   ];
 
@@ -173,9 +218,17 @@ async function main() {
         pickupLocation: "My Home (Verified)",
         status: "active",
         imageUrl: item.imageUrl,
+        category: item.category,
+        tags: item.tags,
       },
     });
   }
+
+  await prisma.appSetting.upsert({
+    where: { key: "platform_fee" },
+    update: { value: "0" },
+    create: { key: "platform_fee", value: "0" },
+  });
 
   const pastOrderDate = new Date();
   pastOrderDate.setDate(pastOrderDate.getDate() - 5);
@@ -188,8 +241,8 @@ async function main() {
       status: "completed",
       paymentMethod: "upi",
       subtotal: 180,
-      communityFee: 10,
-      total: 190,
+      communityFee: 0,
+      total: 180,
       createdAt: pastOrderDate,
       items: {
         create: {
@@ -216,9 +269,9 @@ async function main() {
   });
 
   console.log("Seed complete:");
-  console.log(`  Society: Prestige Notting Hill`);
-  console.log(`  Seller: ${seller.name} (${SELLER_PHONE}) — Flat 3062`);
-  console.log(`  Buyer:  ${buyer.name} (${BUYER_PHONE}) — Flat 3062`);
+  console.log(`  Societies: Prestige Notting Hill, Brigade Gateway, Sobha Dream Acres`);
+  console.log(`  Seller: ${seller.name} (${SELLER_PHONE}) — Flat 3062 (Prestige)`);
+  console.log(`  Buyer:  ${buyer.name} (${BUYER_PHONE}) — Flat 3062 (Prestige)`);
   console.log(`  Listings: ${listings.length} active items`);
   console.log(`  Past order: ${completedOrder.orderNumber} (completed + review)`);
 }

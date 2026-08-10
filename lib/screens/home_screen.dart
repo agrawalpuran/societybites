@@ -56,7 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
       results = results.where((food) {
         return food.name.toLowerCase().contains(q) ||
             food.sellerName.toLowerCase().contains(q) ||
-            food.description.toLowerCase().contains(q) ||
             food.block.toLowerCase().contains(q) ||
             food.tags.any((tag) => tag.toLowerCase().contains(q));
       }).toList();
@@ -542,7 +541,9 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Text(
             _searchQuery.isNotEmpty
                 ? 'No listings match "$_searchQuery".'
-                : 'No listings yet. Be the first to add food from the seller dashboard.',
+                : _selectedCategory != null
+                    ? 'No listings in $_selectedCategory yet.'
+                    : 'No listings yet. Be the first to add food from the seller dashboard.',
             style: const TextStyle(
               color: Color(0xFF6A7774),
               fontWeight: FontWeight.w500,
