@@ -82,7 +82,7 @@ model Listing {
   availableAt    DateTime?
   pickupLocation String      @default("My Home (Verified)")
   imageUrl       String?
-  /// active | paused | sold_out | inactive
+  /// active | paused | expired | sold_out | inactive
   status         String      @default("active")
   featured       Boolean     @default(false)
   createdAt      DateTime    @default(now())
@@ -115,6 +115,9 @@ model Order {
   pickedUpAt            DateTime?
   completedAt           DateTime?
   cancelledAt           DateTime?
+  rejectedAt            DateTime?
+  rejectReason          String?
+  rejectedBy            String?
   paymentStatus         String      @default("pending")
   buyerMarkedPaidAt     DateTime?
   sellerConfirmedPaidAt DateTime?

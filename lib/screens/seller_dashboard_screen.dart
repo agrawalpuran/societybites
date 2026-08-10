@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/seller_onboarding.dart';
 import 'add_listing_screen.dart';
 import 'my_listings_screen.dart';
+import 'seller_feedback_screen.dart';
 
 class SellerDashboardScreen extends StatefulWidget {
   const SellerDashboardScreen({super.key});
@@ -51,12 +52,8 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
       if (!mounted) return;
 
       setState(() {
-        _activeOrders = parsed
-            .where((o) => o.status != 'completed' && o.status != 'cancelled')
-            .toList();
-        _pastOrders = parsed
-            .where((o) => o.status == 'completed' || o.status == 'cancelled')
-            .toList();
+        _activeOrders = parsed.where((o) => !o.isTerminal).toList();
+        _pastOrders = parsed.where((o) => o.isTerminal).toList();
         _isLoading = false;
       });
       _loadStats();
@@ -95,6 +92,40 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
     }
   }
 
+  Future<void> _rejectOrder(Order order) async {
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _RejectOrderSheet(orderId: order.orderId),
+    );
+
+    if (result == null || !mounted) return;
+
+    try {
+      await ApiService.rejectOrder(
+        orderId: order.id,
+        reason: result['reason']!,
+        otherText: result['otherText'],
+      );
+      await _loadOrders();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order rejected'),
+          backgroundColor: Color(0xFFD94F4F),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not reject order: $e')),
+      );
+    }
+  }
+
   String _statusLabel(String status) {
     switch (status) {
       case 'pending':
@@ -111,6 +142,8 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
         return 'Completed';
       case 'cancelled':
         return 'Cancelled';
+      case 'rejected':
+        return 'Rejected';
       default:
         return status;
     }
@@ -244,6 +277,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 order: order,
                 onAction: _updateStatus,
                 onPaymentConfirmed: _loadOrders,
+                onReject: _rejectOrder,
               ),
             ),
         ],
@@ -319,6 +353,14 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
               Expanded(
                 child: _SatisfactionCard(
                   rating: (_stats['avgRating'] as num?)?.toDouble() ?? 0,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SellerFeedbackScreen(),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -631,64 +673,92 @@ class _EarningsCard extends StatelessWidget {
 }
 
 class _SatisfactionCard extends StatelessWidget {
-  const _SatisfactionCard({this.rating = 0});
+  const _SatisfactionCard({this.rating = 0, this.onTap});
 
   final double rating;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFEAEFED)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF8E8),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: const Icon(Icons.star_rounded,
-                color: Colors.amber, size: 18),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFFEAEFED)),
           ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                rating > 0 ? rating.toString() : '—',
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF101617),
-                ),
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF8E8),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Icon(Icons.star_rounded,
+                        color: Colors.amber, size: 18),
+                  ),
+                  const Spacer(),
+                  if (onTap != null)
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Color(0xFFADB5B2),
+                      size: 20,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    rating > 0 ? rating.toString() : '—',
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF101617),
+                    ),
+                  ),
+                  const Text(
+                    '/5',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF8A9491),
+                    ),
+                  ),
+                ],
               ),
               const Text(
-                '/5',
+                'Satisfaction Score',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 13,
+                  color: Color(0xFF6A7774),
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF8A9491),
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                'View feedback',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF0E5A47),
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
           ),
-          const Text(
-            'Satisfaction Score',
-            style: TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6A7774),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -699,11 +769,13 @@ class _ActiveOrderCard extends StatefulWidget {
     required this.order,
     required this.onAction,
     required this.onPaymentConfirmed,
+    required this.onReject,
   });
 
   final Order order;
   final Future<void> Function(Order order, String nextStatus) onAction;
   final Future<void> Function() onPaymentConfirmed;
+  final Future<void> Function(Order order) onReject;
 
   @override
   State<_ActiveOrderCard> createState() => _ActiveOrderCardState();
@@ -756,6 +828,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
     final isReady = order.status == 'ready';
     final isPickedUp = order.status == 'picked_up';
     final hasSellerAction = isPending || isAccepted || isPrep;
+    final canReject = isPending || isAccepted || isPrep;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -943,6 +1016,30 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
               ),
             ],
           ),
+          if (canReject) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: OutlinedButton.icon(
+                onPressed: _isUpdating
+                    ? null
+                    : () => widget.onReject(order),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFD94F4F),
+                  side: const BorderSide(color: Color(0xFFFFD4D4)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.cancel_outlined, size: 18),
+                label: const Text(
+                  'Reject Order',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1041,11 +1138,18 @@ class _SellerPastOrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCancelled = order.status == 'cancelled';
-    final statusLabel = isCancelled ? 'CANCELLED' : 'COMPLETED';
-    final statusColor =
-        isCancelled ? const Color(0xFFD94F4F) : const Color(0xFF0E5A47);
-    final statusBg =
-        isCancelled ? const Color(0xFFFFF0F0) : const Color(0xFFE8F5EE);
+    final isRejected = order.status == 'rejected';
+    final statusLabel = isRejected
+        ? 'REJECTED'
+        : isCancelled
+            ? 'CANCELLED'
+            : 'COMPLETED';
+    final statusColor = isRejected || isCancelled
+        ? const Color(0xFFD94F4F)
+        : const Color(0xFF0E5A47);
+    final statusBg = isRejected || isCancelled
+        ? const Color(0xFFFFF0F0)
+        : const Color(0xFFE8F5EE);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1128,6 +1232,191 @@ class _SellerPastOrderCard extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF8A9491),
+                ),
+              ),
+            ],
+          ),
+          if (isRejected &&
+              order.rejectReason != null &&
+              order.rejectReason!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF5F5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFD4D4)),
+              ),
+              child: Text(
+                'Reason: ${order.rejectReason}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF8A3030),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RejectOrderSheet extends StatefulWidget {
+  const _RejectOrderSheet({required this.orderId});
+
+  final String orderId;
+
+  @override
+  State<_RejectOrderSheet> createState() => _RejectOrderSheetState();
+}
+
+class _RejectOrderSheetState extends State<_RejectOrderSheet> {
+  static const _reasons = [
+    'Food sold out',
+    'Unable to prepare today',
+    'Kitchen closed',
+    'Ingredients unavailable',
+    'Other',
+  ];
+
+  String? _selected;
+  final _otherController = TextEditingController();
+
+  @override
+  void dispose() {
+    _otherController.dispose();
+    super.dispose();
+  }
+
+  bool get _canSubmit {
+    if (_selected == null) return false;
+    if (_selected == 'Other') {
+      final text = _otherController.text.trim();
+      return text.isNotEmpty && text.length <= 200;
+    }
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Reject Order',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF101617),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Choose a reason for rejecting ${widget.orderId}. Inventory will be restored.',
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6A7774),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ..._reasons.map((reason) {
+            final selected = _selected == reason;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Material(
+                color: selected
+                    ? const Color(0xFFFFF0F0)
+                    : const Color(0xFFF5F7F6),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: () => setState(() => _selected = reason),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_off,
+                          size: 20,
+                          color: selected
+                              ? const Color(0xFFD94F4F)
+                              : const Color(0xFF8A9491),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          reason,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: selected
+                                ? const Color(0xFF8A3030)
+                                : const Color(0xFF3A4644),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+          if (_selected == 'Other') ...[
+            const SizedBox(height: 4),
+            TextField(
+              controller: _otherController,
+              maxLength: 200,
+              maxLines: 3,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: 'Describe the reason…',
+                filled: true,
+                fillColor: const Color(0xFFF5F7F6),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: !_canSubmit
+                      ? null
+                      : () {
+                          Navigator.pop(context, {
+                            'reason': _selected!,
+                            if (_selected == 'Other')
+                              'otherText': _otherController.text.trim(),
+                          });
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD94F4F),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFFE8EDEB),
+                  ),
+                  child: const Text('Confirm Reject'),
                 ),
               ),
             ],

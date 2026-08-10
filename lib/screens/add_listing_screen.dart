@@ -53,6 +53,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
       }
       _selectedTags = List<String>.from(listing.tags);
       _category = listing.category;
+      _dateTime = listing.availableAt;
     }
   }
 
@@ -67,9 +68,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
   }
 
   Future<void> _pickDateTime() async {
+    final initial = _dateTime ?? DateTime.now().add(const Duration(hours: 1));
     final date = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: initial.isBefore(DateTime.now()) ? DateTime.now() : initial,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 7)),
     );
@@ -77,7 +79,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: TimeOfDay.fromDateTime(initial),
     );
     if (time == null || !mounted) return;
 

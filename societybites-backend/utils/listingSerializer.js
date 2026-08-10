@@ -6,6 +6,7 @@ const ORDER_STATUS_TO_STEP = {
   picked_up: 4,
   completed: 5,
   cancelled: -1,
+  rejected: -1,
 };
 
 function serializeListing(listing) {
@@ -72,6 +73,9 @@ function serializeOrder(order) {
     societyId: order.societyId,
     buyerId: order.buyerId,
     hasReview: Array.isArray(order.reviews) && order.reviews.length > 0,
+    rejectReason: order.rejectReason || null,
+    rejectedAt: order.rejectedAt || null,
+    rejectedBy: order.rejectedBy || null,
     items,
     timeline: {
       createdAt: order.createdAt,
@@ -81,6 +85,7 @@ function serializeOrder(order) {
       pickedUpAt: order.pickedUpAt || null,
       completedAt: order.completedAt || null,
       cancelledAt: order.cancelledAt || null,
+      rejectedAt: order.rejectedAt || null,
     },
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
@@ -90,11 +95,13 @@ function serializeOrder(order) {
 function serializeReview(review) {
   const reviewer = review.reviewer || {};
   const flat = reviewer.flat;
+  const listing = review.listing || {};
 
   return {
     id: review.id,
     orderId: review.orderId,
     listingId: review.listingId,
+    listingName: listing.name || null,
     reviewerId: review.reviewerId,
     name: reviewer.name || "Neighbor",
     flatNumber: flat?.flatNumber || null,

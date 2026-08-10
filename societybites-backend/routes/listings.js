@@ -3,6 +3,10 @@ const prisma = require("../lib/prisma");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser } = require("../middleware/requireUser");
 const { serializeListing } = require("../utils/listingSerializer");
+const {
+  expireDueListings,
+  expireListingIfDue,
+} = require("../utils/listingExpiry");
 
 const router = express.Router();
 
@@ -26,10 +30,18 @@ router.get(
 
     const searchTerm = search ? String(search).trim() : "";
 
+    // Lazy expiry before any listing read (no cron).
+    await expireDueListings(prisma, {
+      societyId: String(societyId),
+      ...(sellerId && { sellerId: String(sellerId) }),
+    });
+
     let statusFilter;
     if (status === "all") {
       // Seller management view: exclude soft-deleted (inactive) only
-      statusFilter = { status: { in: ["active", "paused", "sold_out"] } };
+      statusFilter = {
+        status: { in: ["active", "paused", "sold_out", "expired"] },
+      };
     } else if (status) {
       statusFilter = { status: String(status) };
     } else {
@@ -60,7 +72,7 @@ router.get(
 router.get(
   "/:id",
   asyncHandler(async (req, res) => {
-    const listing = await prisma.listing.findUnique({
+    let listing = await prisma.listing.findUnique({
       where: { id: req.params.id },
       include: listingInclude,
     });
@@ -68,6 +80,8 @@ router.get(
     if (!listing) {
       return res.status(404).json({ error: "Listing not found" });
     }
+
+    listing = await expireListingIfDue(prisma, listing, { include: listingInclude });
 
     res.json(serializeListing(listing));
   })
@@ -118,6 +132,13 @@ router.post(
       });
     }
 
+    const availableAtDate = availableAt ? new Date(availableAt) : null;
+    if (availableAtDate && availableAtDate < new Date()) {
+      return res.status(400).json({
+        error: "Available Until must be in the future",
+      });
+    }
+
     const listing = await prisma.listing.create({
       data: {
         sellerId: req.user.id,
@@ -126,7 +147,7 @@ router.post(
         description,
         price: parseFloat(price),
         quantity: parseInt(quantity, 10),
-        availableAt: availableAt ? new Date(availableAt) : null,
+        availableAt: availableAtDate,
         pickupLocation: pickupLocation || "My Home (Verified)",
         imageUrl,
         weightUnit: weightUnit || null,
@@ -145,7 +166,7 @@ router.patch(
   "/:id",
   requireUser,
   asyncHandler(async (req, res) => {
-    const listing = await prisma.listing.findUnique({
+    let listing = await prisma.listing.findUnique({
       where: { id: req.params.id },
     });
 
@@ -156,6 +177,8 @@ router.patch(
     if (listing.sellerId !== req.user.id) {
       return res.status(403).json({ error: "Not allowed to update this listing" });
     }
+
+    listing = await expireListingIfDue(prisma, listing);
 
     const {
       name,
@@ -177,9 +200,6 @@ router.patch(
       ...(description !== undefined && { description }),
       ...(price !== undefined && { price: parseFloat(price) }),
       ...(quantity !== undefined && { quantity: parseInt(quantity, 10) }),
-      ...(availableAt !== undefined && {
-        availableAt: availableAt ? new Date(availableAt) : null,
-      }),
       ...(pickupLocation !== undefined && { pickupLocation }),
       ...(imageUrl !== undefined && { imageUrl }),
       ...(weightUnit !== undefined && { weightUnit: weightUnit || null }),
@@ -188,6 +208,15 @@ router.patch(
       ...(category !== undefined && { category: category || null }),
       ...(status !== undefined && { status }),
     };
+
+    if (availableAt !== undefined) {
+      const availableAtDate = availableAt ? new Date(availableAt) : null;
+      data.availableAt = availableAtDate;
+      // Renew via edit: future Available Until reactivates expired listings
+      if (availableAtDate && availableAtDate > new Date() && listing.status === "expired") {
+        data.status = "active";
+      }
+    }
 
     if (quantity !== undefined && parseInt(quantity, 10) > 0 && listing.status === "sold_out") {
       data.status = "active";
@@ -207,7 +236,7 @@ router.patch(
   "/:id/pause",
   requireUser,
   asyncHandler(async (req, res) => {
-    const listing = await prisma.listing.findUnique({
+    let listing = await prisma.listing.findUnique({
       where: { id: req.params.id },
     });
 
@@ -219,12 +248,20 @@ router.patch(
       return res.status(403).json({ error: "Not allowed to pause this listing" });
     }
 
+    listing = await expireListingIfDue(prisma, listing);
+
     if (listing.status === "paused") {
       return res.status(400).json({ error: "Listing is already paused" });
     }
 
     if (listing.status === "inactive") {
       return res.status(400).json({ error: "Cannot pause a removed listing" });
+    }
+
+    if (listing.status === "expired") {
+      return res.status(400).json({
+        error: "Cannot pause an expired listing. Renew it first.",
+      });
     }
 
     if (listing.status !== "active" && listing.status !== "sold_out") {
@@ -247,7 +284,7 @@ router.patch(
   "/:id/resume",
   requireUser,
   asyncHandler(async (req, res) => {
-    const listing = await prisma.listing.findUnique({
+    let listing = await prisma.listing.findUnique({
       where: { id: req.params.id },
     });
 
@@ -257,6 +294,14 @@ router.patch(
 
     if (listing.sellerId !== req.user.id) {
       return res.status(403).json({ error: "Not allowed to resume this listing" });
+    }
+
+    listing = await expireListingIfDue(prisma, listing);
+
+    if (listing.status === "expired") {
+      return res.status(400).json({
+        error: "Listing has expired. Renew it with a new Available Until time.",
+      });
     }
 
     if (listing.status === "active") {
@@ -272,6 +317,58 @@ router.patch(
     const updated = await prisma.listing.update({
       where: { id: listing.id },
       data: { status: "active" },
+      include: listingInclude,
+    });
+
+    res.json(serializeListing(updated));
+  })
+);
+
+router.patch(
+  "/:id/renew",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    let listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!listing) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    if (listing.sellerId !== req.user.id) {
+      return res.status(403).json({ error: "Not allowed to renew this listing" });
+    }
+
+    listing = await expireListingIfDue(prisma, listing);
+
+    if (listing.status !== "expired") {
+      return res.status(400).json({
+        error: `Only expired listings can be renewed (current status: "${listing.status}")`,
+      });
+    }
+
+    const { availableAt } = req.body;
+    if (!availableAt) {
+      return res.status(400).json({ error: "availableAt is required to renew" });
+    }
+
+    const availableAtDate = new Date(availableAt);
+    if (Number.isNaN(availableAtDate.getTime())) {
+      return res.status(400).json({ error: "availableAt must be a valid date" });
+    }
+    if (availableAtDate <= new Date()) {
+      return res.status(400).json({
+        error: "Available Until must be in the future",
+      });
+    }
+
+    const updated = await prisma.listing.update({
+      where: { id: listing.id },
+      data: {
+        availableAt: availableAtDate,
+        status: "active",
+      },
       include: listingInclude,
     });
 

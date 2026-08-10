@@ -367,6 +367,24 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> renewListing({
+    required String listingId,
+    required DateTime availableAt,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/listings/$listingId/renew'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'availableAt': availableAt.toIso8601String(),
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<List<Map<String, dynamic>>> getOrders({
     String role = 'buyer',
     String? status,
@@ -400,6 +418,27 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> rejectOrder({
+    required String orderId,
+    required String reason,
+    String? otherText,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/orders/$orderId/reject'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'reason': reason,
+        if (otherText != null && otherText.trim().isNotEmpty)
+          'otherText': otherText.trim(),
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> getSellerStats() async {
     final response = await http.get(
       Uri.parse('$baseUrl/orders/seller/stats'),
@@ -417,6 +456,19 @@ class ApiService {
   ) async {
     final response =
         await http.get(Uri.parse('$baseUrl/reviews/listing/$listingId'));
+
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response) as List;
+      return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getSellerReviews() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/reviews/seller/me'),
+      headers: await _authHeaders(),
+    );
 
     if (response.statusCode == 200) {
       final data = _decodeResponse(response) as List;

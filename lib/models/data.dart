@@ -38,6 +38,7 @@ class FoodItem {
   final List<String> tags;
   final String? category;
   final String status;
+  final DateTime? availableAt;
   final int reviewCount;
   final IconData icon;
   final Color bgColor;
@@ -63,6 +64,7 @@ class FoodItem {
     this.tags = const [],
     this.category,
     this.status = 'active',
+    this.availableAt,
     this.reviewCount = 0,
     required this.icon,
     required this.bgColor,
@@ -71,6 +73,7 @@ class FoodItem {
 
   bool get isPaused => status == 'paused';
   bool get isActive => status == 'active';
+  bool get isExpired => status == 'expired';
 
   /// Human-readable pickup / seller location for cards and detail.
   String get locationLabel {
@@ -115,7 +118,10 @@ class FoodItem {
   factory FoodItem.fromJson(Map<String, dynamic> json) {
     final id = json['id'] as String;
     final hash = id.hashCode.abs();
-    final availableAt = json['availableAt'];
+    final availableAtRaw = json['availableAt'];
+    final availableAt = availableAtRaw == null
+        ? null
+        : DateTime.tryParse(availableAtRaw.toString());
 
     return FoodItem(
       id: id,
@@ -127,7 +133,7 @@ class FoodItem {
       pickupLocation: json['pickupLocation'] as String?,
       price: (json['price'] as num).toDouble(),
       rating: (json['avgRating'] as num?)?.toDouble() ?? 0,
-      pickupTime: _formatPickupTime(availableAt),
+      pickupTime: _formatPickupTime(availableAtRaw),
       description: (json['description'] as String?) ?? '',
       imageUrl: json['imageUrl'] as String?,
       imageCacheKey: json['updatedAt'] as String?,
@@ -137,6 +143,7 @@ class FoodItem {
       tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
       category: json['category'] as String?,
       status: (json['status'] as String?) ?? 'active',
+      availableAt: availableAt,
       reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
       icon: _icons[hash % _icons.length],
       bgColor: _colors[hash % _colors.length],
@@ -170,6 +177,8 @@ class Review {
   final double rating;
   final String comment;
   final List<String> tags;
+  final String? listingName;
+  final DateTime? createdAt;
 
   const Review({
     required this.name,
@@ -178,6 +187,8 @@ class Review {
     required this.rating,
     required this.comment,
     required this.tags,
+    this.listingName,
+    this.createdAt,
   });
 
   String get displayName {
@@ -196,6 +207,10 @@ class Review {
       rating: (json['rating'] as num).toDouble(),
       comment: (json['comment'] as String?) ?? '',
       tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      listingName: json['listingName'] as String?,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
+          : null,
     );
   }
 }
@@ -245,6 +260,8 @@ class Order {
   final String? paymentMethod;
   final String paymentStatus;
   final bool hasReview;
+  final String? rejectReason;
+  final DateTime? rejectedAt;
 
   const Order({
     required this.id,
@@ -259,7 +276,14 @@ class Order {
     this.paymentMethod,
     this.paymentStatus = 'pending',
     this.hasReview = false,
+    this.rejectReason,
+    this.rejectedAt,
   });
+
+  bool get isRejected => status == 'rejected';
+  bool get isCancelled => status == 'cancelled';
+  bool get isTerminal =>
+      status == 'completed' || status == 'cancelled' || status == 'rejected';
 
   FoodItem get food =>
       items.isNotEmpty ? items.first.food : _placeholderFood;
@@ -329,6 +353,8 @@ class Order {
       paymentMethod: json['paymentMethod'] as String?,
       paymentStatus: (json['paymentStatus'] as String?) ?? 'pending',
       hasReview: json['hasReview'] == true,
+      rejectReason: json['rejectReason'] as String?,
+      rejectedAt: DateTime.tryParse(json['rejectedAt']?.toString() ?? ''),
     );
   }
 

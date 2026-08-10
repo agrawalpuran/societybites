@@ -52,12 +52,8 @@ class OrdersScreenState extends State<OrdersScreen>
       if (!mounted) return;
 
       setState(() {
-        _activeOrders = parsed
-            .where((o) => o.status != 'completed' && o.status != 'cancelled')
-            .toList();
-        _pastOrders = parsed
-            .where((o) => o.status == 'completed' || o.status == 'cancelled')
-            .toList();
+        _activeOrders = parsed.where((o) => !o.isTerminal).toList();
+        _pastOrders = parsed.where((o) => o.isTerminal).toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -829,7 +825,18 @@ class _PastOrderTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCancelled = order.status == 'cancelled';
-    final statusLabel = isCancelled ? 'CANCELLED' : 'COMPLETED';
+    final isRejected = order.status == 'rejected';
+    final statusLabel = isRejected
+        ? 'ORDER REJECTED'
+        : isCancelled
+            ? 'CANCELLED'
+            : 'COMPLETED';
+    final statusBg = isRejected || isCancelled
+        ? const Color(0xFFFFF0F0)
+        : const Color(0xFFE8F5EE);
+    final statusFg = isRejected || isCancelled
+        ? const Color(0xFFD94F4F)
+        : const Color(0xFF0E5A47);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -886,13 +893,11 @@ class _PastOrderTile extends StatelessWidget {
             OrderItemsList(items: order.items, compact: true),
           ],
           const SizedBox(height: 10),
-          if (isSellerView)
+          if (isSellerView) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: isCancelled
-                    ? const Color(0xFFFFF0F0)
-                    : const Color(0xFFE8F5EE),
+                color: statusBg,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -901,33 +906,71 @@ class _PastOrderTile extends StatelessWidget {
                   fontSize: 11,
                   letterSpacing: 0.6,
                   fontWeight: FontWeight.w700,
-                  color: isCancelled
-                      ? const Color(0xFFD94F4F)
-                      : const Color(0xFF0E5A47),
-                ),
-              ),
-            )
-          else ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: isCancelled
-                    ? const Color(0xFFFFF0F0)
-                    : const Color(0xFFE8F5EE),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                statusLabel,
-                style: TextStyle(
-                  fontSize: 11,
-                  letterSpacing: 0.6,
-                  fontWeight: FontWeight.w700,
-                  color: isCancelled
-                      ? const Color(0xFFD94F4F)
-                      : const Color(0xFF0E5A47),
+                  color: statusFg,
                 ),
               ),
             ),
+            if (isRejected &&
+                order.rejectReason != null &&
+                order.rejectReason!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF5F5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFFD4D4)),
+                ),
+                child: Text(
+                  'Reason: ${order.rejectReason}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF8A3030),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: statusBg,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                statusLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  letterSpacing: 0.6,
+                  fontWeight: FontWeight.w700,
+                  color: statusFg,
+                ),
+              ),
+            ),
+            if (isRejected &&
+                order.rejectReason != null &&
+                order.rejectReason!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF5F5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFFD4D4)),
+                ),
+                child: Text(
+                  'Reason: ${order.rejectReason}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF8A3030),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [

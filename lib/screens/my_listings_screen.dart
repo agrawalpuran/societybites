@@ -186,6 +186,35 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     }
   }
 
+  Future<void> _renewListing(FoodItem listing) async {
+    final picked = await showDialog<DateTime>(
+      context: context,
+      builder: (context) => _RenewListingDialog(
+        listingName: listing.name,
+        initial: listing.availableAt,
+      ),
+    );
+
+    if (picked == null) return;
+
+    try {
+      await ApiService.renewListing(
+        listingId: listing.id,
+        availableAt: picked,
+      );
+      await _loadListings();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Listing renewed')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not renew: ${_cleanError(e)}')),
+      );
+    }
+  }
+
   Future<void> _openEditor([FoodItem? listing]) async {
     if (listing == null) {
       final canList = await SellerOnboarding.ensureCanCreateListing(context);
@@ -304,6 +333,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                                     onDelete: () => _deleteListing(listing),
                                     onPause: () => _pauseListing(listing),
                                     onResume: () => _resumeListing(listing),
+                                    onRenew: () => _renewListing(listing),
                                   );
                                 },
                               ),
@@ -323,6 +353,7 @@ class _SellerListingCard extends StatelessWidget {
     required this.onDelete,
     required this.onPause,
     required this.onResume,
+    required this.onRenew,
   });
 
   final FoodItem listing;
@@ -330,12 +361,15 @@ class _SellerListingCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onPause;
   final VoidCallback onResume;
+  final VoidCallback onRenew;
 
   @override
   Widget build(BuildContext context) {
     final isPaused = listing.isPaused;
+    final isExpired = listing.isExpired;
     final canPause = listing.isActive || listing.status == 'sold_out';
     final canResume = isPaused;
+    final canRenew = isExpired;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -416,6 +450,17 @@ class _SellerListingCard extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                   ),
                 ),
+              if (canRenew)
+                TextButton.icon(
+                  onPressed: onRenew,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Renew'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF3A4644),
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
               const Spacer(),
               IconButton(
                 onPressed: onEdit,
@@ -458,6 +503,11 @@ class _StatusBadge extends StatelessWidget {
         bg = const Color(0xFFFFF3E0);
         fg = const Color(0xFFB86A00);
         break;
+      case 'expired':
+        label = 'EXPIRED';
+        bg = const Color(0xFFEEEEEE);
+        fg = const Color(0xFF6A7774);
+        break;
       case 'sold_out':
         label = 'SOLD OUT';
         bg = const Color(0xFFFFEBEE);
@@ -486,6 +536,123 @@ class _StatusBadge extends StatelessWidget {
           letterSpacing: 0.4,
         ),
       ),
+    );
+  }
+}
+
+class _RenewListingDialog extends StatefulWidget {
+  const _RenewListingDialog({
+    required this.listingName,
+    this.initial,
+  });
+
+  final String listingName;
+  final DateTime? initial;
+
+  @override
+  State<_RenewListingDialog> createState() => _RenewListingDialogState();
+}
+
+class _RenewListingDialogState extends State<_RenewListingDialog> {
+  late DateTime _dateTime;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final candidate =
+        widget.initial ?? now.add(const Duration(hours: 2));
+    _dateTime = candidate.isAfter(now)
+        ? candidate
+        : now.add(const Duration(hours: 2));
+  }
+
+  Future<void> _pickDateTime() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _dateTime.isBefore(DateTime.now())
+          ? DateTime.now()
+          : _dateTime,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 7)),
+    );
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_dateTime),
+    );
+    if (time == null || !mounted) return;
+
+    setState(() {
+      _dateTime =
+          DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    });
+  }
+
+  String get _formatted {
+    final d = _dateTime;
+    final h = d.hour > 12 ? d.hour - 12 : (d.hour == 0 ? 12 : d.hour);
+    final ampm = d.hour >= 12 ? 'PM' : 'AM';
+    return '${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year}, '
+        '${h.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')} $ampm';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final valid = _dateTime.isAfter(DateTime.now());
+    return AlertDialog(
+      title: const Text('Renew listing'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Set a new Available Until for "${widget.listingName}".',
+            style: const TextStyle(fontSize: 14, color: Color(0xFF3A4644)),
+          ),
+          const SizedBox(height: 16),
+          InkWell(
+            onTap: _pickDateTime,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F7F6),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE0E5E3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.event_available_outlined,
+                      color: Color(0xFF0E5A47)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _formatted,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF101617),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: !valid ? null : () => Navigator.pop(context, _dateTime),
+          child: const Text('Renew'),
+        ),
+      ],
     );
   }
 }

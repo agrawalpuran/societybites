@@ -7,11 +7,34 @@ const { serializeReview } = require("../utils/listingSerializer");
 const router = express.Router();
 
 router.get(
+  "/seller/me",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const reviews = await prisma.review.findMany({
+      where: {
+        hidden: false,
+        listing: { sellerId: req.user.id },
+      },
+      include: {
+        reviewer: { include: { flat: true } },
+        listing: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json(reviews.map(serializeReview));
+  })
+);
+
+router.get(
   "/listing/:listingId",
   asyncHandler(async (req, res) => {
     const reviews = await prisma.review.findMany({
       where: { listingId: req.params.listingId, hidden: false },
-      include: { reviewer: { include: { flat: true } } },
+      include: {
+        reviewer: { include: { flat: true } },
+        listing: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
 

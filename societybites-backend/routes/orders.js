@@ -6,20 +6,40 @@ const { requireUser } = require("../middleware/requireUser");
 const { generateOrderNumber } = require("../utils/orderNumber");
 const { serializeOrder } = require("../utils/listingSerializer");
 const { getPlatformFee } = require("../lib/platformFee");
+const { expireListingIfDue } = require("../utils/listingExpiry");
 
 const router = express.Router();
 
-const VALID_STATUSES = ["pending", "accepted", "preparing", "ready", "picked_up", "completed", "cancelled"];
+const VALID_STATUSES = [
+  "pending",
+  "accepted",
+  "preparing",
+  "ready",
+  "picked_up",
+  "completed",
+  "cancelled",
+  "rejected",
+];
+
+const REJECT_REASONS = [
+  "Food sold out",
+  "Unable to prepare today",
+  "Kitchen closed",
+  "Ingredients unavailable",
+  "Other",
+];
+
+const REJECTABLE_STATUSES = new Set(["pending", "accepted", "preparing"]);
 
 const TRANSITIONS = {
-  pending: ["accepted", "cancelled"],
-  accepted: ["preparing", "cancelled"],
-  preparing: ["ready"],
+  pending: ["accepted", "cancelled", "rejected"],
+  accepted: ["preparing", "cancelled", "rejected"],
+  preparing: ["ready", "rejected"],
   ready: ["picked_up"],
   picked_up: ["completed"],
 };
 
-const SELLER_ACTIONS = new Set(["accepted", "preparing", "ready"]);
+const SELLER_ACTIONS = new Set(["accepted", "preparing", "ready", "rejected"]);
 const BUYER_ACTIONS = new Set(["cancelled", "picked_up", "completed"]);
 
 const TIMESTAMP_FIELDS = {
@@ -29,6 +49,7 @@ const TIMESTAMP_FIELDS = {
   picked_up: "pickedUpAt",
   completed: "completedAt",
   cancelled: "cancelledAt",
+  rejected: "rejectedAt",
 };
 
 const orderInclude = {
@@ -257,12 +278,6 @@ router.post(
         });
       }
 
-      if (listing.status !== "active") {
-        return res.status(400).json({
-          error: `"${listing.name}" is no longer available (${listing.status})`,
-        });
-      }
-
       if (listing.sellerId === req.user.id) {
         return res.status(400).json({
           error: "You cannot order your own listing",
@@ -275,9 +290,29 @@ router.post(
         });
       }
 
-      if (listing.availableAt && new Date(listing.availableAt) < new Date()) {
+      const current = await expireListingIfDue(prisma, listing);
+
+      if (current.status === "paused") {
         return res.status(400).json({
-          error: `"${listing.name}" has expired`,
+          error: `"${current.name}" is paused and cannot be ordered`,
+        });
+      }
+
+      if (current.status === "expired") {
+        return res.status(400).json({
+          error: `"${current.name}" has expired and cannot be ordered`,
+        });
+      }
+
+      if (current.status !== "active") {
+        return res.status(400).json({
+          error: `"${current.name}" is no longer available (${current.status})`,
+        });
+      }
+
+      if (current.availableAt && new Date(current.availableAt) < new Date()) {
+        return res.status(400).json({
+          error: `"${current.name}" has expired and cannot be ordered`,
         });
       }
 
@@ -287,13 +322,13 @@ router.post(
         return res.status(400).json({ error: "Each item needs quantity >= 1" });
       }
 
-      if (quantity > listing.quantity) {
+      if (quantity > current.quantity) {
         return res.status(400).json({
-          error: `Only ${listing.quantity} portions left for "${listing.name}"`,
+          error: `Only ${current.quantity} portions left for "${current.name}"`,
         });
       }
 
-      preparedItems.push({ listing, quantity });
+      preparedItems.push({ listing: current, quantity });
     }
 
     const sellerIds = new Set(preparedItems.map(({ listing }) => listing.sellerId));
@@ -387,7 +422,11 @@ router.patch(
       return res.status(404).json({ error: "Order not found" });
     }
 
-    if (order.status === "completed" || order.status === "cancelled") {
+    if (
+      order.status === "completed" ||
+      order.status === "cancelled" ||
+      order.status === "rejected"
+    ) {
       return res.status(400).json({
         error: `Cannot modify a ${order.status} order`,
       });
@@ -467,6 +506,10 @@ router.patch(
         logger.info("order", `Cancelled ${order.orderNumber} — inventory restored`);
         return result;
       });
+    } else if (status === "rejected") {
+      return res.status(400).json({
+        error: "Use POST /orders/:id/reject to reject an order with a reason",
+      });
     } else {
       updated = await prisma.order.update({
         where: { id: order.id },
@@ -476,6 +519,90 @@ router.patch(
 
       logger.info("order", `${order.orderNumber} → ${status}`);
     }
+
+    res.json(serializeOrder(updated));
+  })
+);
+
+router.post(
+  "/:id/reject",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const { reason, otherText } = req.body;
+
+    if (!reason || !REJECT_REASONS.includes(reason)) {
+      return res.status(400).json({
+        error: `reason must be one of: ${REJECT_REASONS.join(", ")}`,
+      });
+    }
+
+    let rejectReason = reason;
+    if (reason === "Other") {
+      const text = typeof otherText === "string" ? otherText.trim() : "";
+      if (!text) {
+        return res.status(400).json({ error: "otherText is required when reason is Other" });
+      }
+      if (text.length > 200) {
+        return res.status(400).json({ error: "otherText must be at most 200 characters" });
+      }
+      rejectReason = text;
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: orderInclude,
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    if (!REJECTABLE_STATUSES.has(order.status)) {
+      return res.status(400).json({
+        error: `Cannot reject an order with status "${order.status}"`,
+      });
+    }
+
+    const isSeller = order.items.some(
+      (item) => item.listing.sellerId === req.user.id
+    );
+
+    if (!isSeller) {
+      return res.status(403).json({ error: "Only the seller can reject this order" });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: "rejected",
+          rejectReason,
+          rejectedAt: new Date(),
+          rejectedBy: req.user.id,
+          paymentStatus:
+            order.paymentStatus === "seller_confirmed"
+              ? order.paymentStatus
+              : "failed",
+        },
+        include: orderInclude,
+      });
+
+      for (const item of order.items) {
+        await tx.listing.update({
+          where: { id: item.listingId },
+          data: {
+            quantity: { increment: item.quantity },
+            status: "active",
+          },
+        });
+      }
+
+      logger.info(
+        "order",
+        `Rejected ${order.orderNumber} by ${req.user.phone} — ${rejectReason}`
+      );
+      return result;
+    });
 
     res.json(serializeOrder(updated));
   })

@@ -7,11 +7,16 @@
 - Listings belong to one seller.
 - Listings belong to one society.
 - Buyers can only see listings from their own society.
-- Buyers only see listings with status `active` (paused / sold_out / inactive are hidden).
+- Buyers only see listings with status `active` (paused / expired / sold_out / inactive are hidden).
 - Sellers can pause an active listing (`paused`) and resume it later (`active`).
-- Sellers can still view and edit paused listings in My Listings.
+- When `availableAt` (Available Until) is in the past, listings become `expired` on read (no cron).
+- Sellers can renew expired listings by setting a new future Available Until (`active`).
+- Sellers can still view and edit paused or expired listings in My Listings.
 - Soft-delete sets status to `inactive` (removed from seller management list).
+- Sellers may reject orders in `pending`, `accepted`, or `preparing` with a required reason (`rejected`).
+- Buyers see rejected orders in Past with the rejection reason; payment actions are hidden.
 - Reviews are allowed only after completed orders.
+- Orders cannot be placed for paused or expired listings.
 - One review per order.
 - Pickup only.
 - No delivery.
