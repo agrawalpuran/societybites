@@ -1,4 +1,4 @@
-package com.example.societybites
+package com.puran.societybites
 
 import io.flutter.embedding.android.FlutterActivity
 
