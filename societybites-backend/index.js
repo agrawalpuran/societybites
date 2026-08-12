@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 require("dotenv").config();
+console.log("DATABASE_URL:", process.env.DATABASE_URL);
 
 const prisma = require("./lib/prisma");
 const logger = require("./lib/logger");
