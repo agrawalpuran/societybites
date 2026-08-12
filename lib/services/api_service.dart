@@ -15,14 +15,7 @@ class TokenExpiredException implements Exception {
 
 class ApiService {
   static String get baseUrl {
-    if (kIsWeb) {
-      final host = Uri.base.host;
-      final port = 3000;
-      final scheme = Uri.base.scheme;
-      return '$scheme://$host:$port';
-    }
-    if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:3000';
-    return 'http://127.0.0.1:3000';
+    return 'https://societybites.onrender.com';
   }
 
   static String absoluteUrl(String path) {

@@ -33,13 +33,13 @@ model Society {
   name       String
   city       String
   inviteCode String    @unique
-  /// UI label for building subdivision: "Block" or "Wing"
-  unitLabel  String    @default("Block")
   address    String?
   state      String?
   pincode    String?
   logoUrl    String?
   status     String    @default("active")
+  /// UI label for building subdivision: "Block" or "Wing"
+  unitLabel  String    @default("Block")
   blocks     Block[]
   flats      Flat[]
   listings   Listing[]
@@ -115,13 +115,13 @@ model Order {
   pickedUpAt            DateTime?
   completedAt           DateTime?
   cancelledAt           DateTime?
-  rejectedAt            DateTime?
-  rejectReason          String?
-  rejectedBy            String?
   paymentStatus         String      @default("pending")
   buyerMarkedPaidAt     DateTime?
   sellerConfirmedPaidAt DateTime?
   upiTransactionRef     String?
+  rejectReason          String?
+  rejectedAt            DateTime?
+  rejectedBy            String?
   buyer                 User        @relation("BuyerOrders", fields: [buyerId], references: [id])
   society               Society     @relation(fields: [societyId], references: [id])
   items                 OrderItem[]
