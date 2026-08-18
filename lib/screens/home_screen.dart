@@ -485,57 +485,12 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSpecialsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 2),
-          child: Row(
-            children: [
-              const Text(
-                "Today's Specials",
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF101617),
-                ),
-              ),
-              const Spacer(),
-              ...List.generate(
-                3,
-                (i) => Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.only(left: 5),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: i == 0
-                        ? const Color(0xFF0E5A47)
-                        : const Color(0xFFD4DBD8),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        SizedBox(
-          height: 268,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: _specials.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 14),
-            itemBuilder: (_, i) => _SpecialCard(
-              food: _specials[i],
-              cartQty: _cartQtyFor(_specials[i]),
-              onAdd: () => _addToCart(_specials[i]),
-              onRemove: () => _removeFromCart(_specials[i]),
-              onTap: () => _openDetail(_specials[i]),
-            ),
-          ),
-        ),
-      ],
+    return _TodaysSpecialsSection(
+      specials: _specials,
+      cartQtyFor: _cartQtyFor,
+      onAdd: _addToCart,
+      onRemove: _removeFromCart,
+      onTap: _openDetail,
     );
   }
 
@@ -626,6 +581,164 @@ class _SellerChip extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Today's Specials carousel with scroll-synced pagination dots.
+/// Page count is derived from scroll extent vs card stride (not one-dot-per-item).
+class _TodaysSpecialsSection extends StatefulWidget {
+  const _TodaysSpecialsSection({
+    required this.specials,
+    required this.cartQtyFor,
+    required this.onAdd,
+    required this.onRemove,
+    required this.onTap,
+  });
+
+  final List<FoodItem> specials;
+  final int Function(FoodItem food) cartQtyFor;
+  final void Function(FoodItem food) onAdd;
+  final void Function(FoodItem food) onRemove;
+  final void Function(FoodItem food) onTap;
+
+  @override
+  State<_TodaysSpecialsSection> createState() => _TodaysSpecialsSectionState();
+}
+
+class _TodaysSpecialsSectionState extends State<_TodaysSpecialsSection> {
+  static const double _cardWidth = 190;
+  static const double _gap = 14;
+  static const double _stride = _cardWidth + _gap;
+
+  final ScrollController _scrollController = ScrollController();
+  final ValueNotifier<_SpecialsPageInfo> _pageInfo =
+      ValueNotifier(const _SpecialsPageInfo(activePage: 0, pageCount: 1));
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_syncPageFromScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncPageFromScroll());
+  }
+
+  @override
+  void didUpdateWidget(covariant _TodaysSpecialsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.specials.length != widget.specials.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncPageFromScroll());
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_syncPageFromScroll);
+    _scrollController.dispose();
+    _pageInfo.dispose();
+    super.dispose();
+  }
+
+  void _syncPageFromScroll() {
+    if (!_scrollController.hasClients) return;
+
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final pageCount =
+        maxScroll <= 0 ? 1 : (maxScroll / _stride).ceil() + 1;
+    final offset = _scrollController.offset.clamp(0.0, maxScroll);
+    final activePage = (pageCount <= 1 || maxScroll <= 0)
+        ? 0
+        : ((offset / maxScroll) * (pageCount - 1)).round().clamp(0, pageCount - 1);
+
+    final next = _SpecialsPageInfo(activePage: activePage, pageCount: pageCount);
+    if (_pageInfo.value != next) {
+      _pageInfo.value = next;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 2),
+          child: Row(
+            children: [
+              const Text(
+                "Today's Specials",
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF101617),
+                ),
+              ),
+              const Spacer(),
+              ValueListenableBuilder<_SpecialsPageInfo>(
+                valueListenable: _pageInfo,
+                builder: (context, info, _) {
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(
+                      info.pageCount,
+                      (i) => Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(left: 5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: i == info.activePage
+                              ? const Color(0xFF0E5A47)
+                              : const Color(0xFFD4DBD8),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 268,
+          child: ListView.separated(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: widget.specials.length,
+            separatorBuilder: (context, index) => const SizedBox(width: _gap),
+            itemBuilder: (_, i) {
+              final food = widget.specials[i];
+              return _SpecialCard(
+                food: food,
+                cartQty: widget.cartQtyFor(food),
+                onAdd: () => widget.onAdd(food),
+                onRemove: () => widget.onRemove(food),
+                onTap: () => widget.onTap(food),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SpecialsPageInfo {
+  const _SpecialsPageInfo({
+    required this.activePage,
+    required this.pageCount,
+  });
+
+  final int activePage;
+  final int pageCount;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _SpecialsPageInfo &&
+      other.activePage == activePage &&
+      other.pageCount == pageCount;
+
+  @override
+  int get hashCode => Object.hash(activePage, pageCount);
 }
 
 class _SpecialCard extends StatelessWidget {
