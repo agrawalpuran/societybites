@@ -108,7 +108,11 @@ app.use((err, _req, res, _next) => {
 
   const statusCode = err.statusCode || 500;
   const message = statusCode === 500 ? "Internal server error" : err.message;
-  res.status(statusCode).json({ error: message });
+  const payload = { error: message };
+  if (err.availableQuantity !== undefined) {
+    payload.availableQuantity = err.availableQuantity;
+  }
+  res.status(statusCode).json(payload);
 });
 
 app.listen(PORT, () => {

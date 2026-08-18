@@ -112,6 +112,8 @@ model Order {
   acceptedAt            DateTime?
   preparingAt           DateTime?
   readyAt               DateTime?
+  /// Optional seller estimate for when order will be ready (informational only).
+  expectedReadyAt       DateTime?
   pickedUpAt            DateTime?
   completedAt           DateTime?
   cancelledAt           DateTime?

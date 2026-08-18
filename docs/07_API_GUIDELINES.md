@@ -53,3 +53,12 @@ Stored as lowercase strings on `Listing.status`:
 - When `reason` is `Other`, `otherText` is required (trimmed, max 200 chars) and stored as `rejectReason`.
 - Sets `status=rejected`, `rejectReason`, `rejectedAt`, `rejectedBy`; restores listing quantity.
 - Do not set `rejected` via `PATCH /orders/:id/status` — use the reject endpoint.
+
+## Optional Ready by (seller)
+
+- `PATCH /orders/:id/ready-time` — seller only.
+- Body: `{ "expectedReadyAt": "<ISO datetime>" | null }`.
+- Allowed only when status is `accepted` or `preparing`.
+- Non-null values must be in the future; `null` clears the estimate.
+- Informational only — never required for accept / prepare / ready / cancel / reject.
+- Returned on existing order APIs as `expectedReadyAt` (no extra query).

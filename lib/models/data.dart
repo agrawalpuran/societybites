@@ -262,6 +262,12 @@ class Order {
   final bool hasReview;
   final String? rejectReason;
   final DateTime? rejectedAt;
+  final DateTime? expectedReadyAt;
+  final String? buyerName;
+  final String? buyerPhone;
+  final String? buyerFlatNumber;
+  final String? buyerBlock;
+  final String? buyerSocietyName;
 
   const Order({
     required this.id,
@@ -278,12 +284,42 @@ class Order {
     this.hasReview = false,
     this.rejectReason,
     this.rejectedAt,
+    this.expectedReadyAt,
+    this.buyerName,
+    this.buyerPhone,
+    this.buyerFlatNumber,
+    this.buyerBlock,
+    this.buyerSocietyName,
   });
 
   bool get isRejected => status == 'rejected';
   bool get isCancelled => status == 'cancelled';
   bool get isTerminal =>
       status == 'completed' || status == 'cancelled' || status == 'rejected';
+
+  /// Show Ready-by estimate only before the order is actually marked ready.
+  bool get showExpectedReadyAt =>
+      expectedReadyAt != null &&
+      (status == 'accepted' || status == 'preparing');
+
+  /// Seller-facing buyer label: name + flat/block.
+  String get buyerLabel {
+    final parts = <String>[];
+    final name = buyerName?.trim();
+    if (name != null && name.isNotEmpty) parts.add(name);
+
+    final location = <String>[];
+    if (buyerBlock != null && buyerBlock!.trim().isNotEmpty) {
+      location.add('Block ${buyerBlock!.trim()}');
+    }
+    if (buyerFlatNumber != null && buyerFlatNumber!.trim().isNotEmpty) {
+      location.add('Flat ${buyerFlatNumber!.trim()}');
+    }
+    if (location.isNotEmpty) parts.add(location.join(', '));
+
+    if (parts.isEmpty) return 'Neighbor';
+    return parts.join(' · ');
+  }
 
   FoodItem get food =>
       items.isNotEmpty ? items.first.food : _placeholderFood;
@@ -355,7 +391,34 @@ class Order {
       hasReview: json['hasReview'] == true,
       rejectReason: json['rejectReason'] as String?,
       rejectedAt: DateTime.tryParse(json['rejectedAt']?.toString() ?? ''),
+      expectedReadyAt:
+          DateTime.tryParse(json['expectedReadyAt']?.toString() ?? ''),
+      buyerName: json['buyerName'] as String?,
+      buyerPhone: json['buyerPhone'] as String?,
+      buyerFlatNumber: json['buyerFlatNumber'] as String?,
+      buyerBlock: json['buyerBlock'] as String?,
+      buyerSocietyName: json['buyerSocietyName'] as String?,
     );
+  }
+
+  static String formatReadyBy(DateTime dt) {
+    final local = dt.toLocal();
+    final now = DateTime.now();
+    final sameDay = local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+    final hour = local.hour > 12
+        ? local.hour - 12
+        : (local.hour == 0 ? 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    final time =
+        '${hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')} $ampm';
+    if (sameDay) return time;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${local.day} ${months[local.month - 1]}, $time';
   }
 
   static String _formatDate(DateTime dt) {

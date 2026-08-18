@@ -297,9 +297,17 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
                           ],
-                          validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Required' : null,
-                          decoration: _inputDeco('1'),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Required';
+                            final n = int.tryParse(v.trim());
+                            if (n == null || n < 1) return 'Enter at least 1';
+                            return null;
+                          },
+                          decoration: _inputDeco(
+                            _isEditing
+                                ? 'Remaining portions (current stock)'
+                                : '1',
+                          ),
                         ),
                       ),
                       const SizedBox(height: 18),

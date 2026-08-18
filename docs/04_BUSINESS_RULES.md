@@ -8,6 +8,10 @@
 - Listings belong to one society.
 - Buyers can only see listings from their own society.
 - Buyers only see listings with status `active` (paused / expired / sold_out / inactive are hidden).
+- `Listing.quantity` is remaining available portions (decremented on order; restored on cancel/reject).
+- Buyers see remaining stock as "X left"; quantity `0` / `sold_out` cannot be purchased.
+- Order create uses an atomic conditional decrement so concurrent orders cannot oversell.
+- Sellers may optionally set a Ready-by estimate (`expectedReadyAt`) after accept; it never blocks the order lifecycle.
 - Sellers can pause an active listing (`paused`) and resume it later (`active`).
 - When `availableAt` (Available Until) is in the past, listings become `expired` on read (no cron).
 - Sellers can renew expired listings by setting a new future Available Until (`active`).

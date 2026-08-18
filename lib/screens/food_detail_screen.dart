@@ -184,6 +184,7 @@ class _QuickInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final soldOut = food.quantity <= 0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
       child: Row(
@@ -191,16 +192,16 @@ class _QuickInfoRow extends StatelessWidget {
           Expanded(
             child: _InfoChip(
               label: 'AVAILABILITY',
-              value: '5',
-              sub: 'portions left',
+              value: soldOut ? 'Sold out' : '${food.quantity}',
+              sub: soldOut ? 'currently unavailable' : 'portions left',
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: _InfoChip(
               label: 'PICKUP',
-              value: '1:00 PM',
-              sub: 'Lobby Area',
+              value: food.pickupTime,
+              sub: food.locationLabel,
             ),
           ),
         ],
@@ -700,29 +701,39 @@ class _BottomCta extends StatelessWidget {
             SizedBox(
               height: 54,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CheckoutScreen(
-                        cartItems: [CartItem(food: food)],
-                      ),
-                    ),
-                  );
-                },
+                onPressed: food.quantity <= 0
+                    ? null
+                    : () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CheckoutScreen(
+                              cartItems: [CartItem(food: food)],
+                            ),
+                          ),
+                        );
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0E5A47),
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFD94F4F),
+                  disabledForegroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 28),
                 ),
-                icon: const Icon(Icons.shopping_cart_rounded, size: 20),
-                label: const Text(
-                  'Order Now',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                icon: Icon(
+                  food.quantity <= 0
+                      ? Icons.block_rounded
+                      : Icons.shopping_cart_rounded,
+                  size: 20,
+                ),
+                label: Text(
+                  food.quantity <= 0 ? 'Sold out' : 'Order Now',
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w700),
                 ),
               ),
             ),

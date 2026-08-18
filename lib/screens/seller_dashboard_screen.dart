@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/app_header.dart';
 import '../widgets/order_items_list.dart';
 import '../models/data.dart';
@@ -83,11 +84,83 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
           backgroundColor: const Color(0xFF0E5A47),
         ),
       );
+
+      // Optional Ready-by: never blocks accept; Skip leaves NULL.
+      if (nextStatus == 'accepted') {
+        await _promptReadyBy(order.id, order.orderId);
+      }
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update order: $e')),
+      );
+    }
+  }
+
+  Future<void> _promptReadyBy(String orderId, String orderNumber) async {
+    final result = await showModalBottomSheet<Object?>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _ReadyBySheet(
+        orderId: orderNumber,
+        allowClear: false,
+      ),
+    );
+
+    if (!mounted || result == null || result == 'skip') return;
+
+    await _applyReadyBy(orderId, result);
+  }
+
+  Future<void> _editReadyBy(Order order) async {
+    final result = await showModalBottomSheet<Object?>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _ReadyBySheet(
+        orderId: order.orderId,
+        allowClear: order.expectedReadyAt != null,
+        initial: order.expectedReadyAt,
+      ),
+    );
+
+    if (!mounted || result == null || result == 'skip') return;
+
+    await _applyReadyBy(order.id, result);
+  }
+
+  Future<void> _applyReadyBy(String orderId, Object result) async {
+    try {
+      if (result == 'clear') {
+        await ApiService.setOrderReadyTime(orderId: orderId, expectedReadyAt: null);
+      } else if (result is DateTime) {
+        await ApiService.setOrderReadyTime(
+          orderId: orderId,
+          expectedReadyAt: result,
+        );
+      } else {
+        return;
+      }
+      await _loadOrders();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result == 'clear' ? 'Ready by estimate removed' : 'Ready by updated',
+          ),
+          backgroundColor: const Color(0xFF0E5A47),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update Ready by: $e')),
       );
     }
   }
@@ -278,6 +351,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 onAction: _updateStatus,
                 onPaymentConfirmed: _loadOrders,
                 onReject: _rejectOrder,
+                onReadyBy: _editReadyBy,
               ),
             ),
         ],
@@ -770,12 +844,14 @@ class _ActiveOrderCard extends StatefulWidget {
     required this.onAction,
     required this.onPaymentConfirmed,
     required this.onReject,
+    required this.onReadyBy,
   });
 
   final Order order;
   final Future<void> Function(Order order, String nextStatus) onAction;
   final Future<void> Function() onPaymentConfirmed;
   final Future<void> Function(Order order) onReject;
+  final Future<void> Function(Order order) onReadyBy;
 
   @override
   State<_ActiveOrderCard> createState() => _ActiveOrderCardState();
@@ -819,6 +895,31 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
     }
   }
 
+  Future<void> _callBuyer() async {
+    final phone = widget.order.buyerPhone?.trim();
+    if (phone == null || phone.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Buyer phone is not available')),
+      );
+      return;
+    }
+    final uri = Uri(scheme: 'tel', path: phone);
+    try {
+      final launched = await launchUrl(uri);
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not dial $phone')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not dial $phone')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
@@ -829,6 +930,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
     final isPickedUp = order.status == 'picked_up';
     final hasSellerAction = isPending || isAccepted || isPrep;
     final canReject = isPending || isAccepted || isPrep;
+    final canSetReadyBy = isAccepted || isPrep;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -862,6 +964,15 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                         fontSize: 12,
                         color: Color(0xFF8A9491),
                         fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      order.buyerLabel,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF3A4644),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -1003,19 +1114,71 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                 ),
               ),
               const SizedBox(width: 10),
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F7F6),
+              Material(
+                color: const Color(0xFFF5F7F6),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: _callBuyer,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE0E5E3)),
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE0E5E3)),
+                    ),
+                    child: const Icon(Icons.phone_rounded,
+                        size: 20, color: Color(0xFF3A4644)),
+                  ),
                 ),
-                child: const Icon(Icons.phone_rounded,
-                    size: 20, color: Color(0xFF3A4644)),
               ),
             ],
           ),
+          if (canSetReadyBy) ...[
+            const SizedBox(height: 8),
+            if (order.showExpectedReadyAt) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F7F4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFD4E8DF)),
+                ),
+                child: Text(
+                  'Ready by ${Order.formatReadyBy(order.expectedReadyAt!)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0E5A47),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: OutlinedButton.icon(
+                onPressed: _isUpdating ? null : () => widget.onReadyBy(order),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0E5A47),
+                  side: const BorderSide(color: Color(0xFFD4E8DF)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.schedule_rounded, size: 18),
+                label: Text(
+                  order.expectedReadyAt == null
+                      ? 'Set Ready by'
+                      : 'Update Ready by',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+              ),
+            ),
+          ],
           if (canReject) ...[
             const SizedBox(height: 8),
             SizedBox(
@@ -1184,6 +1347,15 @@ class _SellerPastOrderCard extends StatelessWidget {
                         fontSize: 12,
                         color: Color(0xFF8A9491),
                         fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      order.buyerLabel,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF3A4644),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -1420,6 +1592,145 @@ class _RejectOrderSheetState extends State<_RejectOrderSheet> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Returns: DateTime | 'skip' | 'clear' | null (dismissed).
+class _ReadyBySheet extends StatefulWidget {
+  const _ReadyBySheet({
+    required this.orderId,
+    this.allowClear = false,
+    this.initial,
+  });
+
+  final String orderId;
+  final bool allowClear;
+  final DateTime? initial;
+
+  @override
+  State<_ReadyBySheet> createState() => _ReadyBySheetState();
+}
+
+class _ReadyBySheetState extends State<_ReadyBySheet> {
+  static const _presets = [
+    (15, '15 min'),
+    (30, '30 min'),
+    (45, '45 min'),
+    (60, '1 hour'),
+  ];
+
+  Future<void> _pickCustom() async {
+    final now = DateTime.now();
+    final initial = widget.initial?.isAfter(now) == true
+        ? widget.initial!
+        : now.add(const Duration(minutes: 30));
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: now.add(const Duration(days: 2)),
+    );
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null || !mounted) return;
+
+    final picked =
+        DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    if (!picked.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ready by must be in the future')),
+      );
+      return;
+    }
+    Navigator.pop(context, picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Ready by',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF101617),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Optional estimate for ${widget.orderId}. You can skip this.',
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6A7774),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _presets.map((p) {
+              return ActionChip(
+                label: Text(p.$2),
+                onPressed: () {
+                  Navigator.pop(
+                    context,
+                    DateTime.now().add(Duration(minutes: p.$1)),
+                  );
+                },
+                backgroundColor: const Color(0xFFF0F7F4),
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0E5A47),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _pickCustom,
+              icon: const Icon(Icons.schedule_rounded, size: 18),
+              label: const Text('Choose time'),
+            ),
+          ),
+          if (widget.allowClear) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context, 'clear'),
+                child: const Text('Remove estimate'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context, 'skip'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0E5A47),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Skip'),
+            ),
           ),
         ],
       ),

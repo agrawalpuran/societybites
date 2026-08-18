@@ -63,10 +63,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _updateQuantity(int index, int delta) {
+    final maxAvailable = _items[index].food.quantity;
+    final proposed = _items[index].quantity + delta;
+    if (delta > 0 && proposed > maxAvailable) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            maxAvailable <= 0
+                ? '${_items[index].food.name} is sold out'
+                : 'Only $maxAvailable portions available for ${_items[index].food.name}',
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFFD94F4F),
+        ),
+      );
+      return;
+    }
+
     var becameEmpty = false;
     setState(() {
       final next = List<CartItem>.from(_items);
-      next[index].quantity += delta;
+      next[index].quantity = proposed;
       if (next[index].quantity <= 0) {
         next.removeAt(index);
       }
@@ -122,9 +140,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      var message = e.toString();
+      if (message.startsWith('Exception: ')) {
+        message = message.substring('Exception: '.length);
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not place order: $e'),
+          content: Text(message),
           backgroundColor: Colors.red,
         ),
       );
@@ -514,6 +537,19 @@ class _OrderItemCard extends StatelessWidget {
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF101617),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                item.food.quantity <= 0
+                    ? 'Sold out'
+                    : '${item.food.quantity} left',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: item.food.quantity <= 0
+                      ? const Color(0xFFD94F4F)
+                      : const Color(0xFF6A7774),
                 ),
               ),
             ],

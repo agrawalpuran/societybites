@@ -53,6 +53,12 @@ const TIMESTAMP_FIELDS = {
 };
 
 const orderInclude = {
+  buyer: {
+    include: {
+      flat: true,
+      society: true,
+    },
+  },
   items: {
     include: {
       listing: {
@@ -323,8 +329,12 @@ router.post(
       }
 
       if (quantity > current.quantity) {
-        return res.status(400).json({
-          error: `Only ${current.quantity} portions left for "${current.name}"`,
+        return res.status(409).json({
+          error:
+            current.quantity === 0
+              ? `"${current.name}" is sold out`
+              : `Only ${current.quantity} portions are available for "${current.name}".`,
+          availableQuantity: current.quantity,
         });
       }
 
@@ -345,55 +355,76 @@ router.post(
     const platformFee = await getPlatformFee();
     const total = subtotal + platformFee;
 
-    const order = await prisma.$transaction(async (tx) => {
-      for (const { listing, quantity } of preparedItems) {
-        const updated = await tx.listing.updateMany({
-          where: {
-            id: listing.id,
-            quantity: { gte: quantity },
-            status: "active",
-          },
-          data: {
-            quantity: { decrement: quantity },
-          },
-        });
-
-        if (updated.count === 0) {
-          throw new Error(`Insufficient inventory for "${listing.name}". Please refresh and try again.`);
-        }
-
-        const refreshed = await tx.listing.findUnique({ where: { id: listing.id } });
-        if (refreshed && refreshed.quantity <= 0) {
-          await tx.listing.update({
-            where: { id: listing.id },
-            data: { status: "sold_out" },
+    let order;
+    try {
+      order = await prisma.$transaction(async (tx) => {
+        for (const { listing, quantity } of preparedItems) {
+          const updated = await tx.listing.updateMany({
+            where: {
+              id: listing.id,
+              quantity: { gte: quantity },
+              status: "active",
+            },
+            data: {
+              quantity: { decrement: quantity },
+            },
           });
+
+          if (updated.count === 0) {
+            const latest = await tx.listing.findUnique({
+              where: { id: listing.id },
+              select: { quantity: true },
+            });
+            const available = latest?.quantity ?? 0;
+            const err = new Error(
+              available === 0
+                ? `"${listing.name}" is sold out`
+                : `Only ${available} portions are available for "${listing.name}".`
+            );
+            err.statusCode = 409;
+            err.availableQuantity = available;
+            throw err;
+          }
+
+          const refreshed = await tx.listing.findUnique({ where: { id: listing.id } });
+          if (refreshed && refreshed.quantity <= 0) {
+            await tx.listing.update({
+              where: { id: listing.id },
+              data: { status: "sold_out" },
+            });
+          }
         }
-      }
 
-      const created = await tx.order.create({
-        data: {
-          orderNumber: generateOrderNumber(),
-          buyerId: req.user.id,
-          societyId,
-          status: "pending",
-          paymentMethod,
-          subtotal,
-          communityFee: platformFee,
-          total,
-          items: {
-            create: preparedItems.map(({ listing, quantity }) => ({
-              listingId: listing.id,
-              quantity,
-              unitPrice: listing.price,
-            })),
+        return tx.order.create({
+          data: {
+            orderNumber: generateOrderNumber(),
+            buyerId: req.user.id,
+            societyId,
+            status: "pending",
+            paymentMethod,
+            subtotal,
+            communityFee: platformFee,
+            total,
+            items: {
+              create: preparedItems.map(({ listing, quantity }) => ({
+                listingId: listing.id,
+                quantity,
+                unitPrice: listing.price,
+              })),
+            },
           },
-        },
-        include: orderInclude,
+          include: orderInclude,
+        });
       });
-
-      return created;
-    });
+    } catch (err) {
+      if (err.statusCode === 409) {
+        return res.status(409).json({
+          error: err.message,
+          availableQuantity: err.availableQuantity,
+        });
+      }
+      throw err;
+    }
 
     logger.info("order", `Created ${order.orderNumber} by ${req.user.phone}`);
 
@@ -604,6 +635,79 @@ router.post(
       return result;
     });
 
+    res.json(serializeOrder(updated));
+  })
+);
+
+router.patch(
+  "/:id/ready-time",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: orderInclude,
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    const isSeller = order.items.some(
+      (item) => item.listing.sellerId === req.user.id
+    );
+
+    if (!isSeller) {
+      return res.status(403).json({
+        error: "Only the seller can set a Ready by time for this order",
+      });
+    }
+
+    if (!["accepted", "preparing"].includes(order.status)) {
+      return res.status(400).json({
+        error: `Ready by can only be set while the order is accepted or preparing (current: "${order.status}")`,
+      });
+    }
+
+    const { expectedReadyAt } = req.body;
+
+    // Explicit null / missing key with null clears the estimate.
+    if (expectedReadyAt === null) {
+      const updated = await prisma.order.update({
+        where: { id: order.id },
+        data: { expectedReadyAt: null },
+        include: orderInclude,
+      });
+      logger.info("order", `Cleared Ready by for ${order.orderNumber}`);
+      return res.json(serializeOrder(updated));
+    }
+
+    if (expectedReadyAt === undefined) {
+      return res.status(400).json({
+        error: "expectedReadyAt is required (ISO datetime or null to clear)",
+      });
+    }
+
+    const readyAt = new Date(expectedReadyAt);
+    if (Number.isNaN(readyAt.getTime())) {
+      return res.status(400).json({ error: "expectedReadyAt must be a valid date" });
+    }
+
+    if (readyAt <= new Date()) {
+      return res.status(400).json({
+        error: "Ready by time must be in the future",
+      });
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: { expectedReadyAt: readyAt },
+      include: orderInclude,
+    });
+
+    logger.info(
+      "order",
+      `Ready by set for ${order.orderNumber}: ${readyAt.toISOString()}`
+    );
     res.json(serializeOrder(updated));
   })
 );

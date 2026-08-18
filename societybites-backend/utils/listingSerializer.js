@@ -55,6 +55,10 @@ function serializeOrder(order) {
     listing: item.listing ? serializeListing({ ...item.listing, seller: item.listing.seller }) : null,
   }));
 
+  const buyer = order.buyer || {};
+  const buyerFlat = buyer.flat || null;
+  const buyerSociety = buyer.society || null;
+
   return {
     id: order.id,
     orderId: order.orderNumber,
@@ -72,16 +76,23 @@ function serializeOrder(order) {
     total: order.total,
     societyId: order.societyId,
     buyerId: order.buyerId,
+    buyerName: buyer.name || null,
+    buyerPhone: buyer.phone || null,
+    buyerFlatNumber: buyerFlat?.flatNumber || null,
+    buyerBlock: buyerFlat?.block || null,
+    buyerSocietyName: buyerSociety?.name || null,
     hasReview: Array.isArray(order.reviews) && order.reviews.length > 0,
     rejectReason: order.rejectReason || null,
     rejectedAt: order.rejectedAt || null,
     rejectedBy: order.rejectedBy || null,
+    expectedReadyAt: order.expectedReadyAt || null,
     items,
     timeline: {
       createdAt: order.createdAt,
       acceptedAt: order.acceptedAt || null,
       preparingAt: order.preparingAt || null,
       readyAt: order.readyAt || null,
+      expectedReadyAt: order.expectedReadyAt || null,
       pickedUpAt: order.pickedUpAt || null,
       completedAt: order.completedAt || null,
       cancelledAt: order.cancelledAt || null,

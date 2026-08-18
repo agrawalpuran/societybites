@@ -402,12 +402,52 @@ class _ActiveOrderCard extends StatelessWidget {
               ),
             ),
           ),
+          if (isSellerView) ...[
+            const SizedBox(height: 10),
+            Text(
+              order.buyerLabel,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF3A4644),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           OrderItemsList(items: order.items),
           const SizedBox(height: 12),
           OrderTotalRow(order: order),
           const SizedBox(height: 20),
           _StatusTracker(currentStep: order.statusStep, steps: _steps),
+          if (order.showExpectedReadyAt) ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F7F4),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFD4E8DF)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.schedule_rounded,
+                      size: 18, color: Color(0xFF0E5A47)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Ready by ${Order.formatReadyBy(order.expectedReadyAt!)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0E5A47),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           if (isSellerView) ...[
             Container(
@@ -875,6 +915,17 @@ class _PastOrderTile extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    if (isSellerView) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        order.buyerLabel,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF3A4644),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

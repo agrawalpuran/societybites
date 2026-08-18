@@ -105,6 +105,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _addToCart(FoodItem food) {
+    if (food.quantity <= 0) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${food.name} is sold out'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: const Color(0xFFD94F4F),
+        ),
+      );
+      return;
+    }
+
     if (_cart.isNotEmpty) {
       final cartSellerId = _cart.first.food.sellerId;
       if (food.sellerId != cartSellerId) {
@@ -716,6 +731,19 @@ class _SpecialCard extends StatelessWidget {
                       color: isDark ? Colors.white : const Color(0xFF101617),
                     ),
                   ),
+                  if (food.quantity > 0) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '${food.quantity} left',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? Colors.white70
+                            : const Color(0xFF6A7774),
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   food.quantity <= 0
                       ? Container(
@@ -859,6 +887,17 @@ class _AvailableItemTile extends StatelessWidget {
                           color: Color(0xFF0E5A47),
                         ),
                       ),
+                      if (food.quantity > 0) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '${food.quantity} left',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF6A7774),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 4),

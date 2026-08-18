@@ -411,6 +411,25 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  /// Set or clear optional Ready-by estimate. Pass null to clear.
+  static Future<Map<String, dynamic>> setOrderReadyTime({
+    required String orderId,
+    DateTime? expectedReadyAt,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/orders/$orderId/ready-time'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'expectedReadyAt': expectedReadyAt?.toIso8601String(),
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> rejectOrder({
     required String orderId,
     required String reason,
