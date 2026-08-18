@@ -62,3 +62,9 @@ Stored as lowercase strings on `Listing.status`:
 - Non-null values must be in the future; `null` clears the estimate.
 - Informational only — never required for accept / prepare / ready / cancel / reject.
 - Returned on existing order APIs as `expectedReadyAt` (no extra query).
+
+## Device tokens (FCM)
+
+- `POST /devices/register` — JWT required. Body `{ "token": "<fcm>", "platform"?: "android"|"ios" }`. Upserts by token.
+- `DELETE /devices` — JWT required. Body `{ "token"?: "<fcm>" }`; omit token to deactivate all of the user’s tokens (logout).
+- Push sends happen **after** order/payment commits; FCM failure never rolls back the order.

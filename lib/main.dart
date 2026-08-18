@@ -5,6 +5,7 @@ import 'screens/main_shell_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/society_selection_screen.dart';
 import 'services/session_service.dart';
+import 'services/push_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +13,8 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  await PushNotificationService.init();
 
   runApp(const MyApp());
 }
@@ -24,6 +27,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'SocietyBites',
       debugShowCheckedModeBanner: false,
+      navigatorKey: PushNotificationService.navigatorKey,
       home: const AuthGate(),
     );
   }

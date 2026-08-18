@@ -17,6 +17,7 @@ const reviewRoutes = require("./routes/reviews");
 const mediaRoutes = require("./routes/media");
 const adminRoutes = require("./routes/admin");
 const settingsRoutes = require("./routes/settings");
+const deviceRoutes = require("./routes/devices");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -95,6 +96,7 @@ app.use("/reviews", reviewRoutes);
 app.use("/media", mediaRoutes);
 app.use("/admin", adminRoutes);
 app.use("/settings", settingsRoutes);
+app.use("/devices", deviceRoutes);
 
 app.use((err, _req, res, _next) => {
   logger.error("server", err.message, { stack: err.stack });

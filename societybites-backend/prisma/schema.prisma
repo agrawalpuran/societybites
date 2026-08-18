@@ -20,12 +20,13 @@ model User {
   createdAt       DateTime   @default(now())
   societyId       String?
   flatId          String?
-  auditLogs       AuditLog[] @relation("AdminLogs")
+  auditLogs       AuditLog[]    @relation("AdminLogs")
+  deviceTokens    DeviceToken[]
   listings        Listing[]
-  orders          Order[]    @relation("BuyerOrders")
+  orders          Order[]       @relation("BuyerOrders")
   reviews         Review[]
-  flat            Flat?      @relation(fields: [flatId], references: [id])
-  society         Society?   @relation(fields: [societyId], references: [id])
+  flat            Flat?         @relation(fields: [flatId], references: [id])
+  society         Society?      @relation(fields: [societyId], references: [id])
 }
 
 model Society {
@@ -180,4 +181,19 @@ model AppSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+/// FCM device tokens for push notifications (multi-device).
+model DeviceToken {
+  id         String   @id @default(uuid())
+  userId     String
+  token      String   @unique
+  platform   String?
+  active     Boolean  @default(true)
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
 }

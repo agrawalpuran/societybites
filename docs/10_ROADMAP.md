@@ -21,9 +21,12 @@
 
 ## Future
 
-- Push Notifications
 - Messaging
 - Analytics
 - Platform Monetization
 - Society Admin Portal
+
+## Recently shipped
+
+- Push Notifications (FCM) + auto-refresh on tab/resume
 

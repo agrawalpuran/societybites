@@ -7,6 +7,12 @@ const { generateOrderNumber } = require("../utils/orderNumber");
 const { serializeOrder } = require("../utils/listingSerializer");
 const { getPlatformFee } = require("../lib/platformFee");
 const { expireListingIfDue } = require("../utils/listingExpiry");
+const {
+  notifyOrderCreated,
+  notifyStatusChange,
+  notifyOrderRejected,
+  notifyReadyBy,
+} = require("../utils/notifications");
 
 const router = express.Router();
 
@@ -428,6 +434,8 @@ router.post(
 
     logger.info("order", `Created ${order.orderNumber} by ${req.user.phone}`);
 
+    notifyOrderCreated(order);
+
     res.status(201).json(serializeOrder(order));
   })
 );
@@ -551,6 +559,8 @@ router.patch(
       logger.info("order", `${order.orderNumber} → ${status}`);
     }
 
+    notifyStatusChange(updated, status);
+
     res.json(serializeOrder(updated));
   })
 );
@@ -635,6 +645,8 @@ router.post(
       return result;
     });
 
+    notifyOrderRejected(updated);
+
     res.json(serializeOrder(updated));
   })
 );
@@ -678,6 +690,7 @@ router.patch(
         include: orderInclude,
       });
       logger.info("order", `Cleared Ready by for ${order.orderNumber}`);
+      notifyReadyBy(updated, true);
       return res.json(serializeOrder(updated));
     }
 
@@ -708,6 +721,7 @@ router.patch(
       "order",
       `Ready by set for ${order.orderNumber}: ${readyAt.toISOString()}`
     );
+    notifyReadyBy(updated, false);
     res.json(serializeOrder(updated));
   })
 );

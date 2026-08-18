@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../services/session_service.dart';
+import '../services/push_notification_service.dart';
 import '../widgets/app_header.dart';
 import 'admin/admin_shell_screen.dart';
 import 'legal_screen.dart';
@@ -113,6 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (confirmed != true || !mounted) return;
 
+    await PushNotificationService.unregister();
     await SessionService.clear();
     await FirebaseAuth.instance.signOut();
 

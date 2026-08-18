@@ -1,5 +1,6 @@
 const { initializeApp, getApps, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
+const { getMessaging } = require("firebase-admin/messaging");
 
 if (getApps().length === 0) {
   const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -21,4 +22,4 @@ if (getApps().length === 0) {
   }
 }
 
-module.exports = { getAuth };
+module.exports = { getAuth, getMessaging };

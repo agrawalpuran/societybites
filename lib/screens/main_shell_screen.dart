@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/push_notification_service.dart';
 import '../widgets/app_bottom_nav.dart';
 import 'home_screen.dart';
 import 'orders_screen.dart';
@@ -15,20 +16,66 @@ class MainShellScreen extends StatefulWidget {
   State<MainShellScreen> createState() => _MainShellScreenState();
 }
 
-class _MainShellScreenState extends State<MainShellScreen> {
+class _MainShellScreenState extends State<MainShellScreen>
+    with WidgetsBindingObserver {
   late int _navIndex;
+  final _homeKey = GlobalKey<HomeScreenState>();
   final _ordersKey = GlobalKey<OrdersScreenState>();
+  final _dashboardKey = GlobalKey<SellerDashboardScreenState>();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _navIndex = widget.initialIndex;
+    PushNotificationService.onForegroundOrderUpdate = _refreshVisibleTab;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PushNotificationService.registerIfPossible();
+    });
+  }
+
+  @override
+  void dispose() {
+    if (PushNotificationService.onForegroundOrderUpdate == _refreshVisibleTab) {
+      PushNotificationService.onForegroundOrderUpdate = null;
+    }
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshVisibleTab();
+    }
+  }
+
+  void _refreshVisibleTab() {
+    switch (_navIndex) {
+      case 0:
+        _homeKey.currentState?.refresh();
+        break;
+      case 1:
+        _ordersKey.currentState?.refresh();
+        break;
+      case 2:
+        _dashboardKey.currentState?.refresh();
+        break;
+    }
   }
 
   void _selectTab(int index) {
     setState(() => _navIndex = index);
-    if (index == 1) {
-      _ordersKey.currentState?.refresh();
+    switch (index) {
+      case 0:
+        _homeKey.currentState?.refresh();
+        break;
+      case 1:
+        _ordersKey.currentState?.refresh();
+        break;
+      case 2:
+        _dashboardKey.currentState?.refresh();
+        break;
     }
   }
 
@@ -38,9 +85,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
       body: IndexedStack(
         index: _navIndex,
         children: [
-          const HomeScreen(),
+          HomeScreen(key: _homeKey),
           OrdersScreen(key: _ordersKey, onExploreHome: () => _selectTab(0)),
-          const SellerDashboardScreen(),
+          SellerDashboardScreen(key: _dashboardKey),
           ProfileScreen(onSelectTab: _selectTab),
         ],
       ),

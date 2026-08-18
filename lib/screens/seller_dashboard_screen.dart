@@ -13,10 +13,10 @@ class SellerDashboardScreen extends StatefulWidget {
   const SellerDashboardScreen({super.key});
 
   @override
-  State<SellerDashboardScreen> createState() => _SellerDashboardScreenState();
+  SellerDashboardScreenState createState() => SellerDashboardScreenState();
 }
 
-class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
+class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   List<Order> _activeOrders = [];
   List<Order> _pastOrders = [];
   bool _isLoading = true;
@@ -28,6 +28,12 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _loadOrders();
+    _loadStats();
+  }
+
+  /// Called by MainShell when Dashboard tab is selected or app resumes.
+  void refresh() {
     _loadOrders();
     _loadStats();
   }

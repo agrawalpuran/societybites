@@ -830,4 +830,32 @@ class ApiService {
     }
     _throwFromResponse(response);
   }
+
+  static Future<void> registerDeviceToken(
+    String token, {
+    String? platform,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/devices/register'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'token': token,
+        if (platform != null) 'platform': platform,
+      }),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) return;
+    _throwFromResponse(response);
+  }
+
+  static Future<void> unregisterDeviceToken({String? token}) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/devices'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        if (token != null) 'token': token,
+      }),
+    );
+    if (response.statusCode == 200) return;
+    _throwFromResponse(response);
+  }
 }

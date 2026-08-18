@@ -3,6 +3,10 @@ const prisma = require("../lib/prisma");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser } = require("../middleware/requireUser");
 const { serializeOrder } = require("../utils/listingSerializer");
+const {
+  notifyBuyerMarkedPaid,
+  notifyPaymentConfirmed,
+} = require("../utils/notifications");
 
 const router = express.Router();
 
@@ -56,6 +60,8 @@ router.post(
       include: orderInclude,
     });
 
+    notifyBuyerMarkedPaid(updated);
+
     res.json(serializeOrder(updated));
   })
 );
@@ -97,6 +103,8 @@ router.post(
     });
 
     console.log(`[PAYMENT] Confirmed for ${order.orderNumber} by seller ${req.user.phone}`);
+
+    notifyPaymentConfirmed(updated);
 
     res.json(serializeOrder(updated));
   })

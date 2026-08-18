@@ -11,10 +11,10 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  HomeScreenState createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   final List<CartItem> _cart = [];
   final TextEditingController _searchController = TextEditingController();
 
@@ -28,6 +28,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _loadListings();
+  }
+
+  /// Called by MainShell when Home tab is selected or app resumes.
+  void refresh() {
     _loadListings();
   }
 
