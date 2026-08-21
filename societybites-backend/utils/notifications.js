@@ -191,10 +191,13 @@ function notifyBuyerMarkedPaid(order) {
 
 /** Payment confirm also moves to preparing — one buyer notification only. */
 function notifyPaymentConfirmed(order) {
+  const isCash = order.paymentMethod === "cash";
   notifyAsync(() =>
     sendToUser(order.buyerId, {
-      title: "Payment confirmed",
-      body: `Payment confirmed for order ${order.orderNumber}`,
+      title: isCash ? "Payment received" : "Payment confirmed",
+      body: isCash
+        ? `Payment received for order ${order.orderNumber}`
+        : `Payment confirmed for order ${order.orderNumber}`,
       notificationType: "payment_confirmed",
       orderId: order.id,
     })

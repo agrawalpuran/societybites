@@ -1,6 +1,8 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SessionService {
+  static const _secureStorage = FlutterSecureStorage();
   static const _userIdKey = 'user_id';
   static const _phoneKey = 'phone';
   static const _userNameKey = 'user_name';
@@ -10,6 +12,8 @@ class SessionService {
   static const _flatNumberKey = 'flat_number';
   static const _roleKey = 'user_role';
   static const _jwtKey = 'auth_token';
+  static const _refreshTokenKey = 'refresh_token';
+  static const _authProviderKey = 'auth_provider';
 
   static const defaultSocietyId = 'prestige-notting-hill';
   static const defaultSocietyName = 'Prestige Notting Hill';
@@ -43,9 +47,7 @@ class SessionService {
     await prefs.setString(_userNameKey, name);
   }
 
-  static Future<void> cacheProfileFromApi(
-    Map<String, dynamic> profile,
-  ) async {
+  static Future<void> cacheProfileFromApi(Map<String, dynamic> profile) async {
     final prefs = await SharedPreferences.getInstance();
     final name = profile['name'] as String?;
     final society = profile['society'] as Map<String, dynamic>?;
@@ -122,16 +124,60 @@ class SessionService {
   }
 
   static Future<void> saveToken(String token) async {
+    await _secureStorage.write(key: _jwtKey, value: token);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_jwtKey, token);
+    await prefs.remove(_jwtKey);
   }
 
   static Future<String?> getToken() async {
+    final secureToken = await _secureStorage.read(key: _jwtKey);
+    if (secureToken != null && secureToken.isNotEmpty) return secureToken;
+
+    // Backward-compatible migration for existing Firebase demo sessions.
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_jwtKey);
+    final legacyToken = prefs.getString(_jwtKey);
+    if (legacyToken != null && legacyToken.isNotEmpty) {
+      await _secureStorage.write(key: _jwtKey, value: legacyToken);
+      await prefs.remove(_jwtKey);
+    }
+    return legacyToken;
+  }
+
+  static Future<void> saveRefreshToken(String token) async {
+    await _secureStorage.write(key: _refreshTokenKey, value: token);
+  }
+
+  static Future<String?> getRefreshToken() async {
+    return _secureStorage.read(key: _refreshTokenKey);
+  }
+
+  static Future<void> saveAuthProvider(String provider) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_authProviderKey, provider);
+  }
+
+  static Future<String> getAuthProvider() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_authProviderKey) ?? 'firebase';
+  }
+
+  static Future<void> saveAuthSession({
+    required String accessToken,
+    required String provider,
+    String? refreshToken,
+  }) async {
+    await saveToken(accessToken);
+    await saveAuthProvider(provider);
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      await saveRefreshToken(refreshToken);
+    } else {
+      await _secureStorage.delete(key: _refreshTokenKey);
+    }
   }
 
   static Future<void> clear() async {
+    await _secureStorage.delete(key: _jwtKey);
+    await _secureStorage.delete(key: _refreshTokenKey);
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   }

@@ -494,6 +494,15 @@ router.patch(
       }
     }
 
+    if (status === "completed" && order.paymentMethod === "cash") {
+      if (order.paymentStatus !== "paid") {
+        return res.status(400).json({
+          error:
+            "Please confirm that payment has been received before completing this order.",
+        });
+      }
+    }
+
     const isBuyer = order.buyerId === req.user.id;
     const isSeller = order.items.some(
       (item) => item.listing.sellerId === req.user.id
@@ -503,11 +512,14 @@ router.patch(
       return res.status(403).json({ error: "Not allowed to update this order" });
     }
 
-    if (SELLER_ACTIONS.has(status) && !isSeller) {
+    // Buyer or seller may complete after pickup; other actions stay role-gated.
+    if (status === "completed") {
+      if (!isBuyer && !isSeller) {
+        return res.status(403).json({ error: "Not allowed to complete this order" });
+      }
+    } else if (SELLER_ACTIONS.has(status) && !isSeller) {
       return res.status(403).json({ error: "Only the seller can perform this action" });
-    }
-
-    if (BUYER_ACTIONS.has(status) && !isBuyer) {
+    } else if (BUYER_ACTIONS.has(status) && !isBuyer) {
       return res.status(403).json({ error: "Only the buyer can perform this action" });
     }
 
@@ -621,7 +633,8 @@ router.post(
           rejectedAt: new Date(),
           rejectedBy: req.user.id,
           paymentStatus:
-            order.paymentStatus === "seller_confirmed"
+            order.paymentStatus === "seller_confirmed" ||
+            order.paymentStatus === "paid"
               ? order.paymentStatus
               : "failed",
         },

@@ -901,6 +901,62 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
     }
   }
 
+  Future<void> _confirmCashPayment() async {
+    final order = widget.order;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm cash received?'),
+        content: Text(
+          'Confirm that you have received ₹${order.total.toStringAsFixed(0)} in cash?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF0E5A47),
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isConfirmingPayment = true);
+    try {
+      await ApiService.confirmCashPayment(orderId: order.id);
+      await widget.onPaymentConfirmed();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment received'),
+          backgroundColor: Color(0xFF0E5A47),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not confirm cash payment: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isConfirmingPayment = false);
+    }
+  }
+
+  Future<void> _completeOrder() async {
+    setState(() => _isUpdating = true);
+    try {
+      await widget.onAction(widget.order, 'completed');
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
+  }
+
   Future<void> _callBuyer() async {
     final phone = widget.order.buyerPhone?.trim();
     if (phone == null || phone.isEmpty) {
@@ -934,9 +990,16 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
     final isPrep = order.status == 'preparing';
     final isReady = order.status == 'ready';
     final isPickedUp = order.status == 'picked_up';
+    final isCash = (order.paymentMethod ?? 'upi').toLowerCase() == 'cash';
+    final cashPaid = order.paymentStatus == 'paid';
+    final needsCashConfirm =
+        isCash && isPickedUp && !cashPaid && order.paymentStatus != 'failed';
+    final canCompleteCash = isCash && isPickedUp && cashPaid;
     final hasSellerAction = isPending || isAccepted || isPrep;
     final canReject = isPending || isAccepted || isPrep;
     final canSetReadyBy = isAccepted || isPrep;
+    final showUpiConfirm =
+        !isCash && order.paymentStatus == 'buyer_marked_paid';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1034,9 +1097,21 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
               ),
               const SizedBox(width: 8),
               _PaymentBadge(paymentStatus: order.paymentStatus),
+              if (isCash) ...[
+                const SizedBox(width: 8),
+                const Text(
+                  'CASH',
+                  style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 0.6,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF8A9491),
+                  ),
+                ),
+              ],
             ],
           ),
-          if (order.paymentStatus == 'buyer_marked_paid') ...[
+          if (showUpiConfirm) ...[
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
@@ -1064,6 +1139,134 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                   _isConfirmingPayment ? 'Confirming...' : 'Confirm Payment',
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                 ),
+              ),
+            ),
+          ],
+          if (needsCashConfirm) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF0F0),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFD4D4)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Payment',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF8A9491),
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Cash on Delivery',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFD94F4F),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Payment Pending',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFD94F4F),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 42,
+                    child: ElevatedButton.icon(
+                      onPressed:
+                          _isConfirmingPayment ? null : _confirmCashPayment,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE85D04),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      icon: _isConfirmingPayment
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.payments_rounded, size: 18),
+                      label: Text(
+                        _isConfirmingPayment
+                            ? 'Confirming...'
+                            : 'Confirm Payment Received',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (canCompleteCash) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5EE),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFD4E8DF)),
+              ),
+              child: const Text(
+                'Payment Received',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0E5A47),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: ElevatedButton(
+                onPressed: _isUpdating ? null : _completeOrder,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0E5A47),
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFE8EDEB),
+                  disabledForegroundColor: const Color(0xFF6A7774),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: _isUpdating
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Complete Order',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 13),
+                      ),
               ),
             ),
           ],
@@ -1107,7 +1310,11 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                             isReady
                                 ? 'Awaiting pickup'
                                 : isPickedUp
-                                    ? 'Waiting for buyer to complete'
+                                    ? (isCash
+                                        ? (cashPaid
+                                            ? 'Ready to complete'
+                                            : 'Confirm cash to complete')
+                                        : 'Waiting for buyer to complete')
                                     : isPrep
                                         ? 'Mark Ready'
                                         : isAccepted
@@ -1228,6 +1435,7 @@ class _PaymentBadge extends StatelessWidget {
 
     switch (paymentStatus) {
       case 'seller_confirmed':
+      case 'paid':
         label = 'PAID ✓';
         textColor = const Color(0xFF0E5A47);
         bgColor = const Color(0xFFE8F5EE);

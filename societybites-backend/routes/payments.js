@@ -23,6 +23,10 @@ const orderInclude = {
   },
 };
 
+function isOrderSeller(order, userId) {
+  return order.items.some((item) => item.listing.sellerId === userId);
+}
+
 router.post(
   "/:orderId/mark-paid",
   requireUser,
@@ -40,6 +44,13 @@ router.post(
 
     if (order.buyerId !== req.user.id) {
       return res.status(403).json({ error: "Only the buyer can mark payment" });
+    }
+
+    if (order.paymentMethod !== "upi") {
+      return res.status(400).json({
+        error:
+          "Mark paid is only for UPI orders. Cash is confirmed by the seller after pickup.",
+      });
     }
 
     if (order.status !== "accepted") {
@@ -79,12 +90,14 @@ router.post(
       return res.status(404).json({ error: "Order not found" });
     }
 
-    const isSeller = order.items.some(
-      (item) => item.listing.sellerId === req.user.id
-    );
-
-    if (!isSeller) {
+    if (!isOrderSeller(order, req.user.id)) {
       return res.status(403).json({ error: "Only the seller can confirm payment" });
+    }
+
+    if (order.paymentMethod !== "upi") {
+      return res.status(400).json({
+        error: "Use confirm-cash for cash on delivery orders",
+      });
     }
 
     if (order.paymentStatus !== "buyer_marked_paid") {
@@ -110,6 +123,81 @@ router.post(
   })
 );
 
+/**
+ * POST /payments/:orderId/confirm-cash
+ * Seller confirms physical cash received after pickup (COD).
+ * Sets paymentStatus=paid; does not auto-complete the order.
+ */
+router.post(
+  "/:orderId/confirm-cash",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.orderId },
+      include: orderInclude,
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    if (!isOrderSeller(order, req.user.id)) {
+      return res.status(403).json({
+        error: "Only the seller can confirm cash payment for this order",
+      });
+    }
+
+    if (order.paymentMethod !== "cash") {
+      return res.status(400).json({
+        error: "This endpoint is only for cash on delivery orders",
+      });
+    }
+
+    if (["cancelled", "rejected"].includes(order.status)) {
+      return res.status(400).json({
+        error: `Cannot confirm payment for a ${order.status} order`,
+      });
+    }
+
+    // Idempotent: already paid → return current order, keep original timestamp.
+    if (order.paymentStatus === "paid") {
+      return res.json(serializeOrder(order));
+    }
+
+    if (order.status !== "picked_up") {
+      return res.status(400).json({
+        error: "Cash payment can only be confirmed after the order is picked up",
+      });
+    }
+
+    if (
+      order.paymentStatus !== "pending" &&
+      order.paymentStatus !== "buyer_marked_paid"
+    ) {
+      return res.status(400).json({
+        error: `Cannot confirm cash payment while payment status is "${order.paymentStatus}"`,
+      });
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        paymentStatus: "paid",
+        sellerConfirmedPaidAt: new Date(),
+      },
+      include: orderInclude,
+    });
+
+    console.log(
+      `[PAYMENT] Cash confirmed for ${order.orderNumber} by seller ${req.user.phone}`
+    );
+
+    notifyPaymentConfirmed(updated);
+
+    res.json(serializeOrder(updated));
+  })
+);
+
 router.get(
   "/:orderId",
   requireUser,
@@ -124,9 +212,7 @@ router.get(
     }
 
     const isBuyer = order.buyerId === req.user.id;
-    const isSeller = order.items.some(
-      (item) => item.listing.sellerId === req.user.id
-    );
+    const isSeller = isOrderSeller(order, req.user.id);
 
     if (!isBuyer && !isSeller) {
       return res.status(403).json({ error: "Not allowed to view payment info" });

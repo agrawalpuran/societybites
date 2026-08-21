@@ -24,8 +24,9 @@
 - One review per order.
 - Pickup only.
 - No delivery.
-- Payment is Direct UPI.
-- Seller confirms payment.
+- Payment is Direct UPI or cash on pickup (`paymentMethod`: `upi` | `cash`).
+- UPI: buyer marks paid → seller confirms (`seller_confirmed`) before prepare.
+- Cash: stays pending through pickup; seller confirms cash received (`paid`) before complete.
 - Platform fee is configurable by admin (default ₹0) and applied at order creation.
 - Cancelled orders cannot be reviewed.
 

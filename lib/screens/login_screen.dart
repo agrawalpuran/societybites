@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'otp_screen.dart';
+import '../services/api_service.dart';
+import '../services/auth_config.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,19 +22,11 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _phoneController.addListener(_onPhoneChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _phoneFocusNode.requestFocus();
       }
     });
-  }
-
-  void _onPhoneChanged() {
-    final number = _normalizeIndianNumber(_phoneController.text);
-    if (number.length == 10 && !_isSendingOtp) {
-      _sendOtp();
-    }
   }
 
   String _normalizeIndianNumber(String raw) {
@@ -60,8 +54,24 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isSendingOtp = true);
 
     try {
+      if (AuthConfig.usesTwoFactor) {
+        await ApiService.sendOtp('+91$number');
+        if (!mounted) return;
+        setState(() => _isSendingOtp = false);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                OtpScreen(phoneNumber: '+91$number', verificationId: ''),
+          ),
+        );
+        return;
+      }
+
       if (kIsWeb) {
-        final confirmationResult = await _auth.signInWithPhoneNumber('+91$number');
+        final confirmationResult = await _auth.signInWithPhoneNumber(
+          '+91$number',
+        );
         if (!mounted) return;
         setState(() => _isSendingOtp = false);
         Navigator.push(
@@ -84,7 +94,9 @@ class _LoginScreenState extends State<LoginScreen> {
             await _auth.signInWithCredential(credential);
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Phone number verified successfully.')),
+              const SnackBar(
+                content: Text('Phone number verified successfully.'),
+              ),
             );
           } on FirebaseAuthException catch (e) {
             if (!mounted) return;
@@ -119,18 +131,21 @@ class _LoginScreenState extends State<LoginScreen> {
           setState(() => _isSendingOtp = false);
         },
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _isSendingOtp = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send OTP: $e')),
+        const SnackBar(
+          content: Text(
+            'We could not send the OTP. Check your connection and try again.',
+          ),
+        ),
       );
     }
   }
 
   @override
   void dispose() {
-    _phoneController.removeListener(_onPhoneChanged);
     _phoneController.dispose();
     _phoneFocusNode.dispose();
     super.dispose();
@@ -278,10 +293,7 @@ class _HeaderSection extends StatelessWidget {
 }
 
 class _InputSection extends StatelessWidget {
-  const _InputSection({
-    required this.controller,
-    required this.focusNode,
-  });
+  const _InputSection({required this.controller, required this.focusNode});
 
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -380,17 +392,18 @@ class _SendOtpButton extends StatelessWidget {
       height: 62,
       child: ElevatedButton(
         onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF0E5A47),
-          foregroundColor: Colors.white,
-          shape: const StadiumBorder(),
-          elevation: 0,
-          shadowColor: Colors.transparent,
-        ).copyWith(
-          overlayColor: WidgetStatePropertyAll(
-            Colors.white.withOpacity(0.07),
-          ),
-        ),
+        style:
+            ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0E5A47),
+              foregroundColor: Colors.white,
+              shape: const StadiumBorder(),
+              elevation: 0,
+              shadowColor: Colors.transparent,
+            ).copyWith(
+              overlayColor: WidgetStatePropertyAll(
+                Colors.white.withOpacity(0.07),
+              ),
+            ),
         child: Container(
           decoration: BoxDecoration(
             boxShadow: [
@@ -436,10 +449,7 @@ class _TrustIndicatorsRow extends StatelessWidget {
         ),
         SizedBox(width: 12),
         Expanded(
-          child: _TrustItem(
-            icon: Icons.groups_rounded,
-            label: 'SOCIETY\nONLY',
-          ),
+          child: _TrustItem(icon: Icons.groups_rounded, label: 'SOCIETY\nONLY'),
         ),
         SizedBox(width: 12),
         Expanded(
@@ -502,16 +512,9 @@ class _IconBadge extends StatelessWidget {
         height: 38,
         decoration: BoxDecoration(
           color: const Color(0xFFE6F0ED),
-          border: Border.all(
-            color: const Color(0xFFD4E5E0),
-            width: 1,
-          ),
+          border: Border.all(color: const Color(0xFFD4E5E0), width: 1),
         ),
-        child: Icon(
-          icon,
-          color: const Color(0xFF0E5A47),
-          size: 18,
-        ),
+        child: Icon(icon, color: const Color(0xFF0E5A47), size: 18),
       ),
     );
   }

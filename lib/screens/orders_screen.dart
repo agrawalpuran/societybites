@@ -323,7 +323,8 @@ class _ActiveOrderCard extends StatelessWidget {
       case 'buyer_marked_paid':
         return 'Awaiting Seller Confirmation';
       case 'seller_confirmed':
-        return 'Payment Confirmed ✓';
+      case 'paid':
+        return 'Payment Received ✓';
       default:
         return 'Payment Pending';
     }
@@ -332,6 +333,7 @@ class _ActiveOrderCard extends StatelessWidget {
   Color get _paymentColor {
     switch (order.paymentStatus) {
       case 'seller_confirmed':
+      case 'paid':
         return const Color(0xFF0E5A47);
       case 'buyer_marked_paid':
         return const Color(0xFFB8860B);
@@ -343,6 +345,7 @@ class _ActiveOrderCard extends StatelessWidget {
   Color get _paymentBg {
     switch (order.paymentStatus) {
       case 'seller_confirmed':
+      case 'paid':
         return const Color(0xFFE8F5EE);
       case 'buyer_marked_paid':
         return const Color(0xFFFFF8E8);
@@ -470,7 +473,8 @@ class _ActiveOrderCard extends StatelessWidget {
             ),
           ] else ...[
             if (order.status == 'accepted' &&
-                order.paymentStatus == 'pending') ...[
+                order.paymentStatus == 'pending' &&
+                (order.paymentMethod ?? 'upi') == 'upi') ...[
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -540,6 +544,18 @@ class _ActiveOrderCard extends StatelessWidget {
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () async {
+                    final isCash =
+                        (order.paymentMethod ?? 'upi').toLowerCase() == 'cash';
+                    if (isCash && order.paymentStatus != 'paid') {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Please confirm that payment has been received before completing this order.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
                     try {
                       await ApiService.updateOrderStatus(
                         orderId: order.id,
@@ -568,9 +584,12 @@ class _ActiveOrderCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14)),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Mark Complete',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  child: Text(
+                    (order.paymentMethod ?? 'upi').toLowerCase() == 'cash' &&
+                            order.paymentStatus != 'paid'
+                        ? 'Waiting for seller to confirm cash'
+                        : 'Mark Complete',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
               ),

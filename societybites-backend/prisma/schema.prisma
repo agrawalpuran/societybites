@@ -22,6 +22,7 @@ model User {
   flatId          String?
   auditLogs       AuditLog[]    @relation("AdminLogs")
   deviceTokens    DeviceToken[]
+  refreshTokens   RefreshToken[]
   listings        Listing[]
   orders          Order[]       @relation("BuyerOrders")
   reviews         Review[]
@@ -196,4 +197,17 @@ model DeviceToken {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, active])
+}
+
+/// Hashed refresh tokens for 2Factor persistent login. Firebase login is unchanged.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

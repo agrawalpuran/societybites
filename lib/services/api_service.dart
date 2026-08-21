@@ -1,10 +1,99 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart' show VoidCallback;
+import 'package:http/http.dart' as http_client;
 
+import 'auth_config.dart';
 import 'session_service.dart';
+
+final http = _RefreshAwareHttp();
+
+class _RefreshAwareHttp {
+  Future<http_client.Response> get(Uri url, {Map<String, String>? headers}) {
+    return _send('GET', url, headers: headers);
+  }
+
+  Future<http_client.Response> post(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+  }) {
+    return _send('POST', url, headers: headers, body: body);
+  }
+
+  Future<http_client.Response> patch(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+  }) {
+    return _send('PATCH', url, headers: headers, body: body);
+  }
+
+  Future<http_client.Response> delete(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+  }) {
+    return _send('DELETE', url, headers: headers, body: body);
+  }
+
+  Future<http_client.Response> _send(
+    String method,
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    bool allowRefresh = true,
+  }) async {
+    final response = await _sendRaw(method, url, headers: headers, body: body);
+    final wasAuthenticated = headers?.containsKey('Authorization') ?? false;
+
+    if (allowRefresh &&
+        wasAuthenticated &&
+        ApiService._isUnauthorizedResponse(response)) {
+      final requestAuthorization = headers?['Authorization'];
+      final currentToken = await SessionService.getToken();
+      final currentAuthorization = currentToken == null
+          ? null
+          : 'Bearer $currentToken';
+
+      // Another request may already have completed the single-flight refresh.
+      // In that case, retry once with its new token instead of rotating again.
+      if (currentAuthorization != null &&
+          currentAuthorization != requestAuthorization) {
+        final retryHeaders = Map<String, String>.from(headers ?? const {});
+        retryHeaders['Authorization'] = currentAuthorization;
+        return _sendRaw(method, url, headers: retryHeaders, body: body);
+      }
+
+      if (!await ApiService._refreshAccessToken()) return response;
+
+      final retryHeaders = Map<String, String>.from(headers ?? const {});
+      final token = await SessionService.getToken();
+      if (token != null) retryHeaders['Authorization'] = 'Bearer $token';
+      return _sendRaw(method, url, headers: retryHeaders, body: body);
+    }
+
+    return response;
+  }
+
+  Future<http_client.Response> _sendRaw(
+    String method,
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+  }) {
+    switch (method) {
+      case 'POST':
+        return http_client.post(url, headers: headers, body: body);
+      case 'PATCH':
+        return http_client.patch(url, headers: headers, body: body);
+      case 'DELETE':
+        return http_client.delete(url, headers: headers, body: body);
+      default:
+        return http_client.get(url, headers: headers);
+    }
+  }
+}
 
 class TokenExpiredException implements Exception {
   final String message;
@@ -14,8 +103,19 @@ class TokenExpiredException implements Exception {
 }
 
 class ApiService {
+  static Future<bool>? _refreshInFlight;
+  static VoidCallback? onSessionInvalidated;
+
   static String get baseUrl {
-    return 'https://societybites.onrender.com';
+    const configured = String.fromEnvironment(
+      'API_BASE_URL',
+      defaultValue: 'https://societybites.onrender.com',
+    );
+    final normalized = configured.trim();
+    if (normalized.isEmpty) return 'https://societybites.onrender.com';
+    return normalized.endsWith('/')
+        ? normalized.substring(0, normalized.length - 1)
+        : normalized;
   }
 
   static String absoluteUrl(String path) {
@@ -44,25 +144,99 @@ class ApiService {
     };
   }
 
-  static dynamic _decodeResponse(http.Response response) {
+  static dynamic _decodeResponse(http_client.Response response) {
     if (response.body.isEmpty) return null;
     return jsonDecode(response.body);
   }
 
-  static Never _throwFromResponse(http.Response response) {
+  static Never _throwFromResponse(http_client.Response response) {
     final body = _decodeResponse(response);
     final message = body is Map && body['error'] != null
         ? body['error'].toString()
         : response.body;
 
-    if (response.statusCode == 401 && body is Map && body['code'] == 'TOKEN_EXPIRED') {
+    if (response.statusCode == 401 &&
+        body is Map &&
+        body['code'] == 'TOKEN_EXPIRED') {
       throw TokenExpiredException(message);
     }
 
     throw Exception(message);
   }
 
-  static Future<Map<String, dynamic>> firebaseLogin(String firebaseToken) async {
+  static bool _isUnauthorizedResponse(http_client.Response response) =>
+      response.statusCode == 401;
+
+  static Future<bool> _refreshAccessToken() {
+    final active = _refreshInFlight;
+    if (active != null) return active;
+
+    final future = _performRefresh();
+    _refreshInFlight = future;
+    return future.whenComplete(() => _refreshInFlight = null);
+  }
+
+  static Future<bool> _performRefresh() async {
+    if (!AuthConfig.usesTwoFactor ||
+        await SessionService.getAuthProvider() != '2factor') {
+      return false;
+    }
+
+    final refreshToken = await SessionService.getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await _invalidateSession();
+      return false;
+    }
+
+    try {
+      final response = await http_client.post(
+        Uri.parse('$baseUrl/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': refreshToken}),
+      );
+      if (response.statusCode != 200) {
+        await _invalidateSession();
+        return false;
+      }
+
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      final access = data['token'] as String?;
+      final refresh = data['refreshToken'] as String?;
+      if (access == null || refresh == null) {
+        await _invalidateSession();
+        return false;
+      }
+
+      await SessionService.saveAuthSession(
+        accessToken: access,
+        refreshToken: refresh,
+        provider: '2factor',
+      );
+      final user = data['user'];
+      if (user is Map) {
+        final profile = Map<String, dynamic>.from(user);
+        await SessionService.cacheProfileFromApi(profile);
+        final userId = profile['id'] as String?;
+        final phone = profile['phone'] as String?;
+        if (userId != null && phone != null) {
+          await SessionService.saveUser(userId: userId, phone: phone);
+        }
+      }
+      return true;
+    } catch (_) {
+      await _invalidateSession();
+      return false;
+    }
+  }
+
+  static Future<void> _invalidateSession() async {
+    await SessionService.clear();
+    onSessionInvalidated?.call();
+  }
+
+  static Future<Map<String, dynamic>> firebaseLogin(
+    String firebaseToken,
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/firebase-login'),
       headers: {'Content-Type': 'application/json'},
@@ -73,6 +247,59 @@ class ApiService {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
     }
     _throwFromResponse(response);
+  }
+
+  static Future<void> sendOtp(String phone) async {
+    final response = await http_client.post(
+      Uri.parse('$baseUrl/auth/send-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'phone': phone}),
+    );
+    if (response.statusCode == 200) return;
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> verifyOtp({
+    required String phone,
+    required String otp,
+  }) async {
+    final response = await http_client.post(
+      Uri.parse('$baseUrl/auth/verify-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'phone': phone, 'otp': otp}),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<bool> restoreTwoFactorSession() async {
+    if (!AuthConfig.usesTwoFactor) return false;
+    if (await SessionService.getAuthProvider() != '2factor') return false;
+    final refreshToken = await SessionService.getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await _invalidateSession();
+      return false;
+    }
+
+    // Startup performs exactly one rotation. Successful refresh responses
+    // already include and cache the authoritative backend user.
+    return _refreshAccessToken();
+  }
+
+  static Future<void> logoutTwoFactor() async {
+    final refreshToken = await SessionService.getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) return;
+    try {
+      await http_client.post(
+        Uri.parse('$baseUrl/auth/logout'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': refreshToken}),
+      );
+    } catch (_) {
+      // Local session clearing must still succeed if logout is offline.
+    }
   }
 
   static Future<Map<String, dynamic>> getMe() async {
@@ -112,7 +339,8 @@ class ApiService {
 
     if (response.statusCode == 200) {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
-      if (data['token'] != null) {
+      if (data['token'] != null &&
+          await SessionService.getAuthProvider() == 'firebase') {
         await SessionService.saveToken(data['token'] as String);
       }
       return Map<String, dynamic>.from(data['user'] as Map);
@@ -128,9 +356,7 @@ class ApiService {
     if (response.statusCode == 200) {
       final data = _decodeResponse(response);
       if (data is List) {
-        return data
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
       return [];
     }
@@ -230,8 +456,10 @@ class ApiService {
         if (availableAt != null) 'availableAt': availableAt.toIso8601String(),
         if (pickupLocation != null) 'pickupLocation': pickupLocation,
         if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
-        if (weightUnit != null && weightUnit.isNotEmpty) 'weightUnit': weightUnit,
-        if (weightValue != null && weightValue.isNotEmpty) 'weightValue': weightValue,
+        if (weightUnit != null && weightUnit.isNotEmpty)
+          'weightUnit': weightUnit,
+        if (weightValue != null && weightValue.isNotEmpty)
+          'weightValue': weightValue,
         if (tags != null && tags.isNotEmpty) 'tags': tags,
         if (category != null && category.isNotEmpty) 'category': category,
       }),
@@ -367,9 +595,7 @@ class ApiService {
     final response = await http.patch(
       Uri.parse('$baseUrl/listings/$listingId/renew'),
       headers: await _authHeaders(),
-      body: jsonEncode({
-        'availableAt': availableAt.toIso8601String(),
-      }),
+      body: jsonEncode({'availableAt': availableAt.toIso8601String()}),
     );
 
     if (response.statusCode == 200) {
@@ -419,9 +645,7 @@ class ApiService {
     final response = await http.patch(
       Uri.parse('$baseUrl/orders/$orderId/ready-time'),
       headers: await _authHeaders(),
-      body: jsonEncode({
-        'expectedReadyAt': expectedReadyAt?.toIso8601String(),
-      }),
+      body: jsonEncode({'expectedReadyAt': expectedReadyAt?.toIso8601String()}),
     );
 
     if (response.statusCode == 200) {
@@ -466,8 +690,9 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getListingReviews(
     String listingId,
   ) async {
-    final response =
-        await http.get(Uri.parse('$baseUrl/reviews/listing/$listingId'));
+    final response = await http.get(
+      Uri.parse('$baseUrl/reviews/listing/$listingId'),
+    );
 
     if (response.statusCode == 200) {
       final data = _decodeResponse(response) as List;
@@ -546,6 +771,20 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  /// Seller confirms COD/cash received after pickup.
+  static Future<Map<String, dynamic>> confirmCashPayment({
+    required String orderId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/payments/$orderId/confirm-cash'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> getPaymentStatus({
     required String orderId,
   }) async {
@@ -614,8 +853,9 @@ class ApiService {
     final query = <String, String>{'page': '$page'};
     if (search != null && search.isNotEmpty) query['search'] = search;
     if (role != null && role.isNotEmpty) query['role'] = role;
-    final uri =
-        Uri.parse('$baseUrl/admin/users').replace(queryParameters: query);
+    final uri = Uri.parse(
+      '$baseUrl/admin/users',
+    ).replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       final data = _decodeResponse(response);
@@ -732,8 +972,9 @@ class ApiService {
   }) async {
     final query = <String, String>{'page': '$page'};
     if (search != null && search.isNotEmpty) query['search'] = search;
-    final uri =
-        Uri.parse('$baseUrl/admin/listings').replace(queryParameters: query);
+    final uri = Uri.parse(
+      '$baseUrl/admin/listings',
+    ).replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       final data = _decodeResponse(response);
@@ -774,8 +1015,9 @@ class ApiService {
   }) async {
     final query = <String, String>{'page': '$page'};
     if (status != null && status.isNotEmpty) query['status'] = status;
-    final uri =
-        Uri.parse('$baseUrl/admin/orders').replace(queryParameters: query);
+    final uri = Uri.parse(
+      '$baseUrl/admin/orders',
+    ).replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       final data = _decodeResponse(response);
@@ -794,8 +1036,9 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getAdminReviews({
     int page = 1,
   }) async {
-    final uri = Uri.parse('$baseUrl/admin/reviews')
-        .replace(queryParameters: {'page': '$page'});
+    final uri = Uri.parse(
+      '$baseUrl/admin/reviews',
+    ).replace(queryParameters: {'page': '$page'});
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       final data = _decodeResponse(response);
@@ -814,8 +1057,9 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getAdminAuditLog({
     int page = 1,
   }) async {
-    final uri = Uri.parse('$baseUrl/admin/audit-log')
-        .replace(queryParameters: {'page': '$page'});
+    final uri = Uri.parse(
+      '$baseUrl/admin/audit-log',
+    ).replace(queryParameters: {'page': '$page'});
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       final data = _decodeResponse(response);
@@ -851,9 +1095,7 @@ class ApiService {
     final response = await http.delete(
       Uri.parse('$baseUrl/devices'),
       headers: await _authHeaders(),
-      body: jsonEncode({
-        if (token != null) 'token': token,
-      }),
+      body: jsonEncode({if (token != null) 'token': token}),
     );
     if (response.statusCode == 200) return;
     _throwFromResponse(response);

@@ -68,3 +68,20 @@ Stored as lowercase strings on `Listing.status`:
 - `POST /devices/register` — JWT required. Body `{ "token": "<fcm>", "platform"?: "android"|"ios" }`. Upserts by token.
 - `DELETE /devices` — JWT required. Body `{ "token"?: "<fcm>" }`; omit token to deactivate all of the user’s tokens (logout).
 - Push sends happen **after** order/payment commits; FCM failure never rolls back the order.
+
+## Cash on delivery (paymentMethod = `cash`)
+
+- Cash stays `paymentStatus=pending` until after pickup.
+- `POST /payments/:orderId/confirm-cash` — seller only; order must be `picked_up`; sets `paymentStatus=paid` + `sellerConfirmedPaidAt`.
+- Idempotent if already `paid` (does not overwrite timestamp).
+- `PATCH /orders/:id/status` → `completed` is blocked for cash until `paymentStatus=paid`.
+- UPI mark-paid / confirm endpoints reject cash orders (seller uses confirm-cash instead).
+
+## Auth (2Factor — parallel to Firebase)
+
+- `POST /auth/firebase-login` — **unchanged**. Body `{ "firebaseToken" }`. Returns `{ token, user }` (7d JWT).
+- `POST /auth/send-otp` — Body `{ "phone" }`. Phone is normalized to `+91XXXXXXXXXX`. Does not return OTP.
+- `POST /auth/verify-otp` — Body `{ "phone", "otp" }`. Returns `{ token, refreshToken, expiresIn, user }`. Finds existing user by canonical phone.
+- `POST /auth/refresh` — Body `{ "refreshToken" }`. Rotates refresh token; returns new access JWT.
+- `POST /auth/logout` — Body `{ "refreshToken" }`. Revokes that refresh token.
+- Protected APIs still use `Authorization: Bearer <access token>`.

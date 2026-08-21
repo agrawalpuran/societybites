@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -5,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'society_selection_screen.dart';
 import 'main_shell_screen.dart';
 import '../services/api_service.dart';
+import '../services/auth_config.dart';
 import '../services/session_service.dart';
 
 class OtpScreen extends StatefulWidget {
@@ -28,15 +31,22 @@ class OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<OtpScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   static const int _otpLength = 6;
-  final List<TextEditingController> _controllers =
-      List.generate(_otpLength, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(_otpLength, (_) => FocusNode());
+  final List<TextEditingController> _controllers = List.generate(
+    _otpLength,
+    (_) => TextEditingController(),
+  );
+  final List<FocusNode> _focusNodes = List.generate(
+    _otpLength,
+    (_) => FocusNode(),
+  );
 
   late String _verificationId;
   int? _resendToken;
   ConfirmationResult? _confirmationResult;
   bool _isVerifying = false;
   bool _isResending = false;
+  Timer? _resendTimer;
+  int _resendSecondsRemaining = 60;
 
   @override
   void initState() {
@@ -44,6 +54,7 @@ class _OtpScreenState extends State<OtpScreen> {
     _verificationId = widget.verificationId;
     _resendToken = widget.resendToken;
     _confirmationResult = widget.confirmationResult;
+    _startResendCountdown();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _focusNodes.first.requestFocus();
@@ -53,6 +64,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     for (final controller in _controllers) {
       controller.dispose();
     }
@@ -64,50 +76,87 @@ class _OtpScreenState extends State<OtpScreen> {
 
   String get _otp => _controllers.map((c) => c.text).join();
 
-Future<void> _verifyOtp() async {
-  FocusScope.of(context).unfocus();
-
-  if (_otp.length != _otpLength) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please enter the 6-digit OTP.')),
-    );
-    return;
+  void _startResendCountdown() {
+    _resendTimer?.cancel();
+    _resendSecondsRemaining = 60;
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendSecondsRemaining <= 1) {
+        timer.cancel();
+        setState(() => _resendSecondsRemaining = 0);
+      } else {
+        setState(() => _resendSecondsRemaining--);
+      }
+    });
   }
 
-  setState(() => _isVerifying = true);
+  Future<void> _verifyOtp() async {
+    FocusScope.of(context).unfocus();
 
-  try {
-    if (kIsWeb && _confirmationResult != null) {
-      await _confirmationResult!.confirm(_otp);
-      await _completeLogin();
+    if (_otp.length != _otpLength) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter the 6-digit OTP.')),
+      );
       return;
     }
 
-    final credential = PhoneAuthProvider.credential(
-      verificationId: _verificationId,
-      smsCode: _otp,
-    );
+    setState(() => _isVerifying = true);
 
-    await _auth.signInWithCredential(credential);
-    await _completeLogin();
-  } on FirebaseAuthException catch (e) {
-    if (!mounted) return;
+    try {
+      if (AuthConfig.usesTwoFactor) {
+        final result = await ApiService.verifyOtp(
+          phone: widget.phoneNumber,
+          otp: _otp,
+        );
+        await _persistLogin(result, provider: '2factor');
+        return;
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(e.message ?? 'Invalid OTP. Please try again.')),
-    );
-  } catch (e) {
-    if (!mounted) return;
+      if (kIsWeb && _confirmationResult != null) {
+        await _confirmationResult!.confirm(_otp);
+        await _completeLogin();
+        return;
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Something went wrong: $e')),
-    );
-  } finally {
-    if (mounted) {
-      setState(() => _isVerifying = false);
+      final credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId,
+        smsCode: _otp,
+      );
+
+      await _auth.signInWithCredential(credential);
+      await _completeLogin();
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? 'Invalid OTP. Please try again.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      final message = e.toString().toLowerCase();
+      final invalidOtp =
+          message.contains('invalid otp') ||
+          message.contains('expired') ||
+          message.contains('attempt');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            invalidOtp
+                ? 'The OTP is incorrect or expired. Please try again.'
+                : 'We could not verify the OTP. Check your connection and try again.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isVerifying = false);
+      }
     }
   }
-}
 
   Future<void> _completeLogin() async {
     try {
@@ -122,61 +171,82 @@ Future<void> _verifyOtp() async {
       }
 
       final result = await ApiService.firebaseLogin(idToken);
-
-      final token = result['token'] as String;
-      final user = Map<String, dynamic>.from(result['user'] as Map);
-
-      await SessionService.saveToken(token);
-      await SessionService.saveUser(
-        userId: user['id'] as String,
-        phone: user['phone'] as String,
-      );
-
-      final hasFlat = user['flatId'] != null && user['societyId'] != null;
-
-      if (user['societyId'] != null && user['flatId'] != null) {
-        final society = user['society'] as Map<String, dynamic>?;
-        final flat = user['flat'] as Map<String, dynamic>?;
-        await SessionService.saveSociety(
-          societyId: user['societyId'] as String,
-          societyName: society?['name'] as String? ??
-              SessionService.defaultSocietyName,
-          flatId: user['flatId'] as String,
-          flatNumber: flat?['flatNumber'] as String?,
-        );
-      }
-
-      await SessionService.cacheProfileFromApi(user);
-
-      if (!mounted) return;
-
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (_) =>
-              hasFlat ? const MainShellScreen() : const SocietySelectionScreen(),
-        ),
-        (_) => false,
-      );
+      await _persistLogin(result, provider: 'firebase');
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Phone verified, but backend login failed: $e',
-          ),
-        ),
+        SnackBar(content: Text('Phone verified, but backend login failed: $e')),
       );
     }
   }
 
+  Future<void> _persistLogin(
+    Map<String, dynamic> result, {
+    required String provider,
+  }) async {
+    final token = result['token'] as String;
+    final refreshToken = result['refreshToken'] as String?;
+    final user = Map<String, dynamic>.from(result['user'] as Map);
+
+    await SessionService.saveAuthSession(
+      accessToken: token,
+      refreshToken: refreshToken,
+      provider: provider,
+    );
+    await SessionService.saveUser(
+      userId: user['id'] as String,
+      phone: user['phone'] as String,
+    );
+
+    final hasFlat = user['flatId'] != null && user['societyId'] != null;
+
+    if (user['societyId'] != null && user['flatId'] != null) {
+      final society = user['society'] as Map<String, dynamic>?;
+      final flat = user['flat'] as Map<String, dynamic>?;
+      await SessionService.saveSociety(
+        societyId: user['societyId'] as String,
+        societyName:
+            society?['name'] as String? ?? SessionService.defaultSocietyName,
+        flatId: user['flatId'] as String,
+        flatNumber: flat?['flatNumber'] as String?,
+      );
+    }
+
+    await SessionService.cacheProfileFromApi(user);
+
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            hasFlat ? const MainShellScreen() : const SocietySelectionScreen(),
+      ),
+      (_) => false,
+    );
+  }
+
   Future<void> _resendOtp() async {
+    if (_resendSecondsRemaining > 0) return;
     setState(() => _isResending = true);
     try {
-      if (kIsWeb) {
-        _confirmationResult = await _auth.signInWithPhoneNumber(widget.phoneNumber);
+      if (AuthConfig.usesTwoFactor) {
+        await ApiService.sendOtp(widget.phoneNumber);
         if (!mounted) return;
+        _startResendCountdown();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('OTP resent successfully.')),
+        );
+        return;
+      }
+
+      if (kIsWeb) {
+        _confirmationResult = await _auth.signInWithPhoneNumber(
+          widget.phoneNumber,
+        );
+        if (!mounted) return;
+        _startResendCountdown();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('OTP resent successfully.')),
         );
@@ -201,6 +271,7 @@ Future<void> _verifyOtp() async {
             _verificationId = verificationId;
             _resendToken = resendToken;
           });
+          _startResendCountdown();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('OTP resent successfully.')),
           );
@@ -208,6 +279,15 @@ Future<void> _verifyOtp() async {
         codeAutoRetrievalTimeout: (String verificationId) {
           _verificationId = verificationId;
         },
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'We could not resend the OTP. Check your connection and try again.',
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -316,7 +396,11 @@ Future<void> _verifyOtp() async {
                     children: List.generate(
                       _OtpScreenState._otpLength,
                       (index) => SizedBox(
-                        width: (size.width - (horizontalPadding * 2) - (_OtpScreenState._otpLength - 1) * 8) / _OtpScreenState._otpLength,
+                        width:
+                            (size.width -
+                                (horizontalPadding * 2) -
+                                (_OtpScreenState._otpLength - 1) * 8) /
+                            _OtpScreenState._otpLength,
                         child: _OtpInputBox(
                           controller: _controllers[index],
                           focusNode: _focusNodes[index],
@@ -348,7 +432,10 @@ Future<void> _verifyOtp() async {
                   Center(
                     child: _ResendOtpButton(
                       isLoading: _isResending,
-                      onTap: _isResending ? null : _resendOtp,
+                      secondsRemaining: _resendSecondsRemaining,
+                      onTap: _isResending || _resendSecondsRemaining > 0
+                          ? null
+                          : _resendOtp,
                     ),
                   ),
                   const SizedBox(height: 64),
@@ -454,16 +541,15 @@ class _OtpInputBox extends StatelessWidget {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
           borderSide: BorderSide(
-            color: isPrimary ? const Color(0xFF2D7BFF) : const Color(0xFFE8ECEA),
+            color: isPrimary
+                ? const Color(0xFF2D7BFF)
+                : const Color(0xFFE8ECEA),
             width: isPrimary ? 1.4 : 1,
           ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
-          borderSide: const BorderSide(
-            color: Color(0xFF2D7BFF),
-            width: 1.6,
-          ),
+          borderSide: const BorderSide(color: Color(0xFF2D7BFF), width: 1.6),
         ),
       ),
     );
@@ -516,10 +602,15 @@ class _PrimaryActionButton extends StatelessWidget {
 }
 
 class _ResendOtpButton extends StatelessWidget {
-  const _ResendOtpButton({required this.onTap, required this.isLoading});
+  const _ResendOtpButton({
+    required this.onTap,
+    required this.isLoading,
+    required this.secondsRemaining,
+  });
 
   final VoidCallback? onTap;
   final bool isLoading;
+  final int secondsRemaining;
 
   @override
   Widget build(BuildContext context) {
@@ -537,12 +628,13 @@ class _ResendOtpButton extends StatelessWidget {
               height: 18,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : const Icon(
-              Icons.refresh_rounded,
-              color: Color(0xFF0E5A47),
-            ),
+          : const Icon(Icons.refresh_rounded, color: Color(0xFF0E5A47)),
       label: Text(
-        isLoading ? 'Resending...' : 'Resend OTP',
+        isLoading
+            ? 'Resending...'
+            : secondsRemaining > 0
+            ? 'Resend OTP in ${secondsRemaining}s'
+            : 'Resend OTP',
         style: const TextStyle(
           color: Color(0xFF0E5A47),
           fontWeight: FontWeight.w700,

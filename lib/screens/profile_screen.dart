@@ -114,9 +114,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (confirmed != true || !mounted) return;
 
+    final authProvider = await SessionService.getAuthProvider();
     await PushNotificationService.unregister();
+    if (authProvider == '2factor') {
+      await ApiService.logoutTwoFactor();
+    }
     await SessionService.clear();
-    await FirebaseAuth.instance.signOut();
+    if (authProvider == 'firebase') {
+      await FirebaseAuth.instance.signOut();
+    }
 
     if (!mounted) return;
 
@@ -234,16 +240,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _loadProfile();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update profile: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not update profile: $e')));
     }
   }
 
   Future<void> _editUpi({bool afterEnableSelling = false}) async {
     final upiController = TextEditingController(text: _upiId ?? '');
-    final nameController =
-        TextEditingController(text: _upiDisplayName ?? _name ?? '');
+    final nameController = TextEditingController(
+      text: _upiDisplayName ?? _name ?? '',
+    );
     String? errorText;
 
     final saved = await showModalBottomSheet<bool>(
@@ -360,7 +367,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: const Text(
                         'Save UPI',
                         style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w700),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
@@ -401,9 +410,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save UPI: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not save UPI: $e')));
     }
   }
 
@@ -452,9 +461,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not enable selling: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not enable selling: $e')));
     }
   }
 
@@ -474,13 +483,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
           'SocietyBites',
-          style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0E5A47)),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0E5A47),
+          ),
         ),
         content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Version 1.0.0', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF3A4644))),
+            Text(
+              'Version 1.0.0',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF3A4644),
+              ),
+            ),
             SizedBox(height: 12),
             Text(
               'A hyperlocal food marketplace for gated communities.',
@@ -491,7 +509,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: Color(0xFF0E5A47))),
+            child: const Text(
+              'Close',
+              style: TextStyle(color: Color(0xFF0E5A47)),
+            ),
           ),
         ],
       ),
@@ -568,7 +589,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _MenuTile(
                               icon: Icons.storefront_rounded,
                               title: 'Start Selling',
-                              subtitle: 'List food for neighbors in your society',
+                              subtitle:
+                                  'List food for neighbors in your society',
                               onTap: _enableSelling,
                             ),
                           _MenuTile(
@@ -625,53 +647,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             icon: Icons.help_outline_rounded,
                             title: 'Help Center',
                             subtitle: 'FAQs and community support',
-                            onTap: () => _openLegal('Help Center',
+                            onTap: () => _openLegal(
+                              'Help Center',
                               'SocietyBites Help Center\n\n'
-                              'Need help? We\'re here for you.\n\n'
-                              'Common Questions:\n'
-                              '• How do I place an order? Browse listings on the home screen, add items to your cart, and checkout.\n'
-                              '• How do I become a seller? Go to Profile → Start Selling, add your UPI ID, then create a listing from Dashboard.\n'
-                              '• How do payments work? Buyers pay via UPI or cash on pickup. Sellers receive payments directly.\n'
-                              '• How do I change my society? Society cannot be changed after joining. Contact support for assistance.\n\n'
-                              'Still need help?\n'
-                              'Email us at support@societybites.in\n'
-                              'We typically respond within 24 hours.',
+                                  'Need help? We\'re here for you.\n\n'
+                                  'Common Questions:\n'
+                                  '• How do I place an order? Browse listings on the home screen, add items to your cart, and checkout.\n'
+                                  '• How do I become a seller? Go to Profile → Start Selling, add your UPI ID, then create a listing from Dashboard.\n'
+                                  '• How do payments work? Buyers pay via UPI or cash on pickup. Sellers receive payments directly.\n'
+                                  '• How do I change my society? Society cannot be changed after joining. Contact support for assistance.\n\n'
+                                  'Still need help?\n'
+                                  'Email us at support@societybites.in\n'
+                                  'We typically respond within 24 hours.',
                             ),
                           ),
                           _MenuTile(
                             icon: Icons.privacy_tip_outlined,
                             title: 'Privacy Policy',
-                            onTap: () => _openLegal('Privacy Policy',
+                            onTap: () => _openLegal(
+                              'Privacy Policy',
                               'SocietyBites Privacy Policy\n\n'
-                              'Last updated: July 2026\n\n'
-                              'SocietyBites collects and processes the following information:\n'
-                              '• Phone number (for authentication)\n'
-                              '• Name (for identification within your society)\n'
-                              '• Flat and block number (for delivery coordination)\n'
-                              '• UPI ID (for sellers, to receive payments)\n'
-                              '• Order history\n\n'
-                              'Your data is:\n'
-                              '• Never sold to third parties\n'
-                              '• Only shared within your apartment society\n'
-                              '• Stored securely on encrypted servers\n'
-                              '• Deleted upon request\n\n'
-                              'For questions: support@societybites.in',
+                                  'Last updated: July 2026\n\n'
+                                  'SocietyBites collects and processes the following information:\n'
+                                  '• Phone number (for authentication)\n'
+                                  '• Name (for identification within your society)\n'
+                                  '• Flat and block number (for delivery coordination)\n'
+                                  '• UPI ID (for sellers, to receive payments)\n'
+                                  '• Order history\n\n'
+                                  'Your data is:\n'
+                                  '• Never sold to third parties\n'
+                                  '• Only shared within your apartment society\n'
+                                  '• Stored securely on encrypted servers\n'
+                                  '• Deleted upon request\n\n'
+                                  'For questions: support@societybites.in',
                             ),
                           ),
                           _MenuTile(
                             icon: Icons.description_outlined,
                             title: 'Terms of Service',
-                            onTap: () => _openLegal('Terms of Service',
+                            onTap: () => _openLegal(
+                              'Terms of Service',
                               'SocietyBites Terms of Service\n\n'
-                              'Last updated: July 2026\n\n'
-                              'By using SocietyBites, you agree to:\n'
-                              '• Provide accurate information about your residence\n'
-                              '• Not misuse the platform for commercial resale\n'
-                              '• Maintain food safety and hygiene standards (sellers)\n'
-                              '• Complete payments for accepted orders (buyers)\n'
-                              '• Not share your account credentials\n\n'
-                              'SocietyBites is a community platform. We reserve the right to suspend accounts that violate community guidelines.\n\n'
-                              'For disputes: support@societybites.in',
+                                  'Last updated: July 2026\n\n'
+                                  'By using SocietyBites, you agree to:\n'
+                                  '• Provide accurate information about your residence\n'
+                                  '• Not misuse the platform for commercial resale\n'
+                                  '• Maintain food safety and hygiene standards (sellers)\n'
+                                  '• Complete payments for accepted orders (buyers)\n'
+                                  '• Not share your account credentials\n\n'
+                                  'SocietyBites is a community platform. We reserve the right to suspend accounts that violate community guidelines.\n\n'
+                                  'For disputes: support@societybites.in',
                             ),
                           ),
                           _MenuTile(
@@ -878,10 +903,7 @@ class _MenuTile extends StatelessWidget {
         subtitle: subtitle != null
             ? Text(
                 subtitle!,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF6A7774),
-                ),
+                style: const TextStyle(fontSize: 13, color: Color(0xFF6A7774)),
               )
             : null,
         trailing: const Icon(
