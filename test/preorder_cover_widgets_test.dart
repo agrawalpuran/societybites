@@ -76,6 +76,51 @@ void main() {
     expect(cover.imageUrl, '/uploads/seller-cover.jpg');
   });
 
+  testWidgets('home compact card shows discovery details only', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HomePreOrderCampaignCard(
+            campaign: _campaign(coverImageUrl: '/uploads/home-cover.jpg'),
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
+
+    final size = tester.getSize(find.byType(HomePreOrderCampaignCard));
+    expect(size.width, HomePreOrderCampaignCard.cardWidth);
+    expect(size.height, HomePreOrderCampaignCard.cardHeight);
+
+    final cover = tester.widget<PreOrderCoverImage>(
+      find.byType(PreOrderCoverImage),
+    );
+    expect(cover.imageUrl, '/uploads/home-cover.jpg');
+    expect(cover.height, HomePreOrderCampaignCard.coverHeight);
+    expect(find.text('Friday Evening Specials'), findsOneWidget);
+    expect(find.text('Sharma Snacks'), findsOneWidget);
+    expect(find.textContaining('By'), findsOneWidget);
+    expect(find.textContaining('Samosa'), findsNothing);
+    expect(find.textContaining('PRE-ORDER'), findsNothing);
+  });
+
+  testWidgets('home compact card uses cover placeholder when missing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HomePreOrderCampaignCard(campaign: _campaign(), onTap: () {}),
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('preorder-cover-placeholder')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('buyer campaign card includes its cover', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

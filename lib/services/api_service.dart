@@ -8,6 +8,23 @@ import 'session_service.dart';
 
 final http = _RefreshAwareHttp();
 
+Map<String, dynamic> buildOrderReadyTimePayload({
+  DateTime? expectedReadyAt,
+  num? readyInMinutes,
+}) {
+  if (expectedReadyAt != null && readyInMinutes != null) {
+    throw ArgumentError(
+      'Provide either expectedReadyAt or readyInMinutes, not both',
+    );
+  }
+  return {
+    if (readyInMinutes != null)
+      'readyInMinutes': readyInMinutes
+    else
+      'expectedReadyAt': expectedReadyAt?.toUtc().toIso8601String(),
+  };
+}
+
 class _RefreshAwareHttp {
   Future<http_client.Response> get(Uri url, {Map<String, String>? headers}) {
     return _send('GET', url, headers: headers);
@@ -630,6 +647,18 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> getOrderById(String orderId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/orders/$orderId'),
+      headers: await _authHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> updateOrderStatus({
     required String orderId,
     required String status,
@@ -650,11 +679,17 @@ class ApiService {
   static Future<Map<String, dynamic>> setOrderReadyTime({
     required String orderId,
     DateTime? expectedReadyAt,
+    num? readyInMinutes,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/orders/$orderId/ready-time'),
       headers: await _authHeaders(),
-      body: jsonEncode({'expectedReadyAt': expectedReadyAt?.toIso8601String()}),
+      body: jsonEncode(
+        buildOrderReadyTimePayload(
+          expectedReadyAt: expectedReadyAt,
+          readyInMinutes: readyInMinutes,
+        ),
+      ),
     );
 
     if (response.statusCode == 200) {

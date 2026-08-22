@@ -133,6 +133,12 @@ String formatTime(DateTime value) {
       '${local.hour >= 12 ? 'PM' : 'AM'}';
 }
 
+String formatShortCutoff(DateTime value) {
+  final local = value.toLocal();
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return 'By ${weekdays[local.weekday - 1]} ${formatTime(local)}';
+}
+
 String campaignDisplayStatus(PreOrderCampaign campaign) {
   if (campaign.status == 'open' &&
       !DateTime.now().isBefore(campaign.orderCutoffAt)) {
@@ -348,6 +354,98 @@ class PreOrderEmptyState extends StatelessWidget {
           ),
           if (action != null) ...[const SizedBox(height: 16), action!],
         ],
+      ),
+    );
+  }
+}
+
+class HomePreOrderCampaignCard extends StatelessWidget {
+  const HomePreOrderCampaignCard({
+    super.key,
+    required this.campaign,
+    required this.onTap,
+  });
+
+  static const double cardWidth = 160;
+  static const double cardHeight = 178;
+  static const double coverHeight = 88;
+
+  final PreOrderCampaign campaign;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: cardWidth,
+      height: cardHeight,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: preorderBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                PreOrderCoverImage(
+                  imageUrl: campaign.coverImageUrl,
+                  width: cardWidth,
+                  height: coverHeight,
+                  borderRadius: 0,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          campaign.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: preorderText,
+                            fontSize: 13,
+                            height: 1.15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          campaign.sellerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: preorderMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          formatShortCutoff(campaign.orderCutoffAt),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: preorderGreen,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -815,10 +815,10 @@ router.patch(
       });
     }
 
-    const { expectedReadyAt } = req.body;
+    const { expectedReadyAt, readyInMinutes } = req.body;
 
     // Explicit null / missing key with null clears the estimate.
-    if (expectedReadyAt === null) {
+    if (expectedReadyAt === null && readyInMinutes === undefined) {
       const updated = await prisma.order.update({
         where: { id: order.id },
         data: { expectedReadyAt: null },
@@ -829,15 +829,47 @@ router.patch(
       return res.json(serializeOrder(updated));
     }
 
-    if (expectedReadyAt === undefined) {
+    if (expectedReadyAt !== undefined && readyInMinutes !== undefined) {
       return res.status(400).json({
-        error: "expectedReadyAt is required (ISO datetime or null to clear)",
+        error: "Provide either readyInMinutes or expectedReadyAt, not both",
       });
     }
 
-    const readyAt = new Date(expectedReadyAt);
-    if (Number.isNaN(readyAt.getTime())) {
-      return res.status(400).json({ error: "expectedReadyAt must be a valid date" });
+    let readyAt;
+
+    if (readyInMinutes !== undefined) {
+      if (
+        typeof readyInMinutes !== "number" ||
+        !Number.isFinite(readyInMinutes) ||
+        readyInMinutes <= 0 ||
+        readyInMinutes > 60
+      ) {
+        return res.status(400).json({
+          error: "readyInMinutes must be a positive number no greater than 60",
+        });
+      }
+      readyAt = new Date(Date.now() + readyInMinutes * 60 * 1000);
+    } else {
+      if (typeof expectedReadyAt !== "string") {
+        return res.status(400).json({
+          error:
+            "expectedReadyAt is required (timezone-aware ISO datetime or null to clear)",
+        });
+      }
+
+      const timezoneAwareIso = /(?:Z|[+-]\d{2}:\d{2})$/i;
+      if (!timezoneAwareIso.test(expectedReadyAt)) {
+        return res.status(400).json({
+          error: "expectedReadyAt must include a UTC or timezone offset",
+        });
+      }
+
+      readyAt = new Date(expectedReadyAt);
+      if (Number.isNaN(readyAt.getTime())) {
+        return res.status(400).json({
+          error: "expectedReadyAt must be a valid timezone-aware ISO datetime",
+        });
+      }
     }
 
     if (readyAt <= new Date()) {

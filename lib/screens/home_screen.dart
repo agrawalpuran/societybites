@@ -71,7 +71,7 @@ class HomeScreenState extends State<HomeScreen> {
                     now.isBefore(campaign.orderCutoffAt),
               )
               .toList()
-            ..sort((a, b) => a.orderCutoffAt.compareTo(b.orderCutoffAt));
+            ..sort((a, b) => a.fulfilmentAt.compareTo(b.fulfilmentAt));
       if (!mounted) return;
       setState(() {
         _preOrderCampaigns = campaigns.take(3).toList();
@@ -392,11 +392,11 @@ class HomeScreenState extends State<HomeScreen> {
   Widget _buildPreOrdersSection() {
     if (_preOrdersLoading) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
+        padding: EdgeInsets.symmetric(vertical: 10),
         child: Center(
           child: SizedBox(
-            width: 22,
-            height: 22,
+            width: 18,
+            height: 18,
             child: CircularProgressIndicator(
               color: preorderGreen,
               strokeWidth: 2,
@@ -411,7 +411,7 @@ class HomeScreenState extends State<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 22, 12, 12),
+          padding: const EdgeInsets.fromLTRB(20, 18, 8, 10),
           child: Row(
             children: [
               const Expanded(
@@ -425,26 +425,13 @@ class HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => BuyerPreOrdersScreen(
-                        hasRegularCart: _cart.isNotEmpty,
-                        cartItems: _cart,
-                        onCartChanged: () {
-                          if (mounted) setState(() {});
-                        },
-                      ),
-                    ),
-                  ).then((_) => _loadPreOrders());
-                },
+                onPressed: _openBuyerPreOrders,
                 child: const Text(
-                  'VIEW ALL',
+                  'See all →',
                   style: TextStyle(
-                    fontSize: 12,
-                    letterSpacing: .5,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0E5A47),
                   ),
                 ),
               ),
@@ -452,42 +439,57 @@ class HomeScreenState extends State<HomeScreen> {
           ),
         ),
         SizedBox(
-          height: 405,
-          child: ListView(
+          height: HomePreOrderCampaignCard.cardHeight,
+          child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.only(left: 20),
-            children: _preOrderCampaigns
-                .map(
-                  (campaign) => BuyerPreOrderCampaignCard(
-                    campaign: campaign,
-                    compact: true,
-                    onSellerTap: () =>
-                        _openSeller(sellerFromPreOrderCampaign(campaign)),
-                    onTap: () async {
-                      final placed = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => BuyerPreOrderDetailScreen(
-                            campaignId: campaign.id,
-                            regularCartHasItems: _cart.isNotEmpty,
-                            cartItems: _cart,
-                            onCartChanged: () {
-                              if (mounted) setState(() {});
-                            },
-                          ),
-                        ),
-                      );
-                      if (placed == true) {
-                        _loadPreOrders();
-                      }
-                    },
-                  ),
-                )
-                .toList(),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: _preOrderCampaigns.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final campaign = _preOrderCampaigns[index];
+              return HomePreOrderCampaignCard(
+                campaign: campaign,
+                onTap: () => _openBuyerPreOrderDetail(campaign),
+              );
+            },
           ),
         ),
       ],
     );
+  }
+
+  void _openBuyerPreOrders() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BuyerPreOrdersScreen(
+          hasRegularCart: _cart.isNotEmpty,
+          cartItems: _cart,
+          onCartChanged: () {
+            if (mounted) setState(() {});
+          },
+        ),
+      ),
+    ).then((_) => _loadPreOrders());
+  }
+
+  Future<void> _openBuyerPreOrderDetail(PreOrderCampaign campaign) async {
+    final placed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BuyerPreOrderDetailScreen(
+          campaignId: campaign.id,
+          regularCartHasItems: _cart.isNotEmpty,
+          cartItems: _cart,
+          onCartChanged: () {
+            if (mounted) setState(() {});
+          },
+        ),
+      ),
+    );
+    if (placed == true) {
+      _loadPreOrders();
+    }
   }
 
   Widget _buildHeader() {

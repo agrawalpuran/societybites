@@ -221,6 +221,11 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           orderId: orderId,
           expectedReadyAt: result,
         );
+      } else if (result is num) {
+        await ApiService.setOrderReadyTime(
+          orderId: orderId,
+          readyInMinutes: result,
+        );
       } else {
         return;
       }
@@ -2044,7 +2049,7 @@ class _RejectOrderSheetState extends State<_RejectOrderSheet> {
   }
 }
 
-/// Returns: DateTime | 'skip' | 'clear' | null (dismissed).
+/// Returns: preset minutes | custom DateTime | 'skip' | 'clear' | null.
 class _ReadyBySheet extends StatefulWidget {
   const _ReadyBySheet({
     required this.orderId,
@@ -2070,8 +2075,9 @@ class _ReadyBySheetState extends State<_ReadyBySheet> {
 
   Future<void> _pickCustom() async {
     final now = DateTime.now();
-    final initial = widget.initial?.isAfter(now) == true
-        ? widget.initial!
+    final currentEstimate = widget.initial?.toLocal();
+    final initial = currentEstimate?.isAfter(now) == true
+        ? currentEstimate!
         : now.add(const Duration(minutes: 30));
     final date = await showDatePicker(
       context: context,
@@ -2137,10 +2143,7 @@ class _ReadyBySheetState extends State<_ReadyBySheet> {
               return ActionChip(
                 label: Text(p.$2),
                 onPressed: () {
-                  Navigator.pop(
-                    context,
-                    DateTime.now().add(Duration(minutes: p.$1)),
-                  );
+                  Navigator.pop(context, p.$1);
                 },
                 backgroundColor: const Color(0xFFF0F7F4),
                 labelStyle: const TextStyle(

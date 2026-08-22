@@ -7,6 +7,7 @@ console.log("DATABASE_URL:", process.env.DATABASE_URL);
 const prisma = require("./lib/prisma");
 const logger = require("./lib/logger");
 const { setupSeedImages, UPLOADS_DIR, SEED_DIR } = require("./lib/setupSeedImages");
+const { isObjectStorageConfigured } = require("./lib/objectStorage");
 const { rateLimit } = require("./middleware/rateLimit");
 const authRoutes = require("./routes/auth");
 const societyRoutes = require("./routes/societies");
@@ -122,4 +123,10 @@ app.use((err, _req, res, _next) => {
 app.listen(PORT, () => {
   logger.info("server", `Server running on port ${PORT}`);
   logger.info("server", `Serving uploads from ${UPLOADS_DIR}`);
+  logger.info(
+    "server",
+    isObjectStorageConfigured()
+      ? "Listing images use Supabase Storage"
+      : "Listing images are not configured — set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY"
+  );
 });

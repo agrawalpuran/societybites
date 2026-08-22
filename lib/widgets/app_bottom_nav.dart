@@ -25,9 +25,8 @@ class AppBottomNav extends StatelessWidget {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _NavItem(
                 icon: Icons.home_rounded,
@@ -74,38 +73,60 @@ class _NavItem extends StatelessWidget {
   final bool isActive;
   final VoidCallback onTap;
 
+  static const _activeColor = Color(0xFF0E5A47);
+  static const _inactiveColor = Color(0xFF8A9491);
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF0E5A47) : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isActive ? Colors.white : const Color(0xFF8A9491),
-            ),
-            if (isActive) ...[
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+    final color = isActive ? Colors.white : _inactiveColor;
+
+    return Expanded(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return GestureDetector(
+            onTap: onTap,
+            behavior: HitTestBehavior.opaque,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isActive ? _activeColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 20, color: color),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          softWrap: false,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 10,
+                            height: 1.1,
+                            fontWeight: isActive
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ],
-        ),
+            ),
+          );
+        },
       ),
     );
   }

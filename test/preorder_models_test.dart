@@ -174,6 +174,12 @@ void main() {
     );
   });
 
+  test('short cutoff uses weekday and local time', () {
+    final cutoff = DateTime(2026, 8, 20, 20);
+    expect(formatShortCutoff(cutoff), contains('By Thu'));
+    expect(formatShortCutoff(cutoff), contains('8:00 PM'));
+  });
+
   test('money formatting uses Indian rupee display', () {
     expect(formatMoney(8450), '₹8,450');
     expect(formatMoney(0), '₹0');

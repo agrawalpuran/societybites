@@ -13,7 +13,8 @@
     "download-seed-images": "node scripts/download-seed-images.js",
     "patch-listing-images": "node scripts/patch-listing-images.js",
     "sync-seed-images": "node scripts/sync-seed-images.js",
-    "test": "node tests/preorder.test.js && node tests/preorder-summary.test.js && node tests/preorder-editing.test.js"
+    "migrate-uploads": "node scripts/migrate-uploads-to-supabase.js",
+    "test": "node tests/preorder.test.js && node tests/preorder-summary.test.js && node tests/preorder-editing.test.js && node tests/order-reconciliation.test.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -24,6 +25,7 @@
   "type": "commonjs",
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "@supabase/supabase-js": "^2.112.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.0",
     "express": "^5.2.1",
