@@ -5,8 +5,12 @@ import '../widgets/order_items_list.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
 import '../services/seller_onboarding.dart';
+import '../services/session_service.dart';
+import '../widgets/preorder_widgets.dart';
 import 'add_listing_screen.dart';
 import 'my_listings_screen.dart';
+import 'preorder_detail_screen.dart';
+import 'seller_preorders_screen.dart';
 import 'seller_feedback_screen.dart';
 
 class SellerDashboardScreen extends StatefulWidget {
@@ -22,6 +26,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   bool _isLoading = true;
   String? _error;
   Map<String, dynamic> _stats = {};
+  List<PreOrderCampaign> _preOrderCampaigns = [];
+  bool _preOrdersLoading = true;
+
   /// 0 = Active, 1 = Past
   int _ordersTab = 0;
 
@@ -30,12 +37,79 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     super.initState();
     _loadOrders();
     _loadStats();
+    _loadPreOrders();
   }
 
   /// Called by MainShell when Dashboard tab is selected or app resumes.
   void refresh() {
     _loadOrders();
     _loadStats();
+    _loadPreOrders();
+  }
+
+  Future<void> _loadPreOrders() async {
+    try {
+      final societyId =
+          await SessionService.getSocietyId() ??
+          SessionService.defaultSocietyId;
+      final sellerId = await SessionService.getUserId();
+      if (sellerId == null) return;
+      final raw = await ApiService.getPreOrderCampaigns(
+        societyId: societyId,
+        sellerId: sellerId,
+      );
+      final campaigns = await Future.wait(
+        raw.map((json) async {
+          final campaign = PreOrderCampaign.fromJson(json);
+          try {
+            final summary = PreOrderSummary.fromJson(
+              await ApiService.getPreOrderSummary(campaign.id),
+            );
+            return PreOrderCampaign(
+              id: campaign.id,
+              title: campaign.title,
+              description: campaign.description,
+              coverImageUrl: campaign.coverImageUrl,
+              status: summary.status,
+              orderOpenAt: campaign.orderOpenAt,
+              orderCutoffAt: campaign.orderCutoffAt,
+              fulfilmentAt: campaign.fulfilmentAt,
+              offeredFulfilmentMethods: campaign.offeredFulfilmentMethods,
+              defaultDeliveryCharge: campaign.defaultDeliveryCharge,
+              products: campaign.products,
+              totalOrders: summary.totalOrders,
+              totalItems: summary.totalItems,
+              foodSubtotal: summary.foodSubtotal,
+            );
+          } catch (_) {
+            return campaign;
+          }
+        }),
+      );
+      campaigns.removeWhere(
+        (campaign) => campaignDisplayStatus(campaign) == 'cancelled',
+      );
+      campaigns.sort((a, b) {
+        const rank = {'open': 0, 'draft': 1, 'closed': 2};
+        final statusCompare = (rank[campaignDisplayStatus(a)] ?? 3).compareTo(
+          rank[campaignDisplayStatus(b)] ?? 3,
+        );
+        return statusCompare != 0
+            ? statusCompare
+            : a.fulfilmentAt.compareTo(b.fulfilmentAt);
+      });
+      if (!mounted) return;
+      setState(() {
+        _preOrderCampaigns = campaigns.take(2).toList();
+        _preOrdersLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _preOrdersLoading = false);
+    }
+  }
+
+  Future<void> _refreshDashboard() async {
+    await Future.wait([_loadOrders(), _loadPreOrders(), _loadStats()]);
   }
 
   Future<void> _loadStats() async {
@@ -76,10 +150,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   Future<void> _updateStatus(Order order, String nextStatus) async {
     try {
-      await ApiService.updateOrderStatus(
-        orderId: order.id,
-        status: nextStatus,
-      );
+      await ApiService.updateOrderStatus(orderId: order.id, status: nextStatus);
       await _loadOrders();
 
       if (!mounted) return;
@@ -98,9 +169,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update order: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not update order: $e')));
     }
   }
 
@@ -111,10 +182,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => _ReadyBySheet(
-        orderId: orderNumber,
-        allowClear: false,
-      ),
+      builder: (ctx) => _ReadyBySheet(orderId: orderNumber, allowClear: false),
     );
 
     if (!mounted || result == null || result == 'skip') return;
@@ -144,7 +212,10 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   Future<void> _applyReadyBy(String orderId, Object result) async {
     try {
       if (result == 'clear') {
-        await ApiService.setOrderReadyTime(orderId: orderId, expectedReadyAt: null);
+        await ApiService.setOrderReadyTime(
+          orderId: orderId,
+          expectedReadyAt: null,
+        );
       } else if (result is DateTime) {
         await ApiService.setOrderReadyTime(
           orderId: orderId,
@@ -158,16 +229,18 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            result == 'clear' ? 'Ready by estimate removed' : 'Ready by updated',
+            result == 'clear'
+                ? 'Ready by estimate removed'
+                : 'Ready by updated',
           ),
           backgroundColor: const Color(0xFF0E5A47),
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update Ready by: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not update Ready by: $e')));
     }
   }
 
@@ -199,9 +272,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not reject order: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not reject order: $e')));
     }
   }
 
@@ -244,7 +317,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           color: const Color(0xFF0E5A47),
-          onRefresh: _loadOrders,
+          onRefresh: _refreshDashboard,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
@@ -252,6 +325,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             slivers: [
               SliverToBoxAdapter(child: _buildHeader(context)),
               SliverToBoxAdapter(child: _buildStatsGrid()),
+              SliverToBoxAdapter(child: _buildPreOrdersSection()),
               if (_error != null)
                 SliverToBoxAdapter(
                   child: Padding(
@@ -269,6 +343,123 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPreOrdersSection() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pre-orders',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: preorderText,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Plan ahead and track what to prepare.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: preorderMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SellerPreOrdersScreen(),
+                    ),
+                  );
+                  _loadPreOrders();
+                },
+                child: const Text(
+                  'View all',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_preOrdersLoading)
+            const SizedBox(
+              height: 76,
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: preorderGreen,
+                  strokeWidth: 2,
+                ),
+              ),
+            )
+          else if (_preOrderCampaigns.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F7F4),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFD4E8DF)),
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'No pre-order campaigns yet.',
+                      style: TextStyle(
+                        color: preorderMuted,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SellerPreOrdersScreen(),
+                        ),
+                      );
+                      _loadPreOrders();
+                    },
+                    child: const Text('Create'),
+                  ),
+                ],
+              ),
+            )
+          else
+            ..._preOrderCampaigns.map(
+              (campaign) => PreOrderCampaignCard(
+                campaign: campaign,
+                compact: true,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          PreOrderDetailScreen(campaignId: campaign.id),
+                    ),
+                  );
+                  _loadPreOrders();
+                },
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -338,9 +529,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               child: Text(
                 showingPast
                     ? 'No past orders yet.\n\n'
-                        'Completed and cancelled sales will appear here.'
+                          'Completed and cancelled sales will appear here.'
                     : 'No active orders yet.\n\n'
-                        'When neighbors order your food, they show up here.',
+                          'When neighbors order your food, they show up here.',
                 style: const TextStyle(
                   color: Color(0xFF3A4644),
                   height: 1.45,
@@ -492,13 +683,16 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               child: OutlinedButton(
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('This feature is coming soon')),
+                    const SnackBar(
+                      content: Text('This feature is coming soon'),
+                    ),
                   );
                 },
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF0E5A47), width: 1.5),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   padding: const EdgeInsets.symmetric(horizontal: 22),
                 ),
                 child: const Text(
@@ -529,9 +723,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               onPressed: () async {
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const MyListingsScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const MyListingsScreen()),
                 );
                 _loadOrders();
               },
@@ -555,8 +747,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             height: 58,
             child: ElevatedButton.icon(
               onPressed: () async {
-                final canList =
-                    await SellerOnboarding.ensureCanCreateListing(context);
+                final canList = await SellerOnboarding.ensureCanCreateListing(
+                  context,
+                );
                 if (!canList || !context.mounted) return;
 
                 final created = await Navigator.push<bool>(
@@ -617,8 +810,11 @@ class _OrdersStatCard extends StatelessWidget {
                     color: const Color(0xFFF0F7F4),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.shopping_bag_rounded,
-                      color: Color(0xFF0E5A47), size: 20),
+                  child: const Icon(
+                    Icons.shopping_bag_rounded,
+                    color: Color(0xFF0E5A47),
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(height: 14),
                 Text(
@@ -650,12 +846,17 @@ class _OrdersStatCard extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.restaurant_rounded,
-                    color: const Color(0xFF0E5A47).withAlpha(120), size: 28),
+                Icon(
+                  Icons.restaurant_rounded,
+                  color: const Color(0xFF0E5A47).withAlpha(120),
+                  size: 28,
+                ),
                 const SizedBox(height: 4),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFE0F0EA),
                     borderRadius: BorderRadius.circular(6),
@@ -706,13 +907,15 @@ class _EarningsCard extends StatelessWidget {
                   color: const Color(0xFFF0F7F4),
                   borderRadius: BorderRadius.circular(9),
                 ),
-                child: const Icon(Icons.play_circle_fill_rounded,
-                    color: Color(0xFF0E5A47), size: 18),
+                child: const Icon(
+                  Icons.play_circle_fill_rounded,
+                  color: Color(0xFF0E5A47),
+                  size: 18,
+                ),
               ),
               const Spacer(),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFF0E5A47),
                   borderRadius: BorderRadius.circular(6),
@@ -784,8 +987,11 @@ class _SatisfactionCard extends StatelessWidget {
                       color: const Color(0xFFFFF8E8),
                       borderRadius: BorderRadius.circular(9),
                     ),
-                    child: const Icon(Icons.star_rounded,
-                        color: Colors.amber, size: 18),
+                    child: const Icon(
+                      Icons.star_rounded,
+                      color: Colors.amber,
+                      size: 18,
+                    ),
                   ),
                   const Spacer(),
                   if (onTap != null)
@@ -893,9 +1099,9 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not confirm payment: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not confirm payment: $e')));
     } finally {
       if (mounted) setState(() => _isConfirmingPayment = false);
     }
@@ -970,15 +1176,15 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
     try {
       final launched = await launchUrl(uri);
       if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not dial $phone')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not dial $phone')));
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not dial $phone')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not dial $phone')));
     }
   }
 
@@ -1065,8 +1271,10 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: isPrep || isPickedUp
                       ? const Color(0xFFE8F5EE)
@@ -1077,14 +1285,14 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                   isPrep
                       ? 'IN PREP'
                       : isPending
-                          ? 'NEW'
-                          : isAccepted
-                              ? 'ACCEPTED'
-                              : isReady
-                                  ? 'READY'
-                                  : isPickedUp
-                                      ? 'PICKED UP'
-                                      : 'ACTIVE',
+                      ? 'NEW'
+                      : isAccepted
+                      ? 'ACCEPTED'
+                      : isReady
+                      ? 'READY'
+                      : isPickedUp
+                      ? 'PICKED UP'
+                      : 'ACTIVE',
                   style: TextStyle(
                     fontSize: 11,
                     letterSpacing: 0.6,
@@ -1122,7 +1330,8 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                   backgroundColor: const Color(0xFFE85D04),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 0,
                 ),
                 icon: _isConfirmingPayment
@@ -1137,7 +1346,10 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                     : const Icon(Icons.check_circle_rounded, size: 18),
                 label: Text(
                   _isConfirmingPayment ? 'Confirming...' : 'Confirm Payment',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),
@@ -1187,13 +1399,15 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                     width: double.infinity,
                     height: 42,
                     child: ElevatedButton.icon(
-                      onPressed:
-                          _isConfirmingPayment ? null : _confirmCashPayment,
+                      onPressed: _isConfirmingPayment
+                          ? null
+                          : _confirmCashPayment,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFE85D04),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         elevation: 0,
                       ),
                       icon: _isConfirmingPayment
@@ -1211,7 +1425,9 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                             ? 'Confirming...'
                             : 'Confirm Payment Received',
                         style: const TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 13),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ),
@@ -1250,7 +1466,8 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                   disabledBackgroundColor: const Color(0xFFE8EDEB),
                   disabledForegroundColor: const Color(0xFF6A7774),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 0,
                 ),
                 child: _isUpdating
@@ -1265,7 +1482,9 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                     : const Text(
                         'Complete Order',
                         style: TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 13),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
                       ),
               ),
             ),
@@ -1294,7 +1513,8 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                       disabledBackgroundColor: const Color(0xFFE8EDEB),
                       disabledForegroundColor: const Color(0xFF6A7774),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       elevation: 0,
                     ),
                     child: _isUpdating
@@ -1310,18 +1530,20 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                             isReady
                                 ? 'Awaiting pickup'
                                 : isPickedUp
-                                    ? (isCash
-                                        ? (cashPaid
+                                ? (isCash
+                                      ? (cashPaid
                                             ? 'Ready to complete'
                                             : 'Confirm cash to complete')
-                                        : 'Waiting for buyer to complete')
-                                    : isPrep
-                                        ? 'Mark Ready'
-                                        : isAccepted
-                                            ? 'Start Preparing'
-                                            : 'Accept Order',
+                                      : 'Waiting for buyer to complete')
+                                : isPrep
+                                ? 'Mark Ready'
+                                : isAccepted
+                                ? 'Start Preparing'
+                                : 'Accept Order',
                             style: const TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 13),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
                           ),
                   ),
                 ),
@@ -1341,8 +1563,11 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xFFE0E5E3)),
                     ),
-                    child: const Icon(Icons.phone_rounded,
-                        size: 20, color: Color(0xFF3A4644)),
+                    child: const Icon(
+                      Icons.phone_rounded,
+                      size: 20,
+                      color: Color(0xFF3A4644),
+                    ),
                   ),
                 ),
               ),
@@ -1353,7 +1578,10 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
             if (order.showExpectedReadyAt) ...[
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF0F7F4),
                   borderRadius: BorderRadius.circular(12),
@@ -1387,7 +1615,10 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                   order.expectedReadyAt == null
                       ? 'Set Ready by'
                       : 'Update Ready by',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),
@@ -1398,9 +1629,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
               width: double.infinity,
               height: 42,
               child: OutlinedButton.icon(
-                onPressed: _isUpdating
-                    ? null
-                    : () => widget.onReject(order),
+                onPressed: _isUpdating ? null : () => widget.onReject(order),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFFD94F4F),
                   side: const BorderSide(color: Color(0xFFFFD4D4)),
@@ -1519,8 +1748,8 @@ class _SellerPastOrderCard extends StatelessWidget {
     final statusLabel = isRejected
         ? 'REJECTED'
         : isCancelled
-            ? 'CANCELLED'
-            : 'COMPLETED';
+        ? 'CANCELLED'
+        : 'COMPLETED';
     final statusColor = isRejected || isCancelled
         ? const Color(0xFFD94F4F)
         : const Color(0xFF0E5A47);
@@ -1593,8 +1822,10 @@ class _SellerPastOrderCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: statusBg,
                   borderRadius: BorderRadius.circular(8),
@@ -1856,8 +2087,13 @@ class _ReadyBySheetState extends State<_ReadyBySheet> {
     );
     if (time == null || !mounted) return;
 
-    final picked =
-        DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final picked = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
     if (!picked.isAfter(DateTime.now())) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ready by must be in the future')),

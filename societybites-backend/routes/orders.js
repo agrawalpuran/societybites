@@ -13,6 +13,11 @@ const {
   notifyOrderRejected,
   notifyReadyBy,
 } = require("../utils/notifications");
+const {
+  lazyCloseCampaign,
+  assertCampaignAcceptsOrders,
+  shouldRestoreListingInventory,
+} = require("../lib/preorder");
 
 const router = express.Router();
 
@@ -57,6 +62,19 @@ const TIMESTAMP_FIELDS = {
   cancelled: "cancelledAt",
   rejected: "rejectedAt",
 };
+
+async function restoreReservedInventory(tx, items) {
+  for (const item of items) {
+    if (!shouldRestoreListingInventory(item.listing)) continue;
+    await tx.listing.update({
+      where: { id: item.listingId },
+      data: {
+        quantity: { increment: item.quantity },
+        status: "active",
+      },
+    });
+  }
+}
 
 const orderInclude = {
   buyer: {
@@ -254,6 +272,7 @@ router.post(
   requireUser,
   asyncHandler(async (req, res) => {
     const { items, paymentMethod = "upi" } = req.body;
+    const orderType = req.body.type === "pre_order" ? "pre_order" : "regular";
 
     if (!req.user.societyId) {
       return res.status(400).json({
@@ -271,6 +290,12 @@ router.post(
 
     if (!["upi", "cash"].includes(paymentMethod)) {
       return res.status(400).json({ error: "paymentMethod must be 'upi' or 'cash'" });
+    }
+
+    if (orderType === "regular" && req.body.campaignId) {
+      return res.status(400).json({
+        error: "Regular orders cannot include a pre-order campaign",
+      });
     }
 
     const preparedItems = [];
@@ -302,7 +327,21 @@ router.post(
         });
       }
 
-      const current = await expireListingIfDue(prisma, listing);
+      if (orderType === "regular" && listing.campaignId) {
+        return res.status(400).json({
+          error: "Cannot mix regular listings and pre-order products in one order",
+        });
+      }
+      if (orderType === "pre_order" && !listing.campaignId) {
+        return res.status(400).json({
+          error: "Cannot mix regular listings and pre-order products in one order",
+        });
+      }
+
+      const current =
+        orderType === "regular"
+          ? await expireListingIfDue(prisma, listing)
+          : listing;
 
       if (current.status === "paused") {
         return res.status(400).json({
@@ -310,21 +349,22 @@ router.post(
         });
       }
 
-      if (current.status === "expired") {
-        return res.status(400).json({
-          error: `"${current.name}" has expired and cannot be ordered`,
-        });
+      if (orderType === "regular") {
+        if (current.status === "expired") {
+          return res.status(400).json({
+            error: `"${current.name}" has expired and cannot be ordered`,
+          });
+        }
+        if (current.availableAt && new Date(current.availableAt) < new Date()) {
+          return res.status(400).json({
+            error: `"${current.name}" has expired and cannot be ordered`,
+          });
+        }
       }
 
       if (current.status !== "active") {
         return res.status(400).json({
           error: `"${current.name}" is no longer available (${current.status})`,
-        });
-      }
-
-      if (current.availableAt && new Date(current.availableAt) < new Date()) {
-        return res.status(400).json({
-          error: `"${current.name}" has expired and cannot be ordered`,
         });
       }
 
@@ -334,7 +374,9 @@ router.post(
         return res.status(400).json({ error: "Each item needs quantity >= 1" });
       }
 
-      if (quantity > current.quantity) {
+      const enforceStock =
+        orderType === "regular" || current.inventoryMode === "limited";
+      if (enforceStock && quantity > current.quantity) {
         return res.status(409).json({
           error:
             current.quantity === 0
@@ -354,17 +396,91 @@ router.post(
       });
     }
 
+    let campaign = null;
+    let fulfilmentMethod = null;
+    let deliveryCharge = 0;
+    let fulfilmentAt = null;
+    const fulfilmentNotes =
+      typeof req.body.fulfilmentNotes === "string"
+        ? req.body.fulfilmentNotes.trim() || null
+        : null;
+
+    if (orderType === "pre_order") {
+      const campaignId = req.body.campaignId;
+      if (!campaignId) {
+        return res.status(400).json({ error: "campaignId is required for pre-orders" });
+      }
+
+      campaign = await prisma.preOrderCampaign.findUnique({
+        where: { id: campaignId },
+      });
+      if (!campaign) {
+        return res.status(404).json({ error: "Pre-order campaign not found" });
+      }
+      campaign = await lazyCloseCampaign(campaign);
+
+      try {
+        assertCampaignAcceptsOrders(campaign);
+      } catch (err) {
+        return res.status(err.statusCode || 400).json({ error: err.message });
+      }
+
+      if (campaign.societyId !== societyId) {
+        return res.status(400).json({ error: "Campaign does not belong to this society" });
+      }
+
+      const campaignListingIds = new Set(
+        preparedItems.map(({ listing }) => listing.campaignId)
+      );
+      if (campaignListingIds.size !== 1 || !campaignListingIds.has(campaign.id)) {
+        return res.status(400).json({
+          error: "All pre-order items must belong to the same campaign",
+        });
+      }
+
+      const campaignSellerIds = new Set(
+        preparedItems.map(({ listing }) => listing.sellerId)
+      );
+      if (!campaignSellerIds.has(campaign.sellerId) || campaignSellerIds.size !== 1) {
+        return res.status(400).json({
+          error: "All items must belong to the campaign seller",
+        });
+      }
+
+      fulfilmentMethod = req.body.fulfilmentMethod;
+      if (!["pickup", "seller_delivery"].includes(fulfilmentMethod)) {
+        return res.status(400).json({
+          error: "fulfilmentMethod must be pickup or seller_delivery",
+        });
+      }
+      if (!(campaign.offeredFulfilmentMethods || []).includes(fulfilmentMethod)) {
+        return res.status(400).json({
+          error: "That fulfilment method is not offered for this campaign",
+        });
+      }
+
+      deliveryCharge =
+        fulfilmentMethod === "seller_delivery"
+          ? Number(campaign.defaultDeliveryCharge || 0)
+          : 0;
+      fulfilmentAt = campaign.fulfilmentAt;
+    }
+
     const subtotal = preparedItems.reduce(
       (sum, { listing, quantity }) => sum + listing.price * quantity,
       0
     );
     const platformFee = await getPlatformFee();
-    const total = subtotal + platformFee;
+    const total = subtotal + platformFee + deliveryCharge;
 
     let order;
     try {
       order = await prisma.$transaction(async (tx) => {
         for (const { listing, quantity } of preparedItems) {
+          const reserveStock =
+            orderType === "regular" || listing.inventoryMode === "limited";
+          if (!reserveStock) continue;
+
           const updated = await tx.listing.updateMany({
             where: {
               id: listing.id,
@@ -406,6 +522,12 @@ router.post(
             orderNumber: generateOrderNumber(),
             buyerId: req.user.id,
             societyId,
+            type: orderType,
+            campaignId: campaign ? campaign.id : null,
+            fulfilmentMethod,
+            deliveryCharge,
+            fulfilmentNotes,
+            fulfilmentAt,
             status: "pending",
             paymentMethod,
             subtotal,
@@ -529,6 +651,22 @@ router.patch(
       });
     }
 
+    if (status === "cancelled" && (order.type || "regular") === "pre_order") {
+      if (order.campaignId) {
+        let campaign = await prisma.preOrderCampaign.findUnique({
+          where: { id: order.campaignId },
+        });
+        if (campaign) {
+          campaign = await lazyCloseCampaign(campaign);
+          if (new Date() >= new Date(campaign.orderCutoffAt)) {
+            return res.status(400).json({
+              error: "Pre-orders cannot be cancelled after the cutoff",
+            });
+          }
+        }
+      }
+    }
+
     const updateData = {
       status,
       ...(TIMESTAMP_FIELDS[status] && { [TIMESTAMP_FIELDS[status]]: new Date() }),
@@ -544,15 +682,7 @@ router.patch(
           include: orderInclude,
         });
 
-        for (const item of order.items) {
-          await tx.listing.update({
-            where: { id: item.listingId },
-            data: {
-              quantity: { increment: item.quantity },
-              status: "active",
-            },
-          });
-        }
+        await restoreReservedInventory(tx, order.items);
 
         logger.info("order", `Cancelled ${order.orderNumber} — inventory restored`);
         return result;
@@ -641,15 +771,7 @@ router.post(
         include: orderInclude,
       });
 
-      for (const item of order.items) {
-        await tx.listing.update({
-          where: { id: item.listingId },
-          data: {
-            quantity: { increment: item.quantity },
-            status: "active",
-          },
-        });
-      }
+      await restoreReservedInventory(tx, order.items);
 
       logger.info(
         "order",

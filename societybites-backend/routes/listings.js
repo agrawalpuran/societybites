@@ -7,6 +7,7 @@ const {
   expireDueListings,
   expireListingIfDue,
 } = require("../utils/listingExpiry");
+const { campaignHasOrders } = require("../lib/preorder");
 
 const router = express.Router();
 
@@ -18,6 +19,16 @@ const listingInclude = {
     select: { rating: true },
   },
 };
+
+async function rejectCommittedCampaignProductMutation(listing, res) {
+  if (!listing.campaignId || !(await campaignHasOrders(listing.campaignId))) {
+    return false;
+  }
+  res.status(400).json({
+    error: "This product cannot be changed because orders have already been placed.",
+  });
+  return true;
+}
 
 router.get(
   "/",
@@ -51,6 +62,7 @@ router.get(
     const listings = await prisma.listing.findMany({
       where: {
         societyId: String(societyId),
+        campaignId: null,
         ...(sellerId && { sellerId: String(sellerId) }),
         ...statusFilter,
         ...(category && { category: String(category) }),
@@ -178,6 +190,8 @@ router.patch(
       return res.status(403).json({ error: "Not allowed to update this listing" });
     }
 
+    if (await rejectCommittedCampaignProductMutation(listing, res)) return;
+
     listing = await expireListingIfDue(prisma, listing);
 
     const {
@@ -248,6 +262,8 @@ router.patch(
       return res.status(403).json({ error: "Not allowed to pause this listing" });
     }
 
+    if (await rejectCommittedCampaignProductMutation(listing, res)) return;
+
     listing = await expireListingIfDue(prisma, listing);
 
     if (listing.status === "paused") {
@@ -296,6 +312,8 @@ router.patch(
       return res.status(403).json({ error: "Not allowed to resume this listing" });
     }
 
+    if (await rejectCommittedCampaignProductMutation(listing, res)) return;
+
     listing = await expireListingIfDue(prisma, listing);
 
     if (listing.status === "expired") {
@@ -339,6 +357,8 @@ router.patch(
     if (listing.sellerId !== req.user.id) {
       return res.status(403).json({ error: "Not allowed to renew this listing" });
     }
+
+    if (await rejectCommittedCampaignProductMutation(listing, res)) return;
 
     listing = await expireListingIfDue(prisma, listing);
 
@@ -391,6 +411,8 @@ router.delete(
     if (listing.sellerId !== req.user.id) {
       return res.status(403).json({ error: "Not allowed to delete this listing" });
     }
+
+    if (await rejectCommittedCampaignProductMutation(listing, res)) return;
 
     await prisma.listing.update({
       where: { id: req.params.id },

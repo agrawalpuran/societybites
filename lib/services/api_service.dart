@@ -495,6 +495,10 @@ class ApiService {
     required String societyId,
     required List<Map<String, dynamic>> items,
     String paymentMethod = 'upi',
+    String type = 'regular',
+    String? campaignId,
+    String? fulfilmentMethod,
+    String? fulfilmentNotes,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/orders'),
@@ -502,6 +506,11 @@ class ApiService {
       body: jsonEncode({
         'societyId': societyId,
         'paymentMethod': paymentMethod,
+        'type': type,
+        if (campaignId != null) 'campaignId': campaignId,
+        if (fulfilmentMethod != null) 'fulfilmentMethod': fulfilmentMethod,
+        if (fulfilmentNotes != null && fulfilmentNotes.trim().isNotEmpty)
+          'fulfilmentNotes': fulfilmentNotes.trim(),
         'items': items,
       }),
     );
@@ -683,6 +692,225 @@ class ApiService {
 
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getPreOrderCampaigns({
+    required String societyId,
+    String? sellerId,
+    String? status,
+  }) async {
+    final query = <String, String>{'societyId': societyId};
+    if (sellerId != null) query['sellerId'] = sellerId;
+    if (status != null) query['status'] = status;
+    final uri = Uri.parse(
+      '$baseUrl/preorder-campaigns',
+    ).replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response) as List;
+      return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getPreOrderCampaign(String id) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/preorder-campaigns/$id'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> createPreOrderCampaign({
+    required String title,
+    String? description,
+    required DateTime orderOpenAt,
+    required DateTime orderCutoffAt,
+    required DateTime fulfilmentAt,
+    required List<String> offeredFulfilmentMethods,
+    double defaultDeliveryCharge = 0,
+    String status = 'draft',
+    String? coverImageUrl,
+    String? fulfilmentNotes,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/preorder-campaigns'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'title': title,
+        if (description != null && description.trim().isNotEmpty)
+          'description': description.trim(),
+        'orderOpenAt': orderOpenAt.toUtc().toIso8601String(),
+        'orderCutoffAt': orderCutoffAt.toUtc().toIso8601String(),
+        'fulfilmentAt': fulfilmentAt.toUtc().toIso8601String(),
+        'offeredFulfilmentMethods': offeredFulfilmentMethods,
+        'defaultDeliveryCharge': defaultDeliveryCharge,
+        'status': status,
+        if (coverImageUrl != null && coverImageUrl.trim().isNotEmpty)
+          'coverImageUrl': coverImageUrl.trim(),
+        if (fulfilmentNotes != null && fulfilmentNotes.trim().isNotEmpty)
+          'fulfilmentNotes': fulfilmentNotes.trim(),
+      }),
+    );
+    if (response.statusCode == 201) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updatePreOrderCampaign({
+    required String id,
+    String? status,
+    String? title,
+    String? description,
+    String? coverImageUrl,
+    bool clearCoverImage = false,
+    String? fulfilmentNotes,
+    DateTime? orderOpenAt,
+    DateTime? orderCutoffAt,
+    DateTime? fulfilmentAt,
+    List<String>? offeredFulfilmentMethods,
+    double? defaultDeliveryCharge,
+  }) async {
+    final payload = <String, dynamic>{};
+    if (status != null) payload['status'] = status;
+    if (title != null) payload['title'] = title.trim();
+    if (description != null) payload['description'] = description.trim();
+    if (coverImageUrl != null) {
+      payload['coverImageUrl'] = coverImageUrl.trim();
+    } else if (clearCoverImage) {
+      payload['coverImageUrl'] = null;
+    }
+    if (fulfilmentNotes != null) {
+      payload['fulfilmentNotes'] = fulfilmentNotes.trim();
+    }
+    if (orderOpenAt != null) {
+      payload['orderOpenAt'] = orderOpenAt.toUtc().toIso8601String();
+    }
+    if (orderCutoffAt != null) {
+      payload['orderCutoffAt'] = orderCutoffAt.toUtc().toIso8601String();
+    }
+    if (fulfilmentAt != null) {
+      payload['fulfilmentAt'] = fulfilmentAt.toUtc().toIso8601String();
+    }
+    if (offeredFulfilmentMethods != null) {
+      payload['offeredFulfilmentMethods'] = offeredFulfilmentMethods;
+    }
+    if (defaultDeliveryCharge != null) {
+      payload['defaultDeliveryCharge'] = defaultDeliveryCharge;
+    }
+    final response = await http.patch(
+      Uri.parse('$baseUrl/preorder-campaigns/$id'),
+      headers: await _authHeaders(),
+      body: jsonEncode(payload),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> addPreOrderProduct({
+    required String campaignId,
+    required String name,
+    required double price,
+    required String inventoryMode,
+    int? maxQuantity,
+    String? description,
+    String? imageUrl,
+    String? weightUnit,
+    String? weightValue,
+    List<String>? tags,
+    String? category,
+    String? pickupLocation,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/preorder-campaigns/$campaignId/products'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'name': name,
+        'price': price,
+        'inventoryMode': inventoryMode,
+        if (inventoryMode == 'limited') 'quantity': maxQuantity,
+        if (description != null && description.isNotEmpty)
+          'description': description,
+        if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
+        if (weightUnit != null && weightUnit.isNotEmpty)
+          'weightUnit': weightUnit,
+        if (weightValue != null && weightValue.isNotEmpty)
+          'weightValue': weightValue,
+        if (tags != null && tags.isNotEmpty) 'tags': tags,
+        if (category != null && category.isNotEmpty) 'category': category,
+        if (pickupLocation != null && pickupLocation.isNotEmpty)
+          'pickupLocation': pickupLocation,
+      }),
+    );
+    if (response.statusCode == 201) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updatePreOrderProduct({
+    required String campaignId,
+    required String productId,
+    required String name,
+    required double price,
+    required String inventoryMode,
+    int? maxQuantity,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/preorder-campaigns/$campaignId/products/$productId'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'name': name.trim(),
+        'price': price,
+        'inventoryMode': inventoryMode,
+        'quantity': inventoryMode == 'limited' ? maxQuantity : 0,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<void> deletePreOrderProduct({
+    required String campaignId,
+    required String productId,
+  }) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/preorder-campaigns/$campaignId/products/$productId'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 204) return;
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getPreOrderSummary(String id) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/preorder-campaigns/$id/summary'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getPreOrderOrders(String id) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/preorder-campaigns/$id/orders'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response) as List;
+      return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     }
     _throwFromResponse(response);
   }

@@ -4,11 +4,7 @@ import '../widgets/listing_image.dart';
 import '../models/data.dart';
 
 class OrderItemsList extends StatelessWidget {
-  const OrderItemsList({
-    super.key,
-    required this.items,
-    this.compact = false,
-  });
+  const OrderItemsList({super.key, required this.items, this.compact = false});
 
   final List<OrderLineItem> items;
   final bool compact;
@@ -16,10 +12,7 @@ class OrderItemsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
-      return const Text(
-        'No items',
-        style: TextStyle(color: Color(0xFF8A9491)),
-      );
+      return const Text('No items', style: TextStyle(color: Color(0xFF8A9491)));
     }
 
     return Column(
@@ -80,10 +73,7 @@ class OrderItemsList extends StatelessWidget {
 }
 
 class OrderTotalRow extends StatelessWidget {
-  const OrderTotalRow({
-    super.key,
-    required this.order,
-  });
+  const OrderTotalRow({super.key, required this.order});
 
   final Order order;
 
@@ -128,6 +118,30 @@ class OrderTotalRow extends StatelessWidget {
                 const Spacer(),
                 Text(
                   '₹${order.communityFee.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3A4644),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (order.deliveryCharge > 0) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Text(
+                  'Seller delivery',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6A7774),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '₹${order.deliveryCharge.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,

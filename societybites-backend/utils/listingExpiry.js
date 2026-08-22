@@ -15,6 +15,7 @@ async function expireDueListings(prisma, { societyId, sellerId, ids } = {}) {
     where: {
       availableAt: { not: null, lt: now },
       status: { in: EXPIREABLE_STATUSES },
+      campaignId: null,
       ...(societyId && { societyId: String(societyId) }),
       ...(sellerId && { sellerId: String(sellerId) }),
       ...(ids && ids.length > 0 && { id: { in: ids } }),
@@ -29,6 +30,7 @@ async function expireDueListings(prisma, { societyId, sellerId, ids } = {}) {
  */
 async function expireListingIfDue(prisma, listing, { include } = {}) {
   if (!listing || !listing.availableAt) return listing;
+  if (listing.campaignId) return listing;
   if (!EXPIREABLE_STATUSES.includes(listing.status)) return listing;
   if (new Date(listing.availableAt) >= new Date()) return listing;
 

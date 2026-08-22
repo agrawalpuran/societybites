@@ -18,6 +18,7 @@ const mediaRoutes = require("./routes/media");
 const adminRoutes = require("./routes/admin");
 const settingsRoutes = require("./routes/settings");
 const deviceRoutes = require("./routes/devices");
+const preorderCampaignRoutes = require("./routes/preorderCampaigns");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -90,6 +91,7 @@ app.get("/", (_req, res) => {
 app.use("/auth", rateLimit({ windowMs: 60000, max: 20 }), authRoutes);
 app.use("/societies", societyRoutes);
 app.use("/listings", listingRoutes);
+app.use("/preorder-campaigns", preorderCampaignRoutes);
 app.use("/orders", orderRoutes);
 app.use("/payments", paymentRoutes);
 app.use("/reviews", reviewRoutes);

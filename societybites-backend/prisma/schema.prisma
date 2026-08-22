@@ -23,11 +23,12 @@ model User {
   auditLogs       AuditLog[]    @relation("AdminLogs")
   deviceTokens    DeviceToken[]
   refreshTokens   RefreshToken[]
-  listings        Listing[]
-  orders          Order[]       @relation("BuyerOrders")
-  reviews         Review[]
-  flat            Flat?         @relation(fields: [flatId], references: [id])
-  society         Society?      @relation(fields: [societyId], references: [id])
+  listings             Listing[]
+  preOrderCampaigns    PreOrderCampaign[]
+  orders               Order[]            @relation("BuyerOrders")
+  reviews              Review[]
+  flat                 Flat?              @relation(fields: [flatId], references: [id])
+  society              Society?           @relation(fields: [societyId], references: [id])
 }
 
 model Society {
@@ -44,9 +45,10 @@ model Society {
   unitLabel  String    @default("Block")
   blocks     Block[]
   flats      Flat[]
-  listings   Listing[]
-  orders     Order[]
-  users      User[]
+  listings            Listing[]
+  preOrderCampaigns   PreOrderCampaign[]
+  orders              Order[]
+  users               User[]
 }
 
 model Block {
@@ -87,12 +89,47 @@ model Listing {
   /// active | paused | expired | sold_out | inactive
   status         String      @default("active")
   featured       Boolean     @default(false)
+  /// When set, this listing is a pre-order campaign product, not a regular listing.
+  campaignId     String?
+  /// demand | limited — only for campaign products. Regular listings ignore this.
+  inventoryMode  String?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   seller         User        @relation(fields: [sellerId], references: [id])
   society        Society     @relation(fields: [societyId], references: [id])
+  campaign       PreOrderCampaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   orderItems     OrderItem[]
   reviews        Review[]
+
+  @@index([societyId, status])
+  @@index([sellerId])
+  @@index([campaignId])
+}
+
+/// Seller-created future offering. Products are Listings with campaignId set.
+model PreOrderCampaign {
+  id                       String    @id @default(uuid())
+  sellerId                 String
+  societyId                String
+  title                    String
+  description              String?
+  coverImageUrl            String?
+  fulfilmentNotes          String?
+  orderOpenAt              DateTime
+  orderCutoffAt            DateTime
+  fulfilmentAt             DateTime
+  /// draft | open | closed | cancelled
+  status                   String    @default("draft")
+  /// pickup | seller_delivery
+  offeredFulfilmentMethods String[]  @default(["pickup"])
+  /// Default used when the buyer chooses seller_delivery; snapshotted onto Order.deliveryCharge.
+  defaultDeliveryCharge    Float     @default(0)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  seller                   User      @relation(fields: [sellerId], references: [id])
+  society                  Society   @relation(fields: [societyId], references: [id])
+  products                 Listing[]
+  orders                   Order[]
 
   @@index([societyId, status])
   @@index([sellerId])
@@ -103,6 +140,16 @@ model Order {
   orderNumber           String      @unique
   buyerId               String
   societyId             String
+  /// regular | pre_order
+  type                  String      @default("regular")
+  campaignId            String?
+  /// pickup | seller_delivery — buyer choice; null for regular orders.
+  fulfilmentMethod      String?
+  /// Historical charge for this order. 0 for pickup / regular.
+  deliveryCharge        Float       @default(0)
+  fulfilmentNotes       String?
+  /// Snapshot of campaign.fulfilmentAt at place-order time.
+  fulfilmentAt          DateTime?
   status                String      @default("pending")
   paymentMethod         String      @default("upi")
   subtotal              Float
@@ -128,11 +175,14 @@ model Order {
   rejectedBy            String?
   buyer                 User        @relation("BuyerOrders", fields: [buyerId], references: [id])
   society               Society     @relation(fields: [societyId], references: [id])
+  campaign              PreOrderCampaign? @relation(fields: [campaignId], references: [id])
   items                 OrderItem[]
   reviews               Review[]
 
   @@index([buyerId, createdAt])
   @@index([societyId, status])
+  @@index([campaignId])
+  @@index([type])
 }
 
 model OrderItem {

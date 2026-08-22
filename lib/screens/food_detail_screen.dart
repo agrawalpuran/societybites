@@ -6,9 +6,10 @@ import '../services/api_service.dart';
 import 'checkout_screen.dart';
 
 class FoodDetailScreen extends StatelessWidget {
-  const FoodDetailScreen({super.key, required this.food});
+  const FoodDetailScreen({super.key, required this.food, this.onSellerTap});
 
   final FoodItem food;
+  final VoidCallback? onSellerTap;
 
   @override
   Widget build(BuildContext context) {
@@ -22,9 +23,13 @@ class FoodDetailScreen extends StatelessWidget {
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                SliverToBoxAdapter(child: _HeroSection(food: food, size: size)),
+                SliverToBoxAdapter(
+                  child: _HeroSection(food: food, size: size),
+                ),
                 SliverToBoxAdapter(child: _QuickInfoRow(food: food)),
-                SliverToBoxAdapter(child: _SellerCard(food: food)),
+                SliverToBoxAdapter(
+                  child: _SellerCard(food: food, onTap: onSellerTap),
+                ),
                 SliverToBoxAdapter(child: _StorySection(food: food)),
                 SliverToBoxAdapter(child: _ReviewsSection(food: food)),
                 const SliverToBoxAdapter(child: SizedBox(height: 20)),
@@ -80,8 +85,10 @@ class _HeroSection extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(right: 10),
                       child: Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0E5A47),
                           borderRadius: BorderRadius.circular(8),
@@ -98,8 +105,10 @@ class _HeroSection extends StatelessWidget {
                       ),
                     ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withAlpha(220),
                       borderRadius: BorderRadius.circular(8),
@@ -107,13 +116,14 @@ class _HeroSection extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.star_rounded,
-                            size: 15, color: Colors.amber),
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 15,
+                          color: Colors.amber,
+                        ),
                         const SizedBox(width: 3),
                         Text(
-                          food.rating > 0
-                              ? '${food.rating}'
-                              : 'New',
+                          food.rating > 0 ? '${food.rating}' : 'New',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -265,71 +275,92 @@ class _InfoChip extends StatelessWidget {
 }
 
 class _SellerCard extends StatelessWidget {
-  const _SellerCard({required this.food});
+  const _SellerCard({required this.food, this.onTap});
   final FoodItem food;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: const Color(0xFFE8F5EE),
-            child: Icon(Icons.person_rounded,
-                color: const Color(0xFF0E5A47), size: 26),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: const Color(0xFFE8F5EE),
+                child: Icon(
+                  Icons.person_rounded,
+                  color: const Color(0xFF0E5A47),
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        Text(
+                          food.sellerName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF101617),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(
+                          Icons.verified_rounded,
+                          size: 18,
+                          color: Color(0xFF0E5A47),
+                        ),
+                      ],
+                    ),
                     Text(
-                      food.sellerName,
+                      food.locationLabel,
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF101617),
+                        fontSize: 13,
+                        color: Color(0xFF6A7774),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    const Icon(Icons.verified_rounded,
-                        size: 18, color: Color(0xFF0E5A47)),
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5EE),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'VERIFIED RESIDENT',
+                        style: TextStyle(
+                          fontSize: 10,
+                          letterSpacing: 1,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0E5A47),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-                Text(
-                  food.locationLabel,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6A7774),
-                    fontWeight: FontWeight.w500,
-                  ),
+              ),
+              if (onTap != null)
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFFADB5B2),
                 ),
-                Container(
-                  margin: const EdgeInsets.only(top: 4),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5EE),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'VERIFIED RESIDENT',
-                    style: TextStyle(
-                      fontSize: 10,
-                      letterSpacing: 1,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0E5A47),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -561,22 +592,26 @@ class _ReviewCard extends StatelessWidget {
           Wrap(
             spacing: 6,
             children: review.tags
-                .map((t) => Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5EE),
-                        borderRadius: BorderRadius.circular(8),
+                .map(
+                  (t) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5EE),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      t,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0E5A47),
                       ),
-                      child: Text(
-                        t,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0E5A47),
-                        ),
-                      ),
-                    ))
+                    ),
+                  ),
+                )
                 .toList(),
           ),
         ],
@@ -600,9 +635,21 @@ class _RatingSummary extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _RatingBubble(label: 'OVERALL', value: avg, color: const Color(0xFFE8F5EE)),
-        _RatingBubble(label: 'REVIEWS', value: reviews.length.toDouble(), color: const Color(0xFFFFE5D6)),
-        _RatingBubble(label: 'RATING', value: avg, color: const Color(0xFFE8F0F5)),
+        _RatingBubble(
+          label: 'OVERALL',
+          value: avg,
+          color: const Color(0xFFE8F5EE),
+        ),
+        _RatingBubble(
+          label: 'REVIEWS',
+          value: reviews.length.toDouble(),
+          color: const Color(0xFFFFE5D6),
+        ),
+        _RatingBubble(
+          label: 'RATING',
+          value: avg,
+          color: const Color(0xFFE8F0F5),
+        ),
       ],
     );
   }
@@ -733,7 +780,9 @@ class _BottomCta extends StatelessWidget {
                 label: Text(
                   food.quantity <= 0 ? 'Sold out' : 'Order Now',
                   style: const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w700),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),

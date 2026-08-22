@@ -13,7 +13,7 @@
     "download-seed-images": "node scripts/download-seed-images.js",
     "patch-listing-images": "node scripts/patch-listing-images.js",
     "sync-seed-images": "node scripts/sync-seed-images.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node tests/preorder.test.js && node tests/preorder-summary.test.js && node tests/preorder-editing.test.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
