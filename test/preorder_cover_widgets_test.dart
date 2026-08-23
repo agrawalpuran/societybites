@@ -99,9 +99,9 @@ void main() {
     expect(cover.height, HomePreOrderCampaignCard.coverHeight);
     expect(find.text('Friday Evening Specials'), findsOneWidget);
     expect(find.text('Sharma Snacks'), findsOneWidget);
-    expect(find.textContaining('By'), findsOneWidget);
+    expect(find.textContaining('PRE-ORDER'), findsOneWidget);
+    expect(find.textContaining('Ready'), findsOneWidget);
     expect(find.textContaining('Samosa'), findsNothing);
-    expect(find.textContaining('PRE-ORDER'), findsNothing);
   });
 
   testWidgets('home compact card uses cover placeholder when missing', (

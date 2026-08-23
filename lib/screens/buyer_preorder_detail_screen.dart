@@ -10,6 +10,7 @@ class BuyerPreOrderDetailScreen extends StatefulWidget {
   const BuyerPreOrderDetailScreen({
     super.key,
     required this.campaignId,
+    this.initialCampaign,
     this.regularCartHasItems = false,
     this.cartItems,
     this.onCartChanged,
@@ -17,6 +18,7 @@ class BuyerPreOrderDetailScreen extends StatefulWidget {
   });
 
   final String campaignId;
+  final PreOrderCampaign? initialCampaign;
   final bool regularCartHasItems;
   final List<CartItem>? cartItems;
   final VoidCallback? onCartChanged;
@@ -30,20 +32,24 @@ class BuyerPreOrderDetailScreen extends StatefulWidget {
 class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
   PreOrderCampaign? _campaign;
   final Map<String, int> _quantities = {};
-  bool _loading = true;
+  late bool _loading;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _campaign = widget.initialCampaign;
+    _loading = _campaign == null;
     _load();
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_campaign == null && mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final raw = await ApiService.getPreOrderCampaign(widget.campaignId);
       final campaign = PreOrderCampaign.fromJson(raw);
@@ -51,6 +57,7 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
       setState(() {
         _campaign = campaign;
         _loading = false;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -169,18 +176,18 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: preorderGreen))
-          : _error != null
-          ? _errorState()
+      body: _campaign == null
+          ? _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: preorderGreen),
+                  )
+                : _errorState()
           : RefreshIndicator(
               color: preorderGreen,
               onRefresh: _load,
               child: _content(),
             ),
-      bottomNavigationBar: _loading || _campaign == null
-          ? null
-          : SafeArea(child: _bottomBar()),
+      bottomNavigationBar: _campaign == null ? null : _bottomBar(),
     );
   }
 
@@ -210,6 +217,7 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 PreOrderCoverImage(
@@ -219,25 +227,7 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                   borderRadius: 20,
                 ),
                 const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFE5D6),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Text(
-                    'PRE-ORDER',
-                    style: TextStyle(
-                      color: Color(0xFFB85C3A),
-                      fontSize: 10,
-                      letterSpacing: .8,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
+                const PreOrderBadge(),
                 const SizedBox(height: 10),
                 Text(
                   campaign.title,
@@ -246,6 +236,24 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                     fontSize: 28,
                     height: 1.15,
                     fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  formatReadyAt(campaign.fulfilmentAt),
+                  style: const TextStyle(
+                    color: preorderGreen,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  formatOrderByLabel(campaign.orderCutoffAt),
+                  style: const TextStyle(
+                    color: preorderMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 5),
@@ -362,6 +370,7 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
     final quantity = _quantity(product);
     final limited = product.inventoryMode == 'limited';
     final soldOut = limited && product.quantity <= 0;
+    final campaign = _campaign!;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -370,62 +379,114 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: preorderBorder),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F7F4),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.restaurant_menu, color: preorderGreen),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F7F4),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.restaurant_menu, color: preorderGreen),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const PreOrderBadge(compact: true),
+                    const SizedBox(height: 6),
+                    Text(
+                      product.name,
+                      style: const TextStyle(
+                        color: preorderText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      formatMoney(product.price),
+                      style: const TextStyle(
+                        color: preorderGreen,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      formatReadyAt(campaign.fulfilmentAt),
+                      style: const TextStyle(
+                        color: preorderGreen,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      formatOrderByLabel(campaign.orderCutoffAt),
+                      style: const TextStyle(
+                        color: preorderMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      limited
+                          ? soldOut
+                                ? 'Sold out'
+                                : '${product.quantity} remaining'
+                          : 'Prepared based on pre-orders',
+                      style: TextStyle(
+                        color: soldOut
+                            ? const Color(0xFFD94F4F)
+                            : preorderMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  style: const TextStyle(
-                    color: preorderText,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  formatMoney(product.price),
-                  style: const TextStyle(
-                    color: preorderGreen,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  limited
-                      ? soldOut
-                            ? 'Sold out'
-                            : '${product.quantity} remaining'
-                      : 'Pre-order — prepared based on orders',
-                  style: TextStyle(
-                    color: soldOut ? const Color(0xFFD94F4F) : preorderMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: _quantityControl(product, quantity, soldOut),
           ),
-          const SizedBox(width: 8),
-          _quantityControl(product, quantity, soldOut),
         ],
       ),
     );
   }
 
   Widget _quantityControl(PreOrderProduct product, int quantity, bool soldOut) {
+    if (quantity == 0) {
+      return FilledButton(
+        onPressed: soldOut || !_acceptingOrders
+            ? null
+            : () => _changeQuantity(product, 1),
+        style: FilledButton.styleFrom(
+          backgroundColor: preorderGreen,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: const Color(0xFFE8EDEB),
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child: Text(
+          soldOut ? 'Sold out' : 'Add to Pre-order',
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+        ),
+      );
+    }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -540,15 +601,16 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
     ),
   );
 
-  Widget _bottomBar() => Container(
-    padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      border: Border(top: BorderSide(color: preorderBorder)),
-    ),
-    child: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
+  Widget _bottomBar() => Material(
+    color: Colors.white,
+    child: SafeArea(
+      top: false,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: preorderBorder)),
+        ),
         child: Row(
           children: [
             Expanded(
@@ -585,7 +647,7 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                   ),
                 ),
                 child: const Text(
-                  'Continue',
+                  'Continue Pre-order',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),

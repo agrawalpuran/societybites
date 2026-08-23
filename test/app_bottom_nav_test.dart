@@ -29,6 +29,35 @@ void main() {
     }
   });
 
+  testWidgets('nav stays compact so the scaffold body keeps its height', (
+    tester,
+  ) async {
+    const bodyKey = ValueKey('body');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: const ColoredBox(
+            key: bodyKey,
+            color: Colors.white,
+            child: SizedBox.expand(),
+          ),
+          bottomNavigationBar: AppBottomNav(selectedIndex: 0, onTap: (_) {}),
+        ),
+      ),
+    );
+
+    final screenHeight =
+        (tester.view.physicalSize / tester.view.devicePixelRatio).height;
+    final navRect = tester.getRect(find.byType(AppBottomNav));
+
+    expect(navRect.height, lessThan(80));
+    expect(navRect.bottom, screenHeight);
+    expect(
+      tester.getSize(find.byKey(bodyKey)).height,
+      screenHeight - navRect.height,
+    );
+  });
+
   testWidgets('tapping items still reports the same tab indices', (
     tester,
   ) async {

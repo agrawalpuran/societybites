@@ -45,6 +45,7 @@ class FoodItem {
   final IconData icon;
   final Color bgColor;
   final String? sellerUpiId;
+  final String? campaignId;
 
   const FoodItem({
     required this.id,
@@ -71,7 +72,13 @@ class FoodItem {
     required this.icon,
     required this.bgColor,
     this.sellerUpiId,
+    this.campaignId,
   });
+
+  bool get isPreOrder {
+    final id = campaignId?.trim();
+    return id != null && id.isNotEmpty;
+  }
 
   bool get isPaused => status == 'paused';
   bool get isActive => status == 'active';
@@ -148,6 +155,9 @@ class FoodItem {
       icon: _icons[hash % _icons.length],
       bgColor: _colors[hash % _colors.length],
       sellerUpiId: json['sellerUpiId'] as String?,
+      campaignId: (json['campaignId'] as String?)?.trim().isEmpty == true
+          ? null
+          : json['campaignId'] as String?,
     );
   }
 

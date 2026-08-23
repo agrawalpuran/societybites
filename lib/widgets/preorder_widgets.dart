@@ -139,6 +139,47 @@ String formatShortCutoff(DateTime value) {
   return 'By ${weekdays[local.weekday - 1]} ${formatTime(local)}';
 }
 
+String formatReadyAt(DateTime value) {
+  final local = value.toLocal();
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return 'Ready ${weekdays[local.weekday - 1]} ${formatTime(local)}';
+}
+
+String formatOrderByLabel(DateTime value) {
+  final local = value.toLocal();
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return 'Order by ${weekdays[local.weekday - 1]} ${formatTime(local)}';
+}
+
+class PreOrderBadge extends StatelessWidget {
+  const PreOrderBadge({super.key, this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 7 : 9,
+        vertical: compact ? 3 : 4,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFE5D6),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        'PRE-ORDER',
+        style: TextStyle(
+          color: const Color(0xFFB85C3A),
+          fontSize: compact ? 9 : 10,
+          letterSpacing: compact ? .5 : .7,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
 String campaignDisplayStatus(PreOrderCampaign campaign) {
   if (campaign.status == 'open' &&
       !DateTime.now().isBefore(campaign.orderCutoffAt)) {
@@ -393,11 +434,20 @@ class HomePreOrderCampaignCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                PreOrderCoverImage(
-                  imageUrl: campaign.coverImageUrl,
-                  width: cardWidth,
-                  height: coverHeight,
-                  borderRadius: 0,
+                Stack(
+                  children: [
+                    PreOrderCoverImage(
+                      imageUrl: campaign.coverImageUrl,
+                      width: cardWidth,
+                      height: coverHeight,
+                      borderRadius: 0,
+                    ),
+                    const Positioned(
+                      left: 8,
+                      top: 8,
+                      child: PreOrderBadge(compact: true),
+                    ),
+                  ],
                 ),
                 Expanded(
                   child: Padding(
@@ -429,7 +479,7 @@ class HomePreOrderCampaignCard extends StatelessWidget {
                         ),
                         const Spacer(),
                         Text(
-                          formatShortCutoff(campaign.orderCutoffAt),
+                          formatReadyAt(campaign.fulfilmentAt),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -495,25 +545,7 @@ class BuyerPreOrderCampaignCard extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFE5D6),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Text(
-                      'PRE-ORDER',
-                      style: TextStyle(
-                        color: Color(0xFFB85C3A),
-                        fontSize: 10,
-                        letterSpacing: .7,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
+                  const PreOrderBadge(),
                   const Spacer(),
                   if (campaign.startingPrice > 0)
                     Text(
@@ -587,7 +619,7 @@ class BuyerPreOrderCampaignCard extends StatelessWidget {
               if (compact) const Spacer() else const SizedBox(height: 8),
               const SizedBox(height: 8),
               Text(
-                'Order by ${formatDateTime(campaign.orderCutoffAt)}',
+                formatOrderByLabel(campaign.orderCutoffAt),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -601,7 +633,7 @@ class BuyerPreOrderCampaignCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Fulfilment ${formatDateTime(campaign.fulfilmentAt)}',
+                      formatReadyAt(campaign.fulfilmentAt),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

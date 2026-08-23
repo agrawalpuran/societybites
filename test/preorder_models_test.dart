@@ -178,6 +178,29 @@ void main() {
     final cutoff = DateTime(2026, 8, 20, 20);
     expect(formatShortCutoff(cutoff), contains('By Thu'));
     expect(formatShortCutoff(cutoff), contains('8:00 PM'));
+    expect(formatReadyAt(cutoff), contains('Ready Thu'));
+    expect(formatOrderByLabel(cutoff), contains('Order by Thu'));
+  });
+
+  test('campaignId marks a listing as a pre-order product', () {
+    final regular = FoodItem.fromJson({
+      'id': 'listing-regular',
+      'sellerId': 'seller-1',
+      'name': 'Samosa',
+      'price': 20,
+      'campaignId': null,
+    });
+    final preorder = FoodItem.fromJson({
+      'id': 'listing-preorder',
+      'sellerId': 'seller-1',
+      'name': 'Samosa',
+      'price': 20,
+      'campaignId': 'campaign-1',
+    });
+
+    expect(regular.isPreOrder, isFalse);
+    expect(preorder.isPreOrder, isTrue);
+    expect(preorder.campaignId, 'campaign-1');
   });
 
   test('money formatting uses Indian rupee display', () {

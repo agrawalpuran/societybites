@@ -94,7 +94,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   List<FoodItem> get _filteredListings {
-    var results = _listings;
+    var results = _listings.where((food) => !food.isPreOrder).toList();
 
     if (_selectedCategory != null && _selectedCategory != 'All') {
       results = results
@@ -465,6 +465,7 @@ class HomeScreenState extends State<HomeScreen> {
         builder: (_) => BuyerPreOrdersScreen(
           hasRegularCart: _cart.isNotEmpty,
           cartItems: _cart,
+          initialCampaigns: List<PreOrderCampaign>.from(_preOrderCampaigns),
           onCartChanged: () {
             if (mounted) setState(() {});
           },
@@ -479,6 +480,7 @@ class HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(
         builder: (_) => BuyerPreOrderDetailScreen(
           campaignId: campaign.id,
+          initialCampaign: campaign,
           regularCartHasItems: _cart.isNotEmpty,
           cartItems: _cart,
           onCartChanged: () {

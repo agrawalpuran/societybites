@@ -62,7 +62,7 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       ]);
       final products = responses[0]
           .map(FoodItem.fromJson)
-          .where((item) => item.isActive)
+          .where((item) => item.isActive && !item.isPreOrder)
           .toList();
       final now = DateTime.now();
       final campaigns =
@@ -512,6 +512,7 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
             MaterialPageRoute(
               builder: (_) => BuyerPreOrderDetailScreen(
                 campaignId: campaign.id,
+                initialCampaign: campaign,
                 regularCartHasItems: _cart.isNotEmpty,
                 cartItems: _cart,
                 onCartChanged: widget.onCartChanged,
@@ -537,6 +538,8 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const PreOrderBadge(compact: true),
+                    const SizedBox(height: 8),
                     Text(
                       campaign.title,
                       style: const TextStyle(
@@ -559,7 +562,7 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                     ],
                     const SizedBox(height: 8),
                     Text(
-                      'Order by ${formatDateTime(campaign.orderCutoffAt)}',
+                      formatOrderByLabel(campaign.orderCutoffAt),
                       style: const TextStyle(
                         color: preorderMuted,
                         fontSize: 12,
@@ -568,7 +571,7 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Fulfilment ${formatDateTime(campaign.fulfilmentAt)}',
+                      formatReadyAt(campaign.fulfilmentAt),
                       style: const TextStyle(
                         color: preorderGreen,
                         fontSize: 12,
