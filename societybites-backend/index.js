@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 require("dotenv").config();
-console.log("DATABASE_URL:", process.env.DATABASE_URL);
 
 const prisma = require("./lib/prisma");
 const logger = require("./lib/logger");
@@ -74,10 +73,11 @@ app.get("/ready", async (_req, res) => {
       database: "connected"
     });
   } catch (e) {
-    // Keep the detailed error in the server logs
-    console.error("READY CHECK ERROR:", e);
+    logger.error("server", "Ready check failed", {
+      code: e && e.code,
+      message: e && e.message,
+    });
 
-    // Return only a generic response to clients
     res.status(503).json({
       status: "not_ready",
       database: "disconnected"
@@ -120,7 +120,7 @@ app.use((err, _req, res, _next) => {
   res.status(statusCode).json(payload);
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info("server", `Server running on port ${PORT}`);
   logger.info("server", `Serving uploads from ${UPLOADS_DIR}`);
   logger.info(
@@ -130,3 +130,19 @@ app.listen(PORT, () => {
       : "Listing images are not configured — set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY"
   );
 });
+
+let shuttingDown = false;
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info("server", `${signal} received, shutting down`);
+  server.close(() => {
+    prisma
+      .$disconnect()
+      .catch(() => {})
+      .finally(() => process.exit(0));
+  });
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
