@@ -8,7 +8,8 @@ void main() {
       upiId: 'seller.name@okaxis',
       payeeName: 'Sharma Snacks & More',
       amount: 245,
-      transactionNote: 'SocietyBites Order #SB1023',
+      transactionNote: 'SocietyBites Order SB-1023',
+      transactionRef: 'SB-1023',
     );
 
     expect(uri.scheme, 'upi');
@@ -18,11 +19,12 @@ void main() {
       'pn': 'Sharma Snacks & More',
       'am': '245.00',
       'cu': 'INR',
-      'tn': 'SocietyBites Order #SB1023',
+      'tr': 'SB1023',
+      'tn': 'SocietyBites Order SB-1023',
     });
     expect(uri.toString(), contains('Sharma+Snacks+%26+More'));
-    expect(uri.toString(), contains('%23SB1023'));
-    expect(uri.queryParameters.keys, hasLength(5));
+    expect(uri.toString(), contains('SB-1023'));
+    expect(uri.queryParameters.keys, hasLength(6));
   });
 
   test('rejects missing or invalid payment values', () {
@@ -33,7 +35,7 @@ void main() {
         upiId: 'invalid',
         payeeName: 'Seller',
         amount: 245,
-        transactionNote: 'SocietyBites Order #SB1023',
+        transactionNote: 'SocietyBites Order SB1023',
       ),
       throwsArgumentError,
     );
@@ -42,7 +44,7 @@ void main() {
         upiId: 'seller@upi',
         payeeName: 'Seller',
         amount: 0,
-        transactionNote: 'SocietyBites Order #SB1023',
+        transactionNote: 'SocietyBites Order SB1023',
       ),
       throwsArgumentError,
     );
@@ -61,5 +63,10 @@ void main() {
       shouldOfferUpiIntent(isWeb: false, platform: TargetPlatform.iOS),
       isFalse,
     );
+  });
+
+  test('sanitizes UPI transaction references', () {
+    expect(sanitizeUpiTransactionRef('SB-307454'), 'SB307454');
+    expect(sanitizeUpiTransactionRef(''), 'SBORDER');
   });
 }

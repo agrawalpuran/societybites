@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -67,16 +68,13 @@ class _PaymentScreenState extends State<PaymentScreen>
   }
 
   String get _amount => _order.orderTotal.toStringAsFixed(2);
-  String get _displayAmount =>
-      _order.orderTotal == _order.orderTotal.roundToDouble()
-      ? _order.orderTotal.toStringAsFixed(0)
-      : _amount;
 
   Uri get _upiPaymentUri => buildUpiPaymentUri(
     upiId: _sellerUpiId ?? '',
-    payeeName: _sellerName,
+    payeeName: _sellerName.trim().isEmpty ? 'SocietyBites seller' : _sellerName,
     amount: _order.orderTotal,
-    transactionNote: 'SocietyBites Order #${_order.orderId}',
+    transactionNote: 'SocietyBites Order ${_order.orderId}',
+    transactionRef: _order.orderId,
   );
 
   @override
@@ -188,8 +186,11 @@ class _PaymentScreenState extends State<PaymentScreen>
     }
   }
 
+  static const _noUpiAppMessage =
+      'No UPI app found. You can scan the QR code or copy the UPI ID instead.';
+
   Future<void> _launchUpiApp() async {
-    if (!_hasUpi) return;
+    if (!_hasUpi || _order.orderTotal <= 0) return;
 
     try {
       setState(() => _upiLaunchError = null);
@@ -197,20 +198,38 @@ class _PaymentScreenState extends State<PaymentScreen>
       final launch = widget.launchUpi;
       final launched = launch != null
           ? await launch(uri)
-          : await launchUrl(uri, mode: LaunchMode.externalApplication);
+          : await _launchUpiUri(uri);
       if (!launched && mounted) {
-        setState(() {
-          _upiLaunchError =
-              "We couldn't open a UPI app. Please use the QR code below to complete payment.";
-        });
+        setState(() => _upiLaunchError = _noUpiAppMessage);
       }
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _upiLaunchError =
-            "We couldn't open a UPI app. Please use the QR code below to complete payment.";
-      });
+      setState(() => _upiLaunchError = _noUpiAppMessage);
     }
+  }
+
+  Future<bool> _launchUpiUri(Uri uri) async {
+    try {
+      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _copyUpiId() async {
+    final upiId = _sellerUpiId?.trim();
+    if (upiId == null || upiId.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: upiId));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('UPI ID copied'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   Future<void> _markPaid() async {
@@ -254,6 +273,7 @@ class _PaymentScreenState extends State<PaymentScreen>
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildOrderSummary(),
             const SizedBox(height: 28),
@@ -446,7 +466,7 @@ class _PaymentScreenState extends State<PaymentScreen>
           ),
           const SizedBox(height: 6),
           const Text(
-            'If you’re using another phone to pay, scan this code with your UPI app.',
+            'Scan with any UPI app, including from another phone.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
@@ -456,52 +476,121 @@ class _PaymentScreenState extends State<PaymentScreen>
             ),
           ),
           const SizedBox(height: 16),
-          QrImageView(
-            data: _upiPaymentUri.toString(),
-            version: QrVersions.auto,
-            size: 200,
-            backgroundColor: Colors.white,
-            eyeStyle: const QrEyeStyle(
-              eyeShape: QrEyeShape.square,
-              color: Color(0xFF0E5A47),
-            ),
-            dataModuleStyle: const QrDataModuleStyle(
-              dataModuleShape: QrDataModuleShape.square,
-              color: Color(0xFF101617),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'UPI ID: ${_sellerUpiId ?? ''}',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF6A7774),
-              fontWeight: FontWeight.w500,
+          GestureDetector(
+            onTap: _showUpiIntentButton ? _launchUpiApp : null,
+            child: QrImageView(
+              data: _upiPaymentUri.toString(),
+              version: QrVersions.auto,
+              size: 200,
+              backgroundColor: Colors.white,
+              eyeStyle: const QrEyeStyle(
+                eyeShape: QrEyeShape.square,
+                color: Color(0xFF0E5A47),
+              ),
+              dataModuleStyle: const QrDataModuleStyle(
+                dataModuleShape: QrDataModuleShape.square,
+                color: Color(0xFF101617),
+              ),
             ),
           ),
+          const SizedBox(height: 16),
+          _buildCopyUpiIdRow(),
         ],
       ),
     );
   }
 
   Widget _buildUpiButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: ElevatedButton.icon(
-        onPressed: _launchUpiApp,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF0E5A47),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed: _order.orderTotal > 0 ? _launchUpiApp : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0E5A47),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 0,
+            ),
+            icon: const Icon(Icons.account_balance_wallet_rounded, size: 20),
+            label: const Text(
+              'Pay with UPI App',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
           ),
-          elevation: 0,
         ),
-        icon: const Icon(Icons.open_in_new_rounded, size: 20),
-        label: Text(
-          'Pay ₹$_displayAmount via UPI',
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+        const SizedBox(height: 8),
+        const Text(
+          'Google Pay, PhonePe, BHIM & more',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF6A7774),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCopyUpiIdRow() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const ValueKey('copy-upi-id'),
+        onTap: _copyUpiId,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'UPI ID',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6A7774),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _sellerUpiId ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF101617),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'Copy UPI ID',
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF4F2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.copy_rounded,
+                    size: 18,
+                    color: Color(0xFF0E5A47),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

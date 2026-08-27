@@ -12,15 +12,26 @@ bool isValidUpiId(String value) {
   return RegExp(r'^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$').hasMatch(upiId);
 }
 
+/// NPCI `tr` values are alphanumeric. Keep a stable, unique order reference.
+String sanitizeUpiTransactionRef(String value) {
+  final sanitized = value.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+  if (sanitized.isEmpty) return 'SBORDER';
+  return sanitized.length <= 35 ? sanitized : sanitized.substring(0, 35);
+}
+
 Uri buildUpiPaymentUri({
   required String upiId,
   required String payeeName,
   required double amount,
   required String transactionNote,
+  String? transactionRef,
 }) {
   final normalizedUpiId = upiId.trim();
   final normalizedPayeeName = payeeName.trim();
   final normalizedNote = transactionNote.trim();
+  final normalizedRef = sanitizeUpiTransactionRef(
+    (transactionRef ?? transactionNote).trim(),
+  );
 
   if (!isValidUpiId(normalizedUpiId)) {
     throw ArgumentError.value(upiId, 'upiId', 'Invalid UPI ID');
@@ -47,6 +58,7 @@ Uri buildUpiPaymentUri({
       'pn': normalizedPayeeName,
       'am': amount.toStringAsFixed(2),
       'cu': 'INR',
+      'tr': normalizedRef,
       'tn': normalizedNote,
     },
   );
