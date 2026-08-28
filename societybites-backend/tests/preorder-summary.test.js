@@ -203,6 +203,7 @@ async function main() {
     const listWithCover = await jsonRequest(server, {
       method: "GET",
       path: `/preorder-campaigns?societyId=${encodeURIComponent(seller.societyId)}`,
+      token: sellerToken,
     });
     assert(listWithCover.status === 200, "campaign list failed");
     assert(

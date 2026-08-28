@@ -34,4 +34,15 @@ async function requireUser(req, res, next) {
   next();
 }
 
-module.exports = { requireUser };
+function requireJoinedSociety(req, res) {
+  if (!req.user || !req.user.societyId) {
+    res.status(400).json({
+      error: "You must join a society first",
+      code: "SOCIETY_REQUIRED",
+    });
+    return null;
+  }
+  return req.user.societyId;
+}
+
+module.exports = { requireUser, requireJoinedSociety };

@@ -32,11 +32,12 @@ class _SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
       _error = null;
     });
     try {
-      final societyId =
-          await SessionService.getSocietyId() ??
-          SessionService.defaultSocietyId;
+      final societyId = await SessionService.getSocietyId();
       final sellerId = await SessionService.getUserId();
       if (sellerId == null) throw Exception('Please log in again.');
+      if (societyId == null || societyId.isEmpty) {
+        throw Exception('Join your society to manage pre-orders.');
+      }
       final raw = await ApiService.getPreOrderCampaigns(
         societyId: societyId,
         sellerId: sellerId,

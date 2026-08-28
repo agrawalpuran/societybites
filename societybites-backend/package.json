@@ -14,7 +14,7 @@
     "patch-listing-images": "node scripts/patch-listing-images.js",
     "sync-seed-images": "node scripts/sync-seed-images.js",
     "migrate-uploads": "node scripts/migrate-uploads-to-supabase.js",
-    "test": "node tests/preorder.test.js && node tests/preorder-summary.test.js && node tests/preorder-editing.test.js && node tests/order-reconciliation.test.js"
+    "test": "node tests/preorder.test.js && node tests/preorder-summary.test.js && node tests/preorder-editing.test.js && node tests/order-reconciliation.test.js && node tests/society-scoping.test.js && node tests/society-places.test.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

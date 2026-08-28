@@ -252,8 +252,6 @@ router.patch(
     const {
       name,
       role,
-      societyId,
-      flatId,
       profilePhotoUrl,
       upiId,
       upiDisplayName,
@@ -263,8 +261,7 @@ router.patch(
     const data = {};
     if (name !== undefined) data.name = name;
     if (role !== undefined && ["buyer", "seller"].includes(role)) data.role = role;
-    if (societyId !== undefined) data.societyId = societyId;
-    if (flatId !== undefined) data.flatId = flatId;
+    // societyId / flatId are assigned only via POST /societies/join.
     if (profilePhotoUrl !== undefined) data.profilePhotoUrl = profilePhotoUrl;
     if (upiId !== undefined) {
       const trimmed = typeof upiId === "string" ? upiId.trim() : upiId;

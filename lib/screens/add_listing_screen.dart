@@ -125,8 +125,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final societyId =
-          await SessionService.getSocietyId() ?? SessionService.defaultSocietyId;
+      final societyId = await SessionService.getSocietyId();
+      if (societyId == null || societyId.isEmpty) {
+        throw Exception('Join your society before creating a listing.');
+      }
 
       String? imageUrl = _existingImageUrl;
       if (_imageBytes != null) {

@@ -60,9 +60,10 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
     if (_submitting) return;
     setState(() => _submitting = true);
     try {
-      final societyId =
-          await SessionService.getSocietyId() ??
-          SessionService.defaultSocietyId;
+      final societyId = await SessionService.getSocietyId();
+      if (societyId == null || societyId.isEmpty) {
+        throw Exception('Join your society before placing an order.');
+      }
       final raw = await ApiService.createOrder(
         societyId: societyId,
         type: 'pre_order',

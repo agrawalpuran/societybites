@@ -49,9 +49,16 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   Future<void> _loadPreOrders() async {
     try {
-      final societyId =
-          await SessionService.getSocietyId() ??
-          SessionService.defaultSocietyId;
+      final societyId = await SessionService.getSocietyId();
+      if (societyId == null || societyId.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _preOrderCampaigns = [];
+            _preOrdersLoading = false;
+          });
+        }
+        return;
+      }
       final sellerId = await SessionService.getUserId();
       if (sellerId == null) return;
       final raw = await ApiService.getPreOrderCampaigns(

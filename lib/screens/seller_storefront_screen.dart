@@ -46,9 +46,17 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       _error = null;
     });
     try {
-      final societyId =
-          await SessionService.getSocietyId() ??
-          SessionService.defaultSocietyId;
+      final societyId = await SessionService.getSocietyId();
+      if (societyId == null || societyId.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _products = [];
+          _campaigns = [];
+          _loading = false;
+          _error = 'Join your society to view this storefront.';
+        });
+        return;
+      }
       final responses = await Future.wait([
         ApiService.getListings(
           societyId: societyId,

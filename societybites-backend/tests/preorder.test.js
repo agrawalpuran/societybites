@@ -130,6 +130,7 @@ async function main() {
     const campaignDetail = await jsonRequest(server, {
       method: "GET",
       path: `/preorder-campaigns/${campaign.id}`,
+      token: buyerToken,
     });
     assert(campaignDetail.status === 200, "campaign detail failed");
     assert(
@@ -140,6 +141,7 @@ async function main() {
     const catalog = await jsonRequest(server, {
       method: "GET",
       path: `/listings?societyId=${encodeURIComponent(seller.societyId)}`,
+      token: buyerToken,
     });
     assert(catalog.status === 200, "listings GET failed");
     assert(

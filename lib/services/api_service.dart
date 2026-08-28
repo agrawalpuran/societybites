@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http_client;
 
 import 'auth_config.dart';
 import 'session_service.dart';
+import 'society_search.dart';
 
 final http = _RefreshAwareHttp();
 
@@ -380,8 +381,65 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<List<Map<String, dynamic>>> searchSocieties(String query) async {
+    final q = query.trim();
+    if (q.length < 2) return const [];
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/societies/places/search').replace(
+          queryParameters: {'q': q},
+        ),
+        headers: await _authHeaders(),
+      );
+      if (response.statusCode == 200) {
+        final data = _decodeResponse(response);
+        if (data is Map && data['results'] is List) {
+          return (data['results'] as List)
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+        if (data is List) {
+          return data
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+        return const [];
+      }
+      if (response.statusCode == 503 || response.statusCode == 404) {
+        return _searchSocietiesFallback(q);
+      }
+      _throwFromResponse(response);
+    } catch (e) {
+      if (e is TokenExpiredException) rethrow;
+      return _searchSocietiesFallback(q);
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> _searchSocietiesFallback(
+    String query,
+  ) async {
+    final societies = await getSocieties();
+    return filterSocieties(societies: societies, query: query);
+  }
+
+  static Future<Map<String, dynamic>> previewSocietyPlace(String placeId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/societies/places/preview'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'placeId': placeId}),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> joinSociety({
-    required String societyId,
+    String? societyId,
+    String? googlePlaceId,
     required String flatNumber,
     required String block,
     required String firstName,
@@ -391,7 +449,10 @@ class ApiService {
       Uri.parse('$baseUrl/societies/join'),
       headers: await _authHeaders(),
       body: jsonEncode({
-        'societyId': societyId,
+        if (googlePlaceId != null && googlePlaceId.trim().isNotEmpty)
+          'googlePlaceId': googlePlaceId.trim(),
+        if (societyId != null && societyId.trim().isNotEmpty)
+          'societyId': societyId.trim(),
         'flatNumber': flatNumber,
         'block': block,
         'firstName': firstName,
@@ -437,7 +498,7 @@ class ApiService {
     }
 
     final uri = Uri.parse('$baseUrl/listings').replace(queryParameters: query);
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: await _authHeaders());
 
     if (response.statusCode == 200) {
       final data = _decodeResponse(response) as List;

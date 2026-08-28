@@ -47,9 +47,17 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
       });
     }
     try {
-      final societyId =
-          await SessionService.getSocietyId() ??
-          SessionService.defaultSocietyId;
+      final societyId = await SessionService.getSocietyId();
+      if (societyId == null || societyId.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          if (_campaigns.isEmpty) {
+            _error = 'Join your society to see pre-orders.';
+          }
+        });
+        return;
+      }
       final userId = await SessionService.getUserId();
       final raw = await ApiService.getPreOrderCampaigns(
         societyId: societyId,

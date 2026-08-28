@@ -110,8 +110,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final societyId =
-          await SessionService.getSocietyId() ?? SessionService.defaultSocietyId;
+      final societyId = await SessionService.getSocietyId();
+      if (societyId == null || societyId.isEmpty) {
+        throw Exception('Join your society before placing an order.');
+      }
 
       await ApiService.createOrder(
         societyId: societyId,

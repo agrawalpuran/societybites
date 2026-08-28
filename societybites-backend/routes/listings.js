@@ -1,7 +1,7 @@
 const express = require("express");
 const prisma = require("../lib/prisma");
 const { asyncHandler } = require("../utils/asyncHandler");
-const { requireUser } = require("../middleware/requireUser");
+const { requireUser, requireJoinedSociety } = require("../middleware/requireUser");
 const { serializeListing } = require("../utils/listingSerializer");
 const {
   expireDueListings,
@@ -32,18 +32,18 @@ async function rejectCommittedCampaignProductMutation(listing, res) {
 
 router.get(
   "/",
+  requireUser,
   asyncHandler(async (req, res) => {
-    const { societyId, sellerId, status = "active", search, category } = req.query;
+    const societyId = requireJoinedSociety(req, res);
+    if (!societyId) return;
 
-    if (!societyId) {
-      return res.status(400).json({ error: "societyId query param is required" });
-    }
+    const { sellerId, status = "active", search, category } = req.query;
 
     const searchTerm = search ? String(search).trim() : "";
 
     // Lazy expiry before any listing read (no cron).
     await expireDueListings(prisma, {
-      societyId: String(societyId),
+      societyId,
       ...(sellerId && { sellerId: String(sellerId) }),
     });
 
@@ -61,7 +61,7 @@ router.get(
 
     const listings = await prisma.listing.findMany({
       where: {
-        societyId: String(societyId),
+        societyId,
         campaignId: null,
         ...(sellerId && { sellerId: String(sellerId) }),
         ...statusFilter,
@@ -83,13 +83,17 @@ router.get(
 
 router.get(
   "/:id",
+  requireUser,
   asyncHandler(async (req, res) => {
+    const societyId = requireJoinedSociety(req, res);
+    if (!societyId) return;
+
     let listing = await prisma.listing.findUnique({
       where: { id: req.params.id },
       include: listingInclude,
     });
 
-    if (!listing) {
+    if (!listing || listing.societyId !== societyId) {
       return res.status(404).json({ error: "Listing not found" });
     }
 

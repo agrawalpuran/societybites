@@ -206,8 +206,7 @@ class _OtpScreenState extends State<OtpScreen> {
       final flat = user['flat'] as Map<String, dynamic>?;
       await SessionService.saveSociety(
         societyId: user['societyId'] as String,
-        societyName:
-            society?['name'] as String? ?? SessionService.defaultSocietyName,
+        societyName: society?['name'] as String? ?? 'Society',
         flatId: user['flatId'] as String,
         flatNumber: flat?['flatNumber'] as String?,
       );

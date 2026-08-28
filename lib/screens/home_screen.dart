@@ -51,9 +51,15 @@ class HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadPreOrders() async {
     try {
-      final societyId =
-          await SessionService.getSocietyId() ??
-          SessionService.defaultSocietyId;
+      final societyId = await SessionService.getSocietyId();
+      if (societyId == null || societyId.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _preOrderCampaigns = [];
+          _preOrdersLoading = false;
+        });
+        return;
+      }
       final userId = await SessionService.getUserId();
       final raw = await ApiService.getPreOrderCampaigns(
         societyId: societyId,
@@ -125,9 +131,16 @@ class HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final societyId =
-          await SessionService.getSocietyId() ??
-          SessionService.defaultSocietyId;
+      final societyId = await SessionService.getSocietyId();
+      if (societyId == null || societyId.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _listings = [];
+          _error = 'Join your society to see listings.';
+          _isLoading = false;
+        });
+        return;
+      }
       final raw = await ApiService.getListings(societyId: societyId);
       final listings = raw.map(FoodItem.fromJson).toList();
 

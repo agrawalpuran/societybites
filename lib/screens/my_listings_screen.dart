@@ -41,11 +41,13 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     });
 
     try {
-      final societyId =
-          await SessionService.getSocietyId() ?? SessionService.defaultSocietyId;
+      final societyId = await SessionService.getSocietyId();
       final userId = await SessionService.getUserId();
       if (userId == null) {
         throw Exception('Please log in again.');
+      }
+      if (societyId == null || societyId.isEmpty) {
+        throw Exception('Join your society to manage listings.');
       }
 
       final raw = await ApiService.getListings(

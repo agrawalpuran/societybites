@@ -15,9 +15,6 @@ class SessionService {
   static const _refreshTokenKey = 'refresh_token';
   static const _authProviderKey = 'auth_provider';
 
-  static const defaultSocietyId = 'prestige-notting-hill';
-  static const defaultSocietyName = 'Prestige Notting Hill';
-
   static Future<void> saveUser({
     required String userId,
     required String phone,

@@ -1,7 +1,7 @@
 const express = require("express");
 const prisma = require("../lib/prisma");
 const { asyncHandler } = require("../utils/asyncHandler");
-const { requireUser } = require("../middleware/requireUser");
+const { requireUser, requireJoinedSociety } = require("../middleware/requireUser");
 const { serializeListing } = require("../utils/listingSerializer");
 const { serializeOrder } = require("../utils/listingSerializer");
 const {
@@ -73,16 +73,17 @@ function buildProductData(user, campaign, product) {
 
 router.get(
   "/",
+  requireUser,
   asyncHandler(async (req, res) => {
-    const { societyId, sellerId, status } = req.query;
-    if (!societyId) {
-      return res.status(400).json({ error: "societyId query param is required" });
-    }
+    const societyId = requireJoinedSociety(req, res);
+    if (!societyId) return;
+
+    const { sellerId, status } = req.query;
 
     const now = new Date();
     const openDue = await prisma.preOrderCampaign.findMany({
       where: {
-        societyId: String(societyId),
+        societyId,
         status: "open",
         orderCutoffAt: { lte: now },
       },
@@ -97,7 +98,7 @@ router.get(
 
     const campaigns = await prisma.preOrderCampaign.findMany({
       where: {
-        societyId: String(societyId),
+        societyId,
         ...(sellerId && { sellerId: String(sellerId) }),
         ...(status && { status: String(status) }),
       },
@@ -111,12 +112,16 @@ router.get(
 
 router.get(
   "/:id",
+  requireUser,
   asyncHandler(async (req, res) => {
+    const societyId = requireJoinedSociety(req, res);
+    if (!societyId) return;
+
     let campaign = await prisma.preOrderCampaign.findUnique({
       where: { id: req.params.id },
       include: campaignInclude,
     });
-    if (!campaign) {
+    if (!campaign || campaign.societyId !== societyId) {
       return res.status(404).json({ error: "Pre-order campaign not found" });
     }
     const previousStatus = campaign.status;

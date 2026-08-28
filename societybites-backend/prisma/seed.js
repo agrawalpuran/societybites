@@ -31,10 +31,17 @@ async function resetTestData(sellerId, buyerId) {
   await prisma.listing.deleteMany({ where: { sellerId } });
 }
 
-async function ensureSociety({ id, name, city, inviteCode, unitLabel, blockNames }) {
+async function ensureSociety({ id, name, city, inviteCode, unitLabel, blockNames, address }) {
   const society = await prisma.society.upsert({
     where: { id },
-    update: { name, city, inviteCode, unitLabel, status: "active" },
+    update: {
+      name,
+      city,
+      inviteCode,
+      unitLabel,
+      status: "active",
+      ...(address ? { address } : {}),
+    },
     create: {
       id,
       name,
@@ -42,6 +49,7 @@ async function ensureSociety({ id, name, city, inviteCode, unitLabel, blockNames
       inviteCode,
       unitLabel,
       status: "active",
+      ...(address ? { address } : {}),
     },
   });
 
@@ -69,6 +77,7 @@ async function main() {
     city: "Bangalore",
     inviteCode: "PRESTIGE2026",
     unitLabel: "Block",
+    address: "Bannerghatta Road",
     blockNames: ["A", "B", "C", "D", "E"],
   });
 

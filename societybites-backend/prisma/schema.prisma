@@ -44,6 +44,11 @@ model Society {
   status     String    @default("active")
   /// UI label for building subdivision: "Block" or "Wing"
   unitLabel  String    @default("Block")
+  /// Google Place ID of the real-world society. Discovery only — SocietyBites id remains source of truth.
+  googlePlaceId String? @unique
+  /// Society location (not the user's live GPS).
+  latitude      Float?
+  longitude     Float?
   blocks     Block[]
   flats      Flat[]
   listings            Listing[]

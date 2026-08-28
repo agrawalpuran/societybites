@@ -2,6 +2,19 @@ const express = require("express");
 const prisma = require("../lib/prisma");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser } = require("../middleware/requireUser");
+const { rateLimit } = require("../middleware/rateLimit");
+const {
+  isPlacesConfigured,
+  autocompletePlaces,
+  getPlaceDetails,
+} = require("../lib/placesGoogle");
+const {
+  mapAutocompleteSuggestions,
+  mapPlaceDetails,
+  matchesDatabaseQuery,
+  previewSocietyFromPlace,
+  findOrCreateSocietyFromPlace,
+} = require("../lib/societyFromPlace");
 
 const router = express.Router();
 
@@ -22,6 +35,26 @@ function parseFloorUnit(flatNumber) {
   return { floor: 0, unit: String(flatNumber).trim() || "1" };
 }
 
+function serializePublicSociety(society) {
+  return {
+    id: society.id,
+    name: society.name,
+    city: society.city,
+    address: society.address,
+    state: society.state,
+    pincode: society.pincode,
+    logoUrl: society.logoUrl,
+    status: society.status,
+    unitLabel: society.unitLabel,
+    blocks: Array.isArray(society.blocks)
+      ? society.blocks.map((block) => ({
+          id: block.id,
+          name: block.name,
+        }))
+      : [],
+  };
+}
+
 router.get(
   "/",
   asyncHandler(async (_req, res) => {
@@ -32,7 +65,79 @@ router.get(
         blocks: { orderBy: { name: "asc" } },
       },
     });
-    res.json(societies);
+    res.json(societies.map(serializePublicSociety));
+  })
+);
+
+const placesSearchLimit = rateLimit({ windowMs: 60000, max: 30 });
+
+async function searchDatabaseSocieties(query) {
+  const societies = await prisma.society.findMany({
+    where: { status: "active" },
+    orderBy: { name: "asc" },
+    include: { blocks: { orderBy: { name: "asc" } } },
+  });
+  return societies
+    .filter((society) => matchesDatabaseQuery(society, query))
+    .slice(0, 8)
+    .map(serializePublicSociety);
+}
+
+router.get(
+  "/places/search",
+  requireUser,
+  placesSearchLimit,
+  asyncHandler(async (req, res) => {
+    const query = String(req.query.q || "").trim();
+    if (query.length < 2) {
+      return res.json({ results: [], source: "google" });
+    }
+
+    if (!isPlacesConfigured()) {
+      return res.json({
+        results: await searchDatabaseSocieties(query),
+        source: "database",
+      });
+    }
+
+    try {
+      const json = await autocompletePlaces(query);
+      return res.json({
+        results: mapAutocompleteSuggestions(json),
+        source: "google",
+      });
+    } catch (err) {
+      if (err && err.code === "PLACES_UNAVAILABLE") {
+        return res.json({
+          results: await searchDatabaseSocieties(query),
+          source: "database",
+        });
+      }
+      throw err;
+    }
+  })
+);
+
+router.post(
+  "/places/preview",
+  requireUser,
+  placesSearchLimit,
+  asyncHandler(async (req, res) => {
+    const placeId = String(req.body?.placeId || "").trim();
+    if (!placeId) {
+      return res.status(400).json({ error: "placeId is required" });
+    }
+
+    const details = mapPlaceDetails(await getPlaceDetails(placeId));
+    const preview = await previewSocietyFromPlace(prisma, details, {
+      persist: false,
+    });
+
+    res.json({
+      place: preview.place,
+      society: preview.society ? serializePublicSociety(preview.society) : null,
+      isNew: preview.isNew,
+    });
   })
 );
 
@@ -50,7 +155,7 @@ router.get(
       return res.status(404).json({ error: "Society not found" });
     }
 
-    res.json(society);
+    res.json(serializePublicSociety(society));
   })
 );
 
@@ -58,8 +163,15 @@ router.post(
   "/join",
   requireUser,
   asyncHandler(async (req, res) => {
-    const { societyId, inviteCode, flatNumber, block, firstName, lastName } =
-      req.body;
+    const {
+      societyId,
+      inviteCode,
+      googlePlaceId,
+      flatNumber,
+      block,
+      firstName,
+      lastName,
+    } = req.body;
 
     if (!firstName || !String(firstName).trim()) {
       return res.status(400).json({ error: "First name is required" });
@@ -73,8 +185,10 @@ router.post(
       return res.status(400).json({ error: "block is required" });
     }
 
-    if (!societyId && !inviteCode) {
-      return res.status(400).json({ error: "societyId or inviteCode is required" });
+    if (!societyId && !inviteCode && !googlePlaceId) {
+      return res.status(400).json({
+        error: "societyId, googlePlaceId or inviteCode is required",
+      });
     }
 
     const fullName = [String(firstName).trim(), String(lastName || "").trim()]
@@ -87,7 +201,12 @@ router.post(
 
     let society = null;
 
-    if (societyId) {
+    if (googlePlaceId) {
+      const details = mapPlaceDetails(
+        await getPlaceDetails(String(googlePlaceId).trim())
+      );
+      society = await findOrCreateSocietyFromPlace(prisma, details);
+    } else if (societyId) {
       society = await prisma.society.findUnique({ where: { id: societyId } });
     } else if (inviteCode) {
       society = await prisma.society.findFirst({
@@ -97,7 +216,9 @@ router.post(
 
     if (!society) {
       return res.status(400).json({
-        error: societyId ? "Society not found" : "Invalid invite code",
+        error: inviteCode && !societyId && !googlePlaceId
+          ? "Invalid invite code"
+          : "Society not found",
       });
     }
 
