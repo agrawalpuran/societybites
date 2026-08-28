@@ -1,4 +1,9 @@
 const {
+  suggestionMatchesLaunchCity,
+  societyMatchesLaunchCity,
+  placeMatchesLaunchCity,
+} = require("../lib/launchCity");
+const {
   isPrestigeNottingHillPlace,
   extractAddressParts,
   mapPlaceDetails,
@@ -226,6 +231,152 @@ async function main() {
     cityError.message.includes("city"),
     "missing city uses a safe user-facing error"
   );
+
+  const bengaluruMantri = {
+    placeId: "ChIJ-mantri-blr",
+    name: "Mantri Residency",
+    address: "Bannerghatta Road, Kalena Agrahara, Bengaluru, Karnataka, India",
+  };
+  const puneMantri = {
+    placeId: "ChIJ-mantri-pune",
+    name: "Mantri Residency",
+    address: "Baner, Pune, Maharashtra, India",
+  };
+  const hyderabadOnly = {
+    placeId: "ChIJ-hyd",
+    name: "My Home Bhooja",
+    address: "Gachibowli, Hyderabad, Telangana, India",
+  };
+  const bangaloreVariant = {
+    placeId: "ChIJ-blr-variant",
+    name: "Spring Valley Apartments",
+    address: "Sarjapur Road, Bangalore, Karnataka, India",
+  };
+
+  assert(
+    suggestionMatchesLaunchCity(bengaluruMantri),
+    "Bengaluru Mantri Residency is kept"
+  );
+  assert(
+    !suggestionMatchesLaunchCity(puneMantri),
+    "Pune Mantri Residency is dropped"
+  );
+  assert(
+    !suggestionMatchesLaunchCity(hyderabadOnly),
+    "Hyderabad-only society is dropped"
+  );
+  assert(
+    suggestionMatchesLaunchCity(bangaloreVariant),
+    "Bangalore is accepted as Bengaluru"
+  );
+  assert(
+    suggestionMatchesLaunchCity({
+      name: "New Bengaluru Society",
+      address: "Whitefield, Bengaluru, Karnataka, India",
+    }),
+    "Bengaluru society not in DB is still returned"
+  );
+  assert(
+    !suggestionMatchesLaunchCity({
+      name: "Ambiguous Towers",
+      address: "Karnataka, India",
+    }),
+    "ambiguous city is omitted from search"
+  );
+
+  const puneDb = {
+    id: "mantri-pune",
+    name: "Mantri Residency",
+    city: "Pune",
+    address: "Baner",
+  };
+  assert(
+    matchesDatabaseQuery(puneDb, "mantri"),
+    "name still matches for fallback input"
+  );
+  assert(
+    !societyMatchesLaunchCity(puneDb),
+    "DB fallback drops Pune even when the name matches"
+  );
+  assert(
+    societyMatchesLaunchCity(pnh),
+    "DB fallback keeps Bangalore PNH"
+  );
+
+  assert(
+    placeMatchesLaunchCity({ city: "Bangalore", state: "Karnataka" }),
+    "Bangalore locality is launch city"
+  );
+  assert(
+    placeMatchesLaunchCity({
+      city: "",
+      district: "Bengaluru Urban",
+      address: "Bengaluru Urban, Karnataka, India",
+    }),
+    "Bengaluru Urban district is launch city"
+  );
+  assert(
+    !placeMatchesLaunchCity({ city: "Pune", state: "Maharashtra" }),
+    "Pune locality is outside launch city"
+  );
+
+  let puneCreateError = null;
+  try {
+    await findOrCreateSocietyFromPlace(mockPrisma([]), {
+      placeId: "ChIJ-pune-place",
+      name: "Mantri Residency",
+      address: "Baner, Pune, Maharashtra, India",
+      city: "Pune",
+      state: "Maharashtra",
+      latitude: 18.5,
+      longitude: 73.8,
+    });
+  } catch (err) {
+    puneCreateError = err;
+  }
+  assert(puneCreateError && puneCreateError.statusCode === 400, "Pune confirm is 400");
+  assert(
+    puneCreateError.code === "LAUNCH_CITY_UNAVAILABLE",
+    "Pune confirm uses launch-city error"
+  );
+  assert(
+    /Bengaluru/.test(puneCreateError.message),
+    "Pune confirm names the launch city"
+  );
+  assert(!puneCreateError.message.includes("Pune"), "do not echo out-of-city internals");
+
+  let outsidePreview = null;
+  try {
+    await previewSocietyFromPlace(
+      mockPrisma([]),
+      {
+        placeId: "ChIJ-pune-preview",
+        name: "Mantri Residency",
+        city: "Pune",
+        address: "Baner, Pune, Maharashtra, India",
+      },
+      { persist: false }
+    );
+  } catch (err) {
+    outsidePreview = err;
+  }
+  assert(
+    outsidePreview && outsidePreview.code === "LAUNCH_CITY_UNAVAILABLE",
+    "preview of a Pune place does not create a society"
+  );
+
+  const blrCreate = mockPrisma([]);
+  const createdBlr = await findOrCreateSocietyFromPlace(blrCreate, {
+    placeId: "ChIJ-new-blr",
+    name: "A Bengaluru Society",
+    address: "Whitefield, Bengaluru, Karnataka, India",
+    city: "Bangalore",
+    state: "Karnataka",
+    latitude: 12.97,
+    longitude: 77.75,
+  });
+  assert(blrCreate._store.length === 1, "new Bengaluru society is created once");
+  assert(createdBlr.city === "Bangalore" || createdBlr.city === "Bengaluru", "stores Google city");
 
   console.log("society-places tests passed");
 }

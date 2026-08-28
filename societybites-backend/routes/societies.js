@@ -9,6 +9,10 @@ const {
   getPlaceDetails,
 } = require("../lib/placesGoogle");
 const {
+  suggestionMatchesLaunchCity,
+  societyMatchesLaunchCity,
+} = require("../lib/launchCity");
+const {
   mapAutocompleteSuggestions,
   mapPlaceDetails,
   matchesDatabaseQuery,
@@ -79,6 +83,7 @@ async function searchDatabaseSocieties(query) {
   });
   return societies
     .filter((society) => matchesDatabaseQuery(society, query))
+    .filter((society) => societyMatchesLaunchCity(society))
     .slice(0, 8)
     .map(serializePublicSociety);
 }
@@ -102,8 +107,11 @@ router.get(
 
     try {
       const json = await autocompletePlaces(query);
+      const results = mapAutocompleteSuggestions(json).filter((item) =>
+        suggestionMatchesLaunchCity(item)
+      );
       return res.json({
-        results: mapAutocompleteSuggestions(json),
+        results,
         source: "google",
       });
     } catch (err) {

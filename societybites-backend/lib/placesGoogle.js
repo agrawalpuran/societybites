@@ -1,4 +1,5 @@
 const logger = require("./logger");
+const { getLaunchCityConfig } = require("./launchCity");
 
 const AUTOCOMPLETE_URL = "https://places.googleapis.com/v1/places:autocomplete";
 const DETAILS_URL = "https://places.googleapis.com/v1/places";
@@ -76,16 +77,30 @@ async function googleFetch(url, { method = "GET", body } = {}) {
 }
 
 async function autocompletePlaces(query) {
+  const launch = getLaunchCityConfig();
   const input = String(query || "").trim();
   const body = {
     input,
     languageCode: "en",
   };
-  const region = String(process.env.GOOGLE_PLACES_REGION_CODE || "")
+  const region = String(
+    process.env.GOOGLE_PLACES_REGION_CODE || launch.country || "IN"
+  )
     .trim()
     .toUpperCase();
   if (/^[A-Z]{2}$/.test(region)) {
     body.includedRegionCodes = [region];
+  }
+  if (launch.bias) {
+    body.locationBias = {
+      circle: {
+        center: {
+          latitude: launch.bias.latitude,
+          longitude: launch.bias.longitude,
+        },
+        radius: launch.bias.radiusMeters,
+      },
+    };
   }
 
   const json = await googleFetch(AUTOCOMPLETE_URL, {

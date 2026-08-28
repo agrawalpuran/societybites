@@ -1,3 +1,5 @@
+const { assertPlaceAllowedForLaunch } = require("./launchCity");
+
 const PNH_SOCIETY_ID = "prestige-notting-hill";
 const INVITE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -64,10 +66,13 @@ function findComponent(addressComponents, type) {
 }
 
 function extractAddressParts(addressComponents) {
+  const locality =
+    findComponent(addressComponents, "locality") ||
+    findComponent(addressComponents, "postal_town");
+  const district = findComponent(addressComponents, "administrative_area_level_2");
   return {
-    city:
-      findComponent(addressComponents, "locality") ||
-      findComponent(addressComponents, "postal_town"),
+    city: locality,
+    district,
     state: findComponent(addressComponents, "administrative_area_level_1"),
     pincode: findComponent(addressComponents, "postal_code"),
   };
@@ -85,6 +90,7 @@ function mapPlaceDetails(json) {
     name: String(json?.displayName?.text || "").trim(),
     address: String(json?.formattedAddress || "").trim(),
     city: parts.city,
+    district: parts.district,
     state: parts.state,
     pincode: parts.pincode,
     latitude,
@@ -211,7 +217,9 @@ async function backfillIfNeeded(prisma, existing, place) {
 }
 
 async function createSocietyFromPlace(prisma, place) {
-  if (!place.city) throw cityRequiredError();
+  assertPlaceAllowedForLaunch(place);
+  const city = String(place.city || place.district || "").trim();
+  if (!city) throw cityRequiredError();
   if (!place.name) {
     throw httpError(400, "We couldn't identify this society.");
   }
@@ -221,7 +229,7 @@ async function createSocietyFromPlace(prisma, place) {
     return await prisma.society.create({
       data: {
         name: place.name,
-        city: place.city,
+        city,
         address: place.address || null,
         state: place.state || null,
         pincode: place.pincode || null,
@@ -266,7 +274,8 @@ async function previewSocietyFromPlace(prisma, place, { persist = false } = {}) 
     return { place: publicPlace(place), society, isNew: false };
   }
 
-  if (!place.city) throw cityRequiredError();
+  if (!place.city && !place.district) throw cityRequiredError();
+  assertPlaceAllowedForLaunch(place);
   return { place: publicPlace(place), society: null, isNew: true };
 }
 
