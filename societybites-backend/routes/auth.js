@@ -7,6 +7,7 @@ const { requireUser } = require("../middleware/requireUser");
 const { normalizeIndianPhone, toTwoFactorPhone } = require("../utils/phone");
 const twoFactor = require("../lib/twoFactor");
 const otpStore = require("../lib/otpStore");
+const { isTestPhone, canonicalTestPhone, otpMatches } = require("../lib/testOtp");
 const {
   issueRefreshToken,
   rotateRefreshToken,
@@ -16,7 +17,14 @@ const { rateLimit } = require("../middleware/rateLimit");
 
 const router = express.Router();
 
-const otpIpLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+const otpIpLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.OTP_IP_MAX) || 20,
+});
+
+function resolveLoginPhone(raw) {
+  return normalizeIndianPhone(raw) || canonicalTestPhone(raw);
+}
 
 function serializeAuthUser(user) {
   return {
@@ -113,7 +121,7 @@ router.post(
   "/send-otp",
   otpIpLimit,
   asyncHandler(async (req, res) => {
-    const phone = normalizeIndianPhone(req.body?.phone);
+    const phone = resolveLoginPhone(req.body?.phone);
     if (!phone) {
       return res.status(400).json({ error: "Enter a valid 10-digit Indian mobile number" });
     }
@@ -121,6 +129,11 @@ router.post(
     const allowed = otpStore.canSend(phone);
     if (!allowed.ok) {
       return res.status(allowed.status).json({ error: allowed.error });
+    }
+
+    if (isTestPhone(phone)) {
+      otpStore.saveSend(phone, "test");
+      return res.json({ ok: true, message: "OTP sent" });
     }
 
     const tfPhone = toTwoFactorPhone(phone);
@@ -135,7 +148,7 @@ router.post(
   "/verify-otp",
   otpIpLimit,
   asyncHandler(async (req, res) => {
-    const phone = normalizeIndianPhone(req.body?.phone);
+    const phone = resolveLoginPhone(req.body?.phone);
     const otp = typeof req.body?.otp === "string" ? req.body.otp.trim() : "";
 
     if (!phone) {
@@ -155,7 +168,9 @@ router.post(
       return res.status(429).json({ error: "Too many incorrect attempts. Request a new OTP." });
     }
 
-    const { matched } = await twoFactor.verifyOtp(challenge.sessionId, otp);
+    const { matched } = isTestPhone(phone)
+      ? { matched: otpMatches(otp) }
+      : await twoFactor.verifyOtp(challenge.sessionId, otp);
     if (!matched) {
       const attempted = otpStore.recordAttempt(phone);
       if (attempted && otpStore.tooManyAttempts(attempted)) {
