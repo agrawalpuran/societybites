@@ -14,7 +14,10 @@ import 'seller_preorders_screen.dart';
 import 'seller_feedback_screen.dart';
 
 class SellerDashboardScreen extends StatefulWidget {
-  const SellerDashboardScreen({super.key});
+  const SellerDashboardScreen({super.key, this.onInitialLoadSettled});
+
+  /// Fired once when the first orders load finishes (success or failure).
+  final VoidCallback? onInitialLoadSettled;
 
   @override
   SellerDashboardScreenState createState() => SellerDashboardScreenState();
@@ -29,6 +32,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   Map<String, dynamic> _stats = {};
   List<PreOrderCampaign> _preOrderCampaigns = [];
   bool _preOrdersLoading = true;
+  bool _didNotifyInitialSettle = false;
 
   /// 0 = Active, 1 = Past
   int _ordersTab = 0;
@@ -158,6 +162,17 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         _isLoading = false;
       });
     }
+    _notifyInitialLoadSettled();
+  }
+
+  void _notifyInitialLoadSettled() {
+    if (_didNotifyInitialSettle) return;
+    _didNotifyInitialSettle = true;
+    final callback = widget.onInitialLoadSettled;
+    if (callback == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) callback();
+    });
   }
 
   Future<void> _updateStatus(Order order, String nextStatus) async {

@@ -20,7 +20,12 @@ class _RoleOrders {
 }
 
 class OrdersScreen extends StatefulWidget {
-  const OrdersScreen({super.key, this.onExploreHome, this.fetchOrders});
+  const OrdersScreen({
+    super.key,
+    this.onExploreHome,
+    this.fetchOrders,
+    this.onInitialLoadSettled,
+  });
 
   /// Switches to the home tab in the main shell (e.g. "Explore" CTA).
   final VoidCallback? onExploreHome;
@@ -28,6 +33,10 @@ class OrdersScreen extends StatefulWidget {
   /// Test seam. Production uses [ApiService.getOrders].
   final Future<List<Map<String, dynamic>>> Function({required String role})?
       fetchOrders;
+
+  /// Fired once when the first load of the default (Buying) role finishes,
+  /// success or failure, so MainShell can continue sequential preload.
+  final VoidCallback? onInitialLoadSettled;
 
   @override
   OrdersScreenState createState() => OrdersScreenState();
@@ -41,6 +50,7 @@ class OrdersScreenState extends State<OrdersScreen>
 
   /// Buying = orders you placed; Selling = orders for your listings.
   bool _isSellingView = false;
+  bool _didNotifyInitialSettle = false;
 
   _RoleOrders get _currentRole => _isSellingView ? _seller : _buyer;
 
@@ -49,7 +59,7 @@ class OrdersScreenState extends State<OrdersScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() => setState(() {}));
-    _loadOrders();
+    _loadOrders(isInitial: true);
   }
 
   bool get isLoadInProgress => _currentRole.isLoading;
@@ -58,7 +68,7 @@ class OrdersScreenState extends State<OrdersScreen>
   /// Called by MainShell on failed first-load retry, app resume, and FCM.
   void refresh() => _loadOrders();
 
-  Future<void> _loadOrders() async {
+  Future<void> _loadOrders({bool isInitial = false}) async {
     final selling = _isSellingView;
     final bucket = selling ? _seller : _buyer;
     setState(() {
@@ -116,6 +126,17 @@ class OrdersScreenState extends State<OrdersScreen>
         bucket.error = e.toString();
       });
     }
+    if (isInitial) _notifyInitialLoadSettled();
+  }
+
+  void _notifyInitialLoadSettled() {
+    if (_didNotifyInitialSettle) return;
+    _didNotifyInitialSettle = true;
+    final callback = widget.onInitialLoadSettled;
+    if (callback == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) callback();
+    });
   }
 
   void _selectRole({required bool selling}) {

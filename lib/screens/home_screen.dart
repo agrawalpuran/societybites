@@ -11,9 +11,14 @@ import 'checkout_screen.dart';
 import 'food_detail_screen.dart';
 import 'seller_list_screen.dart';
 import 'seller_storefront_screen.dart';
+import 'tab_preload.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.onInitialLoadSuccess});
+
+  /// Fired once after the first successful listings load so MainShell can
+  /// start conservative background preload of other tabs.
+  final VoidCallback? onInitialLoadSuccess;
 
   @override
   HomeScreenState createState() => HomeScreenState();
@@ -31,6 +36,7 @@ class HomeScreenState extends State<HomeScreen> {
   String? _error;
   String _searchQuery = '';
   String? _selectedCategory;
+  bool _didNotifyInitialSuccess = false;
 
   bool get isLoadInProgress => _isLoading;
   bool get hasSuccessfullyLoaded => _hasSuccessfullyLoaded;
@@ -38,6 +44,7 @@ class HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    debugPreloadLog('HOME INITIAL LOAD');
     _searchController.addListener(_onSearchChanged);
     _loadListings();
     _loadPreOrders();
@@ -155,6 +162,7 @@ class HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
         _hasSuccessfullyLoaded = true;
       });
+      _notifyInitialLoadSuccess();
     } catch (e) {
       if (!mounted) return;
 
@@ -165,6 +173,16 @@ class HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _notifyInitialLoadSuccess() {
+    if (_didNotifyInitialSuccess) return;
+    _didNotifyInitialSuccess = true;
+    final callback = widget.onInitialLoadSuccess;
+    if (callback == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) callback();
+    });
   }
 
   List<FoodItem> get _specials => _filteredListings.take(3).toList();

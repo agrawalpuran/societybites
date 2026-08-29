@@ -6,6 +6,7 @@ import 'home_screen.dart';
 import 'orders_screen.dart';
 import 'profile_screen.dart';
 import 'seller_dashboard_screen.dart';
+import 'tab_preload.dart';
 import 'tab_select_load.dart';
 
 class MainShellScreen extends StatefulWidget {
@@ -24,11 +25,23 @@ class _MainShellScreenState extends State<MainShellScreen>
   final _ordersKey = GlobalKey<OrdersScreenState>();
   final _dashboardKey = GlobalKey<SellerDashboardScreenState>();
 
+  late final HomeFirstPreload _preload;
+  var _ordersMounted = false;
+  var _dashboardMounted = false;
+  var _profileMounted = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _navIndex = widget.initialIndex;
+    _ordersMounted = _navIndex == 1;
+    _dashboardMounted = _navIndex == 2;
+    _profileMounted = _navIndex == 3;
+    _preload = HomeFirstPreload(
+      onMountOrders: _mountOrders,
+      onMountDashboard: _mountDashboard,
+    );
     PushNotificationService.onForegroundOrderUpdate = _refreshVisibleTab;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.registerIfPossible();
@@ -37,6 +50,7 @@ class _MainShellScreenState extends State<MainShellScreen>
 
   @override
   void dispose() {
+    _preload.dispose();
     if (PushNotificationService.onForegroundOrderUpdate == _refreshVisibleTab) {
       PushNotificationService.onForegroundOrderUpdate = null;
     }
@@ -49,6 +63,16 @@ class _MainShellScreenState extends State<MainShellScreen>
     if (state == AppLifecycleState.resumed) {
       _refreshVisibleTab();
     }
+  }
+
+  void _mountOrders() {
+    if (!mounted || _ordersMounted) return;
+    setState(() => _ordersMounted = true);
+  }
+
+  void _mountDashboard() {
+    if (!mounted || _dashboardMounted) return;
+    setState(() => _dashboardMounted = true);
   }
 
   void _refreshVisibleTab() {
@@ -66,7 +90,16 @@ class _MainShellScreenState extends State<MainShellScreen>
   }
 
   void _selectTab(int index) {
-    setState(() => _navIndex = index);
+    final wasOrdersMounted = _ordersMounted;
+    final wasDashboardMounted = _dashboardMounted;
+
+    setState(() {
+      _navIndex = index;
+      if (index == 1) _ordersMounted = true;
+      if (index == 2) _dashboardMounted = true;
+      if (index == 3) _profileMounted = true;
+    });
+
     switch (index) {
       case 0:
         final home = _homeKey.currentState;
@@ -79,6 +112,7 @@ class _MainShellScreenState extends State<MainShellScreen>
         }
         break;
       case 1:
+        if (!wasOrdersMounted) break;
         final orders = _ordersKey.currentState;
         if (orders != null &&
             shouldFetchOnTabSelect(
@@ -89,6 +123,7 @@ class _MainShellScreenState extends State<MainShellScreen>
         }
         break;
       case 2:
+        if (!wasDashboardMounted) break;
         final dashboard = _dashboardKey.currentState;
         if (dashboard != null &&
             shouldFetchOnTabSelect(
@@ -107,10 +142,26 @@ class _MainShellScreenState extends State<MainShellScreen>
       body: IndexedStack(
         index: _navIndex,
         children: [
-          HomeScreen(key: _homeKey),
-          OrdersScreen(key: _ordersKey, onExploreHome: () => _selectTab(0)),
-          SellerDashboardScreen(key: _dashboardKey),
-          ProfileScreen(onSelectTab: _selectTab),
+          HomeScreen(
+            key: _homeKey,
+            onInitialLoadSuccess: _preload.onHomeInitialLoadSuccess,
+          ),
+          _ordersMounted
+              ? OrdersScreen(
+                  key: _ordersKey,
+                  onExploreHome: () => _selectTab(0),
+                  onInitialLoadSettled: _preload.onOrdersInitialLoadSettled,
+                )
+              : const SizedBox.shrink(),
+          _dashboardMounted
+              ? SellerDashboardScreen(
+                  key: _dashboardKey,
+                  onInitialLoadSettled: _preload.onDashboardInitialLoadSettled,
+                )
+              : const SizedBox.shrink(),
+          _profileMounted
+              ? ProfileScreen(onSelectTab: _selectTab)
+              : const SizedBox.shrink(),
         ],
       ),
       bottomNavigationBar: AppBottomNav(
