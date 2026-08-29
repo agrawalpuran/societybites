@@ -7,12 +7,27 @@ import 'feedback_screen.dart';
 import 'food_detail_screen.dart';
 import 'seller_storefront_screen.dart';
 import 'payment_screen.dart';
+import 'tab_select_load.dart';
+
+class _RoleOrders {
+  List<Order> active = [];
+  List<Order> past = [];
+  bool isLoading;
+  bool hasSuccessfullyLoaded = false;
+  String? error;
+
+  _RoleOrders({this.isLoading = false});
+}
 
 class OrdersScreen extends StatefulWidget {
-  const OrdersScreen({super.key, this.onExploreHome});
+  const OrdersScreen({super.key, this.onExploreHome, this.fetchOrders});
 
   /// Switches to the home tab in the main shell (e.g. "Explore" CTA).
   final VoidCallback? onExploreHome;
+
+  /// Test seam. Production uses [ApiService.getOrders].
+  final Future<List<Map<String, dynamic>>> Function({required String role})?
+      fetchOrders;
 
   @override
   OrdersScreenState createState() => OrdersScreenState();
@@ -21,14 +36,13 @@ class OrdersScreen extends StatefulWidget {
 class OrdersScreenState extends State<OrdersScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<Order> _activeOrders = [];
-  List<Order> _pastOrders = [];
-  bool _isLoading = true;
-  bool _hasSuccessfullyLoaded = false;
-  String? _error;
+  final _buyer = _RoleOrders(isLoading: true);
+  final _seller = _RoleOrders();
 
   /// Buying = orders you placed; Selling = orders for your listings.
   bool _isSellingView = false;
+
+  _RoleOrders get _currentRole => _isSellingView ? _seller : _buyer;
 
   @override
   void initState() {
@@ -38,22 +52,24 @@ class OrdersScreenState extends State<OrdersScreen>
     _loadOrders();
   }
 
-  bool get isLoadInProgress => _isLoading;
-  bool get hasSuccessfullyLoaded => _hasSuccessfullyLoaded;
+  bool get isLoadInProgress => _currentRole.isLoading;
+  bool get hasSuccessfullyLoaded => _currentRole.hasSuccessfullyLoaded;
 
   /// Called by MainShell on failed first-load retry, app resume, and FCM.
   void refresh() => _loadOrders();
 
   Future<void> _loadOrders() async {
+    final selling = _isSellingView;
+    final bucket = selling ? _seller : _buyer;
     setState(() {
-      _isLoading = true;
-      _error = null;
+      bucket.isLoading = true;
+      bucket.error = null;
     });
 
     try {
-      final orders = await ApiService.getOrders(
-        role: _isSellingView ? 'seller' : 'buyer',
-      );
+      final fetch = widget.fetchOrders ??
+          ({required String role}) => ApiService.getOrders(role: role);
+      final orders = await fetch(role: selling ? 'seller' : 'buyer');
       var parsed = orders.map(Order.fromJson).toList();
       final campaignIds = parsed
           .where((order) => order.isPreOrder && order.campaignId != null)
@@ -86,18 +102,38 @@ class OrdersScreenState extends State<OrdersScreen>
       if (!mounted) return;
 
       setState(() {
-        _activeOrders = parsed.where((o) => !o.isTerminal).toList();
-        _pastOrders = parsed.where((o) => o.isTerminal).toList();
-        _isLoading = false;
-        _hasSuccessfullyLoaded = true;
+        bucket.active = parsed.where((o) => !o.isTerminal).toList();
+        bucket.past = parsed.where((o) => o.isTerminal).toList();
+        bucket.isLoading = false;
+        bucket.hasSuccessfullyLoaded = true;
+        bucket.error = null;
       });
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
-        _error = e.toString();
-        _isLoading = false;
+        bucket.isLoading = false;
+        bucket.error = e.toString();
       });
+    }
+  }
+
+  void _selectRole({required bool selling}) {
+    if (_isSellingView == selling) return;
+    final bucket = selling ? _seller : _buyer;
+    final shouldFetch = shouldFetchOnTabSelect(
+      hasSuccessfullyLoaded: bucket.hasSuccessfullyLoaded,
+      isLoadInProgress: bucket.isLoading,
+    );
+    setState(() {
+      _isSellingView = selling;
+      if (shouldFetch) {
+        bucket.isLoading = true;
+        bucket.error = null;
+      }
+    });
+    if (shouldFetch) {
+      _loadOrders();
     }
   }
 
@@ -146,19 +182,19 @@ class OrdersScreenState extends State<OrdersScreen>
             const SizedBox(height: 14),
             _buildTabs(),
             const SizedBox(height: 16),
-            if (_isLoading)
+            if (_currentRole.isLoading)
               const Expanded(
                 child: Center(
                   child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
                 ),
               )
-            else if (_error != null)
+            else if (_currentRole.error != null)
               Expanded(
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.all(20),
                     child: Text(
-                      _error!,
+                      _currentRole.error!,
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Color(0xFFD94F4F)),
                     ),
@@ -171,12 +207,12 @@ class OrdersScreenState extends State<OrdersScreen>
                   controller: _tabController,
                   children: [
                     _ActiveTab(
-                      orders: _activeOrders,
+                      orders: _currentRole.active,
                       onRefresh: _loadOrders,
                       isSellerView: _isSellingView,
                     ),
                     _PastTab(
-                      orders: _pastOrders,
+                      orders: _currentRole.past,
                       onRefresh: _loadOrders,
                       onExploreHome: widget.onExploreHome,
                       isSellerView: _isSellingView,
@@ -209,24 +245,14 @@ class OrdersScreenState extends State<OrdersScreen>
               child: _RoleChip(
                 label: 'Buying',
                 selected: !_isSellingView,
-                onTap: () {
-                  if (_isSellingView) {
-                    setState(() => _isSellingView = false);
-                    _loadOrders();
-                  }
-                },
+                onTap: () => _selectRole(selling: false),
               ),
             ),
             Expanded(
               child: _RoleChip(
                 label: 'Selling',
                 selected: _isSellingView,
-                onTap: () {
-                  if (!_isSellingView) {
-                    setState(() => _isSellingView = true);
-                    _loadOrders();
-                  }
-                },
+                onTap: () => _selectRole(selling: true),
               ),
             ),
           ],
@@ -259,8 +285,8 @@ class OrdersScreenState extends State<OrdersScreen>
             fontSize: 14,
           ),
           tabs: [
-            Tab(text: 'Active (${_activeOrders.length})'),
-            Tab(text: 'Past (${_pastOrders.length})'),
+            Tab(text: 'Active (${_currentRole.active.length})'),
+            Tab(text: 'Past (${_currentRole.past.length})'),
           ],
         ),
       ),
@@ -326,18 +352,24 @@ class _ActiveTab extends StatelessWidget {
         ),
       );
     }
-    return ListView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      children: orders
-          .map(
-            (o) => _ActiveOrderCard(
-              order: o,
-              onRefresh: onRefresh,
-              isSellerView: isSellerView,
-            ),
-          )
-          .toList(),
+    return RefreshIndicator(
+      color: const Color(0xFF0E5A47),
+      onRefresh: onRefresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        children: orders
+            .map(
+              (o) => _ActiveOrderCard(
+                order: o,
+                onRefresh: onRefresh,
+                isSellerView: isSellerView,
+              ),
+            )
+            .toList(),
+      ),
     );
   }
 }
@@ -992,21 +1024,26 @@ class _PastTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Text(
-            isSellerView ? 'Past Sales' : 'Past Orders',
-            style: const TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF101617),
+    return RefreshIndicator(
+      color: const Color(0xFF0E5A47),
+      onRefresh: onRefresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              isSellerView ? 'Past Sales' : 'Past Orders',
+              style: const TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF101617),
+              ),
             ),
           ),
-        ),
         if (orders.isEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -1032,7 +1069,8 @@ class _PastTab extends StatelessWidget {
           ),
         const SizedBox(height: 20),
         if (!isSellerView) _ExploreBanner(onExploreHome: onExploreHome),
-      ],
+        ],
+      ),
     );
   }
 }
