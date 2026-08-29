@@ -24,6 +24,7 @@ class OrdersScreenState extends State<OrdersScreen>
   List<Order> _activeOrders = [];
   List<Order> _pastOrders = [];
   bool _isLoading = true;
+  bool _hasSuccessfullyLoaded = false;
   String? _error;
 
   /// Buying = orders you placed; Selling = orders for your listings.
@@ -37,6 +38,10 @@ class OrdersScreenState extends State<OrdersScreen>
     _loadOrders();
   }
 
+  bool get isLoadInProgress => _isLoading;
+  bool get hasSuccessfullyLoaded => _hasSuccessfullyLoaded;
+
+  /// Called by MainShell on failed first-load retry, app resume, and FCM.
   void refresh() => _loadOrders();
 
   Future<void> _loadOrders() async {
@@ -84,6 +89,7 @@ class OrdersScreenState extends State<OrdersScreen>
         _activeOrders = parsed.where((o) => !o.isTerminal).toList();
         _pastOrders = parsed.where((o) => o.isTerminal).toList();
         _isLoading = false;
+        _hasSuccessfullyLoaded = true;
       });
     } catch (e) {
       if (!mounted) return;

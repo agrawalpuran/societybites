@@ -24,6 +24,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   List<Order> _activeOrders = [];
   List<Order> _pastOrders = [];
   bool _isLoading = true;
+  bool _hasSuccessfullyLoaded = false;
   String? _error;
   Map<String, dynamic> _stats = {};
   List<PreOrderCampaign> _preOrderCampaigns = [];
@@ -40,7 +41,10 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     _loadPreOrders();
   }
 
-  /// Called by MainShell when Dashboard tab is selected or app resumes.
+  bool get isLoadInProgress => _isLoading;
+  bool get hasSuccessfullyLoaded => _hasSuccessfullyLoaded;
+
+  /// Called by MainShell on failed first-load retry, app resume, and FCM.
   void refresh() {
     _loadOrders();
     _loadStats();
@@ -143,6 +147,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         _activeOrders = parsed.where((o) => !o.isTerminal).toList();
         _pastOrders = parsed.where((o) => o.isTerminal).toList();
         _isLoading = false;
+        _hasSuccessfullyLoaded = true;
       });
       _loadStats();
     } catch (e) {

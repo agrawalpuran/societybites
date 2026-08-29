@@ -6,6 +6,7 @@ import 'home_screen.dart';
 import 'orders_screen.dart';
 import 'profile_screen.dart';
 import 'seller_dashboard_screen.dart';
+import 'tab_select_load.dart';
 
 class MainShellScreen extends StatefulWidget {
   const MainShellScreen({super.key, this.initialIndex = 0});
@@ -68,13 +69,34 @@ class _MainShellScreenState extends State<MainShellScreen>
     setState(() => _navIndex = index);
     switch (index) {
       case 0:
-        _homeKey.currentState?.refresh();
+        final home = _homeKey.currentState;
+        if (home != null &&
+            shouldFetchOnTabSelect(
+              hasSuccessfullyLoaded: home.hasSuccessfullyLoaded,
+              isLoadInProgress: home.isLoadInProgress,
+            )) {
+          home.refresh();
+        }
         break;
       case 1:
-        _ordersKey.currentState?.refresh();
+        final orders = _ordersKey.currentState;
+        if (orders != null &&
+            shouldFetchOnTabSelect(
+              hasSuccessfullyLoaded: orders.hasSuccessfullyLoaded,
+              isLoadInProgress: orders.isLoadInProgress,
+            )) {
+          orders.refresh();
+        }
         break;
       case 2:
-        _dashboardKey.currentState?.refresh();
+        final dashboard = _dashboardKey.currentState;
+        if (dashboard != null &&
+            shouldFetchOnTabSelect(
+              hasSuccessfullyLoaded: dashboard.hasSuccessfullyLoaded,
+              isLoadInProgress: dashboard.isLoadInProgress,
+            )) {
+          dashboard.refresh();
+        }
         break;
     }
   }

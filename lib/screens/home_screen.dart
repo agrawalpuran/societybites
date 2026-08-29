@@ -27,9 +27,13 @@ class HomeScreenState extends State<HomeScreen> {
   List<PreOrderCampaign> _preOrderCampaigns = [];
   bool _preOrdersLoading = true;
   bool _isLoading = true;
+  bool _hasSuccessfullyLoaded = false;
   String? _error;
   String _searchQuery = '';
   String? _selectedCategory;
+
+  bool get isLoadInProgress => _isLoading;
+  bool get hasSuccessfullyLoaded => _hasSuccessfullyLoaded;
 
   @override
   void initState() {
@@ -39,7 +43,7 @@ class HomeScreenState extends State<HomeScreen> {
     _loadPreOrders();
   }
 
-  /// Called by MainShell when Home tab is selected or app resumes.
+  /// Called by MainShell on failed first-load retry, app resume, and FCM.
   void refresh() {
     _loadListings();
     _loadPreOrders();
@@ -149,6 +153,7 @@ class HomeScreenState extends State<HomeScreen> {
       setState(() {
         _listings = listings;
         _isLoading = false;
+        _hasSuccessfullyLoaded = true;
       });
     } catch (e) {
       if (!mounted) return;
