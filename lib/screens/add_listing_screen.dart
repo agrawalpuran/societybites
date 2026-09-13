@@ -5,6 +5,8 @@ import '../widgets/app_header.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
+import '../models/food_type.dart';
+import '../widgets/food_type_selector.dart';
 
 class AddListingScreen extends StatefulWidget {
   const AddListingScreen({super.key, this.existingListing});
@@ -25,6 +27,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   String _pickup = 'My Home (Verified)';
   String _weightUnit = 'portions';
   String? _category;
+  String? _foodType;
   List<String> _selectedTags = [];
   DateTime? _dateTime;
   bool _isSubmitting = false;
@@ -53,6 +56,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
       }
       _selectedTags = List<String>.from(listing.tags);
       _category = listing.category;
+      _foodType = parseFoodType(listing.foodType);
       _dateTime = listing.availableAt;
     }
   }
@@ -122,6 +126,17 @@ class _AddListingScreenState extends State<AddListingScreen> {
       return;
     }
 
+    final foodTypeError = foodTypeSelectionError(
+      foodType: _foodType,
+      tags: _selectedTags,
+    );
+    if (foodTypeError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(foodTypeError)),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -152,6 +167,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
           weightValue: _weightPerUnitController.text.trim(),
           tags: _selectedTags,
           category: _category,
+          foodType: _foodType!,
         );
       } else {
         await ApiService.createListing(
@@ -167,6 +183,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
           weightValue: _weightPerUnitController.text.trim(),
           tags: _selectedTags,
           category: _category,
+          foodType: _foodType!,
         );
       }
 
@@ -543,6 +560,16 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       ),
                       const SizedBox(height: 18),
                       _buildField(
+                        label: 'FOOD TYPE',
+                        child: FoodTypeSelector(
+                          value: _foodType,
+                          onChanged: (value) {
+                            setState(() => _foodType = value);
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      _buildField(
                         label: 'FOOD TAGS',
                         child: _buildTagChips(),
                       ),
@@ -685,7 +712,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       width: double.infinity,
                       height: 170,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _uploadPlaceholder(),
+                      errorBuilder: (context, error, stackTrace) =>
+                          _uploadPlaceholder(),
                     ),
                   )
                 : _uploadPlaceholder(),

@@ -98,20 +98,14 @@ function notifyStatusChange(order, status) {
   const map = {
     accepted: {
       userId: buyerId,
-      title: "Order accepted",
-      body: `Order ${order.orderNumber} was accepted`,
+      title: "Order confirmed",
+      body: "Your order has been confirmed.",
       notificationType: "order_accepted",
-    },
-    preparing: {
-      userId: buyerId,
-      title: "Order preparing",
-      body: `Order ${order.orderNumber} is being prepared`,
-      notificationType: "order_preparing",
     },
     ready: {
       userId: buyerId,
       title: "Ready for pickup",
-      body: `Order ${order.orderNumber} is ready for pickup`,
+      body: "Your order is ready for pickup.",
       notificationType: "order_ready",
     },
     cancelled: {
@@ -120,14 +114,8 @@ function notifyStatusChange(order, status) {
       body: `Order ${order.orderNumber} was cancelled`,
       notificationType: "order_cancelled",
     },
-    picked_up: {
-      userId: sellerId,
-      title: "Order picked up",
-      body: `Order ${order.orderNumber} was marked picked up`,
-      notificationType: "order_picked_up",
-    },
     completed: {
-      userId: sellerId,
+      userId: buyerId,
       title: "Order completed",
       body: `Order ${order.orderNumber} is complete`,
       notificationType: "order_completed",
@@ -148,11 +136,10 @@ function notifyStatusChange(order, status) {
 }
 
 function notifyOrderRejected(order) {
-  const reason = order.rejectReason ? ` — ${order.rejectReason}` : "";
   notifyAsync(() =>
     sendToUser(order.buyerId, {
       title: "Order rejected",
-      body: `Order ${order.orderNumber} was rejected${reason}`.slice(0, 180),
+      body: "Unfortunately, the seller could not fulfil your order.",
       notificationType: "order_rejected",
       orderId: order.id,
     })
@@ -189,7 +176,7 @@ function notifyBuyerMarkedPaid(order) {
   );
 }
 
-/** Payment confirm also moves to preparing — one buyer notification only. */
+/** Payment confirmation does not change order status. */
 function notifyPaymentConfirmed(order) {
   const isCash = order.paymentMethod === "cash";
   notifyAsync(() =>

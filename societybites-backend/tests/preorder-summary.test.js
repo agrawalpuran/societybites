@@ -157,9 +157,9 @@ async function main() {
         defaultDeliveryCharge: 40,
         coverImageUrl: "/uploads/test-preorder-cover.jpg",
         products: [
-          { name: "Samosa", price: 20, inventoryMode: "demand" },
-          { name: "Kachori", price: 25, inventoryMode: "demand" },
-          { name: "Dhokla", price: 30, inventoryMode: "limited", quantity: 10 },
+          { name: "Samosa", price: 20, inventoryMode: "demand", foodType: "VEG" },
+          { name: "Kachori", price: 25, inventoryMode: "demand", foodType: "VEG" },
+          { name: "Dhokla", price: 30, inventoryMode: "limited", quantity: 10, foodType: "VEG" },
         ],
       },
     });

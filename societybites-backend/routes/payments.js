@@ -49,12 +49,14 @@ router.post(
     if (order.paymentMethod !== "upi") {
       return res.status(400).json({
         error:
-          "Mark paid is only for UPI orders. Cash is confirmed by the seller after pickup.",
+          "Mark paid is only for UPI orders. Cash is confirmed by the seller at handover.",
       });
     }
 
-    if (order.status !== "accepted") {
-      return res.status(400).json({ error: "Order must be in accepted status" });
+    if (!["accepted", "preparing", "ready"].includes(order.status)) {
+      return res.status(400).json({
+        error: "Order must be accepted or ready to mark payment",
+      });
     }
 
     if (order.paymentStatus !== "pending") {
@@ -109,8 +111,6 @@ router.post(
       data: {
         paymentStatus: "seller_confirmed",
         sellerConfirmedPaidAt: new Date(),
-        status: "preparing",
-        preparingAt: new Date(),
       },
       include: orderInclude,
     });
@@ -164,9 +164,9 @@ router.post(
       return res.json(serializeOrder(order));
     }
 
-    if (order.status !== "picked_up") {
+    if (!["ready", "picked_up"].includes(order.status)) {
       return res.status(400).json({
-        error: "Cash payment can only be confirmed after the order is picked up",
+        error: "Cash payment can only be confirmed when the order is ready for handover",
       });
     }
 

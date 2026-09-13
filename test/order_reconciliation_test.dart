@@ -25,7 +25,7 @@ Map<String, dynamic> _orderJson({
   String paymentStatus = 'pending',
   double total = 100,
 }) {
-  const steps = {'pending': 0, 'accepted': 1, 'preparing': 2, 'ready': 3};
+  const steps = {'pending': 0, 'accepted': 1, 'ready': 2, 'completed': 3};
   return {
     'id': 'order-1',
     'orderId': 'SB-1001',
@@ -197,7 +197,7 @@ void main() {
       ),
     );
 
-    status = 'preparing';
+    status = 'accepted';
     paymentStatus = 'seller_confirmed';
     await tester.pump(const Duration(milliseconds: 25));
     await tester.pump();

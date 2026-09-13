@@ -111,9 +111,9 @@ async function main() {
         offeredFulfilmentMethods: ["pickup", "seller_delivery"],
         defaultDeliveryCharge: 40,
         products: [
-          { name: "Samosa", price: 20, inventoryMode: "demand" },
-          { name: "Kachori", price: 25, inventoryMode: "demand" },
-          { name: "Dhokla", price: 30, inventoryMode: "limited", quantity: 2 },
+          { name: "Samosa", price: 20, inventoryMode: "demand", foodType: "VEG" },
+          { name: "Kachori", price: 25, inventoryMode: "demand", foodType: "VEG" },
+          { name: "Dhokla", price: 30, inventoryMode: "limited", quantity: 2, foodType: "VEG" },
         ],
       },
     });

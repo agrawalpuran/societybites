@@ -7,6 +7,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/data.dart';
+import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
 import '../services/upi_payment_service.dart';
 
@@ -55,7 +56,7 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   bool get _isAwaitingSeller =>
       _order.paymentStatus == 'buyer_marked_paid' &&
-      _order.status == 'accepted';
+      isOpenPaymentStatus(_order.status);
 
   bool get _showUpiIntentButton =>
       shouldOfferUpiIntent(isWeb: kIsWeb, platform: defaultTargetPlatform);
@@ -142,10 +143,9 @@ class _PaymentScreenState extends State<PaymentScreen>
         }
       });
 
-      if (latest.status != 'accepted' ||
-          latest.paymentStatus == 'seller_confirmed' ||
-          latest.paymentStatus == 'paid' ||
-          latest.paymentStatus == 'failed') {
+      if (!isOpenPaymentStatus(latest.status) ||
+          isPaymentFinished(latest.paymentStatus) ||
+          isTerminalPaymentLeaveStatus(latest.status)) {
         _isLeavingForProgress = true;
         if (mounted) Navigator.pop(context, true);
       }

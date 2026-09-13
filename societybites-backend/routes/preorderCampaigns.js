@@ -5,6 +5,10 @@ const { requireUser, requireJoinedSociety } = require("../middleware/requireUser
 const { serializeListing } = require("../utils/listingSerializer");
 const { serializeOrder } = require("../utils/listingSerializer");
 const {
+  parseFoodType,
+  assertFoodTypeTagCompatibility,
+} = require("../utils/foodType");
+const {
   CAMPAIGN_STATUSES,
   parseDate,
   assertCampaignTimeline,
@@ -43,6 +47,9 @@ function buildProductData(user, campaign, product) {
     throw err;
   }
   const inventoryMode = normalizeInventoryMode(product.inventoryMode);
+  const foodType = parseFoodType(product.foodType, { required: true });
+  const tags = Array.isArray(product.tags) ? product.tags : [];
+  assertFoodTypeTagCompatibility(foodType, tags);
   let quantity = 0;
   if (inventoryMode === "limited") {
     quantity = parseInt(product.quantity ?? product.maxQuantity, 10);
@@ -64,7 +71,8 @@ function buildProductData(user, campaign, product) {
     imageUrl: product.imageUrl || null,
     weightUnit: product.weightUnit || null,
     weightValue: product.weightValue || null,
-    tags: Array.isArray(product.tags) ? product.tags : [],
+    tags,
+    foodType,
     category: product.category || null,
     pickupLocation: product.pickupLocation || "My Home (Verified)",
     status: "active",
@@ -499,6 +507,17 @@ router.patch(
         error: "Limited products need quantity >= 1",
       });
     }
+
+    if (req.body.foodType !== undefined) {
+      data.foodType = parseFoodType(req.body.foodType, { required: true });
+    }
+    if (req.body.tags !== undefined) {
+      data.tags = Array.isArray(req.body.tags) ? req.body.tags : [];
+    }
+    assertFoodTypeTagCompatibility(
+      data.foodType !== undefined ? data.foodType : listing.foodType,
+      data.tags !== undefined ? data.tags : listing.tags
+    );
 
     const updated = await prisma.listing.update({
       where: { id: listing.id },

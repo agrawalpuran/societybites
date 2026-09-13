@@ -188,6 +188,7 @@ async function main() {
       imageUrl: "/uploads/chicken-biryani.jpg",
       category: "Dinner",
       tags: ["Spicy", "Non-Veg"],
+      foodType: "NON_VEG",
     },
     {
       id: LISTING_IDS.paneer,
@@ -199,6 +200,7 @@ async function main() {
       imageUrl: "/uploads/paneer-butter-masala.jpg",
       category: "Lunch",
       tags: ["Veg", "North Indian"],
+      foodType: "VEG",
     },
     {
       id: LISTING_IDS.lemonRice,
@@ -229,6 +231,7 @@ async function main() {
         imageUrl: item.imageUrl,
         category: item.category,
         tags: item.tags,
+        foodType: item.foodType || null,
       },
     });
   }

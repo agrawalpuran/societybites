@@ -7,6 +7,8 @@ import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/preorder_widgets.dart';
+import '../widgets/food_type_selector.dart';
+import '../models/food_type.dart';
 import 'preorder_detail_screen.dart';
 
 class CreatePreOrderScreen extends StatefulWidget {
@@ -686,6 +688,7 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
   List<FoodItem> _listings = [];
   FoodItem? _selected;
   String _mode = 'demand';
+  String? _foodType;
   bool _loading = true;
   bool _submitting = false;
   String? _error;
@@ -704,6 +707,7 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
       if (product.inventoryMode == 'limited') {
         _quantity.text = '${product.quantity}';
       }
+      _foodType = parseFoodType(product.foodType);
     }
     _load();
   }
@@ -761,6 +765,16 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
         (!_isEditing && _selected == null)) {
       return;
     }
+    final foodTypeError = foodTypeSelectionError(
+      foodType: _foodType,
+      tags: _isEditing ? const [] : (_selected?.tags ?? const []),
+    );
+    if (foodTypeError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(foodTypeError)),
+      );
+      return;
+    }
     setState(() => _submitting = true);
     try {
       if (_isEditing) {
@@ -773,6 +787,7 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
           maxQuantity: _mode == 'limited'
               ? int.parse(_quantity.text.trim())
               : null,
+          foodType: _foodType,
         );
         if (mounted) Navigator.pop(context, true);
         return;
@@ -793,6 +808,7 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
         tags: item.tags,
         category: item.category,
         pickupLocation: item.pickupLocation,
+        foodType: _foodType!,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -932,12 +948,30 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
                                   _selected = value;
                                   _price.text =
                                       value?.price.toStringAsFixed(0) ?? '';
+                                  _foodType = parseFoodType(value?.foodType);
                                 });
                               },
                               validator: (value) =>
                                   value == null ? 'Choose a product' : null,
                             ),
                         ],
+                        const SizedBox(height: 18),
+                        const Text(
+                          'FOOD TYPE',
+                          style: TextStyle(
+                            fontSize: 11,
+                            letterSpacing: 1.1,
+                            fontWeight: FontWeight.w800,
+                            color: preorderMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        FoodTypeSelector(
+                          value: _foodType,
+                          onChanged: (value) {
+                            setState(() => _foodType = value);
+                          },
+                        ),
                         const SizedBox(height: 18),
                         const Text(
                           'PRICE FOR THIS CAMPAIGN',

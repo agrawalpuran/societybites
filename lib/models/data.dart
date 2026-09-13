@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'food_type.dart';
+
 class Seller {
   final String id;
   final String name;
@@ -38,6 +40,7 @@ class FoodItem {
   final String? weightUnit;
   final String? weightValue;
   final List<String> tags;
+  final String? foodType;
   final String? category;
   final String status;
   final DateTime? availableAt;
@@ -65,6 +68,7 @@ class FoodItem {
     this.weightUnit,
     this.weightValue,
     this.tags = const [],
+    this.foodType,
     this.category,
     this.status = 'active',
     this.availableAt,
@@ -148,6 +152,7 @@ class FoodItem {
       weightUnit: json['weightUnit'] as String?,
       weightValue: json['weightValue'] as String?,
       tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      foodType: parseFoodType(json['foodType']),
       category: json['category'] as String?,
       status: (json['status'] as String?) ?? 'active',
       availableAt: availableAt,
@@ -540,6 +545,7 @@ class PreOrderProduct {
   final int quantity;
   final String? description;
   final String? imageUrl;
+  final String? foodType;
 
   const PreOrderProduct({
     required this.listingId,
@@ -555,6 +561,7 @@ class PreOrderProduct {
     required this.quantity,
     this.description,
     this.imageUrl,
+    this.foodType,
   });
 
   factory PreOrderProduct.fromJson(Map<String, dynamic> json) {
@@ -572,6 +579,7 @@ class PreOrderProduct {
       quantity: (json['quantity'] as num?)?.toInt() ?? 0,
       description: json['description'] as String?,
       imageUrl: json['imageUrl'] as String?,
+      foodType: parseFoodType(json['foodType']),
     );
   }
 }

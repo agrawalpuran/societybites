@@ -1,10 +1,10 @@
 const ORDER_STATUS_TO_STEP = {
   pending: 0,
   accepted: 1,
-  preparing: 2,
-  ready: 3,
-  picked_up: 4,
-  completed: 5,
+  preparing: 1,
+  ready: 2,
+  picked_up: 2,
+  completed: 3,
   cancelled: -1,
   rejected: -1,
 };
@@ -32,6 +32,7 @@ function serializeListing(listing) {
     weightUnit: listing.weightUnit,
     weightValue: listing.weightValue,
     tags: listing.tags || [],
+    foodType: listing.foodType || null,
     category: listing.category || null,
     status: listing.status,
     societyId: listing.societyId,

@@ -1,9 +1,13 @@
+﻿import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/app_header.dart';
 import '../widgets/order_items_list.dart';
 import '../models/data.dart';
+import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
+import '../widgets/order_lifecycle_dialogs.dart';
 import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
@@ -33,6 +37,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   List<PreOrderCampaign> _preOrderCampaigns = [];
   bool _preOrdersLoading = true;
   bool _didNotifyInitialSettle = false;
+  int _ordersLoadGen = 0;
+  bool _ordersRefreshInFlight = false;
 
   /// 0 = Active, 1 = Past
   int _ordersTab = 0;
@@ -45,7 +51,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     _loadPreOrders();
   }
 
-  bool get isLoadInProgress => _isLoading;
+  bool get isLoadInProgress => _isLoading || _ordersRefreshInFlight;
   bool get hasSuccessfullyLoaded => _hasSuccessfullyLoaded;
 
   /// Called by MainShell on failed first-load retry, app resume, and FCM.
@@ -136,33 +142,69 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   Future<void> _loadOrders() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    final gen = ++_ordersLoadGen;
+    final showSpinner = !_hasSuccessfullyLoaded;
+    _ordersRefreshInFlight = true;
+    if (showSpinner) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    } else if (mounted) {
+      setState(() => _error = null);
+    }
 
     try {
       final orders = await ApiService.getOrders(role: 'seller');
       final parsed = orders.map(Order.fromJson).toList();
 
-      if (!mounted) return;
+      if (!mounted || gen != _ordersLoadGen) return;
 
       setState(() {
         _activeOrders = parsed.where((o) => !o.isTerminal).toList();
         _pastOrders = parsed.where((o) => o.isTerminal).toList();
         _isLoading = false;
         _hasSuccessfullyLoaded = true;
+        _ordersRefreshInFlight = false;
       });
       _loadStats();
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || gen != _ordersLoadGen) return;
 
       setState(() {
         _error = e.toString();
         _isLoading = false;
+        _ordersRefreshInFlight = false;
       });
     }
     _notifyInitialLoadSettled();
+  }
+
+  void _upsertOrder(Order updated) {
+    if (!mounted) return;
+    _ordersLoadGen++;
+    setState(() {
+      if (updated.isTerminal) {
+        _activeOrders =
+            _activeOrders.where((order) => order.id != updated.id).toList();
+        _pastOrders = [
+          updated,
+          ..._pastOrders.where((order) => order.id != updated.id),
+        ];
+        return;
+      }
+      _pastOrders =
+          _pastOrders.where((order) => order.id != updated.id).toList();
+      final index =
+          _activeOrders.indexWhere((order) => order.id == updated.id);
+      if (index >= 0) {
+        final next = [..._activeOrders];
+        next[index] = updated;
+        _activeOrders = next;
+      } else {
+        _activeOrders = [updated, ..._activeOrders];
+      }
+    });
   }
 
   void _notifyInitialLoadSettled() {
@@ -176,14 +218,24 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   Future<void> _updateStatus(Order order, String nextStatus) async {
+    debugPrint(
+      'SELLER STATUS ${order.orderId} ${order.status} → $nextStatus via ${ApiService.baseUrl}',
+    );
     try {
-      await ApiService.updateOrderStatus(orderId: order.id, status: nextStatus);
-      await _loadOrders();
-
+      final json = await ApiService.advanceOrderStatus(
+        orderId: order.id,
+        currentStatus: order.status,
+        nextStatus: nextStatus,
+      );
       if (!mounted) return;
+
+      _upsertOrder(Order.fromJson(json));
+      unawaited(_loadOrders());
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
           content: Text('Order updated to ${_statusLabel(nextStatus)}'),
           backgroundColor: const Color(0xFF0E5A47),
         ),
@@ -194,11 +246,16 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         await _promptReadyBy(order.id, order.orderId);
       }
     } catch (e) {
+      debugPrint('SELLER STATUS FAILED ${order.orderId}: $e');
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not update order: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+          content: Text('Could not update order: $e'),
+        ),
+      );
     }
   }
 
@@ -276,24 +333,16 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     }
   }
 
+  bool _isRejecting = false;
+
   Future<void> _rejectOrder(Order order) async {
-    final result = await showModalBottomSheet<Map<String, String>>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => _RejectOrderSheet(orderId: order.orderId),
-    );
+    if (_isRejecting) return;
+    final confirmed = await confirmRejectOrder(context);
+    if (!confirmed || !mounted) return;
 
-    if (result == null || !mounted) return;
-
+    _isRejecting = true;
     try {
-      await ApiService.rejectOrder(
-        orderId: order.id,
-        reason: result['reason']!,
-        otherText: result['otherText'],
-      );
+      await ApiService.rejectOrder(orderId: order.id);
       await _loadOrders();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -307,6 +356,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not reject order: $e')));
+    } finally {
+      _isRejecting = false;
     }
   }
 
@@ -317,11 +368,11 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       case 'accepted':
         return 'Accepted';
       case 'preparing':
-        return 'Preparing';
+        return 'Accepted';
       case 'ready':
         return 'Ready for pickup';
       case 'picked_up':
-        return 'Picked up';
+        return 'Ready for pickup';
       case 'completed':
         return 'Completed';
       case 'cancelled':
@@ -576,8 +627,10 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           else
             ...orders.map(
               (order) => _ActiveOrderCard(
+                key: ValueKey(order.id),
                 order: order,
                 onAction: _updateStatus,
+                onOrderUpdated: _upsertOrder,
                 onPaymentConfirmed: _loadOrders,
                 onReject: _rejectOrder,
                 onReadyBy: _editReadyBy,
@@ -1084,8 +1137,10 @@ class _SatisfactionCard extends StatelessWidget {
 
 class _ActiveOrderCard extends StatefulWidget {
   const _ActiveOrderCard({
+    super.key,
     required this.order,
     required this.onAction,
+    required this.onOrderUpdated,
     required this.onPaymentConfirmed,
     required this.onReject,
     required this.onReadyBy,
@@ -1093,6 +1148,7 @@ class _ActiveOrderCard extends StatefulWidget {
 
   final Order order;
   final Future<void> Function(Order order, String nextStatus) onAction;
+  final void Function(Order order) onOrderUpdated;
   final Future<void> Function() onPaymentConfirmed;
   final Future<void> Function(Order order) onReject;
   final Future<void> Function(Order order) onReadyBy;
@@ -1106,9 +1162,11 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
   bool _isConfirmingPayment = false;
 
   Future<void> _handleAction(String nextStatus) async {
+    if (_isUpdating) return;
+    final order = widget.order;
     setState(() => _isUpdating = true);
     try {
-      await widget.onAction(widget.order, nextStatus);
+      await widget.onAction(order, nextStatus);
     } finally {
       if (mounted) {
         setState(() => _isUpdating = false);
@@ -1119,13 +1177,13 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
   Future<void> _confirmPayment() async {
     setState(() => _isConfirmingPayment = true);
     try {
-      // Confirm already moves the order to preparing + seller_confirmed.
-      await ApiService.confirmPayment(orderId: widget.order.id);
+      final json = await ApiService.confirmPayment(orderId: widget.order.id);
+      widget.onOrderUpdated(Order.fromJson(json));
       await widget.onPaymentConfirmed();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Payment confirmed — order is now preparing'),
+          content: Text('Payment confirmed'),
           backgroundColor: Color(0xFF0E5A47),
         ),
       );
@@ -1167,7 +1225,8 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
 
     setState(() => _isConfirmingPayment = true);
     try {
-      await ApiService.confirmCashPayment(orderId: order.id);
+      final json = await ApiService.confirmCashPayment(orderId: order.id);
+      widget.onOrderUpdated(Order.fromJson(json));
       await widget.onPaymentConfirmed();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1187,6 +1246,10 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
   }
 
   Future<void> _completeOrder() async {
+    if (_isUpdating) return;
+    final confirmed = await confirmCompleteOrder(context);
+    if (!confirmed || !mounted) return;
+
     setState(() => _isUpdating = true);
     try {
       await widget.onAction(widget.order, 'completed');
@@ -1223,19 +1286,18 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
-    final isPending = order.status == 'pending';
-    final isAccepted = order.status == 'accepted';
-    final isPrep = order.status == 'preparing';
-    final isReady = order.status == 'ready';
-    final isPickedUp = order.status == 'picked_up';
+    final lifecycle = SellerOrderLifecycle.forStatus(order.status);
     final isCash = (order.paymentMethod ?? 'upi').toLowerCase() == 'cash';
     final cashPaid = order.paymentStatus == 'paid';
-    final needsCashConfirm =
-        isCash && isPickedUp && !cashPaid && order.paymentStatus != 'failed';
-    final canCompleteCash = isCash && isPickedUp && cashPaid;
-    final hasSellerAction = isPending || isAccepted || isPrep;
-    final canReject = isPending || isAccepted || isPrep;
-    final canSetReadyBy = isAccepted || isPrep;
+    final needsCashConfirm = isCash &&
+        lifecycle.treatAsReady &&
+        !cashPaid &&
+        order.paymentStatus != 'failed';
+    final canComplete = lifecycle.showComplete && (!isCash || cashPaid);
+    final hasSellerAction =
+        lifecycle.showAccept || lifecycle.showMarkReady || canComplete;
+    final canReject = lifecycle.showReject;
+    final canSetReadyBy = lifecycle.showMarkReady;
     final showUpiConfirm =
         !isCash && order.paymentStatus == 'buyer_marked_paid';
 
@@ -1308,28 +1370,18 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: isPrep || isPickedUp
+                  color: lifecycle.treatAsReady || lifecycle.showMarkReady
                       ? const Color(0xFFE8F5EE)
                       : const Color(0xFFEDE8F5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  isPrep
-                      ? 'IN PREP'
-                      : isPending
-                      ? 'NEW'
-                      : isAccepted
-                      ? 'ACCEPTED'
-                      : isReady
-                      ? 'READY'
-                      : isPickedUp
-                      ? 'PICKED UP'
-                      : 'ACTIVE',
+                  lifecycle.badge,
                   style: TextStyle(
                     fontSize: 11,
                     letterSpacing: 0.6,
                     fontWeight: FontWeight.w700,
-                    color: isPrep || isPickedUp
+                    color: lifecycle.treatAsReady || lifecycle.showMarkReady
                         ? const Color(0xFF0E5A47)
                         : const Color(0xFF5A3E8A),
                   ),
@@ -1351,6 +1403,28 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
               ],
             ],
           ),
+          if (lifecycle.headline != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              lifecycle.headline!,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF101617),
+              ),
+            ),
+            if (lifecycle.detail != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                lifecycle.detail!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF6A7774),
+                ),
+              ),
+            ],
+          ],
           if (showUpiConfirm) ...[
             const SizedBox(height: 12),
             SizedBox(
@@ -1467,7 +1541,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
               ),
             ),
           ],
-          if (canCompleteCash) ...[
+          if (isCash && cashPaid && canComplete) ...[
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
@@ -1486,56 +1560,23 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                 ),
               ),
             ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              height: 42,
-              child: ElevatedButton(
-                onPressed: _isUpdating ? null : _completeOrder,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0E5A47),
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFFE8EDEB),
-                  disabledForegroundColor: const Color(0xFF6A7774),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: _isUpdating
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'Complete Order',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-              ),
-            ),
           ],
           const SizedBox(height: 12),
           Row(
             children: [
+              if (hasSellerAction) ...[
               Expanded(
                 child: SizedBox(
                   height: 42,
                   child: ElevatedButton(
-                    onPressed: _isUpdating || !hasSellerAction
+                    onPressed: _isUpdating
                         ? null
                         : () {
-                            if (isPrep) {
+                            if (canComplete) {
+                              _completeOrder();
+                            } else if (lifecycle.showMarkReady) {
                               _handleAction('ready');
-                            } else if (isAccepted) {
-                              _handleAction('preparing');
-                            } else if (isPending) {
+                            } else if (lifecycle.showAccept) {
                               _handleAction('accepted');
                             }
                           },
@@ -1558,20 +1599,8 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                               color: Colors.white,
                             ),
                           )
-                        : Text(
-                            isReady
-                                ? 'Awaiting pickup'
-                                : isPickedUp
-                                ? (isCash
-                                      ? (cashPaid
-                                            ? 'Ready to complete'
-                                            : 'Confirm cash to complete')
-                                      : 'Waiting for buyer to complete')
-                                : isPrep
-                                ? 'Mark Ready'
-                                : isAccepted
-                                ? 'Start Preparing'
-                                : 'Accept Order',
+                          : Text(
+                            lifecycle.primaryLabel,
                             style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 13,
@@ -1581,6 +1610,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                 ),
               ),
               const SizedBox(width: 10),
+              ],
               Material(
                 color: const Color(0xFFF5F7F6),
                 borderRadius: BorderRadius.circular(12),
@@ -1671,7 +1701,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                 ),
                 icon: const Icon(Icons.cancel_outlined, size: 18),
                 label: const Text(
-                  'Reject Order',
+                  'Reject',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                 ),
               ),
@@ -1907,169 +1937,6 @@ class _SellerPastOrderCard extends StatelessWidget {
               ),
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _RejectOrderSheet extends StatefulWidget {
-  const _RejectOrderSheet({required this.orderId});
-
-  final String orderId;
-
-  @override
-  State<_RejectOrderSheet> createState() => _RejectOrderSheetState();
-}
-
-class _RejectOrderSheetState extends State<_RejectOrderSheet> {
-  static const _reasons = [
-    'Food sold out',
-    'Unable to prepare today',
-    'Kitchen closed',
-    'Ingredients unavailable',
-    'Other',
-  ];
-
-  String? _selected;
-  final _otherController = TextEditingController();
-
-  @override
-  void dispose() {
-    _otherController.dispose();
-    super.dispose();
-  }
-
-  bool get _canSubmit {
-    if (_selected == null) return false;
-    if (_selected == 'Other') {
-      final text = _otherController.text.trim();
-      return text.isNotEmpty && text.length <= 200;
-    }
-    return true;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Reject Order',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF101617),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Choose a reason for rejecting ${widget.orderId}. Inventory will be restored.',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6A7774),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ..._reasons.map((reason) {
-            final selected = _selected == reason;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: selected
-                    ? const Color(0xFFFFF0F0)
-                    : const Color(0xFFF5F7F6),
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  onTap: () => setState(() => _selected = reason),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          selected
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_off,
-                          size: 20,
-                          color: selected
-                              ? const Color(0xFFD94F4F)
-                              : const Color(0xFF8A9491),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          reason,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: selected
-                                ? const Color(0xFF8A3030)
-                                : const Color(0xFF3A4644),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-          if (_selected == 'Other') ...[
-            const SizedBox(height: 4),
-            TextField(
-              controller: _otherController,
-              maxLength: 200,
-              maxLines: 3,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                hintText: 'Describe the reason…',
-                filled: true,
-                fillColor: const Color(0xFFF5F7F6),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: !_canSubmit
-                      ? null
-                      : () {
-                          Navigator.pop(context, {
-                            'reason': _selected!,
-                            if (_selected == 'Other')
-                              'otherText': _otherController.text.trim(),
-                          });
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD94F4F),
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: const Color(0xFFE8EDEB),
-                  ),
-                  child: const Text('Confirm Reject'),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );

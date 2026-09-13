@@ -103,6 +103,7 @@ async function main() {
             name: "Samosa",
             price: 20,
             inventoryMode: "demand",
+            foodType: "VEG",
           },
         ],
       },
@@ -183,6 +184,7 @@ async function main() {
         price: 10,
         inventoryMode: "limited",
         quantity: 3,
+        foodType: "VEG",
       },
     });
     assert(addedBeforeOrder.status === 201, "product add before orders failed");
@@ -302,6 +304,7 @@ async function main() {
         price: 30,
         inventoryMode: "limited",
         quantity: 5,
+        foodType: "VEG",
       },
     });
     assert(addedAfterOrder.status === 201, "adding a new product after orders must succeed");

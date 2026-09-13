@@ -4,6 +4,10 @@ const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser, requireJoinedSociety } = require("../middleware/requireUser");
 const { serializeListing } = require("../utils/listingSerializer");
 const {
+  parseFoodType,
+  assertFoodTypeTagCompatibility,
+} = require("../utils/foodType");
+const {
   expireDueListings,
   expireListingIfDue,
 } = require("../utils/listingExpiry");
@@ -119,6 +123,7 @@ router.post(
       weightValue,
       tags,
       category,
+      foodType,
     } = req.body;
 
     if (!req.user.societyId) {
@@ -148,6 +153,10 @@ router.post(
       });
     }
 
+    const parsedFoodType = parseFoodType(foodType, { required: true });
+    const listingTags = Array.isArray(tags) ? tags : [];
+    assertFoodTypeTagCompatibility(parsedFoodType, listingTags);
+
     const availableAtDate = availableAt ? new Date(availableAt) : null;
     if (availableAtDate && availableAtDate < new Date()) {
       return res.status(400).json({
@@ -168,7 +177,8 @@ router.post(
         imageUrl,
         weightUnit: weightUnit || null,
         weightValue: weightValue || null,
-        tags: Array.isArray(tags) ? tags : [],
+        tags: listingTags,
+        foodType: parsedFoodType,
         category: category || null,
       },
       include: listingInclude,
@@ -211,6 +221,7 @@ router.patch(
       weightValue,
       tags,
       category,
+      foodType,
     } = req.body;
 
     const data = {
@@ -226,6 +237,16 @@ router.patch(
       ...(category !== undefined && { category: category || null }),
       ...(status !== undefined && { status }),
     };
+
+    if (foodType !== undefined) {
+      data.foodType = parseFoodType(foodType, { required: true });
+    }
+
+    const tagsForCompat =
+      data.tags !== undefined ? data.tags : listing.tags;
+    const foodTypeForCompat =
+      data.foodType !== undefined ? data.foodType : listing.foodType;
+    assertFoodTypeTagCompatibility(foodTypeForCompat, tagsForCompat);
 
     if (availableAt !== undefined) {
       const availableAtDate = availableAt ? new Date(availableAt) : null;

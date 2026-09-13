@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:http/http.dart' as http_client;
 
+import '../models/order_lifecycle.dart';
 import 'auth_config.dart';
 import 'session_service.dart';
 import 'society_search.dart';
@@ -520,6 +521,7 @@ class ApiService {
     String? weightValue,
     List<String>? tags,
     String? category,
+    required String foodType,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/listings'),
@@ -540,6 +542,7 @@ class ApiService {
           'weightValue': weightValue,
         if (tags != null && tags.isNotEmpty) 'tags': tags,
         if (category != null && category.isNotEmpty) 'category': category,
+        'foodType': foodType,
       }),
     );
 
@@ -613,6 +616,7 @@ class ApiService {
     String? weightValue,
     List<String>? tags,
     String? category,
+    required String foodType,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/listings/$listingId'),
@@ -630,6 +634,7 @@ class ApiService {
         if (weightValue != null) 'weightValue': weightValue,
         if (tags != null) 'tags': tags,
         if (category != null) 'category': category,
+        'foodType': foodType,
       }),
     );
 
@@ -736,6 +741,39 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  /// Mark Ready against current and legacy order APIs.
+  ///
+  /// New API accepts accepted → ready. Legacy API only accepted preparing
+  /// after UPI confirm, then preparing → ready. Mixed versions left orders
+  /// stuck on Mark Ready after payment confirm.
+  static Future<Map<String, dynamic>> advanceOrderStatus({
+    required String orderId,
+    required String currentStatus,
+    required String nextStatus,
+  }) async {
+    if (nextStatus != 'ready') {
+      return updateOrderStatus(orderId: orderId, status: nextStatus);
+    }
+
+    Object? lastError;
+    for (final path in markReadyStatusPaths(currentStatus)) {
+      try {
+        Map<String, dynamic>? result;
+        for (final step in path) {
+          result = await updateOrderStatus(orderId: orderId, status: step);
+        }
+        return result!;
+      } catch (e) {
+        lastError = e;
+        final msg = e.toString();
+        final retryable = msg.contains('Cannot transition') ||
+            msg.contains('cannot be assigned');
+        if (!retryable) rethrow;
+      }
+    }
+    throw lastError ?? Exception('Could not mark order ready');
+  }
+
   /// Set or clear optional Ready-by estimate. Pass null to clear.
   static Future<Map<String, dynamic>> setOrderReadyTime({
     required String orderId,
@@ -761,14 +799,14 @@ class ApiService {
 
   static Future<Map<String, dynamic>> rejectOrder({
     required String orderId,
-    required String reason,
+    String? reason,
     String? otherText,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/orders/$orderId/reject'),
       headers: await _authHeaders(),
       body: jsonEncode({
-        'reason': reason,
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason,
         if (otherText != null && otherText.trim().isNotEmpty)
           'otherText': otherText.trim(),
       }),
@@ -924,6 +962,7 @@ class ApiService {
     List<String>? tags,
     String? category,
     String? pickupLocation,
+    required String foodType,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/preorder-campaigns/$campaignId/products'),
@@ -944,6 +983,7 @@ class ApiService {
         if (category != null && category.isNotEmpty) 'category': category,
         if (pickupLocation != null && pickupLocation.isNotEmpty)
           'pickupLocation': pickupLocation,
+        'foodType': foodType,
       }),
     );
     if (response.statusCode == 201) {
@@ -959,6 +999,7 @@ class ApiService {
     required double price,
     required String inventoryMode,
     int? maxQuantity,
+    String? foodType,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/preorder-campaigns/$campaignId/products/$productId'),
@@ -968,6 +1009,7 @@ class ApiService {
         'price': price,
         'inventoryMode': inventoryMode,
         'quantity': inventoryMode == 'limited' ? maxQuantity : 0,
+        if (foodType != null) 'foodType': foodType,
       }),
     );
     if (response.statusCode == 200) {

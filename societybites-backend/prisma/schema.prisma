@@ -88,6 +88,8 @@ model Listing {
   weightUnit     String?
   weightValue    String?
   tags           String[]    @default([])
+  /// VEG | NON_VEG. Nullable for listings created before this field existed.
+  foodType       String?
   category       String?
   availableAt    DateTime?
   pickupLocation String      @default("My Home (Verified)")

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/app_header.dart';
 import '../widgets/order_items_list.dart';
 import '../models/data.dart';
+import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
 import 'feedback_screen.dart';
 import 'food_detail_screen.dart';
@@ -406,14 +407,7 @@ class _ActiveOrderCard extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final bool isSellerView;
 
-  static const _steps = [
-    'Pending',
-    'Accepted',
-    'Preparing',
-    'Ready',
-    'Picked Up',
-    'Done',
-  ];
+  static const _steps = BuyerOrderLifecycle.progressSteps;
 
   String get _paymentLabel {
     switch (order.paymentStatus) {
@@ -541,7 +535,33 @@ class _ActiveOrderCard extends StatelessWidget {
           const SizedBox(height: 12),
           OrderTotalRow(order: order),
           const SizedBox(height: 20),
-          _StatusTracker(currentStep: order.statusStep, steps: _steps),
+          if (BuyerOrderLifecycle.progressStep(order.status) >= 0)
+            _StatusTracker(
+              currentStep: BuyerOrderLifecycle.progressStep(order.status),
+              steps: _steps,
+            ),
+          if (!isSellerView) ...[
+            const SizedBox(height: 12),
+            Text(
+              BuyerOrderLifecycle.headline(order.status),
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF101617),
+              ),
+            ),
+            if (BuyerOrderLifecycle.detail(order.status) != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                BuyerOrderLifecycle.detail(order.status)!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF6A7774),
+                ),
+              ),
+            ],
+          ],
           if (order.showExpectedReadyAt) ...[
             const SizedBox(height: 14),
             Container(
@@ -585,7 +605,7 @@ class _ActiveOrderCard extends StatelessWidget {
                 border: Border.all(color: const Color(0xFFD4E8DF)),
               ),
               child: const Text(
-                'Manage this sale on Dashboard — accept, confirm payment, prep, and mark ready.',
+                'Manage this sale on Dashboard — accept, reject, mark ready, and complete.',
                 style: TextStyle(
                   fontSize: 13,
                   color: Color(0xFF3A4644),
@@ -595,9 +615,11 @@ class _ActiveOrderCard extends StatelessWidget {
               ),
             ),
           ] else ...[
-            if (order.status == 'accepted' &&
-                order.paymentStatus == 'pending' &&
-                (order.paymentMethod ?? 'upi') == 'upi') ...[
+            if (BuyerOrderLifecycle.canPayNow(
+              status: order.status,
+              paymentStatus: order.paymentStatus,
+              paymentMethod: order.paymentMethod,
+            )) ...[
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -632,100 +654,6 @@ class _ActiveOrderCard extends StatelessWidget {
                 ? _PreOrderFulfilmentCard(order: order)
                 : _PickupInfoCard(order: order),
             const SizedBox(height: 10),
-            if (order.status == 'ready') ...[
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    try {
-                      await ApiService.updateOrderStatus(
-                        orderId: order.id,
-                        status: 'picked_up',
-                      );
-                      await onRefresh();
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Could not mark picked up: $e')),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0E5A47),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Mark Picked Up',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
-            if (order.status == 'picked_up') ...[
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final isCash =
-                        (order.paymentMethod ?? 'upi').toLowerCase() == 'cash';
-                    if (isCash && order.paymentStatus != 'paid') {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Please confirm that payment has been received before completing this order.',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    try {
-                      await ApiService.updateOrderStatus(
-                        orderId: order.id,
-                        status: 'completed',
-                      );
-                      await onRefresh();
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Order completed! You can rate it under Past.',
-                          ),
-                          backgroundColor: Color(0xFF0E5A47),
-                        ),
-                      );
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Could not complete order: $e')),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0E5A47),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    (order.paymentMethod ?? 'upi').toLowerCase() == 'cash' &&
-                            order.paymentStatus != 'paid'
-                        ? 'Waiting for seller to confirm cash'
-                        : 'Mark Complete',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
             if ((!order.isPreOrder &&
                     (order.status == 'pending' ||
                         order.status == 'accepted')) ||
@@ -1238,6 +1166,17 @@ class _PastOrderTile extends StatelessWidget {
                 ),
               ),
             ),
+            if (isRejected) ...[
+              const SizedBox(height: 10),
+              Text(
+                BuyerOrderLifecycle.detail('rejected')!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF8A3030),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             if (isRejected &&
                 order.rejectReason != null &&
                 order.rejectReason!.isNotEmpty) ...[
@@ -1277,6 +1216,17 @@ class _PastOrderTile extends StatelessWidget {
                 ),
               ),
             ),
+            if (isRejected) ...[
+              const SizedBox(height: 10),
+              Text(
+                BuyerOrderLifecycle.detail('rejected')!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF8A3030),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             if (isRejected &&
                 order.rejectReason != null &&
                 order.rejectReason!.isNotEmpty) ...[

@@ -32,6 +32,8 @@ const VALID_STATUSES = [
   "rejected",
 ];
 
+const RETIRED_STATUSES = new Set(["preparing", "picked_up"]);
+
 const REJECT_REASONS = [
   "Food sold out",
   "Unable to prepare today",
@@ -40,18 +42,18 @@ const REJECT_REASONS = [
   "Other",
 ];
 
-const REJECTABLE_STATUSES = new Set(["pending", "accepted", "preparing"]);
+const REJECTABLE_STATUSES = new Set(["pending"]);
 
 const TRANSITIONS = {
-  pending: ["accepted", "cancelled", "rejected"],
-  accepted: ["preparing", "cancelled", "rejected"],
-  preparing: ["ready", "rejected"],
-  ready: ["picked_up"],
+  pending: ["accepted", "cancelled"],
+  accepted: ["ready", "cancelled"],
+  preparing: ["ready"],
+  ready: ["completed"],
   picked_up: ["completed"],
 };
 
-const SELLER_ACTIONS = new Set(["accepted", "preparing", "ready", "rejected"]);
-const BUYER_ACTIONS = new Set(["cancelled", "picked_up", "completed"]);
+const SELLER_ACTIONS = new Set(["accepted", "ready", "completed"]);
+const BUYER_ACTIONS = new Set(["cancelled"]);
 
 const TIMESTAMP_FIELDS = {
   accepted: "acceptedAt",
@@ -62,6 +64,24 @@ const TIMESTAMP_FIELDS = {
   cancelled: "cancelledAt",
   rejected: "rejectedAt",
 };
+
+async function updateOrderIfCurrentStatus(client, { id, fromStatus, data }) {
+  const result = await client.order.updateMany({
+    where: { id, status: fromStatus },
+    data,
+  });
+  if (result.count === 0) {
+    const err = new Error(
+      "Order status has already changed. Refresh and try again."
+    );
+    err.statusCode = 409;
+    throw err;
+  }
+  return client.order.findUnique({
+    where: { id },
+    include: orderInclude,
+  });
+}
 
 async function restoreReservedInventory(tx, items) {
   for (const item of items) {
@@ -574,6 +594,18 @@ router.patch(
       });
     }
 
+    if (RETIRED_STATUSES.has(status)) {
+      return res.status(400).json({
+        error: `${status} cannot be assigned to orders`,
+      });
+    }
+
+    if (status === "rejected") {
+      return res.status(400).json({
+        error: "Use POST /orders/:id/reject to reject an order",
+      });
+    }
+
     const order = await prisma.order.findUnique({
       where: { id: req.params.id },
       include: orderInclude,
@@ -581,6 +613,22 @@ router.patch(
 
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
+    }
+
+    const isBuyer = order.buyerId === req.user.id;
+    const isSeller = order.items.some(
+      (item) => item.listing.sellerId === req.user.id
+    );
+
+    if (!isBuyer && !isSeller) {
+      return res.status(403).json({ error: "Not allowed to update this order" });
+    }
+
+    if (SELLER_ACTIONS.has(status) && !isSeller) {
+      return res.status(403).json({ error: "Only the seller can perform this action" });
+    }
+    if (BUYER_ACTIONS.has(status) && !isBuyer) {
+      return res.status(403).json({ error: "Only the buyer can perform this action" });
     }
 
     if (
@@ -600,22 +648,6 @@ router.patch(
       });
     }
 
-    if (status === "preparing" && order.status === "accepted") {
-      if (order.paymentMethod === "upi" && order.paymentStatus !== "seller_confirmed") {
-        return res.status(400).json({
-          error: "Payment must be confirmed before preparing",
-        });
-      }
-    }
-
-    if (status === "picked_up" && order.paymentMethod === "upi") {
-      if (!order.paymentStatus || order.paymentStatus === "pending" || order.paymentStatus === "buyer_marked_paid") {
-        return res.status(400).json({
-          error: "Payment must be confirmed before pickup",
-        });
-      }
-    }
-
     if (status === "completed" && order.paymentMethod === "cash") {
       if (order.paymentStatus !== "paid") {
         return res.status(400).json({
@@ -623,26 +655,6 @@ router.patch(
             "Please confirm that payment has been received before completing this order.",
         });
       }
-    }
-
-    const isBuyer = order.buyerId === req.user.id;
-    const isSeller = order.items.some(
-      (item) => item.listing.sellerId === req.user.id
-    );
-
-    if (!isBuyer && !isSeller) {
-      return res.status(403).json({ error: "Not allowed to update this order" });
-    }
-
-    // Buyer or seller may complete after pickup; other actions stay role-gated.
-    if (status === "completed") {
-      if (!isBuyer && !isSeller) {
-        return res.status(403).json({ error: "Not allowed to complete this order" });
-      }
-    } else if (SELLER_ACTIONS.has(status) && !isSeller) {
-      return res.status(403).json({ error: "Only the seller can perform this action" });
-    } else if (BUYER_ACTIONS.has(status) && !isBuyer) {
-      return res.status(403).json({ error: "Only the buyer can perform this action" });
     }
 
     if (status === "cancelled" && !["pending", "accepted"].includes(order.status)) {
@@ -676,10 +688,10 @@ router.patch(
 
     if (status === "cancelled") {
       updated = await prisma.$transaction(async (tx) => {
-        const result = await tx.order.update({
-          where: { id: order.id },
+        const result = await updateOrderIfCurrentStatus(tx, {
+          id: order.id,
+          fromStatus: order.status,
           data: { ...updateData, paymentStatus: "failed" },
-          include: orderInclude,
         });
 
         await restoreReservedInventory(tx, order.items);
@@ -687,15 +699,11 @@ router.patch(
         logger.info("order", `Cancelled ${order.orderNumber} — inventory restored`);
         return result;
       });
-    } else if (status === "rejected") {
-      return res.status(400).json({
-        error: "Use POST /orders/:id/reject to reject an order with a reason",
-      });
     } else {
-      updated = await prisma.order.update({
-        where: { id: order.id },
+      updated = await updateOrderIfCurrentStatus(prisma, {
+        id: order.id,
+        fromStatus: order.status,
         data: updateData,
-        include: orderInclude,
       });
 
       logger.info("order", `${order.orderNumber} → ${status}`);
@@ -711,24 +719,26 @@ router.post(
   "/:id/reject",
   requireUser,
   asyncHandler(async (req, res) => {
-    const { reason, otherText } = req.body;
+    const { reason, otherText } = req.body || {};
 
-    if (!reason || !REJECT_REASONS.includes(reason)) {
-      return res.status(400).json({
-        error: `reason must be one of: ${REJECT_REASONS.join(", ")}`,
-      });
-    }
-
-    let rejectReason = reason;
-    if (reason === "Other") {
-      const text = typeof otherText === "string" ? otherText.trim() : "";
-      if (!text) {
-        return res.status(400).json({ error: "otherText is required when reason is Other" });
+    let rejectReason = null;
+    if (reason) {
+      if (!REJECT_REASONS.includes(reason)) {
+        return res.status(400).json({
+          error: `reason must be one of: ${REJECT_REASONS.join(", ")}`,
+        });
       }
-      if (text.length > 200) {
-        return res.status(400).json({ error: "otherText must be at most 200 characters" });
+      rejectReason = reason;
+      if (reason === "Other") {
+        const text = typeof otherText === "string" ? otherText.trim() : "";
+        if (!text) {
+          return res.status(400).json({ error: "otherText is required when reason is Other" });
+        }
+        if (text.length > 200) {
+          return res.status(400).json({ error: "otherText must be at most 200 characters" });
+        }
+        rejectReason = text;
       }
-      rejectReason = text;
     }
 
     const order = await prisma.order.findUnique({
@@ -755,8 +765,9 @@ router.post(
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-      const result = await tx.order.update({
-        where: { id: order.id },
+      const result = await updateOrderIfCurrentStatus(tx, {
+        id: order.id,
+        fromStatus: order.status,
         data: {
           status: "rejected",
           rejectReason,
@@ -768,14 +779,15 @@ router.post(
               ? order.paymentStatus
               : "failed",
         },
-        include: orderInclude,
       });
 
       await restoreReservedInventory(tx, order.items);
 
       logger.info(
         "order",
-        `Rejected ${order.orderNumber} by ${req.user.phone} — ${rejectReason}`
+        `Rejected ${order.orderNumber} by ${req.user.phone}${
+          rejectReason ? ` — ${rejectReason}` : ""
+        }`
       );
       return result;
     });

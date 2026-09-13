@@ -12,6 +12,8 @@ import 'food_detail_screen.dart';
 import 'seller_list_screen.dart';
 import 'seller_storefront_screen.dart';
 import 'tab_preload.dart';
+import 'home_listing_filter.dart';
+import '../widgets/food_type_selector.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.onInitialLoadSuccess});
@@ -36,6 +38,7 @@ class HomeScreenState extends State<HomeScreen> {
   String? _error;
   String _searchQuery = '';
   String? _selectedCategory;
+  String? _selectedFoodType;
   bool _didNotifyInitialSuccess = false;
 
   bool get isLoadInProgress => _isLoading;
@@ -111,25 +114,12 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   List<FoodItem> get _filteredListings {
-    var results = _listings.where((food) => !food.isPreOrder).toList();
-
-    if (_selectedCategory != null && _selectedCategory != 'All') {
-      results = results
-          .where((food) => food.category == _selectedCategory)
-          .toList();
-    }
-
-    if (_searchQuery.isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
-      results = results.where((food) {
-        return food.name.toLowerCase().contains(q) ||
-            food.sellerName.toLowerCase().contains(q) ||
-            food.block.toLowerCase().contains(q) ||
-            food.tags.any((tag) => tag.toLowerCase().contains(q));
-      }).toList();
-    }
-
-    return results;
+    return applyHomeListingFilters(
+      _listings,
+      category: _selectedCategory,
+      searchQuery: _searchQuery,
+      foodType: _selectedFoodType,
+    );
   }
 
   List<Seller> get _sellers => sellersFromListings(_filteredListings);
@@ -536,71 +526,83 @@ class HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
-      child: Container(
-        height: 52,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE6EBE9)),
-        ),
-        child: Row(
-          children: [
-            const SizedBox(width: 16),
-            const Icon(
-              Icons.search_rounded,
-              color: Color(0xFF8A9491),
-              size: 22,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  hintText: 'Search meals, sellers, blocks…',
-                  hintStyle: TextStyle(
-                    color: Color(0xFFADB5B2),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
+      padding: const EdgeInsets.fromLTRB(20, 18, 12, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE6EBE9)),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 16),
+                  const Icon(
+                    Icons.search_rounded,
+                    color: Color(0xFF8A9491),
+                    size: 22,
                   ),
-                  border: InputBorder.none,
-                  isDense: true,
-                ),
-                style: const TextStyle(
-                  color: Color(0xFF223531),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: const InputDecoration(
+                        hintText: 'Search meals, sellers, blocks…',
+                        hintStyle: TextStyle(
+                          color: Color(0xFFADB5B2),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        border: InputBorder.none,
+                        isDense: true,
+                      ),
+                      style: const TextStyle(
+                        color: Color(0xFF223531),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  if (_searchQuery.isNotEmpty)
+                    IconButton(
+                      onPressed: () {
+                        _searchController.clear();
+                      },
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF8A9491),
+                        size: 20,
+                      ),
+                    )
+                  else
+                    Container(
+                      width: 38,
+                      height: 38,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F7F6),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.tune_rounded,
+                        color: Color(0xFF3A4644),
+                        size: 20,
+                      ),
+                    ),
+                ],
               ),
             ),
-            if (_searchQuery.isNotEmpty)
-              IconButton(
-                onPressed: () {
-                  _searchController.clear();
-                },
-                icon: const Icon(
-                  Icons.close_rounded,
-                  color: Color(0xFF8A9491),
-                  size: 20,
-                ),
-              )
-            else
-              Container(
-                width: 38,
-                height: 38,
-                margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F7F6),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.tune_rounded,
-                  color: Color(0xFF3A4644),
-                  size: 20,
-                ),
-              ),
-          ],
-        ),
+          ),
+          FoodTypeFilterChips(
+            selectedFoodType: _selectedFoodType,
+            onChanged: (value) {
+              setState(() => _selectedFoodType = value);
+            },
+          ),
+        ],
       ),
     );
   }
