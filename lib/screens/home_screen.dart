@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/app_header.dart';
@@ -801,10 +802,12 @@ class _SellerChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isIos = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 64,
@@ -820,19 +823,20 @@ class _SellerChip extends StatelessWidget {
               size: 28,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isIos ? 4 : 8),
           SizedBox(
             width: 72,
+            height: isIos ? 32 : null,
             child: Text(
               seller.name,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF3A4644),
-                height: 1.2,
+                color: const Color(0xFF3A4644),
+                height: isIos ? 1.1 : 1.2,
               ),
             ),
           ),
