@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/app_header.dart';
 import '../widgets/order_items_list.dart';
+import '../widgets/order_fulfilment_banner.dart';
 import '../models/data.dart';
 import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
@@ -1344,6 +1345,14 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (order.fulfilmentMethod != null &&
+                        order.fulfilmentMethod!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      OrderFulfilmentBanner(
+                        order: order,
+                        isSellerView: true,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1863,6 +1872,14 @@ class _SellerPastOrderCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (order.fulfilmentMethod != null &&
+                        order.fulfilmentMethod!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      OrderFulfilmentBanner(
+                        order: order,
+                        isSellerView: true,
+                      ),
+                    ],
                   ],
                 ),
               ),

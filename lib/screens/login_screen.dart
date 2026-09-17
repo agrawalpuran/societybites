@@ -167,6 +167,15 @@ class _LoginScreenState extends State<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(height: topGap),
+        if (Navigator.canPop(context))
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+              color: const Color(0xFF3A4644),
+            ),
+          ),
         _HeaderSection(theme: theme),
         SizedBox(height: sectionGap),
         _InputSection(controller: _phoneController, focusNode: _phoneFocusNode),

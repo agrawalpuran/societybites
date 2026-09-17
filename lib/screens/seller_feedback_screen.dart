@@ -5,15 +5,19 @@ import '../services/api_service.dart';
 import '../widgets/app_header.dart';
 
 class SellerFeedbackScreen extends StatefulWidget {
-  const SellerFeedbackScreen({super.key});
+  const SellerFeedbackScreen({super.key, this.fetchReviews});
+
+  /// Test seam. Production uses [ApiService.getSellerReviews].
+  final Future<List<Map<String, dynamic>>> Function()? fetchReviews;
 
   @override
-  State<SellerFeedbackScreen> createState() => _SellerFeedbackScreenState();
+  SellerFeedbackScreenState createState() => SellerFeedbackScreenState();
 }
 
-class _SellerFeedbackScreenState extends State<SellerFeedbackScreen> {
+class SellerFeedbackScreenState extends State<SellerFeedbackScreen> {
   List<Review> _reviews = [];
   bool _isLoading = true;
+  bool _hasSuccessfullyLoaded = false;
   String? _error;
 
   @override
@@ -21,6 +25,8 @@ class _SellerFeedbackScreenState extends State<SellerFeedbackScreen> {
     super.initState();
     _load();
   }
+
+  Future<void> reload() => _load();
 
   String _cleanError(Object e) {
     var message = e.toString();
@@ -31,25 +37,33 @@ class _SellerFeedbackScreenState extends State<SellerFeedbackScreen> {
   }
 
   Future<void> _load() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (!_hasSuccessfullyLoaded) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
-      final raw = await ApiService.getSellerReviews();
+      final raw = widget.fetchReviews != null
+          ? await widget.fetchReviews!()
+          : await ApiService.getSellerReviews();
       final reviews = raw.map(Review.fromJson).toList();
       if (!mounted) return;
       setState(() {
         _reviews = reviews;
         _isLoading = false;
+        _hasSuccessfullyLoaded = true;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = _cleanError(e);
-        _isLoading = false;
-      });
+      if (!_hasSuccessfullyLoaded) {
+        setState(() {
+          _error = _cleanError(e);
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -91,7 +105,7 @@ class _SellerFeedbackScreenState extends State<SellerFeedbackScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Text(
-                _isLoading
+                _isLoading && !_hasSuccessfullyLoaded
                     ? 'Loading reviews…'
                     : _reviews.isEmpty
                         ? 'Reviews from neighbors appear here.'
@@ -104,7 +118,7 @@ class _SellerFeedbackScreenState extends State<SellerFeedbackScreen> {
               ),
             ),
             Expanded(
-              child: _isLoading
+              child: _isLoading && !_hasSuccessfullyLoaded
                   ? const Center(
                       child: CircularProgressIndicator(
                         color: Color(0xFF0E5A47),

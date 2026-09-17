@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../services/api_service.dart';
+import '../services/my_listings_cache.dart';
 import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/app_header.dart';
@@ -9,22 +10,61 @@ import '../widgets/listing_image.dart';
 import 'add_listing_screen.dart';
 
 class MyListingsScreen extends StatefulWidget {
-  const MyListingsScreen({super.key});
+  const MyListingsScreen({
+    super.key,
+    this.fetchListings,
+    this.updateCatalog,
+  });
+
+  /// Test seam. Production uses [ApiService.getListings].
+  final Future<List<Map<String, dynamic>>> Function()? fetchListings;
+
+  /// Test seam. Production uses [ApiService.updateListingCatalog].
+  final Future<void> Function(String listingId, String catalogType)?
+      updateCatalog;
 
   @override
-  State<MyListingsScreen> createState() => _MyListingsScreenState();
+  MyListingsScreenState createState() => MyListingsScreenState();
 }
 
-class _MyListingsScreenState extends State<MyListingsScreen> {
+class MyListingsScreenState extends State<MyListingsScreen>
+    with SingleTickerProviderStateMixin {
   List<FoodItem> _listings = [];
   bool _isLoading = true;
+  bool _hasSuccessfullyLoaded = false;
   String? _error;
+  late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted && !_tabController.indexIsChanging) setState(() {});
+    });
+    if (MyListingsCache.hasSnapshot) {
+      _listings = MyListingsCache.listings;
+      _isLoading = false;
+      _hasSuccessfullyLoaded = true;
+    }
     _loadListings();
   }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  List<FoodItem> get _regularListings =>
+      _listings.where((item) => !item.isPreOrderCatalog).toList();
+
+  List<FoodItem> get _preorderListings =>
+      _listings.where((item) => item.isPreOrderCatalog).toList();
+
+  bool get _isPreorderTab => _tabController.index == 1;
+
+  Future<void> reload() => _loadListings();
 
   String _cleanError(Object e) {
     var message = e.toString();
@@ -35,39 +75,65 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
   }
 
   Future<void> _loadListings() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (!_hasSuccessfullyLoaded && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
-      final societyId = await SessionService.getSocietyId();
-      final userId = await SessionService.getUserId();
-      if (userId == null) {
-        throw Exception('Please log in again.');
+      List<Map<String, dynamic>> raw;
+      final fetchListings = widget.fetchListings;
+      if (fetchListings != null) {
+        raw = await fetchListings();
+      } else {
+        final societyId = await SessionService.getSocietyId();
+        final userId = await SessionService.getUserId();
+        if (userId == null) {
+          throw Exception('Please log in again.');
+        }
+        if (societyId == null || societyId.isEmpty) {
+          throw Exception('Join your society to manage listings.');
+        }
+
+        raw = await ApiService.getListings(
+          societyId: societyId,
+          sellerId: userId,
+          status: 'all',
+          catalogType: 'all',
+        ).timeout(
+          const Duration(seconds: 20),
+          onTimeout: () {
+            throw Exception('Could not load listings. Please try again.');
+          },
+        );
       }
-      if (societyId == null || societyId.isEmpty) {
-        throw Exception('Join your society to manage listings.');
+      final listings = <FoodItem>[];
+      for (final item in raw) {
+        try {
+          listings.add(FoodItem.fromJson(item));
+        } catch (_) {
+          // Skip a corrupt row so one bad listing cannot blank the screen.
+        }
       }
 
-      final raw = await ApiService.getListings(
-        societyId: societyId,
-        sellerId: userId,
-        status: 'all',
-      );
-      final listings = raw.map(FoodItem.fromJson).toList();
-
+      MyListingsCache.replace(listings);
       if (!mounted) return;
       setState(() {
         _listings = listings;
         _isLoading = false;
+        _hasSuccessfullyLoaded = true;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = _cleanError(e);
-        _isLoading = false;
-      });
+      if (!_hasSuccessfullyLoaded) {
+        setState(() {
+          _error = _cleanError(e);
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -223,15 +289,81 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       if (!canList || !mounted) return;
     }
 
+    final catalogType = listing?.catalogType ??
+        (_isPreorderTab ? listingCatalogPreorder : listingCatalogRegular);
+
     final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => AddListingScreen(existingListing: listing),
+        builder: (_) => AddListingScreen(
+          existingListing: listing,
+          catalogType: catalogType,
+        ),
       ),
     );
 
     if (changed == true) {
       await _loadListings();
+    }
+  }
+
+  Future<void> _moveListing(FoodItem listing) async {
+    final toPreorder = !listing.isPreOrderCatalog;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          toPreorder
+              ? 'Move ${listing.name} to Pre-orders?'
+              : 'Move ${listing.name} to Regular Orders?',
+        ),
+        content: Text(
+          toPreorder
+              ? 'This item will no longer be available for regular orders. Customers will only be able to order it through your pre-order campaigns.'
+              : 'This item will become available for normal daily ordering.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Move'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final catalogType =
+          toPreorder ? listingCatalogPreorder : listingCatalogRegular;
+      final updateCatalog = widget.updateCatalog;
+      if (updateCatalog != null) {
+        await updateCatalog(listing.id, catalogType);
+      } else {
+        await ApiService.updateListingCatalog(
+          listingId: listing.id,
+          catalogType: catalogType,
+        );
+      }
+      await _loadListings();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            toPreorder
+                ? 'Moved to Pre-orders'
+                : 'Moved to Regular Orders',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_cleanError(e))),
+      );
     }
   }
 
@@ -268,7 +400,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                   TextButton.icon(
                     onPressed: () => _openEditor(),
                     icon: const Icon(Icons.add_rounded, size: 20),
-                    label: const Text('Add'),
+                    label: Text(
+                      _isPreorderTab ? 'Add Pre-order Item' : 'Add Listing',
+                    ),
                     style: TextButton.styleFrom(
                       foregroundColor: const Color(0xFF0E5A47),
                     ),
@@ -287,62 +421,158 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                       ? Center(
                           child: Padding(
                             padding: const EdgeInsets.all(20),
-                            child: Text(
-                              _error!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: Color(0xFFD94F4F)),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _error!,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Color(0xFFD94F4F),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: _loadListings,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0E5A47),
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  child: const Text('Try again'),
+                                ),
+                              ],
                             ),
                           ),
                         )
-                      : _listings.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
+                      : Column(
+                          children: [
+                            _buildCatalogTabs(),
+                            Expanded(
+                              child: TabBarView(
+                                controller: _tabController,
                                 children: [
-                                  const Text(
-                                    'No listings yet',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16,
-                                    ),
+                                  _buildCatalogPane(
+                                    listings: _regularListings,
+                                    isPreorder: false,
                                   ),
-                                  const SizedBox(height: 12),
-                                  ElevatedButton(
-                                    onPressed: () => _openEditor(),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF0E5A47),
-                                      foregroundColor: Colors.white,
-                                    ),
-                                    child: const Text('Create first listing'),
+                                  _buildCatalogPane(
+                                    listings: _preorderListings,
+                                    isPreorder: true,
                                   ),
                                 ],
                               ),
-                            )
-                          : RefreshIndicator(
-                              color: const Color(0xFF0E5A47),
-                              onRefresh: _loadListings,
-                              child: ListView.builder(
-                                physics: const AlwaysScrollableScrollPhysics(
-                                  parent: BouncingScrollPhysics(),
-                                ),
-                                padding: const EdgeInsets.all(20),
-                                itemCount: _listings.length,
-                                itemBuilder: (_, index) {
-                                  final listing = _listings[index];
-                                  return _SellerListingCard(
-                                    listing: listing,
-                                    onEdit: () => _openEditor(listing),
-                                    onDelete: () => _deleteListing(listing),
-                                    onPause: () => _pauseListing(listing),
-                                    onResume: () => _resumeListing(listing),
-                                    onRenew: () => _renewListing(listing),
-                                  );
-                                },
-                              ),
                             ),
+                          ],
+                        ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCatalogTabs() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F2F1),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: TabBar(
+          controller: _tabController,
+          indicator: BoxDecoration(
+            color: const Color(0xFF0E5A47),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          indicatorSize: TabBarIndicatorSize.tab,
+          dividerHeight: 0,
+          labelColor: Colors.white,
+          unselectedLabelColor: const Color(0xFF6A7774),
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+          tabs: [
+            Tab(text: 'Regular Orders (${_regularListings.length})'),
+            Tab(text: 'Pre-orders (${_preorderListings.length})'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCatalogPane({
+    required List<FoodItem> listings,
+    required bool isPreorder,
+  }) {
+    if (listings.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isPreorder
+                    ? 'No pre-order items yet'
+                    : 'No regular listings yet',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isPreorder
+                    ? 'Add food items that customers can order through your pre-order campaigns.'
+                    : 'Add food items that customers can order anytime.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF6A7774),
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => _openEditor(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0E5A47),
+                  foregroundColor: Colors.white,
+                ),
+                child: Text(
+                  isPreorder ? 'Add Pre-order Item' : 'Add Listing',
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      color: const Color(0xFF0E5A47),
+      onRefresh: _loadListings,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.all(20),
+        itemCount: listings.length,
+        itemBuilder: (_, index) {
+          final listing = listings[index];
+          return _SellerListingCard(
+            listing: listing,
+            onEdit: () => _openEditor(listing),
+            onDelete: () => _deleteListing(listing),
+            onPause: () => _pauseListing(listing),
+            onResume: () => _resumeListing(listing),
+            onRenew: () => _renewListing(listing),
+            onMove: () => _moveListing(listing),
+          );
+        },
       ),
     );
   }
@@ -356,6 +586,7 @@ class _SellerListingCard extends StatelessWidget {
     required this.onPause,
     required this.onResume,
     required this.onRenew,
+    required this.onMove,
   });
 
   final FoodItem listing;
@@ -364,6 +595,7 @@ class _SellerListingCard extends StatelessWidget {
   final VoidCallback onPause;
   final VoidCallback onResume;
   final VoidCallback onRenew;
+  final VoidCallback onMove;
 
   @override
   Widget build(BuildContext context) {
@@ -463,6 +695,19 @@ class _SellerListingCard extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                   ),
                 ),
+              TextButton(
+                onPressed: onMove,
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF0E5A47),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: Text(
+                  listing.isPreOrderCatalog
+                      ? 'Move to Regular Orders'
+                      : 'Move to Pre-orders',
+                ),
+              ),
               const Spacer(),
               IconButton(
                 onPressed: onEdit,

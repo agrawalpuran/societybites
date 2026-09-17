@@ -40,6 +40,26 @@ function serializeCampaignWithProducts(campaign) {
   return base;
 }
 
+async function assertPreorderCatalogSource(user, product) {
+  const listingId = product && product.listingId;
+  if (!listingId) return;
+  const source = await prisma.listing.findUnique({
+    where: { id: String(listingId) },
+  });
+  if (!source || source.sellerId !== user.id || source.campaignId) {
+    const err = new Error("Choose an item from your pre-order catalog.");
+    err.statusCode = 400;
+    throw err;
+  }
+  if ((source.catalogType || "REGULAR") !== "PREORDER") {
+    const err = new Error(
+      "Campaign products must be selected from your pre-order catalog."
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+}
+
 function buildProductData(user, campaign, product) {
   if (!product || !product.name || product.price === undefined) {
     const err = new Error("Each product needs name and price");
@@ -76,6 +96,8 @@ function buildProductData(user, campaign, product) {
     category: product.category || null,
     pickupLocation: product.pickupLocation || "My Home (Verified)",
     status: "active",
+    catalogType: "PREORDER",
+    sourceListingId: product.listingId ? String(product.listingId) : null,
   };
 }
 
@@ -238,6 +260,9 @@ router.post(
     }
 
     const products = Array.isArray(req.body.products) ? req.body.products : [];
+    for (const product of products) {
+      await assertPreorderCatalogSource(req.user, product);
+    }
 
     const campaign = await prisma.$transaction(async (tx) => {
       const created = await tx.preOrderCampaign.create({
@@ -383,6 +408,9 @@ router.patch(
           error: "Cannot replace campaign products after orders have been placed",
         });
       }
+      for (const product of req.body.products) {
+        await assertPreorderCatalogSource(req.user, product);
+      }
     }
 
     const campaign = await prisma.$transaction(async (tx) => {
@@ -427,6 +455,8 @@ router.post(
     if (campaign.status === "cancelled") {
       return res.status(400).json({ error: "Cannot add products to a cancelled campaign" });
     }
+
+    await assertPreorderCatalogSource(req.user, req.body);
 
     const listing = await prisma.listing.create({
       data: buildProductData(req.user, campaign, req.body),

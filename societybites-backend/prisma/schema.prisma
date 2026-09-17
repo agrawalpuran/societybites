@@ -17,6 +17,12 @@ model User {
   upiId           String?
   upiDisplayName  String?
   paymentEnabled  Boolean    @default(false)
+  /// MY_SOCIETY | NEARBY | EXTENDED. Radius km lives on CityReachConfig, not here.
+  sellingReachLevel String   @default("MY_SOCIETY")
+  /// BUYER_PICKUP | SELLER_DELIVERY | BOTH. Independent of sellingReachLevel.
+  fulfilmentMode    String   @default("BUYER_PICKUP")
+  /// Seller-stated delivery charge. Money uses Float like Listing.price / Order.total.
+  deliveryCharge    Float    @default(0)
   suspended       Boolean    @default(false)
   createdAt       DateTime   @default(now())
   societyId       String?
@@ -97,8 +103,12 @@ model Listing {
   /// active | paused | expired | sold_out | inactive
   status         String      @default("active")
   featured       Boolean     @default(false)
+  /// REGULAR | PREORDER. Marketplace vs seller pre-order catalog. Independent of campaignId.
+  catalogType    String      @default("REGULAR")
   /// When set, this listing is a pre-order campaign product, not a regular listing.
   campaignId     String?
+  /// Catalog listing this campaign product was copied from. Null for ad-hoc / historical copies.
+  sourceListingId String?
   /// demand | limited — only for campaign products. Regular listings ignore this.
   inventoryMode  String?
   createdAt      DateTime    @default(now())
@@ -106,12 +116,15 @@ model Listing {
   seller         User        @relation(fields: [sellerId], references: [id])
   society        Society     @relation(fields: [societyId], references: [id])
   campaign       PreOrderCampaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sourceListing  Listing?    @relation("ListingCampaignSource", fields: [sourceListingId], references: [id], onDelete: SetNull)
+  campaignCopies Listing[]   @relation("ListingCampaignSource")
   orderItems     OrderItem[]
   reviews        Review[]
 
   @@index([societyId, status])
   @@index([sellerId])
   @@index([campaignId])
+  @@index([sourceListingId])
 }
 
 /// Seller-created future offering. Products are Listings with campaignId set.
@@ -233,6 +246,16 @@ model AuditLog {
   details   String?
   createdAt DateTime @default(now())
   admin     User     @relation("AdminLogs", fields: [adminId], references: [id])
+}
+
+/// Per-city Level 2 / Level 3 selling radii. cityKey is canonicalCityKey(city).
+/// Do not store these radii on User. Validation: nearby > 0, extended > nearby.
+model CityReachConfig {
+  cityKey          String   @id
+  displayName      String
+  nearbyRadiusKm   Float
+  extendedRadiusKm Float
+  updatedAt        DateTime @updatedAt
 }
 
 /// Key/value platform config (e.g. platform_fee).

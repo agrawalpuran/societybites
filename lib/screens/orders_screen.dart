@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/app_header.dart';
+import '../widgets/order_fulfilment_banner.dart';
 import '../widgets/order_items_list.dart';
 import '../models/data.dart';
 import '../models/order_lifecycle.dart';
@@ -72,10 +73,13 @@ class OrdersScreenState extends State<OrdersScreen>
   Future<void> _loadOrders({bool isInitial = false}) async {
     final selling = _isSellingView;
     final bucket = selling ? _seller : _buyer;
-    setState(() {
-      bucket.isLoading = true;
-      bucket.error = null;
-    });
+    final showSpinner = !bucket.hasSuccessfullyLoaded;
+    if (showSpinner) {
+      setState(() {
+        bucket.isLoading = true;
+        bucket.error = null;
+      });
+    }
 
     try {
       final fetch = widget.fetchOrders ??
@@ -122,10 +126,12 @@ class OrdersScreenState extends State<OrdersScreen>
     } catch (e) {
       if (!mounted) return;
 
-      setState(() {
-        bucket.isLoading = false;
-        bucket.error = e.toString();
-      });
+      if (!bucket.hasSuccessfullyLoaded) {
+        setState(() {
+          bucket.isLoading = false;
+          bucket.error = e.toString();
+        });
+      }
     }
     if (isInitial) _notifyInitialLoadSettled();
   }
@@ -531,6 +537,7 @@ class _ActiveOrderCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 14),
+          OrderFulfilmentBanner(order: order, isSellerView: isSellerView),
           OrderItemsList(items: order.items),
           const SizedBox(height: 12),
           OrderTotalRow(order: order),

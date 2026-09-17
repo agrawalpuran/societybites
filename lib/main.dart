@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/main_shell_screen.dart';
+import 'screens/guest_landing_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/society_selection_screen.dart';
 import 'services/api_service.dart';
@@ -54,21 +55,21 @@ class AuthGate extends StatelessWidget {
         // Remove stale Firebase-session identity before the one-time migration
         // login. Firebase SDK/FCM initialization remains intact.
         await SessionService.clear();
-        return const LoginScreen();
+        return const GuestLandingScreen();
       }
 
       final refreshToken = await SessionService.getRefreshToken();
       if (refreshToken == null || refreshToken.isEmpty) {
-        return const LoginScreen();
+        return const GuestLandingScreen();
       }
 
       if (!await ApiService.restoreTwoFactorSession()) {
-        return const LoginScreen();
+        return const GuestLandingScreen();
       }
     } else {
       final token = await SessionService.getToken();
       if (token == null || token.isEmpty) {
-        return const LoginScreen();
+        return const GuestLandingScreen();
       }
     }
 
@@ -81,7 +82,7 @@ class AuthGate extends StatelessWidget {
       return const SocietySelectionScreen();
     }
 
-    return const LoginScreen();
+    return const GuestLandingScreen();
   }
 
   @override

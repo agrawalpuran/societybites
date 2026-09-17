@@ -2,6 +2,16 @@ import 'package:flutter/material.dart';
 
 import 'food_type.dart';
 
+const listingCatalogRegular = 'REGULAR';
+const listingCatalogPreorder = 'PREORDER';
+
+String parseListingCatalogType(dynamic value) {
+  final raw = value?.toString().trim().toUpperCase();
+  return raw == listingCatalogPreorder
+      ? listingCatalogPreorder
+      : listingCatalogRegular;
+}
+
 class Seller {
   final String id;
   final String name;
@@ -49,6 +59,8 @@ class FoodItem {
   final Color bgColor;
   final String? sellerUpiId;
   final String? campaignId;
+  final String? societyId;
+  final String catalogType;
 
   const FoodItem({
     required this.id,
@@ -77,7 +89,11 @@ class FoodItem {
     required this.bgColor,
     this.sellerUpiId,
     this.campaignId,
+    this.societyId,
+    this.catalogType = listingCatalogRegular,
   });
+
+  bool get isPreOrderCatalog => catalogType == listingCatalogPreorder;
 
   bool get isPreOrder {
     final id = campaignId?.trim();
@@ -127,7 +143,10 @@ class FoodItem {
   ];
 
   factory FoodItem.fromJson(Map<String, dynamic> json) {
-    final id = json['id'] as String;
+    final id = json['id']?.toString() ?? '';
+    if (id.isEmpty) {
+      throw const FormatException('Listing is missing an id');
+    }
     final hash = id.hashCode.abs();
     final availableAtRaw = json['availableAt'];
     final availableAt = availableAtRaw == null
@@ -136,34 +155,48 @@ class FoodItem {
 
     return FoodItem(
       id: id,
-      name: json['name'] as String,
-      sellerId: json['sellerId'] as String,
-      sellerName: (json['sellerName'] as String?) ?? 'Neighbor',
-      block: (json['block'] as String?) ?? 'Block ?',
-      flatNumber: json['flatNumber'] as String?,
-      pickupLocation: json['pickupLocation'] as String?,
-      price: (json['price'] as num).toDouble(),
-      rating: (json['avgRating'] as num?)?.toDouble() ?? 0,
+      name: json['name']?.toString() ?? 'Untitled',
+      sellerId: json['sellerId']?.toString() ?? '',
+      sellerName: json['sellerName']?.toString() ?? 'Neighbor',
+      block: json['block']?.toString() ?? 'Block ?',
+      flatNumber: json['flatNumber']?.toString(),
+      pickupLocation: json['pickupLocation']?.toString(),
+      price: _asDouble(json['price']),
+      rating: _asDouble(json['avgRating']),
       pickupTime: _formatPickupTime(availableAtRaw),
-      description: (json['description'] as String?) ?? '',
-      imageUrl: json['imageUrl'] as String?,
-      imageCacheKey: json['updatedAt'] as String?,
-      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
-      weightUnit: json['weightUnit'] as String?,
-      weightValue: json['weightValue'] as String?,
+      description: json['description']?.toString() ?? '',
+      imageUrl: json['imageUrl']?.toString(),
+      imageCacheKey:
+          json['updatedAt']?.toString() ?? json['imageCacheKey']?.toString(),
+      quantity: _asInt(json['quantity'], 1),
+      weightUnit: json['weightUnit']?.toString(),
+      weightValue: json['weightValue']?.toString(),
       tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
       foodType: parseFoodType(json['foodType']),
-      category: json['category'] as String?,
-      status: (json['status'] as String?) ?? 'active',
+      category: json['category']?.toString(),
+      status: json['status']?.toString() ?? 'active',
       availableAt: availableAt,
-      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
+      reviewCount: _asInt(json['reviewCount'], 0),
       icon: _icons[hash % _icons.length],
       bgColor: _colors[hash % _colors.length],
-      sellerUpiId: json['sellerUpiId'] as String?,
-      campaignId: (json['campaignId'] as String?)?.trim().isEmpty == true
-          ? null
-          : json['campaignId'] as String?,
+      sellerUpiId: json['sellerUpiId']?.toString(),
+      campaignId: () {
+        final value = json['campaignId']?.toString().trim();
+        return (value == null || value.isEmpty) ? null : value;
+      }(),
+      societyId: json['societyId']?.toString(),
+      catalogType: parseListingCatalogType(json['catalogType']),
     );
+  }
+
+  static double _asDouble(dynamic value, [double fallback = 0]) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  static int _asInt(dynamic value, int fallback) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? fallback;
   }
 
   static String _formatPickupTime(dynamic availableAt) {
@@ -291,6 +324,7 @@ class Order {
   final String? buyerFlatNumber;
   final String? buyerBlock;
   final String? buyerSocietyName;
+  final String? sellerSocietyName;
 
   const Order({
     required this.id,
@@ -321,6 +355,7 @@ class Order {
     this.buyerFlatNumber,
     this.buyerBlock,
     this.buyerSocietyName,
+    this.sellerSocietyName,
   });
 
   bool get isRejected => status == 'rejected';
@@ -410,6 +445,7 @@ class Order {
       buyerFlatNumber: buyerFlatNumber,
       buyerBlock: buyerBlock,
       buyerSocietyName: buyerSocietyName,
+      sellerSocietyName: sellerSocietyName,
     );
   }
 
@@ -474,6 +510,7 @@ class Order {
       buyerFlatNumber: json['buyerFlatNumber'] as String?,
       buyerBlock: json['buyerBlock'] as String?,
       buyerSocietyName: json['buyerSocietyName'] as String?,
+      sellerSocietyName: json['sellerSocietyName'] as String?,
     );
   }
 

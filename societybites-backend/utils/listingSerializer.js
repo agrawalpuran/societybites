@@ -35,6 +35,7 @@ function serializeListing(listing) {
     foodType: listing.foodType || null,
     category: listing.category || null,
     status: listing.status,
+    catalogType: listing.catalogType || "REGULAR",
     societyId: listing.societyId,
     sellerId: listing.sellerId,
     sellerName: seller.name || "Neighbor",
@@ -84,6 +85,24 @@ function serializeOrder(order) {
     buyerFlatNumber: buyerFlat?.flatNumber || null,
     buyerBlock: buyerFlat?.block || null,
     buyerSocietyName: buyerSociety?.name || null,
+    sellerName: items[0]?.listing?.sellerName || null,
+    sellerSocietyName:
+      (items[0] &&
+        items[0].listing &&
+        order.items &&
+        order.items[0] &&
+        order.items[0].listing &&
+        order.items[0].listing.seller &&
+        order.items[0].listing.seller.society &&
+        order.items[0].listing.seller.society.name) ||
+      null,
+    isCrossSociety: Boolean(
+      items[0] &&
+        items[0].listing &&
+        items[0].listing.societyId &&
+        order.societyId &&
+        items[0].listing.societyId !== order.societyId
+    ),
     hasReview: Array.isArray(order.reviews) && order.reviews.length > 0,
     rejectReason: order.rejectReason || null,
     rejectedAt: order.rejectedAt || null,

@@ -4,13 +4,31 @@ import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
 import '../models/data.dart';
+import '../models/seller_fulfilment.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
+import 'login_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({super.key, required this.cartItems});
+  const CheckoutScreen({
+    super.key,
+    required this.cartItems,
+    this.isCrossSociety = false,
+    this.sellerFulfilment,
+    this.sellerSocietyName,
+    this.placeOrder,
+  });
 
   final List<CartItem> cartItems;
+  final bool isCrossSociety;
+  final SellerFulfilment? sellerFulfilment;
+  final String? sellerSocietyName;
+  final Future<Map<String, dynamic>> Function({
+    required String societyId,
+    required List<Map<String, dynamic>> items,
+    required String paymentMethod,
+    String? fulfilmentMethod,
+  })? placeOrder;
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -23,12 +41,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   PaymentMethod _payment = PaymentMethod.upi;
   double _platformFee = 0;
   bool _isSubmitting = false;
+  String? _fulfilmentMethod;
 
   @override
   void initState() {
     super.initState();
     _items = List<CartItem>.from(widget.cartItems);
     _loadPlatformFee();
+    final fulfilment = widget.sellerFulfilment;
+    if (widget.isCrossSociety && fulfilment != null) {
+      if (fulfilment.mode == FulfilmentMode.buyerPickup) {
+        _fulfilmentMethod = 'pickup';
+      } else if (fulfilment.mode == FulfilmentMode.sellerDelivery) {
+        _fulfilmentMethod = 'seller_delivery';
+      }
+    }
   }
 
   Future<void> _loadPlatformFee() async {
@@ -44,15 +71,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double get _subtotal =>
       _items.fold<double>(0, (sum, item) => sum + item.total);
 
-  double get _grandTotal => _subtotal + _platformFee;
+  double get _deliveryCharge {
+    if (!widget.isCrossSociety) return 0;
+    if (_fulfilmentMethod != 'seller_delivery') return 0;
+    return widget.sellerFulfilment?.deliveryCharge ?? 0;
+  }
+
+  double get _grandTotal => _subtotal + _platformFee + _deliveryCharge;
 
   int get _totalQuantity =>
       _items.fold<int>(0, (sum, item) => sum + item.quantity);
 
-  bool get _canConfirm =>
-      !_isSubmitting && _items.isNotEmpty && _totalQuantity > 0;
+  bool get _canConfirm {
+    if (_isSubmitting || _items.isEmpty || _totalQuantity <= 0) return false;
+    if (widget.isCrossSociety &&
+        widget.sellerFulfilment?.mode == FulfilmentMode.both &&
+        _fulfilmentMethod == null) {
+      return false;
+    }
+    return true;
+  }
 
-  void _goToShell(int index) {
+  Future<void> _goToShell(int index) async {
+    if (!await SessionService.isOnboarded()) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      return;
+    }
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
@@ -110,21 +156,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _isSubmitting = true);
 
     try {
+      if (widget.placeOrder == null && !await SessionService.isSignedIn()) {
+        if (!mounted) return;
+        setState(() => _isSubmitting = false);
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+        return;
+      }
+
       final societyId = await SessionService.getSocietyId();
       if (societyId == null || societyId.isEmpty) {
         throw Exception('Join your society before placing an order.');
       }
 
-      await ApiService.createOrder(
+      final place =
+          widget.placeOrder ??
+          ({
+            required String societyId,
+            required List<Map<String, dynamic>> items,
+            required String paymentMethod,
+            String? fulfilmentMethod,
+          }) {
+            return ApiService.createOrder(
+              societyId: societyId,
+              paymentMethod: paymentMethod,
+              items: items,
+              fulfilmentMethod: fulfilmentMethod,
+            );
+          };
+
+      await place(
         societyId: societyId,
-        paymentMethod:
-            _payment == PaymentMethod.upi ? 'upi' : 'cash',
+        paymentMethod: _payment == PaymentMethod.upi ? 'upi' : 'cash',
         items: _items
             .map((item) => {
                   'listingId': item.food.id,
                   'quantity': item.quantity,
                 })
             .toList(),
+        fulfilmentMethod: widget.isCrossSociety ? _fulfilmentMethod : null,
       );
 
       if (!mounted) return;
@@ -146,6 +218,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (message.startsWith('Exception: ')) {
         message = message.substring('Exception: '.length);
       }
+      message = _friendlyOrderError(message);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -214,6 +287,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         _updateQuantity(e.key, -1),
                                   )),
                           const SizedBox(height: 24),
+                          if (widget.isCrossSociety) ...[
+                            _buildFulfilmentSection(),
+                            const SizedBox(height: 24),
+                          ],
                           _buildPaymentSection(),
                           const SizedBox(height: 24),
                           _buildBillSummary(size),
@@ -234,6 +311,139 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildHeader() {
     return const AppHeader();
+  }
+
+  String _friendlyOrderError(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('no longer available for delivery') ||
+        lower.contains('no longer available in your')) {
+      return 'This seller is no longer available in your area.';
+    }
+    if (lower.contains('delivery option') ||
+        lower.contains('fulfilment') ||
+        lower.contains('fulfillment')) {
+      return 'This delivery option is no longer available.';
+    }
+    if (lower.contains('no longer available') ||
+        lower.contains('sold out') ||
+        lower.contains('expired')) {
+      return 'This item is no longer available.';
+    }
+    if (lower.contains('currently unavailable')) {
+      return 'This seller is currently unavailable.';
+    }
+    return raw;
+  }
+
+  String _chargeLabel(double amount) {
+    return amount == amount.roundToDouble()
+        ? amount.toInt().toString()
+        : amount.toString();
+  }
+
+  Widget _buildFulfilmentSection() {
+    final fulfilment = widget.sellerFulfilment ?? const SellerFulfilment();
+    final society = widget.sellerSocietyName;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'How would you like to receive your order?',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF101617),
+          ),
+        ),
+        if (society != null && society.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            'Seller society: $society',
+            style: const TextStyle(color: Color(0xFF6A7774)),
+          ),
+        ],
+        const SizedBox(height: 12),
+        if (fulfilment.mode == FulfilmentMode.buyerPickup)
+          _fulfilmentTile(
+            value: 'pickup',
+            title: '🏠 Buyer Pickup',
+            subtitle: 'Pick up your order from the seller\'s society.',
+          )
+        else if (fulfilment.mode == FulfilmentMode.sellerDelivery)
+          _fulfilmentTile(
+            value: 'seller_delivery',
+            title: '🛵 Seller Delivery',
+            subtitle:
+                'Delivery charge: ₹${_chargeLabel(fulfilment.deliveryCharge ?? 0)}',
+          )
+        else ...[
+          _fulfilmentTile(
+            value: 'pickup',
+            title: '🏠 Buyer Pickup',
+            subtitle: 'Pick up your order from the seller\'s society.',
+          ),
+          const SizedBox(height: 8),
+          _fulfilmentTile(
+            value: 'seller_delivery',
+            title: '🛵 Seller Delivery',
+            subtitle:
+                '₹${_chargeLabel(fulfilment.deliveryCharge ?? 0)}',
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _fulfilmentTile({
+    required String value,
+    required String title,
+    required String subtitle,
+  }) {
+    final selected = _fulfilmentMethod == value;
+    return InkWell(
+      onTap: () => setState(() => _fulfilmentMethod = value),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? const Color(0xFF0E5A47) : const Color(0xFFE6EBE9),
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: const Color(0xFF0E5A47),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF101617),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: Color(0xFF6A7774)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildProgressBar() {
@@ -354,6 +564,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ],
           ),
+          if (_deliveryCharge > 0) ...[
+            const SizedBox(height: 10),
+            _BillRow(
+              label: 'Delivery charge',
+              value: '₹${_deliveryCharge.toStringAsFixed(0)}',
+            ),
+          ],
           const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -385,6 +602,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               SizedBox(
                 height: 54,
                 child: ElevatedButton(
+                  key: const Key('confirm-order'),
                   onPressed: _canConfirm ? _confirmOrder : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0E5A47),

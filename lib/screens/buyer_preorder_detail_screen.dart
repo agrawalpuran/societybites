@@ -61,10 +61,14 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = cleanApiError(e);
-        _loading = false;
-      });
+      if (_campaign == null) {
+        setState(() {
+          _error = cleanApiError(e);
+          _loading = false;
+        });
+      } else {
+        setState(() => _loading = false);
+      }
     }
   }
 

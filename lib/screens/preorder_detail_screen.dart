@@ -11,16 +11,20 @@ class PreOrderDetailScreen extends StatefulWidget {
     super.key,
     required this.campaignId,
     this.promptToAddProduct = false,
+    this.fetchCampaign,
   });
 
   final String campaignId;
   final bool promptToAddProduct;
 
+  /// Test seam. Production uses campaign, summary, and order APIs.
+  final Future<Map<String, dynamic>> Function()? fetchCampaign;
+
   @override
-  State<PreOrderDetailScreen> createState() => _PreOrderDetailScreenState();
+  PreOrderDetailScreenState createState() => PreOrderDetailScreenState();
 }
 
-class _PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
+class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
   PreOrderCampaign? _campaign;
   PreOrderSummary? _summary;
   List<Order> _orders = [];
@@ -35,32 +39,65 @@ class _PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
     _load();
   }
 
+  Future<void> reload() => _load();
+
+  PreOrderSummary _summaryFromCampaign(PreOrderCampaign campaign) {
+    return PreOrderSummary(
+      campaignId: campaign.id,
+      title: campaign.title,
+      coverImageUrl: campaign.coverImageUrl,
+      status: campaign.status,
+      orderOpenAt: campaign.orderOpenAt,
+      orderCutoffAt: campaign.orderCutoffAt,
+      fulfilmentAt: campaign.fulfilmentAt,
+      totalOrders: campaign.totalOrders,
+      totalItems: campaign.totalItems,
+      foodSubtotal: campaign.foodSubtotal,
+      pickupOrders: 0,
+      sellerDeliveryOrders: 0,
+      products: const [],
+    );
+  }
+
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_campaign == null) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
-      final results = await Future.wait([
-        ApiService.getPreOrderCampaign(widget.campaignId),
-        ApiService.getPreOrderSummary(widget.campaignId),
-        ApiService.getPreOrderOrders(widget.campaignId),
-      ]);
-      final campaign = PreOrderCampaign.fromJson(
-        Map<String, dynamic>.from(results[0] as Map),
-      );
-      final summary = PreOrderSummary.fromJson(
-        Map<String, dynamic>.from(results[1] as Map),
-      );
-      final orders = (results[2] as List<Map<String, dynamic>>)
-          .map(Order.fromJson)
-          .toList();
+      late final PreOrderCampaign campaign;
+      late final PreOrderSummary summary;
+      late final List<Order> orders;
+      final fetchCampaign = widget.fetchCampaign;
+      if (fetchCampaign != null) {
+        campaign = PreOrderCampaign.fromJson(await fetchCampaign());
+        summary = _summaryFromCampaign(campaign);
+        orders = const [];
+      } else {
+        final results = await Future.wait([
+          ApiService.getPreOrderCampaign(widget.campaignId),
+          ApiService.getPreOrderSummary(widget.campaignId),
+          ApiService.getPreOrderOrders(widget.campaignId),
+        ]);
+        campaign = PreOrderCampaign.fromJson(
+          Map<String, dynamic>.from(results[0] as Map),
+        );
+        summary = PreOrderSummary.fromJson(
+          Map<String, dynamic>.from(results[1] as Map),
+        );
+        orders = (results[2] as List<Map<String, dynamic>>)
+            .map(Order.fromJson)
+            .toList();
+      }
       if (!mounted) return;
       setState(() {
         _campaign = campaign;
         _summary = summary;
         _orders = orders;
         _loading = false;
+        _error = null;
       });
       if (widget.promptToAddProduct &&
           !_promptShown &&
@@ -70,10 +107,12 @@ class _PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = cleanApiError(e);
-        _loading = false;
-      });
+      if (_campaign == null) {
+        setState(() {
+          _error = cleanApiError(e);
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -217,9 +256,9 @@ class _PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
-      body: _loading
+      body: _loading && _campaign == null
           ? const Center(child: CircularProgressIndicator(color: preorderGreen))
-          : _error != null
+          : _error != null && _campaign == null
           ? _errorState()
           : RefreshIndicator(
               color: preorderGreen,

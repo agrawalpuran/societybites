@@ -9,9 +9,14 @@ import '../models/food_type.dart';
 import '../widgets/food_type_selector.dart';
 
 class AddListingScreen extends StatefulWidget {
-  const AddListingScreen({super.key, this.existingListing});
+  const AddListingScreen({
+    super.key,
+    this.existingListing,
+    this.catalogType = listingCatalogRegular,
+  });
 
   final FoodItem? existingListing;
+  final String catalogType;
 
   @override
   State<AddListingScreen> createState() => _AddListingScreenState();
@@ -184,6 +189,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
           tags: _selectedTags,
           category: _category,
           foodType: _foodType!,
+          catalogType: widget.catalogType,
         );
       }
 
@@ -257,9 +263,13 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'List a New Bite',
-                        style: TextStyle(
+                      Text(
+                        _isEditing
+                            ? 'Edit listing'
+                            : widget.catalogType == listingCatalogPreorder
+                                ? 'Add a pre-order item'
+                                : 'List a New Bite',
+                        style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF101617),
@@ -267,9 +277,13 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Share your culinary creations with the\nneighborhood.',
-                        style: TextStyle(
+                      Text(
+                        _isEditing
+                            ? 'Update this item. It stays in the same catalog.'
+                            : widget.catalogType == listingCatalogPreorder
+                                ? 'Customers can order this through your pre-order campaigns.'
+                                : 'Share your culinary creations with the\nneighborhood.',
+                        style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF6A7774),
                           fontWeight: FontWeight.w500,

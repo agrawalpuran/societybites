@@ -3,6 +3,8 @@ const prisma = require("../lib/prisma");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser } = require("../middleware/requireUser");
 const { requireAdmin } = require("../middleware/requireAdmin");
+const { canonicalCityKey } = require("../lib/launchCity");
+const { validateCityReachRadii } = require("../lib/sellingReach");
 
 const router = express.Router();
 
@@ -576,6 +578,60 @@ router.patch(
     });
 
     res.json({ platformFee: value });
+  })
+);
+
+function displayNameFromCityKey(cityKey, provided) {
+  if (typeof provided === "string" && provided.trim()) return provided.trim();
+  if (!cityKey) return cityKey;
+  return cityKey.charAt(0).toUpperCase() + cityKey.slice(1);
+}
+
+// GET /admin/city-reach-configs
+router.get(
+  "/city-reach-configs",
+  asyncHandler(async (_req, res) => {
+    const configs = await prisma.cityReachConfig.findMany({
+      orderBy: { cityKey: "asc" },
+    });
+    res.json(configs);
+  })
+);
+
+// PUT /admin/city-reach-configs/:cityKey
+router.put(
+  "/city-reach-configs/:cityKey",
+  asyncHandler(async (req, res) => {
+    const cityKey = canonicalCityKey(req.params.cityKey);
+    if (!cityKey) {
+      return res.status(400).json({ error: "cityKey is required" });
+    }
+
+    const { nearbyRadiusKm, extendedRadiusKm } = validateCityReachRadii(req.body || {});
+    const existing = await prisma.cityReachConfig.findUnique({ where: { cityKey } });
+    const displayName = displayNameFromCityKey(cityKey, req.body && req.body.displayName);
+
+    const config = await prisma.cityReachConfig.upsert({
+      where: { cityKey },
+      update: { displayName, nearbyRadiusKm, extendedRadiusKm },
+      create: { cityKey, displayName, nearbyRadiusKm, extendedRadiusKm },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user.id,
+        action: existing ? "UPDATE_CITY_REACH_CONFIG" : "CREATE_CITY_REACH_CONFIG",
+        target: cityKey,
+        details: JSON.stringify({
+          cityKey,
+          displayName,
+          nearbyRadiusKm,
+          extendedRadiusKm,
+        }),
+      },
+    });
+
+    res.json(config);
   })
 );
 

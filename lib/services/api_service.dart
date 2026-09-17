@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:http/http.dart' as http_client;
 
 import '../models/order_lifecycle.dart';
+import '../models/selling_reach.dart';
 import 'auth_config.dart';
 import 'session_service.dart';
 import 'society_search.dart';
@@ -38,6 +39,14 @@ class _RefreshAwareHttp {
     Object? body,
   }) {
     return _send('POST', url, headers: headers, body: body);
+  }
+
+  Future<http_client.Response> put(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+  }) {
+    return _send('PUT', url, headers: headers, body: body);
   }
 
   Future<http_client.Response> patch(
@@ -104,6 +113,8 @@ class _RefreshAwareHttp {
     switch (method) {
       case 'POST':
         return http_client.post(url, headers: headers, body: body);
+      case 'PUT':
+        return http_client.put(url, headers: headers, body: body);
       case 'PATCH':
         return http_client.patch(url, headers: headers, body: body);
       case 'DELETE':
@@ -333,6 +344,26 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  /// Permanently deletes the authenticated account (token-scoped).
+  /// Does not clear local session — caller must clear on success.
+  static Future<void> deleteMyAccount() async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/auth/me'),
+      headers: await _authHeaders(),
+    );
+
+    if (response.statusCode == 200) return;
+    _throwFromResponse(response);
+  }
+
+  static SellingReachLevel sellingReachLevelFromMe(Map<String, dynamic> me) {
+    return parseSellingReachLevel(me['sellingReachLevel']);
+  }
+
+  static SellingReach sellingReachFromMe(Map<String, dynamic> me) {
+    return SellingReach.fromAuthMe(me);
+  }
+
   static Future<Map<String, dynamic>> updateMyProfile({
     String? name,
     String? role,
@@ -341,6 +372,9 @@ class ApiService {
     String? upiId,
     String? upiDisplayName,
     bool? paymentEnabled,
+    String? sellingReachLevel,
+    String? fulfilmentMode,
+    double? deliveryCharge,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/auth/me/profile'),
@@ -353,6 +387,9 @@ class ApiService {
         if (upiId != null) 'upiId': upiId,
         if (upiDisplayName != null) 'upiDisplayName': upiDisplayName,
         if (paymentEnabled != null) 'paymentEnabled': paymentEnabled,
+        if (sellingReachLevel != null) 'sellingReachLevel': sellingReachLevel,
+        if (fulfilmentMode != null) 'fulfilmentMode': fulfilmentMode,
+        if (deliveryCharge != null) 'deliveryCharge': deliveryCharge,
       }),
     );
 
@@ -488,6 +525,7 @@ class ApiService {
     String? sellerId,
     String? search,
     String? status,
+    String? catalogType,
   }) async {
     final query = <String, String>{'societyId': societyId};
     if (sellerId != null) query['sellerId'] = sellerId;
@@ -497,6 +535,9 @@ class ApiService {
     if (status != null && status.isNotEmpty) {
       query['status'] = status;
     }
+    if (catalogType != null && catalogType.isNotEmpty) {
+      query['catalogType'] = catalogType;
+    }
 
     final uri = Uri.parse('$baseUrl/listings').replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
@@ -504,6 +545,26 @@ class ApiService {
     if (response.statusCode == 200) {
       final data = _decodeResponse(response) as List;
       return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getNearbySellers() async {
+    final uri = Uri.parse('$baseUrl/listings/nearby-sellers');
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getNearbySellerStorefront(
+    String sellerId,
+  ) async {
+    final uri = Uri.parse('$baseUrl/listings/nearby-sellers/$sellerId');
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
     }
     _throwFromResponse(response);
   }
@@ -522,6 +583,7 @@ class ApiService {
     List<String>? tags,
     String? category,
     required String foodType,
+    String catalogType = 'REGULAR',
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/listings'),
@@ -543,6 +605,7 @@ class ApiService {
         if (tags != null && tags.isNotEmpty) 'tags': tags,
         if (category != null && category.isNotEmpty) 'category': category,
         'foodType': foodType,
+        'catalogType': catalogType,
       }),
     );
 
@@ -638,6 +701,21 @@ class ApiService {
       }),
     );
 
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateListingCatalog({
+    required String listingId,
+    required String catalogType,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/listings/$listingId/catalog'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'catalogType': catalogType}),
+    );
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
     }
@@ -963,6 +1041,7 @@ class ApiService {
     String? category,
     String? pickupLocation,
     required String foodType,
+    String? listingId,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/preorder-campaigns/$campaignId/products'),
@@ -971,6 +1050,7 @@ class ApiService {
         'name': name,
         'price': price,
         'inventoryMode': inventoryMode,
+        if (listingId != null && listingId.isNotEmpty) 'listingId': listingId,
         if (inventoryMode == 'limited') 'quantity': maxQuantity,
         if (description != null && description.isNotEmpty)
           'description': description,
@@ -1196,6 +1276,46 @@ class ApiService {
     if (response.statusCode == 200) {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
       return (data['platformFee'] as num?)?.toDouble() ?? platformFee;
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<CityReachConfig>> getAdminCityReachConfigs() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/city-reach-configs'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      if (data is! List) return const [];
+      return data
+          .map((row) => CityReachConfig.fromJson(Map<String, dynamic>.from(row as Map)))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<CityReachConfig> upsertAdminCityReachConfig({
+    required String cityKey,
+    required double nearbyRadiusKm,
+    required double extendedRadiusKm,
+    String? displayName,
+  }) async {
+    final encoded = Uri.encodeComponent(cityKey);
+    final response = await http.put(
+      Uri.parse('$baseUrl/admin/city-reach-configs/$encoded'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'nearbyRadiusKm': nearbyRadiusKm,
+        'extendedRadiusKm': extendedRadiusKm,
+        if (displayName != null && displayName.trim().isNotEmpty)
+          'displayName': displayName.trim(),
+      }),
+    );
+    if (response.statusCode == 200) {
+      return CityReachConfig.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
     }
     _throwFromResponse(response);
   }

@@ -22,7 +22,14 @@ class ListingImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imageUrl = food.imageUrl;
-    final resolvedUrl = imageUrl != null && imageUrl.isNotEmpty
+    final isAsset = imageUrl != null &&
+        imageUrl.isNotEmpty &&
+        (imageUrl.startsWith('asset:') ||
+            imageUrl.startsWith('assets/') ||
+            imageUrl.startsWith('pics/'));
+    final assetPath =
+        isAsset && imageUrl.startsWith('asset:') ? imageUrl.substring(6) : imageUrl;
+    final resolvedUrl = !isAsset && imageUrl != null && imageUrl.isNotEmpty
         ? ApiService.imageUrl(imageUrl, cacheKey: food.imageCacheKey)
         : null;
 
@@ -32,15 +39,23 @@ class ListingImage extends StatelessWidget {
         width: width,
         height: height,
         color: food.bgColor,
-        child: resolvedUrl != null
-            ? Image.network(
-                resolvedUrl,
+        child: isAsset
+            ? Image.asset(
+                assetPath!,
                 width: width,
                 height: height,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _iconFallback(),
+                errorBuilder: (_, _, _) => _iconFallback(),
               )
-            : _iconFallback(),
+            : resolvedUrl != null
+                ? Image.network(
+                    resolvedUrl,
+                    width: width,
+                    height: height,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => _iconFallback(),
+                  )
+                : _iconFallback(),
       ),
     );
   }

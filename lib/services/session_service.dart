@@ -1,6 +1,8 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'my_listings_cache.dart';
+
 class SessionService {
   static const _secureStorage = FlutterSecureStorage();
   static const _userIdKey = 'user_id';
@@ -14,6 +16,30 @@ class SessionService {
   static const _jwtKey = 'auth_token';
   static const _refreshTokenKey = 'refresh_token';
   static const _authProviderKey = 'auth_provider';
+
+  /// In-process cache so clear()/isSignedIn stay responsive if the secure
+  /// storage plugin hangs (common in widget tests / some desktop hosts).
+  static String? _memoryJwt;
+  static String? _memoryRefresh;
+  static bool _clearedThisProcess = false;
+
+  static void _secureBestEffort(Future<dynamic> future) {
+    future.then((_) {}, onError: (_) {});
+  }
+
+  static Future<String?> _secureRead(String key) async {
+    if (_clearedThisProcess &&
+        (key == _jwtKey ? _memoryJwt : _memoryRefresh) == null) {
+      return null;
+    }
+    try {
+      return await _secureStorage
+          .read(key: key)
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {
+      return null;
+    }
+  }
 
   static Future<void> saveUser({
     required String userId,
@@ -120,32 +146,58 @@ class SessionService {
         flatId.isNotEmpty;
   }
 
+  static Future<bool> isSignedIn() async {
+    final token = await getToken();
+    return token != null && token.isNotEmpty;
+  }
+
   static Future<void> saveToken(String token) async {
-    await _secureStorage.write(key: _jwtKey, value: token);
+    _memoryJwt = token;
+    _clearedThisProcess = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_jwtKey);
+    _secureBestEffort(_secureStorage.write(key: _jwtKey, value: token));
   }
 
   static Future<String?> getToken() async {
-    final secureToken = await _secureStorage.read(key: _jwtKey);
-    if (secureToken != null && secureToken.isNotEmpty) return secureToken;
+    if (_memoryJwt != null && _memoryJwt!.isNotEmpty) return _memoryJwt;
+    if (_clearedThisProcess) return null;
+
+    final secureToken = await _secureRead(_jwtKey);
+    if (secureToken != null && secureToken.isNotEmpty) {
+      _memoryJwt = secureToken;
+      return secureToken;
+    }
 
     // Backward-compatible migration for existing Firebase demo sessions.
     final prefs = await SharedPreferences.getInstance();
     final legacyToken = prefs.getString(_jwtKey);
     if (legacyToken != null && legacyToken.isNotEmpty) {
-      await _secureStorage.write(key: _jwtKey, value: legacyToken);
+      _memoryJwt = legacyToken;
+      _secureBestEffort(_secureStorage.write(key: _jwtKey, value: legacyToken));
       await prefs.remove(_jwtKey);
     }
     return legacyToken;
   }
 
   static Future<void> saveRefreshToken(String token) async {
-    await _secureStorage.write(key: _refreshTokenKey, value: token);
+    _memoryRefresh = token;
+    _clearedThisProcess = false;
+    _secureBestEffort(
+      _secureStorage.write(key: _refreshTokenKey, value: token),
+    );
   }
 
   static Future<String?> getRefreshToken() async {
-    return _secureStorage.read(key: _refreshTokenKey);
+    if (_memoryRefresh != null && _memoryRefresh!.isNotEmpty) {
+      return _memoryRefresh;
+    }
+    if (_clearedThisProcess) return null;
+    final token = await _secureRead(_refreshTokenKey);
+    if (token != null && token.isNotEmpty) {
+      _memoryRefresh = token;
+    }
+    return token;
   }
 
   static Future<void> saveAuthProvider(String provider) async {
@@ -168,14 +220,19 @@ class SessionService {
     if (refreshToken != null && refreshToken.isNotEmpty) {
       await saveRefreshToken(refreshToken);
     } else {
-      await _secureStorage.delete(key: _refreshTokenKey);
+      _memoryRefresh = null;
+      _secureBestEffort(_secureStorage.delete(key: _refreshTokenKey));
     }
   }
 
   static Future<void> clear() async {
-    await _secureStorage.delete(key: _jwtKey);
-    await _secureStorage.delete(key: _refreshTokenKey);
+    MyListingsCache.clear();
+    _memoryJwt = null;
+    _memoryRefresh = null;
+    _clearedThisProcess = true;
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    _secureBestEffort(_secureStorage.delete(key: _jwtKey));
+    _secureBestEffort(_secureStorage.delete(key: _refreshTokenKey));
   }
 }

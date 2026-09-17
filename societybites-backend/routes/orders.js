@@ -18,6 +18,10 @@ const {
   assertCampaignAcceptsOrders,
   shouldRestoreListingInventory,
 } = require("../lib/preorder");
+const {
+  authorizeListingForBuyer,
+  snapshotRegularFulfilment,
+} = require("../lib/crossSocietyOrder");
 
 const router = express.Router();
 
@@ -107,7 +111,7 @@ const orderInclude = {
     include: {
       listing: {
         include: {
-          seller: { include: { flat: true } },
+          seller: { include: { flat: true, society: true } },
           reviews: { select: { rating: true } },
         },
       },
@@ -341,15 +345,29 @@ router.post(
         });
       }
 
-      if (listing.societyId !== societyId) {
-        return res.status(400).json({
-          error: `"${listing.name}" does not belong to this society`,
+      let listingAccess;
+      try {
+        listingAccess = await authorizeListingForBuyer({
+          buyer: req.user,
+          listing,
+          clientRadiusKm: req.body.nearbyRadiusKm,
+          clientDistanceKm: req.body.distanceKm,
+        });
+      } catch (err) {
+        return res.status(err.statusCode || 400).json({
+          error: err.message,
+          code: err.code,
         });
       }
 
       if (orderType === "regular" && listing.campaignId) {
         return res.status(400).json({
           error: "Cannot mix regular listings and pre-order products in one order",
+        });
+      }
+      if (orderType === "regular" && listing.catalogType === "PREORDER") {
+        return res.status(400).json({
+          error: "This item is available through pre-orders only.",
         });
       }
       if (orderType === "pre_order" && !listing.campaignId) {
@@ -406,7 +424,12 @@ router.post(
         });
       }
 
-      preparedItems.push({ listing: current, quantity });
+      preparedItems.push({
+        listing: current,
+        quantity,
+        crossSociety: listingAccess.crossSociety,
+        seller: listingAccess.seller || null,
+      });
     }
 
     const sellerIds = new Set(preparedItems.map(({ listing }) => listing.sellerId));
@@ -424,6 +447,32 @@ router.post(
       typeof req.body.fulfilmentNotes === "string"
         ? req.body.fulfilmentNotes.trim() || null
         : null;
+    void req.body.deliveryCharge;
+    void req.body.nearbyRadiusKm;
+
+    const isCrossSocietyRegular =
+      orderType === "regular" && preparedItems.some((item) => item.crossSociety);
+
+    if (isCrossSocietyRegular) {
+      try {
+        const seller =
+          preparedItems.find((item) => item.seller)?.seller ||
+          (await prisma.user.findUnique({
+            where: { id: preparedItems[0].listing.sellerId },
+          }));
+        const snapshot = snapshotRegularFulfilment({
+          seller,
+          requestedMethod: req.body.fulfilmentMethod,
+        });
+        fulfilmentMethod = snapshot.fulfilmentMethod;
+        deliveryCharge = snapshot.deliveryCharge;
+      } catch (err) {
+        return res.status(err.statusCode || 400).json({
+          error: err.message,
+          code: err.code,
+        });
+      }
+    }
 
     if (orderType === "pre_order") {
       const campaignId = req.body.campaignId;

@@ -9,15 +9,19 @@ import 'create_preorder_screen.dart';
 import 'preorder_detail_screen.dart';
 
 class SellerPreOrdersScreen extends StatefulWidget {
-  const SellerPreOrdersScreen({super.key});
+  const SellerPreOrdersScreen({super.key, this.fetchCampaigns});
+
+  /// Test seam. Production uses [ApiService.getPreOrderCampaigns].
+  final Future<List<Map<String, dynamic>>> Function()? fetchCampaigns;
 
   @override
-  State<SellerPreOrdersScreen> createState() => _SellerPreOrdersScreenState();
+  SellerPreOrdersScreenState createState() => SellerPreOrdersScreenState();
 }
 
-class _SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
+class SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
   List<PreOrderCampaign> _campaigns = [];
   bool _loading = true;
+  bool _hasSuccessfullyLoaded = false;
   String? _error;
 
   @override
@@ -26,25 +30,36 @@ class _SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
     _load();
   }
 
+  Future<void> reload() => _load();
+
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (!_hasSuccessfullyLoaded) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
-      final societyId = await SessionService.getSocietyId();
-      final sellerId = await SessionService.getUserId();
-      if (sellerId == null) throw Exception('Please log in again.');
-      if (societyId == null || societyId.isEmpty) {
-        throw Exception('Join your society to manage pre-orders.');
+      late final List<Map<String, dynamic>> raw;
+      final fetchCampaigns = widget.fetchCampaigns;
+      if (fetchCampaigns != null) {
+        raw = await fetchCampaigns();
+      } else {
+        final societyId = await SessionService.getSocietyId();
+        final sellerId = await SessionService.getUserId();
+        if (sellerId == null) throw Exception('Please log in again.');
+        if (societyId == null || societyId.isEmpty) {
+          throw Exception('Join your society to manage pre-orders.');
+        }
+        raw = await ApiService.getPreOrderCampaigns(
+          societyId: societyId,
+          sellerId: sellerId,
+        );
       }
-      final raw = await ApiService.getPreOrderCampaigns(
-        societyId: societyId,
-        sellerId: sellerId,
-      );
       final campaigns = await Future.wait(
         raw.map((json) async {
           final campaign = PreOrderCampaign.fromJson(json);
+          if (fetchCampaigns != null) return campaign;
           try {
             final summaryRaw = await ApiService.getPreOrderSummary(campaign.id);
             final summary = PreOrderSummary.fromJson(summaryRaw);
@@ -82,13 +97,17 @@ class _SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
       setState(() {
         _campaigns = campaigns;
         _loading = false;
+        _hasSuccessfullyLoaded = true;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = cleanApiError(e);
-        _loading = false;
-      });
+      if (!_hasSuccessfullyLoaded) {
+        setState(() {
+          _error = cleanApiError(e);
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -168,7 +187,7 @@ class _SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
                               ),
                             ),
                             const SizedBox(height: 22),
-                            if (_loading)
+                            if (_loading && !_hasSuccessfullyLoaded)
                               const Padding(
                                 padding: EdgeInsets.all(48),
                                 child: Center(
@@ -177,7 +196,7 @@ class _SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
                                   ),
                                 ),
                               )
-                            else if (_error != null)
+                            else if (_error != null && !_hasSuccessfullyLoaded)
                               PreOrderEmptyState(
                                 title: 'Could not load pre-orders',
                                 message: _error!,

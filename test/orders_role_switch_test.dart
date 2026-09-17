@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -229,5 +231,108 @@ void main() {
 
     expect(roles, ['buyer', 'seller', 'seller', 'buyer']);
     expect(find.text('Buyer Biryani'), findsOneWidget);
+  });
+
+  testWidgets('first Buying load can show a spinner then orders', (tester) async {
+    final pending = Completer<List<Map<String, dynamic>>>();
+    await pumpOrders(
+      tester,
+      fetchOrders: ({required String role}) => pending.future,
+    );
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    pending.complete([_buyerOrder]);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Buyer Biryani'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('Buying refresh keeps existing orders visible', (tester) async {
+    var calls = 0;
+    final hang = Completer<List<Map<String, dynamic>>>();
+    final key = GlobalKey<OrdersScreenState>();
+    await pumpOrders(
+      tester,
+      key: key,
+      fetchOrders: ({required String role}) {
+        calls++;
+        if (calls == 1) {
+          return Future.value([_buyerOrder]);
+        }
+        return hang.future;
+      },
+    );
+
+    expect(find.text('Buyer Biryani'), findsOneWidget);
+
+    key.currentState!.refresh();
+    await tester.pump();
+
+    expect(find.text('Buyer Biryani'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    hang.complete([_buyerOrder]);
+    await tester.pump();
+  });
+
+  testWidgets('failed Buying refresh keeps existing orders', (tester) async {
+    var calls = 0;
+    final key = GlobalKey<OrdersScreenState>();
+    await pumpOrders(
+      tester,
+      key: key,
+      fetchOrders: ({required String role}) async {
+        calls++;
+        if (calls == 1) return [_buyerOrder];
+        throw Exception('refresh failed');
+      },
+    );
+
+    expect(find.text('Buyer Biryani'), findsOneWidget);
+
+    key.currentState!.refresh();
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Buyer Biryani'), findsOneWidget);
+    expect(find.textContaining('refresh failed'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('Selling refresh keeps existing orders and failed refresh retains them', (
+    tester,
+  ) async {
+    var sellerCalls = 0;
+    final hang = Completer<List<Map<String, dynamic>>>();
+    final key = GlobalKey<OrdersScreenState>();
+    await pumpOrders(
+      tester,
+      key: key,
+      fetchOrders: ({required String role}) {
+        if (role == 'buyer') return Future.value([_buyerOrder]);
+        sellerCalls++;
+        if (sellerCalls == 1) return Future.value([_sellerOrder]);
+        if (sellerCalls == 2) return hang.future;
+        return Future.error(Exception('seller refresh failed'));
+      },
+    );
+
+    await tester.tap(find.text('Selling'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Seller Pasta'), findsOneWidget);
+
+    key.currentState!.refresh();
+    await tester.pump();
+    expect(find.text('Seller Pasta'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+
+    hang.completeError(Exception('seller refresh failed'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Seller Pasta'), findsOneWidget);
+    expect(find.textContaining('seller refresh failed'), findsNothing);
   });
 }

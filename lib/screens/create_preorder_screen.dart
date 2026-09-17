@@ -669,11 +669,15 @@ class AddPreOrderProductScreen extends StatefulWidget {
     required this.campaignId,
     required this.existingProductNames,
     this.product,
+    this.fetchListings,
   });
 
   final String campaignId;
   final Set<String> existingProductNames;
   final PreOrderProduct? product;
+
+  /// Test seam. Production uses [ApiService.getListings] for PREORDER items.
+  final Future<List<Map<String, dynamic>>> Function()? fetchListings;
 
   @override
   State<AddPreOrderProductScreen> createState() =>
@@ -726,21 +730,29 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
       return;
     }
     try {
-      final societyId = await SessionService.getSocietyId();
-      final sellerId = await SessionService.getUserId();
-      if (sellerId == null) throw Exception('Please log in again.');
-      if (societyId == null || societyId.isEmpty) {
-        throw Exception('Join your society before creating a pre-order.');
+      List<Map<String, dynamic>> raw;
+      final fetchListings = widget.fetchListings;
+      if (fetchListings != null) {
+        raw = await fetchListings();
+      } else {
+        final societyId = await SessionService.getSocietyId();
+        final sellerId = await SessionService.getUserId();
+        if (sellerId == null) throw Exception('Please log in again.');
+        if (societyId == null || societyId.isEmpty) {
+          throw Exception('Join your society before creating a pre-order.');
+        }
+        raw = await ApiService.getListings(
+          societyId: societyId,
+          sellerId: sellerId,
+          status: 'all',
+          catalogType: listingCatalogPreorder,
+        );
       }
-      final raw = await ApiService.getListings(
-        societyId: societyId,
-        sellerId: sellerId,
-        status: 'all',
-      );
       final listings = raw
           .map(FoodItem.fromJson)
           .where(
             (item) =>
+                item.isPreOrderCatalog &&
                 item.status != 'inactive' &&
                 !widget.existingProductNames.contains(item.name.toLowerCase()),
           )
@@ -809,6 +821,7 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
         category: item.category,
         pickupLocation: item.pickupLocation,
         foodType: _foodType!,
+        listingId: item.id,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -912,7 +925,7 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
                           ),
                         ] else ...[
                           const Text(
-                            'Choose one of your listings',
+                            'Choose an item from your pre-order catalog',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
@@ -921,15 +934,15 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
                           ),
                           const SizedBox(height: 6),
                           const Text(
-                            'We copy its product details. Regular listing stock stays separate.',
+                            'We copy its details into this campaign. Your catalog item stays in Pre-orders.',
                             style: TextStyle(color: preorderMuted, height: 1.4),
                           ),
                           const SizedBox(height: 16),
                           if (_listings.isEmpty)
                             const PreOrderEmptyState(
-                              title: 'No products available',
+                              title: 'No pre-order items yet',
                               message:
-                                  'Create a regular listing first, or remove a duplicate product from this campaign.',
+                                  'Add food items under My Listings → Pre-orders, then come back to add them to this campaign.',
                             )
                           else
                             DropdownButtonFormField<FoodItem>(

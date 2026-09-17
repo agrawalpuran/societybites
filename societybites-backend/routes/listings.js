@@ -12,6 +12,18 @@ const {
   expireListingIfDue,
 } = require("../utils/listingExpiry");
 const { campaignHasOrders } = require("../lib/preorder");
+const {
+  discoverNearbySellers,
+  getNearbySellerStorefront,
+} = require("../lib/nearbyDiscovery");
+const {
+  parseCatalogType,
+  catalogListWhere,
+  isRegularMarketplaceListing,
+  listingInActiveCampaign,
+  ACTIVE_CAMPAIGN_MOVE_ERROR,
+  ACTIVE_CAMPAIGN_DELETE_ERROR,
+} = require("../lib/listingCatalog");
 
 const router = express.Router();
 
@@ -35,13 +47,44 @@ async function rejectCommittedCampaignProductMutation(listing, res) {
 }
 
 router.get(
+  "/nearby-sellers",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const societyId = requireJoinedSociety(req, res);
+    if (!societyId) return;
+
+    const payload = await discoverNearbySellers({
+      buyer: req.user,
+      query: req.query,
+    });
+    res.json(payload);
+  })
+);
+
+router.get(
+  "/nearby-sellers/:sellerId",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const societyId = requireJoinedSociety(req, res);
+    if (!societyId) return;
+
+    const payload = await getNearbySellerStorefront({
+      buyer: req.user,
+      sellerId: req.params.sellerId,
+      query: req.query,
+    });
+    res.json(payload);
+  })
+);
+
+router.get(
   "/",
   requireUser,
   asyncHandler(async (req, res) => {
     const societyId = requireJoinedSociety(req, res);
     if (!societyId) return;
 
-    const { sellerId, status = "active", search, category } = req.query;
+    const { sellerId, status = "active", search, category, catalogType } = req.query;
 
     const searchTerm = search ? String(search).trim() : "";
 
@@ -63,10 +106,21 @@ router.get(
       statusFilter = { status: "active" };
     }
 
+    let catalogWhere;
+    try {
+      catalogWhere = catalogListWhere({
+        catalogType,
+        sellerId,
+        userId: req.user.id,
+      });
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+
     const listings = await prisma.listing.findMany({
       where: {
         societyId,
-        campaignId: null,
+        ...catalogWhere,
         ...(sellerId && { sellerId: String(sellerId) }),
         ...statusFilter,
         ...(category && { category: String(category) }),
@@ -98,6 +152,11 @@ router.get(
     });
 
     if (!listing || listing.societyId !== societyId) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    const isOwner = listing.sellerId === req.user.id;
+    if (!isRegularMarketplaceListing(listing) && !isOwner) {
       return res.status(404).json({ error: "Listing not found" });
     }
 
@@ -164,6 +223,8 @@ router.post(
       });
     }
 
+    const parsedCatalogType = parseCatalogType(req.body.catalogType);
+
     const listing = await prisma.listing.create({
       data: {
         sellerId: req.user.id,
@@ -180,11 +241,64 @@ router.post(
         tags: listingTags,
         foodType: parsedFoodType,
         category: category || null,
+        catalogType: parsedCatalogType,
       },
       include: listingInclude,
     });
 
     res.status(201).json(serializeListing(listing));
+  })
+);
+
+router.patch(
+  "/:id/catalog",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const role = req.user.role || "buyer";
+    if (!["seller", "super_admin"].includes(role)) {
+      return res.status(403).json({
+        error: "Enable selling in Profile before managing listings",
+        code: "SELLER_REQUIRED",
+      });
+    }
+
+    let nextType;
+    try {
+      nextType = parseCatalogType(req.body && req.body.catalogType, {
+        required: true,
+      });
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      include: listingInclude,
+    });
+
+    if (!listing) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    if (listing.sellerId !== req.user.id) {
+      return res.status(403).json({ error: "Not allowed to update this listing" });
+    }
+
+    if (await listingInActiveCampaign(prisma, listing)) {
+      return res.status(400).json({ error: ACTIVE_CAMPAIGN_MOVE_ERROR });
+    }
+
+    if ((listing.catalogType || "REGULAR") === nextType) {
+      return res.json(serializeListing(listing));
+    }
+
+    const updated = await prisma.listing.update({
+      where: { id: listing.id },
+      data: { catalogType: nextType },
+      include: listingInclude,
+    });
+
+    res.json(serializeListing(updated));
   })
 );
 
@@ -435,6 +549,10 @@ router.delete(
 
     if (listing.sellerId !== req.user.id) {
       return res.status(403).json({ error: "Not allowed to delete this listing" });
+    }
+
+    if (await listingInActiveCampaign(prisma, listing)) {
+      return res.status(400).json({ error: ACTIVE_CAMPAIGN_DELETE_ERROR });
     }
 
     if (await rejectCommittedCampaignProductMutation(listing, res)) return;

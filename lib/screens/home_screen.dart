@@ -10,18 +10,39 @@ import 'buyer_preorder_detail_screen.dart';
 import 'buyer_preorders_screen.dart';
 import 'checkout_screen.dart';
 import 'food_detail_screen.dart';
+import 'explore_nearby_screen.dart';
+import 'login_screen.dart';
 import 'seller_list_screen.dart';
 import 'seller_storefront_screen.dart';
 import 'tab_preload.dart';
+import '../services/seller_onboarding.dart';
 import 'home_listing_filter.dart';
+import '../models/guest_discovery.dart';
 import '../widgets/food_type_selector.dart';
+import '../widgets/one_seller_cart.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.onInitialLoadSuccess});
+  const HomeScreen({
+    super.key,
+    this.onInitialLoadSuccess,
+    this.fetchListings,
+    this.onStartSelling,
+    this.onExploreNearby,
+    this.guestMode = false,
+    this.initialCategory,
+  });
 
   /// Fired once after the first successful listings load so MainShell can
   /// start conservative background preload of other tabs.
   final VoidCallback? onInitialLoadSuccess;
+
+  /// Test seam. Production uses [ApiService.getListings].
+  final Future<List<Map<String, dynamic>>> Function()? fetchListings;
+
+  final VoidCallback? onStartSelling;
+  final VoidCallback? onExploreNearby;
+  final bool guestMode;
+  final String? initialCategory;
 
   @override
   HomeScreenState createState() => HomeScreenState();
@@ -48,6 +69,7 @@ class HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedCategory = widget.initialCategory;
     debugPreloadLog('HOME INITIAL LOAD');
     _searchController.addListener(_onSearchChanged);
     _loadListings();
@@ -65,6 +87,14 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadPreOrders() async {
+    if (widget.guestMode) {
+      if (!mounted) return;
+      setState(() {
+        _preOrderCampaigns = [];
+        _preOrdersLoading = false;
+      });
+      return;
+    }
     try {
       final societyId = await SessionService.getSocietyId();
       if (societyId == null || societyId.isEmpty) {
@@ -126,24 +156,34 @@ class HomeScreenState extends State<HomeScreen> {
   List<Seller> get _sellers => sellersFromListings(_filteredListings);
 
   Future<void> _loadListings() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-      _listings = [];
-    });
+    final showSpinner = !_hasSuccessfullyLoaded;
+    if (showSpinner) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
-      final societyId = await SessionService.getSocietyId();
-      if (societyId == null || societyId.isEmpty) {
-        if (!mounted) return;
-        setState(() {
-          _listings = [];
-          _error = 'Join your society to see listings.';
-          _isLoading = false;
-        });
-        return;
+      List<Map<String, dynamic>> raw;
+      final fetchListings = widget.fetchListings;
+      if (fetchListings != null) {
+        raw = await fetchListings();
+      } else {
+        final societyId = await SessionService.getSocietyId();
+        if (societyId == null || societyId.isEmpty) {
+          if (!mounted) return;
+          if (!_hasSuccessfullyLoaded) {
+            setState(() {
+              _listings = [];
+              _error = 'Join your society to see listings.';
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+        raw = await ApiService.getListings(societyId: societyId);
       }
-      final raw = await ApiService.getListings(societyId: societyId);
       final listings = raw.map(FoodItem.fromJson).toList();
 
       if (!mounted) return;
@@ -152,17 +192,19 @@ class HomeScreenState extends State<HomeScreen> {
         _listings = listings;
         _isLoading = false;
         _hasSuccessfullyLoaded = true;
+        _error = null;
       });
       _notifyInitialLoadSuccess();
     } catch (e) {
       if (!mounted) return;
-
-      setState(() {
-        _listings = [];
-        _error =
-            'Could not load listings. Please check your internet connection and try again.';
-        _isLoading = false;
-      });
+      if (!_hasSuccessfullyLoaded) {
+        setState(() {
+          _listings = [];
+          _error =
+              'Could not load listings. Please check your internet connection and try again.';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -183,7 +225,7 @@ class HomeScreenState extends State<HomeScreen> {
     return filtered.length > 3 ? filtered.sublist(3) : filtered;
   }
 
-  void _addToCart(FoodItem food) {
+  Future<void> _addToCart(FoodItem food) async {
     if (food.quantity <= 0) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -203,21 +245,12 @@ class HomeScreenState extends State<HomeScreen> {
     if (_cart.isNotEmpty) {
       final cartSellerId = _cart.first.food.sellerId;
       if (food.sellerId != cartSellerId) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Cart only allows one seller. Clear items from ${_cart.first.food.sellerName} first, or checkout separately.',
-            ),
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            backgroundColor: const Color(0xFFD94F4F),
-          ),
+        final replace = await confirmReplaceSellerCart(
+          context,
+          currentSellerName: _cart.first.food.sellerName,
         );
-        return;
+        if (!replace || !mounted) return;
+        setState(_cart.clear);
       }
     }
 
@@ -298,6 +331,13 @@ class HomeScreenState extends State<HomeScreen> {
           onCartChanged: () {
             if (mounted) setState(() {});
           },
+          initialProducts: widget.guestMode
+              ? _listings.where((item) => item.sellerId == seller.id).toList()
+              : null,
+          fetchListings: widget.guestMode
+              ? () => GuestDiscovery.fetchListingsForSeller(seller.id)
+              : null,
+          fetchCampaigns: widget.guestMode ? () async => const [] : null,
         ),
       ),
     ).then((_) {
@@ -323,6 +363,9 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                   slivers: [
                     SliverToBoxAdapter(child: _buildHeader()),
+                    if (_showEmptySocietyState) ...[
+                      SliverToBoxAdapter(child: _buildEmptySocietyState()),
+                    ] else ...[
                     if (_error != null)
                       SliverToBoxAdapter(
                         child: Padding(
@@ -377,6 +420,7 @@ class HomeScreenState extends State<HomeScreen> {
                     SliverToBoxAdapter(child: _buildAvailableHeader()),
                     _buildAvailableList(),
                     const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                    ],
                   ],
                 ),
               ),
@@ -384,6 +428,15 @@ class HomeScreenState extends State<HomeScreen> {
       floatingActionButton: _cart.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: () async {
+                final signedIn = await SessionService.isSignedIn();
+                if (!context.mounted) return;
+                if (!signedIn) {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
+                  return;
+                }
                 final placed = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
@@ -521,8 +574,141 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  bool get _showEmptySocietyState {
+    return _hasSuccessfullyLoaded &&
+        _error == null &&
+        _listings.isEmpty &&
+        _preOrderCampaigns.isEmpty &&
+        !_preOrdersLoading &&
+        _searchQuery.isEmpty &&
+        _selectedCategory == null;
+  }
+
+  Future<void> _startSellingFromHome() async {
+    if (widget.guestMode) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      return;
+    }
+    if (widget.onStartSelling != null) {
+      widget.onStartSelling!();
+      return;
+    }
+    try {
+      final enabled = await SellerOnboarding.startSelling(context);
+      if (!enabled || !mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selling enabled — add a listing from Dashboard'),
+          backgroundColor: Color(0xFF0E5A47),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not enable selling: $error')),
+      );
+    }
+  }
+
+  void _openExploreNearby() {
+    if (widget.guestMode) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      return;
+    }
+    if (widget.onExploreNearby != null) {
+      widget.onExploreNearby!();
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ExploreNearbyScreen()),
+    );
+  }
+
+  Widget _buildEmptySocietyState() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE6EBE9)),
+        ),
+        child: Column(
+          children: [
+            const Text(
+              'No sellers in your society yet',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF101617),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Be the first one to share your homemade food!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF3A4644),
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Discover home food from nearby societies',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF6A7774)),
+            ),
+            const SizedBox(height: 22),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _startSellingFromHome,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0E5A47),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Start Selling'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _openExploreNearby,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0E5A47),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Explore Nearby'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader() {
-    return const AppHeader();
+    if (!widget.guestMode) return const AppHeader();
+    return AppHeader(
+      leading: IconButton(
+        onPressed: () => Navigator.maybePop(context),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+        color: const Color(0xFF3A4644),
+      ),
+    );
   }
 
   Widget _buildSearchBar() {

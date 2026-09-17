@@ -28,18 +28,20 @@ class BuyerPreOrdersScreen extends StatefulWidget {
 class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
   late List<PreOrderCampaign> _campaigns;
   late bool _loading;
+  late bool _hasSuccessfullyLoaded;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _campaigns = List<PreOrderCampaign>.from(widget.initialCampaigns);
-    _loading = _campaigns.isEmpty;
+    _hasSuccessfullyLoaded = _campaigns.isNotEmpty;
+    _loading = !_hasSuccessfullyLoaded;
     _load();
   }
 
   Future<void> _load() async {
-    final blockOnSpinner = _campaigns.isEmpty;
+    final blockOnSpinner = !_hasSuccessfullyLoaded;
     if (blockOnSpinner && mounted) {
       setState(() {
         _loading = true;
@@ -52,7 +54,7 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
         if (!mounted) return;
         setState(() {
           _loading = false;
-          if (_campaigns.isEmpty) {
+          if (!_hasSuccessfullyLoaded) {
             _error = 'Join your society to see pre-orders.';
           }
         });
@@ -80,14 +82,19 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
       setState(() {
         _campaigns = campaigns;
         _loading = false;
+        _hasSuccessfullyLoaded = true;
         _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = cleanApiError(e);
-        _loading = false;
-      });
+      if (!_hasSuccessfullyLoaded) {
+        setState(() {
+          _error = cleanApiError(e);
+          _loading = false;
+        });
+      } else {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -162,7 +169,7 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    if (_loading && _campaigns.isEmpty)
+                    if (_loading && !_hasSuccessfullyLoaded)
                       const Padding(
                         padding: EdgeInsets.all(48),
                         child: Center(
@@ -171,7 +178,7 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
                           ),
                         ),
                       )
-                    else if (_error != null && _campaigns.isEmpty)
+                    else if (_error != null && !_hasSuccessfullyLoaded)
                       PreOrderEmptyState(
                         title: 'Could not load pre-orders',
                         message: _error!,

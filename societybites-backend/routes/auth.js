@@ -14,6 +14,9 @@ const {
   revokeRefreshToken,
 } = require("../lib/refreshTokens");
 const { rateLimit } = require("../middleware/rateLimit");
+const { attachSellingReach, assertSellerSellingReachLevel } = require("../lib/sellingReach");
+const { assertSellerFulfilmentUpdate } = require("../lib/sellerFulfilment");
+const { deleteAuthenticatedAccount } = require("../lib/accountDeletion");
 
 const router = express.Router();
 
@@ -256,7 +259,7 @@ router.get(
       include: { society: true, flat: true },
     });
 
-    res.json(user);
+    res.json(await attachSellingReach(user, prisma));
   })
 );
 
@@ -271,11 +274,43 @@ router.patch(
       upiId,
       upiDisplayName,
       paymentEnabled,
+      sellingReachLevel,
+      fulfilmentMode,
+      deliveryCharge,
     } = req.body;
 
     const data = {};
     if (name !== undefined) data.name = name;
     if (role !== undefined && ["buyer", "seller"].includes(role)) data.role = role;
+    if (sellingReachLevel !== undefined) {
+      const nextRole = data.role || req.user.role;
+      let societyCity = null;
+      if (req.user.societyId) {
+        const society = await prisma.society.findUnique({
+          where: { id: req.user.societyId },
+          select: { city: true },
+        });
+        societyCity = society && society.city;
+      }
+      data.sellingReachLevel = await assertSellerSellingReachLevel({
+        requested: sellingReachLevel,
+        role: nextRole,
+        societyCity,
+        prismaClient: prisma,
+      });
+    }
+    if (fulfilmentMode !== undefined || deliveryCharge !== undefined) {
+      const nextRole = data.role || req.user.role;
+      const requestedMode =
+        fulfilmentMode !== undefined ? fulfilmentMode : req.user.fulfilmentMode || "BUYER_PICKUP";
+      const parsed = assertSellerFulfilmentUpdate({
+        requestedMode,
+        requestedCharge: deliveryCharge,
+        role: nextRole,
+      });
+      if (fulfilmentMode !== undefined) data.fulfilmentMode = parsed.fulfilmentMode;
+      if (parsed.deliveryCharge !== undefined) data.deliveryCharge = parsed.deliveryCharge;
+    }
     // societyId / flatId are assigned only via POST /societies/join.
     if (profilePhotoUrl !== undefined) data.profilePhotoUrl = profilePhotoUrl;
     if (upiId !== undefined) {
@@ -309,7 +344,19 @@ router.patch(
 
     const token = signToken(user);
 
-    res.json({ user, token });
+    res.json({ user: await attachSellingReach(user, prisma), token });
+  })
+);
+
+router.delete(
+  "/me",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const result = await deleteAuthenticatedAccount(req.user.id);
+    res.json({
+      success: true,
+      alreadyDeleted: Boolean(result.alreadyDeleted),
+    });
   })
 );
 

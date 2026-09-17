@@ -1,13 +1,56 @@
 import 'package:flutter/material.dart';
 
 import '../models/data.dart';
+import '../models/nearby_seller.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../widgets/listing_image.dart';
+import '../widgets/one_seller_cart.dart';
 import '../widgets/preorder_widgets.dart';
 import 'buyer_preorder_detail_screen.dart';
 import 'checkout_screen.dart';
 import 'food_detail_screen.dart';
+import 'login_screen.dart';
+
+class _CachedStorefront {
+  const _CachedStorefront({
+    required this.products,
+    required this.campaigns,
+  });
+
+  final List<FoodItem> products;
+  final List<PreOrderCampaign> campaigns;
+}
+
+/// Session-only in-memory storefront cache, keyed by seller ID.
+class SellerStorefrontMemoryCache {
+  SellerStorefrontMemoryCache._();
+
+  static final Map<String, _CachedStorefront> _bySellerId = {};
+
+  @visibleForTesting
+  static void clear() => _bySellerId.clear();
+
+  static _CachedStorefront? _read(String sellerId) {
+    final cached = _bySellerId[sellerId];
+    if (cached == null) return null;
+    return _CachedStorefront(
+      products: List<FoodItem>.from(cached.products),
+      campaigns: List<PreOrderCampaign>.from(cached.campaigns),
+    );
+  }
+
+  static void _write({
+    required String sellerId,
+    required List<FoodItem> products,
+    required List<PreOrderCampaign> campaigns,
+  }) {
+    _bySellerId[sellerId] = _CachedStorefront(
+      products: List<FoodItem>.from(products),
+      campaigns: List<PreOrderCampaign>.from(campaigns),
+    );
+  }
+}
 
 class SellerStorefrontScreen extends StatefulWidget {
   const SellerStorefrontScreen({
@@ -15,21 +58,36 @@ class SellerStorefrontScreen extends StatefulWidget {
     required this.seller,
     this.cartItems,
     this.onCartChanged,
+    this.fetchListings,
+    this.fetchCampaigns,
+    this.nearbyContext,
+    this.browseOnly = false,
+    this.initialProducts,
   });
 
   final Seller seller;
   final List<CartItem>? cartItems;
   final VoidCallback? onCartChanged;
 
+  /// Test seams. Production uses listings and campaign APIs.
+  final Future<List<Map<String, dynamic>>> Function()? fetchListings;
+  final Future<List<Map<String, dynamic>>> Function()? fetchCampaigns;
+
+  /// Nearby discovery context. Does not enable cross-society ordering.
+  final NearbySellerCard? nearbyContext;
+  final bool browseOnly;
+  final List<FoodItem>? initialProducts;
+
   @override
-  State<SellerStorefrontScreen> createState() => _SellerStorefrontScreenState();
+  SellerStorefrontScreenState createState() => SellerStorefrontScreenState();
 }
 
-class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
+class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
   final List<CartItem> _localCart = [];
   List<FoodItem> _products = [];
   List<PreOrderCampaign> _campaigns = [];
   bool _loading = true;
+  bool _hasSuccessfullyLoaded = false;
   String? _error;
 
   List<CartItem> get _cart => widget.cartItems ?? _localCart;
@@ -37,44 +95,91 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = SellerStorefrontMemoryCache._read(widget.seller.id);
+    final initial = widget.initialProducts;
+    if (cached != null) {
+      _products = cached.products;
+      _campaigns = cached.campaigns;
+      _hasSuccessfullyLoaded = true;
+      _loading = false;
+    } else if (initial != null && initial.isNotEmpty) {
+      _products = List<FoodItem>.from(initial);
+      _hasSuccessfullyLoaded = true;
+      _loading = false;
+    }
     _load();
   }
 
+  Future<void> reload() => _load();
+
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (!_hasSuccessfullyLoaded) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
-      final societyId = await SessionService.getSocietyId();
-      if (societyId == null || societyId.isEmpty) {
-        if (!mounted) return;
-        setState(() {
-          _products = [];
-          _campaigns = [];
-          _loading = false;
-          _error = 'Join your society to view this storefront.';
-        });
-        return;
+      late final List<Map<String, dynamic>> listingRaw;
+      late final List<Map<String, dynamic>> campaignRaw;
+      final fetchListings = widget.fetchListings;
+      final fetchCampaigns = widget.fetchCampaigns;
+      if (fetchListings != null && fetchCampaigns != null) {
+        final responses = await Future.wait([
+          fetchListings(),
+          fetchCampaigns(),
+        ]);
+        listingRaw = responses[0];
+        campaignRaw = responses[1];
+      } else {
+        if (widget.nearbyContext != null) {
+          final raw = await ApiService.getNearbySellerStorefront(
+            widget.seller.id,
+          );
+          final listings = raw['listings'];
+          listingRaw = listings is List
+              ? listings
+                    .whereType<Map>()
+                    .map((item) => Map<String, dynamic>.from(item))
+                    .toList()
+              : <Map<String, dynamic>>[];
+          campaignRaw = const [];
+        } else {
+          final societyId = await SessionService.getSocietyId();
+          if (societyId == null || societyId.isEmpty) {
+            if (!mounted) return;
+            if (!_hasSuccessfullyLoaded) {
+              setState(() {
+                _products = [];
+                _campaigns = [];
+                _loading = false;
+                _error = 'Join your society to view this storefront.';
+              });
+            }
+            return;
+          }
+          final responses = await Future.wait([
+            ApiService.getListings(
+              societyId: societyId,
+              sellerId: widget.seller.id,
+            ),
+            ApiService.getPreOrderCampaigns(
+              societyId: societyId,
+              sellerId: widget.seller.id,
+              status: 'open',
+            ),
+          ]);
+          listingRaw = responses[0];
+          campaignRaw = responses[1];
+        }
       }
-      final responses = await Future.wait([
-        ApiService.getListings(
-          societyId: societyId,
-          sellerId: widget.seller.id,
-        ),
-        ApiService.getPreOrderCampaigns(
-          societyId: societyId,
-          sellerId: widget.seller.id,
-          status: 'open',
-        ),
-      ]);
-      final products = responses[0]
+      final products = listingRaw
           .map(FoodItem.fromJson)
           .where((item) => item.isActive && !item.isPreOrder)
           .toList();
       final now = DateTime.now();
       final campaigns =
-          responses[1]
+          campaignRaw
               .map(PreOrderCampaign.fromJson)
               .where(
                 (campaign) =>
@@ -84,18 +189,27 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
               )
               .toList()
             ..sort((a, b) => a.orderCutoffAt.compareTo(b.orderCutoffAt));
+      SellerStorefrontMemoryCache._write(
+        sellerId: widget.seller.id,
+        products: products,
+        campaigns: campaigns,
+      );
       if (!mounted) return;
       setState(() {
         _products = products;
         _campaigns = campaigns;
         _loading = false;
+        _hasSuccessfullyLoaded = true;
+        _error = null;
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _error = cleanApiError(error);
-        _loading = false;
-      });
+      if (!_hasSuccessfullyLoaded) {
+        setState(() {
+          _error = cleanApiError(error);
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -104,16 +218,18 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
     return index == -1 ? 0 : _cart[index].quantity;
   }
 
-  void _changeCart(FoodItem food, int delta) {
+  Future<void> _changeCart(FoodItem food, int delta) async {
     if (delta > 0 && food.quantity <= 0) {
       _show('${food.name} is sold out.');
       return;
     }
     if (_cart.isNotEmpty && _cart.first.food.sellerId != food.sellerId) {
-      _show(
-        'Cart only allows one seller. Checkout or clear the existing seller order first.',
+      final replace = await confirmReplaceSellerCart(
+        context,
+        currentSellerName: _cart.first.food.sellerName,
       );
-      return;
+      if (!replace || !mounted) return;
+      setState(_cart.clear);
     }
     final current = _cartQuantity(food);
     if (delta > 0 && current >= food.quantity) {
@@ -142,6 +258,15 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
 
   Future<void> _checkout() async {
     if (_cart.isEmpty) return;
+    if (!await SessionService.isSignedIn()) {
+      if (!context.mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      return;
+    }
+    if (!context.mounted) return;
     final placed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -149,6 +274,9 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
           cartItems: _cart
               .map((item) => CartItem(food: item.food, quantity: item.quantity))
               .toList(),
+          isCrossSociety: widget.nearbyContext != null,
+          sellerFulfilment: widget.nearbyContext?.fulfilment,
+          sellerSocietyName: widget.nearbyContext?.societyName,
         ),
       ),
     );
@@ -189,6 +317,13 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
     return block.isEmpty || block == 'Block ?' ? null : block;
   }
 
+  String _formatCharge(double? amount) {
+    final value = amount ?? 0;
+    return value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toString();
+  }
+
   int get _cartCount => _cart.fold<int>(0, (sum, item) => sum + item.quantity);
 
   double get _cartTotal =>
@@ -207,14 +342,12 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: preorderGreen))
-          : RefreshIndicator(
-              color: preorderGreen,
-              onRefresh: _load,
-              child: _content(),
-            ),
-      floatingActionButton: _cart.isEmpty
+      body: RefreshIndicator(
+        color: preorderGreen,
+        onRefresh: _load,
+        child: _content(),
+      ),
+      floatingActionButton: widget.browseOnly || _cart.isEmpty
           ? null
           : FloatingActionButton.extended(
               onPressed: _checkout,
@@ -244,16 +377,21 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _header(),
-                if (_error != null) ...[
+                if (_error != null && !_hasSuccessfullyLoaded) ...[
                   const SizedBox(height: 18),
                   PreOrderEmptyState(
-                    title: 'Could not refresh this storefront',
+                    title: 'Unable to load this store',
                     message: _error!,
                     action: OutlinedButton(
                       onPressed: _load,
                       child: const Text('Try again'),
                     ),
                   ),
+                ] else if (_loading && !_hasSuccessfullyLoaded) ...[
+                  const SizedBox(height: 28),
+                  _sectionTitle('PRODUCTS'),
+                  const SizedBox(height: 12),
+                  _productSkeletonGrid(),
                 ] else if (_products.isEmpty && _campaigns.isEmpty) ...[
                   const SizedBox(height: 24),
                   const PreOrderEmptyState(
@@ -327,6 +465,50 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+                if (widget.nearbyContext != null) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Nearby seller',
+                    style: TextStyle(
+                      color: preorderGreen,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    [
+                      widget.nearbyContext!.societyName,
+                      if (widget.nearbyContext!.distanceLabel.isNotEmpty)
+                        widget.nearbyContext!.distanceLabel,
+                    ].join(' • '),
+                    style: const TextStyle(color: preorderMuted),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      if (widget.nearbyContext!.offersDelivery)
+                        const Text(
+                          '🛵 Seller Delivery',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      if (widget.nearbyContext!.deliveryChargeLabel != null)
+                        Text(
+                          widget.nearbyContext!.deliveryChargeLabel ==
+                                  'Free delivery'
+                              ? 'Free delivery'
+                              : 'Delivery charge ₹${_formatCharge(widget.nearbyContext!.fulfilment.deliveryCharge)}',
+                          style: const TextStyle(color: preorderMuted),
+                        ),
+                      if (widget.nearbyContext!.offersPickup)
+                        const Text(
+                          '🏠 Pickup Available',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                    ],
+                  ),
+                ],
                 if (_rating > 0 || reviews > 0) ...[
                   const SizedBox(height: 7),
                   Wrap(
@@ -373,6 +555,27 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _productSkeletonGrid() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 720 ? 3 : 2;
+        return GridView.builder(
+          key: const Key('storefront-product-skeletons'),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 4,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: constraints.maxWidth >= 720 ? .78 : .72,
+          ),
+          itemBuilder: (context, index) => const _StorefrontProductSkeleton(),
+        );
+      },
     );
   }
 
@@ -453,7 +656,9 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                     ),
                   ),
                   const Spacer(),
-                  if (food.quantity <= 0)
+                  if (widget.browseOnly)
+                    const SizedBox.shrink()
+                  else if (food.quantity <= 0)
                     const Text(
                       'Sold out',
                       style: TextStyle(
@@ -635,6 +840,54 @@ class _SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
         fontSize: 12,
         letterSpacing: 1.2,
         fontWeight: FontWeight.w900,
+      ),
+    );
+  }
+}
+
+class _StorefrontProductSkeleton extends StatelessWidget {
+  const _StorefrontProductSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: preorderBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAEFED),
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            height: 14,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAEFED),
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 14,
+            width: 64,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAEFED),
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+        ],
       ),
     );
   }

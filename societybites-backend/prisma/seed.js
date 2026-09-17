@@ -1,5 +1,8 @@
 const { PrismaClient } = require("@prisma/client");
 
+// CityReachConfig is intentionally not seeded. Radii are admin-configured per
+// city and must not be invented as production defaults in this script.
+
 const prisma = new PrismaClient();
 
 const SOCIETY_ID = "prestige-notting-hill";

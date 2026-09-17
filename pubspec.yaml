@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+10
+version: 1.0.0+14
 
 environment:
   sdk: ^3.11.4
@@ -77,9 +77,13 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  assets:
+    - pics/logo.png
+    - assets/branding/societybites_launcher_icon.png
+    - assets/images/guest/hero_food_1.jpg
+    - assets/images/guest/hero_food_2.jpg
+    - assets/images/guest/hero_food_3.jpg
+    - assets/images/guest/hero_food_4.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
