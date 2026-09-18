@@ -14,7 +14,7 @@
     "patch-listing-images": "node scripts/patch-listing-images.js",
     "sync-seed-images": "node scripts/sync-seed-images.js",
     "migrate-uploads": "node scripts/migrate-uploads-to-supabase.js",
-    "test": "node tests/food-type.test.js && node tests/listing-food-type.test.js && node tests/listing-catalog.test.js && node tests/account-deletion.test.js && node tests/preorder.test.js && node tests/preorder-summary.test.js && node tests/preorder-editing.test.js && node tests/order-reconciliation.test.js && node tests/order-lifecycle.test.js && node tests/society-scoping.test.js && node tests/society-places.test.js && node tests/test-otp.test.js && node tests/selling-reach.test.js && node tests/geo-distance.test.js && node tests/selling-reach-eligibility.test.js && node tests/society-location-audit.test.js && node tests/seller-fulfilment.test.js && node tests/nearby-discovery.test.js && node tests/cross-society-order.test.js"
+    "test": "node tests/food-type.test.js && node tests/listing-food-type.test.js && node tests/listing-catalog.test.js && node tests/account-deletion.test.js && node tests/guest-kitchens.test.js && node tests/preorder.test.js && node tests/preorder-summary.test.js && node tests/preorder-editing.test.js && node tests/order-reconciliation.test.js && node tests/order-lifecycle.test.js && node tests/society-scoping.test.js && node tests/society-places.test.js && node tests/test-otp.test.js && node tests/selling-reach.test.js && node tests/geo-distance.test.js && node tests/selling-reach-eligibility.test.js && node tests/society-location-audit.test.js && node tests/seller-fulfilment.test.js && node tests/nearby-discovery.test.js && node tests/cross-society-order.test.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

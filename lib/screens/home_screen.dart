@@ -17,7 +17,6 @@ import 'seller_storefront_screen.dart';
 import 'tab_preload.dart';
 import '../services/seller_onboarding.dart';
 import 'home_listing_filter.dart';
-import '../models/guest_discovery.dart';
 import '../widgets/food_type_selector.dart';
 import '../widgets/one_seller_cart.dart';
 
@@ -28,7 +27,6 @@ class HomeScreen extends StatefulWidget {
     this.fetchListings,
     this.onStartSelling,
     this.onExploreNearby,
-    this.guestMode = false,
     this.initialCategory,
   });
 
@@ -41,7 +39,6 @@ class HomeScreen extends StatefulWidget {
 
   final VoidCallback? onStartSelling;
   final VoidCallback? onExploreNearby;
-  final bool guestMode;
   final String? initialCategory;
 
   @override
@@ -87,14 +84,6 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadPreOrders() async {
-    if (widget.guestMode) {
-      if (!mounted) return;
-      setState(() {
-        _preOrderCampaigns = [];
-        _preOrdersLoading = false;
-      });
-      return;
-    }
     try {
       final societyId = await SessionService.getSocietyId();
       if (societyId == null || societyId.isEmpty) {
@@ -182,7 +171,10 @@ class HomeScreenState extends State<HomeScreen> {
           }
           return;
         }
-        raw = await ApiService.getListings(societyId: societyId);
+        raw = await ApiService.getListings(
+          societyId: societyId,
+          catalogType: 'REGULAR',
+        );
       }
       final listings = raw.map(FoodItem.fromJson).toList();
 
@@ -200,8 +192,7 @@ class HomeScreenState extends State<HomeScreen> {
       if (!_hasSuccessfullyLoaded) {
         setState(() {
           _listings = [];
-          _error =
-              'Could not load listings. Please check your internet connection and try again.';
+          _error = 'Unable to load sellers right now.';
           _isLoading = false;
         });
       }
@@ -331,13 +322,6 @@ class HomeScreenState extends State<HomeScreen> {
           onCartChanged: () {
             if (mounted) setState(() {});
           },
-          initialProducts: widget.guestMode
-              ? _listings.where((item) => item.sellerId == seller.id).toList()
-              : null,
-          fetchListings: widget.guestMode
-              ? () => GuestDiscovery.fetchListingsForSeller(seller.id)
-              : null,
-          fetchCampaigns: widget.guestMode ? () async => const [] : null,
         ),
       ),
     ).then((_) {
@@ -585,14 +569,6 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _startSellingFromHome() async {
-    if (widget.guestMode) {
-      if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-      return;
-    }
     if (widget.onStartSelling != null) {
       widget.onStartSelling!();
       return;
@@ -615,13 +591,6 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _openExploreNearby() {
-    if (widget.guestMode) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-      return;
-    }
     if (widget.onExploreNearby != null) {
       widget.onExploreNearby!();
       return;
@@ -646,7 +615,7 @@ class HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             const Text(
-              'No sellers in your society yet',
+              'No sellers available yet',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 22,
@@ -656,7 +625,7 @@ class HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 10),
             const Text(
-              'Be the first one to share your homemade food!',
+              'Be the first one to share homemade food in your community.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Color(0xFF3A4644),
@@ -701,14 +670,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader() {
-    if (!widget.guestMode) return const AppHeader();
-    return AppHeader(
-      leading: IconButton(
-        onPressed: () => Navigator.maybePop(context),
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-        color: const Color(0xFF3A4644),
-      ),
-    );
+    return const AppHeader();
   }
 
   Widget _buildSearchBar() {

@@ -4,12 +4,19 @@ import '../widgets/app_header.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
 import 'checkout_screen.dart';
+import '../widgets/guest_order_auth.dart';
 
 class FoodDetailScreen extends StatelessWidget {
-  const FoodDetailScreen({super.key, required this.food, this.onSellerTap});
+  const FoodDetailScreen({
+    super.key,
+    required this.food,
+    this.onSellerTap,
+    this.requireAuthToOrder = false,
+  });
 
   final FoodItem food;
   final VoidCallback? onSellerTap;
+  final bool requireAuthToOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +43,7 @@ class FoodDetailScreen extends StatelessWidget {
               ],
             ),
           ),
-          _BottomCta(food: food),
+          _BottomCta(food: food, requireAuthToOrder: requireAuthToOrder),
         ],
       ),
     );
@@ -701,8 +708,9 @@ class _RatingBubble extends StatelessWidget {
 }
 
 class _BottomCta extends StatelessWidget {
-  const _BottomCta({required this.food});
+  const _BottomCta({required this.food, this.requireAuthToOrder = false});
   final FoodItem food;
+  final bool requireAuthToOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -750,7 +758,12 @@ class _BottomCta extends StatelessWidget {
               child: ElevatedButton.icon(
                 onPressed: food.quantity <= 0
                     ? null
-                    : () {
+                    : () async {
+                        if (requireAuthToOrder) {
+                          await showGuestOrderAuthDialog(context);
+                          return;
+                        }
+                        if (!context.mounted) return;
                         Navigator.push(
                           context,
                           MaterialPageRoute(

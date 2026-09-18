@@ -1,3 +1,6 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,10 +27,17 @@ class SessionService {
   static bool _clearedThisProcess = false;
 
   static void _secureBestEffort(Future<dynamic> future) {
+    if (_skipSecureStoragePlugin) return;
     future.then((_) {}, onError: (_) {});
   }
 
+  static bool get _skipSecureStoragePlugin {
+    if (kIsWeb) return false;
+    return Platform.environment.containsKey('FLUTTER_TEST');
+  }
+
   static Future<String?> _secureRead(String key) async {
+    if (_skipSecureStoragePlugin) return null;
     if (_clearedThisProcess &&
         (key == _jwtKey ? _memoryJwt : _memoryRefresh) == null) {
       return null;

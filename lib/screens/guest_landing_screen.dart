@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../config/launch_config.dart';
 import '../models/guest_discovery.dart';
-import 'home_screen.dart';
+import 'guest_kitchens_screen.dart';
 import 'login_screen.dart';
 
 class GuestLandingScreen extends StatefulWidget {
@@ -16,6 +16,8 @@ class GuestLandingScreen extends StatefulWidget {
 
 class _GuestLandingScreenState extends State<GuestLandingScreen> {
   final _pageController = PageController();
+  final _scrollController = ScrollController();
+  final _categoriesKey = GlobalKey();
   Timer? _timer;
   var _page = 0;
 
@@ -42,7 +44,26 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
   void dispose() {
     _timer?.cancel();
     _pageController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _scrollToMarketingExplore() {
+    final context = _categoriesKey.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeInOutCubic,
+        alignment: 0.05,
+      );
+      return;
+    }
+    _scrollController.animateTo(
+      520,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeInOutCubic,
+    );
   }
 
   void _startAutoRotate() {
@@ -58,15 +79,11 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
     });
   }
 
-  void _openMenus({String? category}) {
+  void _openRealMarketplace({String? category}) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => HomeScreen(
-          guestMode: true,
-          initialCategory: category,
-          fetchListings: GuestDiscovery.fetchListings,
-        ),
+        builder: (_) => GuestKitchensScreen(categoryHint: category),
       ),
     );
   }
@@ -87,13 +104,14 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
       backgroundColor: const Color(0xFFF8F6F1),
       body: SafeArea(
         child: CustomScrollView(
+          controller: _scrollController,
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(child: _SocietyBitesHeader(onSignIn: _openSignIn)),
             SliverToBoxAdapter(
               child: _HeroSection(
-                onExplore: () => _openMenus(),
-                onBrowseGuest: () => _openMenus(),
+                onExplore: () => _openRealMarketplace(),
+                onBrowseGuest: _scrollToMarketingExplore,
               ),
             ),
             SliverToBoxAdapter(
@@ -104,14 +122,17 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
                 onPageChanged: (index) => setState(() => _page = index),
               ),
             ),
-            const SliverToBoxAdapter(child: _CuratedCategoriesHeading()),
             SliverToBoxAdapter(
-              child: _CuratedCategories(
-                onSelect: (category) => _openMenus(category: category),
-              ),
+              key: _categoriesKey,
+              child: const _CuratedCategoriesHeading(),
             ),
             SliverToBoxAdapter(
-              child: _ExploreKitchensSection(onTap: () => _openMenus()),
+              child: _CuratedCategories(),
+            ),
+            SliverToBoxAdapter(
+              child: _ExploreKitchensSection(
+                onTap: () => _openRealMarketplace(),
+              ),
             ),
             const SliverToBoxAdapter(
               child: Padding(
@@ -588,9 +609,7 @@ class _CuratedCategoriesHeading extends StatelessWidget {
 }
 
 class _CuratedCategories extends StatelessWidget {
-  const _CuratedCategories({required this.onSelect});
-
-  final ValueChanged<String> onSelect;
+  const _CuratedCategories();
 
   @override
   Widget build(BuildContext context) {
@@ -603,51 +622,44 @@ class _CuratedCategories extends StatelessWidget {
         separatorBuilder: (context, index) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
           final category = GuestDiscovery.curatedCategories[index];
-          return Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            child: InkWell(
-              onTap: () => onSelect(category.homeCategory),
+          return Container(
+            width: 148,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
               borderRadius: BorderRadius.circular(18),
-              child: Container(
-                width: 148,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFE6EBE9)),
+              border: Border.all(color: const Color(0xFFE6EBE9)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: category.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    category.icon,
+                    color: category.accent,
+                    size: 20,
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: category.accent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        category.icon,
-                        color: category.accent,
-                        size: 20,
-                      ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    category.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                      color: Color(0xFF141A18),
+                      height: 1.2,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        category.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13.5,
-                          color: Color(0xFF141A18),
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           );
         },

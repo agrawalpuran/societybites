@@ -398,7 +398,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('Society Dal'), findsOneWidget);
-    expect(find.text('No sellers in your society yet'), findsNothing);
+    expect(find.text('No sellers available yet'), findsNothing);
   });
 
   testWidgets('Orders behavior still shows buyer orders', (tester) async {

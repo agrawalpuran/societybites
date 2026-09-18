@@ -11,6 +11,7 @@ import 'buyer_preorder_detail_screen.dart';
 import 'checkout_screen.dart';
 import 'food_detail_screen.dart';
 import 'login_screen.dart';
+import '../widgets/guest_order_auth.dart';
 
 class _CachedStorefront {
   const _CachedStorefront({
@@ -61,6 +62,8 @@ class SellerStorefrontScreen extends StatefulWidget {
     this.fetchListings,
     this.fetchCampaigns,
     this.nearbyContext,
+    this.guestBrowse = false,
+    this.guestSocietyName,
     this.browseOnly = false,
     this.initialProducts,
   });
@@ -75,6 +78,10 @@ class SellerStorefrontScreen extends StatefulWidget {
 
   /// Nearby discovery context. Does not enable cross-society ordering.
   final NearbySellerCard? nearbyContext;
+
+  /// Public guest kitchen browse. Add/order requires authentication.
+  final bool guestBrowse;
+  final String? guestSocietyName;
   final bool browseOnly;
   final List<FoodItem>? initialProducts;
 
@@ -131,6 +138,16 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
         ]);
         listingRaw = responses[0];
         campaignRaw = responses[1];
+      } else if (widget.guestBrowse) {
+        final raw = await ApiService.getGuestKitchenStorefront(widget.seller.id);
+        final listings = raw['listings'];
+        listingRaw = listings is List
+            ? listings
+                  .whereType<Map>()
+                  .map((item) => Map<String, dynamic>.from(item))
+                  .toList()
+            : <Map<String, dynamic>>[];
+        campaignRaw = const [];
       } else {
         if (widget.nearbyContext != null) {
           final raw = await ApiService.getNearbySellerStorefront(
@@ -162,6 +179,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
             ApiService.getListings(
               societyId: societyId,
               sellerId: widget.seller.id,
+              catalogType: 'REGULAR',
             ),
             ApiService.getPreOrderCampaigns(
               societyId: societyId,
@@ -219,6 +237,10 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
   }
 
   Future<void> _changeCart(FoodItem food, int delta) async {
+    if (widget.guestBrowse && delta > 0) {
+      await showGuestOrderAuthDialog(context);
+      return;
+    }
     if (delta > 0 && food.quantity <= 0) {
       _show('${food.name} is sold out.');
       return;
@@ -414,7 +436,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                       ),
                     ),
                   ],
-                  if (_campaigns.isNotEmpty) ...[
+                  if (_campaigns.isNotEmpty && !widget.guestBrowse) ...[
                     const SizedBox(height: 30),
                     _sectionTitle('PRE-ORDERS'),
                     const SizedBox(height: 12),
@@ -465,7 +487,16 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                if (widget.nearbyContext != null) ...[
+                if (widget.guestBrowse &&
+                    (widget.guestSocietyName ?? widget.seller.block)
+                        .trim()
+                        .isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.guestSocietyName ?? widget.seller.block,
+                    style: const TextStyle(color: preorderMuted),
+                  ),
+                ] else if (widget.nearbyContext != null) ...[
                   const SizedBox(height: 8),
                   const Text(
                     'Nearby seller',
@@ -612,6 +643,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
               builder: (_) => FoodDetailScreen(
                 food: food,
                 onSellerTap: () => Navigator.pop(context),
+                requireAuthToOrder: widget.guestBrowse,
               ),
             ),
           );

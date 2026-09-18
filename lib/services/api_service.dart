@@ -569,6 +569,39 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> getGuestKitchens({
+    String city = 'bengaluru',
+  }) async {
+    final uri = Uri.parse('$baseUrl/listings/guest-kitchens').replace(
+      queryParameters: {'city': city},
+    );
+    final response = await http.get(
+      uri,
+      headers: {'Accept': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getGuestKitchenStorefront(
+    String sellerId, {
+    String city = 'bengaluru',
+  }) async {
+    final uri = Uri.parse('$baseUrl/listings/guest-kitchens/$sellerId').replace(
+      queryParameters: {'city': city},
+    );
+    final response = await http.get(
+      uri,
+      headers: {'Accept': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> createListing({
     required String societyId,
     required String name,

@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/config/launch_config.dart';
 import 'package:societybites/models/guest_discovery.dart';
+import 'package:societybites/screens/guest_kitchens_screen.dart';
 import 'package:societybites/screens/guest_landing_screen.dart';
-import 'package:societybites/screens/home_screen.dart';
 
 void _ignoreKnownLayoutNoise() {
   final previous = FlutterError.onError;
@@ -46,17 +46,25 @@ void main() {
     expect(find.textContaining('Explore All Kitchens'), findsOneWidget);
   });
 
-  testWidgets('Browse as Guest opens existing home listings without login', (
+  testWidgets('Browse as Guest scrolls marketing content without fake marketplace', (
     tester,
   ) async {
     _ignoreKnownLayoutNoise();
     await tester.pumpWidget(const MaterialApp(home: GuestLandingScreen()));
     await tester.pump();
     await tester.tap(find.text('Browse as Guest'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(GuestLandingScreen), findsOneWidget);
+  });
+
+  testWidgets('Explore Menus opens kitchens in Bengaluru', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: GuestLandingScreen()));
+    await tester.pump();
+    await tester.tap(find.text('Explore Menus →'));
     await tester.pump();
     await tester.pump();
-    expect(find.byType(HomeScreen), findsOneWidget);
-    expect(find.text('Fresh Pappardelle & Artisanal Sourdough'), findsWidgets);
+    expect(find.byType(GuestKitchensScreen), findsOneWidget);
+    expect(find.textContaining('Kitchens in'), findsOneWidget);
   });
 
   test('guest discovery uses existing home categories', () {

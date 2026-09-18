@@ -17,6 +17,10 @@ const {
   getNearbySellerStorefront,
 } = require("../lib/nearbyDiscovery");
 const {
+  discoverGuestKitchens,
+  getGuestKitchenStorefront,
+} = require("../lib/guestDiscovery");
+const {
   parseCatalogType,
   catalogListWhere,
   isRegularMarketplaceListing,
@@ -45,6 +49,25 @@ async function rejectCommittedCampaignProductMutation(listing, res) {
   });
   return true;
 }
+
+router.get(
+  "/guest-kitchens",
+  asyncHandler(async (req, res) => {
+    const payload = await discoverGuestKitchens({ query: req.query });
+    res.json(payload);
+  })
+);
+
+router.get(
+  "/guest-kitchens/:sellerId",
+  asyncHandler(async (req, res) => {
+    const payload = await getGuestKitchenStorefront({
+      sellerId: req.params.sellerId,
+      query: req.query,
+    });
+    res.json(payload);
+  })
+);
 
 router.get(
   "/nearby-sellers",
