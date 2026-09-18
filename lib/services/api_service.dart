@@ -615,6 +615,7 @@ class ApiService {
     String? weightValue,
     List<String>? tags,
     String? category,
+    List<String>? categories,
     required String foodType,
     String catalogType = 'REGULAR',
   }) async {
@@ -637,6 +638,7 @@ class ApiService {
           'weightValue': weightValue,
         if (tags != null && tags.isNotEmpty) 'tags': tags,
         if (category != null && category.isNotEmpty) 'category': category,
+        if (categories != null && categories.isNotEmpty) 'categories': categories,
         'foodType': foodType,
         'catalogType': catalogType,
       }),
@@ -712,6 +714,7 @@ class ApiService {
     String? weightValue,
     List<String>? tags,
     String? category,
+    List<String>? categories,
     required String foodType,
   }) async {
     final response = await http.patch(
@@ -730,6 +733,7 @@ class ApiService {
         if (weightValue != null) 'weightValue': weightValue,
         if (tags != null) 'tags': tags,
         if (category != null) 'category': category,
+        if (categories != null) 'categories': categories,
         'foodType': foodType,
       }),
     );
@@ -1072,6 +1076,7 @@ class ApiService {
     String? weightValue,
     List<String>? tags,
     String? category,
+    List<String>? categories,
     String? pickupLocation,
     required String foodType,
     String? listingId,
@@ -1094,6 +1099,7 @@ class ApiService {
           'weightValue': weightValue,
         if (tags != null && tags.isNotEmpty) 'tags': tags,
         if (category != null && category.isNotEmpty) 'category': category,
+        if (categories != null && categories.isNotEmpty) 'categories': categories,
         if (pickupLocation != null && pickupLocation.isNotEmpty)
           'pickupLocation': pickupLocation,
         'foodType': foodType,

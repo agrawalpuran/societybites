@@ -1,5 +1,17 @@
 import '../models/data.dart';
 import '../models/food_type.dart';
+import '../models/listing_categories.dart';
+
+/// Restricts listings to an exact VEG / NON_VEG match.
+/// `null` foodType (All) returns the input unchanged, including unclassified items.
+List<FoodItem> listingsMatchingFoodType(
+  Iterable<FoodItem> listings, {
+  String? foodType,
+}) {
+  final selectedType = parseFoodType(foodType);
+  if (selectedType == null) return List<FoodItem>.from(listings);
+  return listings.where((food) => food.foodType == selectedType).toList();
+}
 
 /// Client-side Home listing filter. Does not fetch; uses already-loaded data.
 List<FoodItem> applyHomeListingFilters(
@@ -8,15 +20,21 @@ List<FoodItem> applyHomeListingFilters(
   String searchQuery = '',
   String? foodType,
 }) {
-  var results = listings.where((food) => !food.isPreOrder).toList();
-
-  final selectedType = parseFoodType(foodType);
-  if (selectedType != null) {
-    results = results.where((food) => food.foodType == selectedType).toList();
-  }
+  var results = listings
+      .where((food) => !food.isPreOrder && !food.isPreOrderCatalog)
+      .toList();
+  results = listingsMatchingFoodType(results, foodType: foodType);
 
   if (category != null && category != 'All') {
-    results = results.where((food) => food.category == category).toList();
+    results = results
+        .where(
+          (food) => listingMatchesHomeCategory(
+            food.listingCategories,
+            selectedCategory: category,
+            legacyCategory: food.category,
+          ),
+        )
+        .toList();
   }
 
   if (searchQuery.isNotEmpty) {

@@ -98,6 +98,26 @@ void main() {
     expect(find.text('Add a pre-order item'), findsOneWidget);
   });
 
+  testWidgets('Add Listing photo picker offers camera and gallery', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: AddListingScreen()),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Upload Cover Photo'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add Food Photo'), findsOneWidget);
+    expect(find.text('Take Photo'), findsOneWidget);
+    expect(find.text('Choose from Gallery'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add Food Photo'), findsNothing);
+  });
+
   testWidgets('Move Regular to Pre-orders shows confirmation and updates tabs', (
     tester,
   ) async {
@@ -183,6 +203,32 @@ void main() {
     await tester.tap(find.textContaining('Regular Orders').first);
     await tester.pumpAndSettle();
     expect(find.text('Sunday Biryani'), findsOneWidget);
+  });
+
+  testWidgets('My Listings actions stay separate on a compact card width', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: SizedBox(
+            width: 320,
+            height: 640,
+            child: MyListingsScreen(
+              fetchListings: () async => [_listingJson('Samosa')],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Pause'), findsOneWidget);
+    expect(find.text('Move to Pre-orders'), findsOneWidget);
+    expect(find.text('Edit'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Active campaign restriction is shown', (tester) async {

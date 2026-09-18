@@ -819,6 +819,7 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
         weightValue: item.weightValue,
         tags: item.tags,
         category: item.category,
+        categories: item.listingCategories,
         pickupLocation: item.pickupLocation,
         foodType: _foodType!,
         listingId: item.id,

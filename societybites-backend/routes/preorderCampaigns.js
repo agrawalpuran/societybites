@@ -9,6 +9,10 @@ const {
   assertFoodTypeTagCompatibility,
 } = require("../utils/foodType");
 const {
+  parseListingCategories,
+  categoryWriteFields,
+} = require("../utils/listingCategories");
+const {
   CAMPAIGN_STATUSES,
   parseDate,
   assertCampaignTimeline,
@@ -79,6 +83,21 @@ function buildProductData(user, campaign, product) {
       throw err;
     }
   }
+  let categoryFields = { categories: [], category: null };
+  try {
+    const parsed = parseListingCategories(product, { required: false });
+    if (parsed) categoryFields = categoryWriteFields(parsed);
+    else if (product.category) {
+      categoryFields = { categories: [String(product.category)], category: String(product.category) };
+    }
+  } catch (_) {
+    if (product.category) {
+      categoryFields = {
+        categories: [String(product.category)],
+        category: String(product.category),
+      };
+    }
+  }
   return {
     sellerId: user.id,
     societyId: user.societyId,
@@ -93,7 +112,7 @@ function buildProductData(user, campaign, product) {
     weightValue: product.weightValue || null,
     tags,
     foodType,
-    category: product.category || null,
+    ...categoryFields,
     pickupLocation: product.pickupLocation || "My Home (Verified)",
     status: "active",
     catalogType: "PREORDER",

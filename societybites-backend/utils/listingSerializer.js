@@ -1,3 +1,5 @@
+const { listingCategoriesFromRecord } = require("./listingCategories");
+
 const ORDER_STATUS_TO_STEP = {
   pending: 0,
   accepted: 1,
@@ -33,7 +35,8 @@ function serializeListing(listing) {
     weightValue: listing.weightValue,
     tags: listing.tags || [],
     foodType: listing.foodType || null,
-    category: listing.category || null,
+    category: listingCategoriesFromRecord(listing)[0] || listing.category || null,
+    categories: listingCategoriesFromRecord(listing),
     status: listing.status,
     catalogType: listing.catalogType || "REGULAR",
     societyId: listing.societyId,

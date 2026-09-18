@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'food_type.dart';
+import 'listing_categories.dart';
 
 const listingCatalogRegular = 'REGULAR';
 const listingCatalogPreorder = 'PREORDER';
@@ -52,6 +53,7 @@ class FoodItem {
   final List<String> tags;
   final String? foodType;
   final String? category;
+  final List<String> categories;
   final String status;
   final DateTime? availableAt;
   final int reviewCount;
@@ -82,6 +84,7 @@ class FoodItem {
     this.tags = const [],
     this.foodType,
     this.category,
+    this.categories = const [],
     this.status = 'active',
     this.availableAt,
     this.reviewCount = 0,
@@ -92,6 +95,13 @@ class FoodItem {
     this.societyId,
     this.catalogType = listingCatalogRegular,
   });
+
+  List<String> get listingCategories {
+    if (categories.isNotEmpty) return categories;
+    final single = category?.trim();
+    if (single == null || single.isEmpty) return const [];
+    return [single];
+  }
 
   bool get isPreOrderCatalog => catalogType == listingCatalogPreorder;
 
@@ -153,6 +163,8 @@ class FoodItem {
         ? null
         : DateTime.tryParse(availableAtRaw.toString());
 
+    final parsedCategories = parseListingCategoriesFromJson(json);
+
     return FoodItem(
       id: id,
       name: json['name']?.toString() ?? 'Untitled',
@@ -173,7 +185,10 @@ class FoodItem {
       weightValue: json['weightValue']?.toString(),
       tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
       foodType: parseFoodType(json['foodType']),
-      category: json['category']?.toString(),
+      category: parsedCategories.isNotEmpty
+          ? parsedCategories.first
+          : json['category']?.toString(),
+      categories: parsedCategories,
       status: json['status']?.toString() ?? 'active',
       availableAt: availableAt,
       reviewCount: _asInt(json['reviewCount'], 0),

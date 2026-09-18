@@ -322,6 +322,7 @@ class HomeScreenState extends State<HomeScreen> {
           onCartChanged: () {
             if (mounted) setState(() {});
           },
+          foodTypeFilter: _selectedFoodType,
         ),
       ),
     ).then((_) {
@@ -846,7 +847,7 @@ class HomeScreenState extends State<HomeScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => SellerListScreen(
-                        sellers: sellersFromListings(_listings),
+                        sellers: _sellers,
                         onSellerTap: _openSeller,
                       ),
                     ),

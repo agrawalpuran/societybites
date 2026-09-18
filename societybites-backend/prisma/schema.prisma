@@ -97,6 +97,8 @@ model Listing {
   /// VEG | NON_VEG. Nullable for listings created before this field existed.
   foodType       String?
   category       String?
+  /// Multi-select food occasions. Display labels: Breakfast, Lunch, Dinner, Snacks, Desserts.
+  categories     String[]    @default([])
   availableAt    DateTime?
   pickupLocation String      @default("My Home (Verified)")
   imageUrl       String?

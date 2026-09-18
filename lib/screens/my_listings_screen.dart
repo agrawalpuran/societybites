@@ -660,74 +660,255 @@ class _SellerListingCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
+          _ListingCardActions(
+            listing: listing,
+            canPause: canPause,
+            canResume: canResume,
+            canRenew: canRenew,
+            onPause: onPause,
+            onResume: onResume,
+            onRenew: onRenew,
+            onMove: onMove,
+            onEdit: onEdit,
+            onDelete: onDelete,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ListingCardActions extends StatelessWidget {
+  const _ListingCardActions({
+    required this.listing,
+    required this.canPause,
+    required this.canResume,
+    required this.canRenew,
+    required this.onPause,
+    required this.onResume,
+    required this.onRenew,
+    required this.onMove,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final FoodItem listing;
+  final bool canPause;
+  final bool canResume;
+  final bool canRenew;
+  final VoidCallback onPause;
+  final VoidCallback onResume;
+  final VoidCallback onRenew;
+  final VoidCallback onMove;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stackEditDelete = constraints.maxWidth < 360;
+        final statusButton = canPause
+            ? _ListingPillButton(
+                icon: Icons.pause_circle_outline,
+                label: 'Pause',
+                foreground: const Color(0xFFB86A00),
+                background: const Color(0xFFFFF3E0),
+                onTap: onPause,
+              )
+            : canResume
+                ? _ListingPillButton(
+                    icon: Icons.play_circle_outline,
+                    label: 'Resume',
+                    foreground: const Color(0xFF0E5A47),
+                    background: const Color(0xFFE8F5EE),
+                    onTap: onResume,
+                  )
+                : canRenew
+                    ? _ListingPillButton(
+                        icon: Icons.refresh_rounded,
+                        label: 'Renew',
+                        foreground: const Color(0xFF3A4644),
+                        background: const Color(0xFFF0F2F1),
+                        onTap: onRenew,
+                      )
+                    : null;
+
+        final moveButton = _ListingPillButton(
+          icon: Icons.swap_horiz_rounded,
+          label: listing.isPreOrderCatalog
+              ? 'Move to Regular Orders'
+              : 'Move to Pre-orders',
+          foreground: const Color(0xFF0E5A47),
+          background: const Color(0xFFD6F0E4),
+          onTap: onMove,
+        );
+
+        final editAction = _ListingIconAction(
+          icon: Icons.edit_outlined,
+          label: 'Edit',
+          color: const Color(0xFF0E5A47),
+          onTap: onEdit,
+        );
+        final deleteAction = _ListingIconAction(
+          icon: Icons.delete_outline_rounded,
+          label: 'Delete',
+          color: const Color(0xFFD94F4F),
+          onTap: onDelete,
+        );
+
+        if (stackEditDelete) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (canPause)
-                TextButton.icon(
-                  onPressed: onPause,
-                  icon: const Icon(Icons.pause_circle_outline, size: 18),
-                  label: const Text('Pause'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFFB86A00),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (statusButton != null)
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                      child: statusButton,
+                    ),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                    child: moveButton,
                   ),
-                ),
-              if (canResume)
-                TextButton.icon(
-                  onPressed: onResume,
-                  icon: const Icon(Icons.play_circle_outline, size: 18),
-                  label: const Text('Resume'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF0E5A47),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
-              if (canRenew)
-                TextButton.icon(
-                  onPressed: onRenew,
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('Renew'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF3A4644),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
-              TextButton(
-                onPressed: onMove,
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF0E5A47),
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                ),
-                child: Text(
-                  listing.isPreOrderCatalog
-                      ? 'Move to Regular Orders'
-                      : 'Move to Pre-orders',
-                ),
+                ],
               ),
-              const Spacer(),
-              IconButton(
-                onPressed: onEdit,
-                tooltip: 'Edit',
-                icon: const Icon(
-                  Icons.edit_outlined,
-                  color: Color(0xFF0E5A47),
-                ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: editAction),
+                  Container(
+                    width: 1,
+                    height: 28,
+                    color: const Color(0xFFEAEFED),
+                  ),
+                  Expanded(child: deleteAction),
+                ],
               ),
-              IconButton(
-                onPressed: onDelete,
-                tooltip: 'Remove',
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  color: Color(0xFFD94F4F),
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (statusButton != null) ...[
+              Flexible(child: statusButton),
+              const SizedBox(width: 8),
+            ],
+            Flexible(child: moveButton),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Container(
+                width: 1,
+                height: 32,
+                color: const Color(0xFFEAEFED),
+              ),
+            ),
+            editAction,
+            deleteAction,
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ListingPillButton extends StatelessWidget {
+  const _ListingPillButton({
+    required this.icon,
+    required this.label,
+    required this.foreground,
+    required this.background,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color foreground;
+  final Color background;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 40),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 18, color: foreground),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    softWrap: true,
+                    style: TextStyle(
+                      color: foreground,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ListingIconAction extends StatelessWidget {
+  const _ListingIconAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

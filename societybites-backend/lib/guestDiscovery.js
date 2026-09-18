@@ -1,4 +1,5 @@
 const prisma = require("./prisma");
+const { listingCategoriesFromRecord } = require("../utils/listingCategories");
 const { canonicalCityKey } = require("./launchCity");
 const { expireDueListings } = require("../utils/listingExpiry");
 
@@ -48,7 +49,8 @@ function serializeGuestListing(listing, seller) {
     weightValue: listing.weightValue,
     tags: listing.tags || [],
     foodType: listing.foodType || null,
-    category: listing.category || null,
+    category: listingCategoriesFromRecord(listing)[0] || listing.category || null,
+    categories: listingCategoriesFromRecord(listing),
     status: listing.status,
     catalogType: listing.catalogType || "REGULAR",
     sellerId: listing.sellerId,
@@ -63,7 +65,7 @@ function serializeGuestKitchen(seller) {
     serializeGuestListing(listing, seller)
   );
   const categories = [
-    ...new Set(listings.map((item) => item.category).filter(Boolean)),
+    ...new Set(listings.flatMap((item) => item.categories || []).filter(Boolean)),
   ];
   return {
     seller: {

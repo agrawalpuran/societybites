@@ -10,20 +10,23 @@ FoodItem _item({
   required String name,
   String? foodType,
   String? category,
+  String sellerId = 'seller-1',
   String sellerName = 'Anita',
   List<String> tags = const [],
   String? campaignId,
+  String catalogType = 'REGULAR',
 }) {
   return FoodItem.fromJson({
     'id': id,
     'name': name,
-    'sellerId': 'seller-1',
+    'sellerId': sellerId,
     'sellerName': sellerName,
     'price': 100,
     'foodType': foodType,
     'category': category,
     'tags': tags,
     'campaignId': campaignId,
+    'catalogType': catalogType,
   });
 }
 
@@ -109,6 +112,72 @@ void main() {
       searchQuery: 'samosa',
     );
     expect(result.map((e) => e.name), ['Veg Samosa']);
+  });
+
+  test('Veg OFF keeps mixed seller listings visible', () {
+    final listings = [
+      _item(id: 'veg', name: "Dadi's Dhokla", foodType: foodTypeVeg),
+      _item(id: 'nv', name: 'Chicken Biryani', foodType: foodTypeNonVeg),
+    ];
+    final result = applyHomeListingFilters(listings);
+    expect(result.map((e) => e.name), ["Dadi's Dhokla", 'Chicken Biryani']);
+    expect(sellersFromListings(result).map((s) => s.id), ['seller-1']);
+  });
+
+  test('Veg ON hides non-veg items but keeps a mixed seller', () {
+    final listings = [
+      _item(id: 'veg1', name: "Dadi's Dhokla", foodType: foodTypeVeg),
+      _item(id: 'veg2', name: 'Samosa', foodType: foodTypeVeg),
+      _item(id: 'nv', name: 'Chicken Biryani', foodType: foodTypeNonVeg),
+    ];
+    final result = applyHomeListingFilters(listings, foodType: foodTypeVeg);
+    expect(result.map((e) => e.name), ["Dadi's Dhokla", 'Samosa']);
+    expect(sellersFromListings(result).single.id, 'seller-1');
+  });
+
+  test('Veg ON hides sellers that only have non-veg listings', () {
+    final listings = [
+      _item(
+        id: 'puran-veg',
+        name: 'Dhokla',
+        foodType: foodTypeVeg,
+        sellerId: 'puran',
+        sellerName: 'Puran Agrawal',
+      ),
+      _item(
+        id: 'only-nv',
+        name: 'Chicken Curry',
+        foodType: foodTypeNonVeg,
+        sellerId: 'other',
+        sellerName: 'Other Kitchen',
+      ),
+    ];
+    final result = applyHomeListingFilters(listings, foodType: foodTypeVeg);
+    expect(result.map((e) => e.sellerId), ['puran']);
+    expect(sellersFromListings(result).map((s) => s.id), ['puran']);
+  });
+
+  test('Veg filter never includes PREORDER catalog items in regular results', () {
+    final listings = [
+      _item(id: 'regular', name: 'Dhokla', foodType: foodTypeVeg),
+      _item(
+        id: 'pre',
+        name: 'Festival Thali',
+        foodType: foodTypeVeg,
+        catalogType: 'PREORDER',
+      ),
+    ];
+    final result = applyHomeListingFilters(listings, foodType: foodTypeVeg);
+    expect(result.map((e) => e.id), ['regular']);
+  });
+
+  test('food type filter does not inspect nearby reach or society fields', () {
+    final listings = [
+      _item(id: 'veg', name: 'Dhokla', foodType: foodTypeVeg),
+      _item(id: 'nv', name: 'Chicken', foodType: foodTypeNonVeg),
+    ];
+    final result = listingsMatchingFoodType(listings, foodType: foodTypeVeg);
+    expect(result.map((e) => e.id), ['veg']);
   });
 
   test('switching All → Veg → Non-Veg makes no API calls', () {

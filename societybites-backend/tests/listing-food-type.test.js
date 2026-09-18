@@ -86,17 +86,18 @@ async function main() {
       method: "POST",
       path: "/listings",
       token: sellerToken,
-      body: { name: `Veg test ${Date.now()}`, price: 50, foodType: "VEG" },
+      body: { name: `Veg test ${Date.now()}`, price: 50, foodType: "VEG", category: "Lunch" },
     });
     assert(veg.status === 201, `VEG listing create failed: ${veg.status} ${JSON.stringify(veg.json)}`);
     assert(veg.json.foodType === "VEG", "serializer must return VEG");
+    assert(Array.isArray(veg.json.categories) && veg.json.categories[0] === "Lunch", "categories array");
     created.listingIds.push(veg.json.id);
 
     const nonVeg = await jsonRequest(server, {
       method: "POST",
       path: "/listings",
       token: sellerToken,
-      body: { name: `Non-veg test ${Date.now()}`, price: 80, foodType: "NON_VEG" },
+      body: { name: `Non-veg test ${Date.now()}`, price: 80, foodType: "NON_VEG", category: "Dinner" },
     });
     assert(nonVeg.status === 201, `NON_VEG listing create failed: ${nonVeg.status}`);
     assert(nonVeg.json.foodType === "NON_VEG", "serializer must return NON_VEG");

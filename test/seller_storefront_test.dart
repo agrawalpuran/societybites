@@ -314,12 +314,68 @@ void main() {
     expect(find.text('1'), findsWidgets);
     expect(find.text('Add'), findsNothing);
   });
+
+  testWidgets('storefront with Veg filter hides non-veg products', (tester) async {
+    await _openStorefront(
+      tester,
+      seller: _seller('puran', 'Puran Agrawal'),
+      foodTypeFilter: 'VEG',
+      fetchListings: () async => [
+        _listingJson(
+          id: 'dhokla',
+          name: "Dadi's Dhokla",
+          sellerId: 'puran',
+          foodType: 'VEG',
+        ),
+        _listingJson(
+          id: 'biryani',
+          name: 'Chicken Biryani home made',
+          sellerId: 'puran',
+          foodType: 'NON_VEG',
+        ),
+      ],
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text("Dadi's Dhokla"), findsOneWidget);
+    expect(find.text('Chicken Biryani home made'), findsNothing);
+  });
+
+  testWidgets('storefront without food type filter shows veg and non-veg', (
+    tester,
+  ) async {
+    await _openStorefront(
+      tester,
+      seller: _seller('puran', 'Puran Agrawal'),
+      fetchListings: () async => [
+        _listingJson(
+          id: 'dhokla',
+          name: "Dadi's Dhokla",
+          sellerId: 'puran',
+          foodType: 'VEG',
+        ),
+        _listingJson(
+          id: 'biryani',
+          name: 'Chicken Biryani home made',
+          sellerId: 'puran',
+          foodType: 'NON_VEG',
+        ),
+      ],
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text("Dadi's Dhokla"), findsOneWidget);
+    expect(find.text('Chicken Biryani home made'), findsOneWidget);
+  });
 }
 
 Map<String, dynamic> _listingJson({
   required String id,
   required String name,
   required String sellerId,
+  String? foodType,
 }) {
   return {
     'id': id,
@@ -328,6 +384,7 @@ Map<String, dynamic> _listingJson({
     'sellerName': 'Neighbor',
     'price': 100,
     'status': 'active',
+    'foodType': ?foodType,
   };
 }
 
@@ -346,6 +403,7 @@ Future<void> _openStorefront(
   WidgetTester tester, {
   required Seller seller,
   required Future<List<Map<String, dynamic>>> Function() fetchListings,
+  String? foodTypeFilter,
 }) {
   return tester.pumpWidget(
     MaterialApp(
@@ -354,6 +412,7 @@ Future<void> _openStorefront(
         seller: seller,
         fetchListings: fetchListings,
         fetchCampaigns: () async => [],
+        foodTypeFilter: foodTypeFilter,
       ),
     ),
   );

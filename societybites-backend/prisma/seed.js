@@ -233,6 +233,7 @@ async function main() {
         status: "active",
         imageUrl: item.imageUrl,
         category: item.category,
+        categories: item.category ? [item.category] : [],
         tags: item.tags,
         foodType: item.foodType || null,
       },

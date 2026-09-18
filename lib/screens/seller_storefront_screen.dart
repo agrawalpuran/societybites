@@ -4,14 +4,15 @@ import '../models/data.dart';
 import '../models/nearby_seller.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
+import '../widgets/guest_order_auth.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/preorder_widgets.dart';
 import 'buyer_preorder_detail_screen.dart';
 import 'checkout_screen.dart';
 import 'food_detail_screen.dart';
+import 'home_listing_filter.dart';
 import 'login_screen.dart';
-import '../widgets/guest_order_auth.dart';
 
 class _CachedStorefront {
   const _CachedStorefront({
@@ -66,6 +67,7 @@ class SellerStorefrontScreen extends StatefulWidget {
     this.guestSocietyName,
     this.browseOnly = false,
     this.initialProducts,
+    this.foodTypeFilter,
   });
 
   final Seller seller;
@@ -85,6 +87,9 @@ class SellerStorefrontScreen extends StatefulWidget {
   final bool browseOnly;
   final List<FoodItem>? initialProducts;
 
+  /// Optional VEG / NON_VEG filter inherited from Home. Null keeps all items.
+  final String? foodTypeFilter;
+
   @override
   SellerStorefrontScreenState createState() => SellerStorefrontScreenState();
 }
@@ -98,6 +103,11 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
   String? _error;
 
   List<CartItem> get _cart => widget.cartItems ?? _localCart;
+
+  List<FoodItem> get _visibleProducts => listingsMatchingFoodType(
+        _products,
+        foodType: widget.foodTypeFilter,
+      );
 
   @override
   void initState() {
@@ -414,14 +424,14 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                   _sectionTitle('PRODUCTS'),
                   const SizedBox(height: 12),
                   _productSkeletonGrid(),
-                ] else if (_products.isEmpty && _campaigns.isEmpty) ...[
+                ] else if (_visibleProducts.isEmpty && _campaigns.isEmpty) ...[
                   const SizedBox(height: 24),
                   const PreOrderEmptyState(
                     title: 'Nothing available right now',
                     message: 'This seller has no items available right now.',
                   ),
                 ] else ...[
-                  if (_products.isNotEmpty) ...[
+                  if (_visibleProducts.isNotEmpty) ...[
                     const SizedBox(height: 28),
                     _sectionTitle('PRODUCTS'),
                     const SizedBox(height: 12),
@@ -617,14 +627,14 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: _products.length,
+          itemCount: _visibleProducts.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
             childAspectRatio: constraints.maxWidth >= 720 ? .78 : .72,
           ),
-          itemBuilder: (context, index) => _productCard(_products[index]),
+          itemBuilder: (context, index) => _productCard(_visibleProducts[index]),
         );
       },
     );

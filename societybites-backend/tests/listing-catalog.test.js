@@ -113,7 +113,7 @@ async function main() {
       method: "POST",
       path: "/listings",
       token: sellerToken,
-      body: { name: `Catalog regular ${stamp}`, price: 40, foodType: "VEG" },
+      body: { name: `Catalog regular ${stamp}`, price: 40, foodType: "VEG", category: "Lunch" },
     });
     assert(regular.status === 201, `create regular failed: ${JSON.stringify(regular.json)}`);
     assert(regular.json.catalogType === "REGULAR", "new listing must default to REGULAR");
@@ -127,6 +127,7 @@ async function main() {
         name: `Catalog preorder ${stamp}`,
         price: 90,
         foodType: "VEG",
+        category: "Dinner",
         catalogType: "PREORDER",
       },
     });
@@ -425,6 +426,7 @@ async function main() {
         name: preorder.json.name,
         price: 45,
         foodType: "VEG",
+        category: "Snacks",
         catalogType: "REGULAR",
       },
     });

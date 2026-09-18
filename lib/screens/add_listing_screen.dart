@@ -6,6 +6,8 @@ import '../models/data.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../models/food_type.dart';
+import '../models/listing_categories.dart';
+import '../widgets/available_in_selector.dart';
 import '../widgets/food_type_selector.dart';
 
 class AddListingScreen extends StatefulWidget {
@@ -31,7 +33,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
   final _descController = TextEditingController();
   String _pickup = 'My Home (Verified)';
   String _weightUnit = 'portions';
-  String? _category;
+  final Set<String> _selectedCategories = {};
+  List<String> _legacyCategories = [];
   String? _foodType;
   List<String> _selectedTags = [];
   DateTime? _dateTime;
@@ -60,7 +63,16 @@ class _AddListingScreenState extends State<AddListingScreen> {
         _weightUnit = listing.weightUnit!;
       }
       _selectedTags = List<String>.from(listing.tags);
-      _category = listing.category;
+      final known = listing.listingCategories
+          .map(normalizeListingCategory)
+          .whereType<String>()
+          .toSet();
+      _selectedCategories.addAll(
+        known.where(listingFoodCategories.contains),
+      );
+      _legacyCategories = known
+          .where((item) => !listingFoodCategories.contains(item))
+          .toList();
       _foodType = parseFoodType(listing.foodType);
       _dateTime = listing.availableAt;
     }
@@ -107,26 +119,109 @@ class _AddListingScreenState extends State<AddListingScreen> {
   }
 
   Future<void> _pickImage() async {
-    final file = await _picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1600,
-      imageQuality: 85,
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0E5E3),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Add Food Photo',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF3A4644),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _PhotoSourceOption(
+                  icon: Icons.photo_camera_outlined,
+                  title: 'Take Photo',
+                  subtitle: 'Use your camera to take a photo',
+                  onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+                ),
+                const SizedBox(height: 8),
+                _PhotoSourceOption(
+                  icon: Icons.photo_library_outlined,
+                  title: 'Choose from Gallery',
+                  subtitle: 'Select a photo from your phone',
+                  onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF6A7774),
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
-    if (file == null || !mounted) return;
+    if (source == null || !mounted) return;
+    await _pickImageFrom(source);
+  }
 
-    final bytes = await file.readAsBytes();
-    setState(() {
-      _imageBytes = bytes;
-      _imageMime = file.mimeType ?? 'image/jpeg';
-    });
+  Future<void> _pickImageFrom(ImageSource source) async {
+    try {
+      final file = await _picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        imageQuality: 85,
+      );
+      if (file == null || !mounted) return;
+
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _imageBytes = bytes;
+        _imageMime = file.mimeType ?? 'image/jpeg';
+      });
+    } on PlatformException catch (error) {
+      if (!mounted) return;
+      final denied = error.code.toLowerCase().contains('denied') ||
+          (error.message?.toLowerCase().contains('denied') ?? false) ||
+          (error.message?.toLowerCase().contains('permission') ?? false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            denied
+                ? (source == ImageSource.camera
+                    ? 'Camera access is needed to take a photo. You can enable it in Settings.'
+                    : 'Photo access is needed to choose from your gallery. You can enable it in Settings.')
+                : 'Could not open ${source == ImageSource.camera ? 'the camera' : 'the gallery'}. Please try again.',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate() || _isSubmitting) return;
 
-    if (_category == null || _category!.trim().isEmpty) {
+    if (_selectedCategories.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category.')),
+        const SnackBar(content: Text('Please select at least one category.')),
       );
       return;
     }
@@ -171,7 +266,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
           weightUnit: _weightUnit,
           weightValue: _weightPerUnitController.text.trim(),
           tags: _selectedTags,
-          category: _category,
+          categories: [..._selectedCategories, ..._legacyCategories],
           foodType: _foodType!,
         );
       } else {
@@ -187,7 +282,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
           weightUnit: _weightUnit,
           weightValue: _weightPerUnitController.text.trim(),
           tags: _selectedTags,
-          category: _category,
+          categories: [..._selectedCategories, ..._legacyCategories],
           foodType: _foodType!,
           catalogType: widget.catalogType,
         );
@@ -524,52 +619,32 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       ),
                       const SizedBox(height: 18),
                       _buildField(
-                        label: 'CATEGORY',
-                        child: Container(
-                          height: 52,
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border:
-                                Border.all(color: const Color(0xFFE0E5E3)),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _category,
-                              isExpanded: true,
-                              hint: const Text(
-                                'Select a category',
-                                style: TextStyle(
-                                  color: Color(0xFFADB5B2),
-                                  fontSize: 15,
-                                ),
-                              ),
-                              icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                                  color: Color(0xFF8A9491)),
-                              style: const TextStyle(
-                                fontSize: 15,
-                                color: Color(0xFF3A4644),
-                                fontWeight: FontWeight.w500,
-                              ),
-                              items: const [
-                                DropdownMenuItem(value: 'Breakfast', child: Text('Breakfast')),
-                                DropdownMenuItem(value: 'Lunch', child: Text('Lunch')),
-                                DropdownMenuItem(value: 'Dinner', child: Text('Dinner')),
-                                DropdownMenuItem(value: 'Snacks', child: Text('Snacks')),
-                                DropdownMenuItem(value: 'Desserts', child: Text('Desserts')),
-                                DropdownMenuItem(value: 'Beverages', child: Text('Beverages')),
-                                DropdownMenuItem(value: 'Healthy', child: Text('Healthy')),
-                                DropdownMenuItem(value: 'Jain', child: Text('Jain')),
-                                DropdownMenuItem(value: 'Kids', child: Text('Kids')),
-                                DropdownMenuItem(value: 'Homemade Specials', child: Text('Homemade Specials')),
-                              ],
-                              onChanged: (v) {
-                                setState(() => _category = v);
+                        label: 'AVAILABLE IN',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AvailableInSelector(
+                              selected: _selectedCategories,
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedCategories
+                                    ..clear()
+                                    ..addAll(value);
+                                });
                               },
                             ),
-                          ),
+                            if (_selectedCategories.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Available in: ${formatAvailableIn(_selectedCategories)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF6A7774),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                       const SizedBox(height: 18),
@@ -760,7 +835,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Tap to choose from gallery',
+          'Tap to take a photo or choose from gallery',
           style: TextStyle(
             fontSize: 12,
             color: Color(0xFF8A9491),
@@ -868,6 +943,73 @@ class _AddListingScreenState extends State<AddListingScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PhotoSourceOption extends StatelessWidget {
+  const _PhotoSourceOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFF5F7F6),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: const Color(0xFF0E5A47), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF3A4644),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF8A9491),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

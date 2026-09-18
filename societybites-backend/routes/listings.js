@@ -21,6 +21,11 @@ const {
   getGuestKitchenStorefront,
 } = require("../lib/guestDiscovery");
 const {
+  parseListingCategories,
+  categoryWriteFields,
+  categoryQueryFilter,
+} = require("../utils/listingCategories");
+const {
   parseCatalogType,
   catalogListWhere,
   isRegularMarketplaceListing,
@@ -140,19 +145,26 @@ router.get(
       return res.status(err.statusCode || 400).json({ error: err.message });
     }
 
+    const extraFilters = [];
+    const categoryFilter = categoryQueryFilter(category);
+    if (Object.keys(categoryFilter).length > 0) extraFilters.push(categoryFilter);
+    if (searchTerm) {
+      extraFilters.push({
+        OR: [
+          { name: { contains: searchTerm, mode: "insensitive" } },
+          { description: { contains: searchTerm, mode: "insensitive" } },
+        ],
+      });
+    }
+
     const listings = await prisma.listing.findMany({
       where: {
         societyId,
         ...catalogWhere,
         ...(sellerId && { sellerId: String(sellerId) }),
         ...statusFilter,
-        ...(category && { category: String(category) }),
-        ...(searchTerm && {
-          OR: [
-            { name: { contains: searchTerm, mode: "insensitive" } },
-            { description: { contains: searchTerm, mode: "insensitive" } },
-          ],
-        }),
+        ...(extraFilters.length === 1 ? extraFilters[0] : {}),
+        ...(extraFilters.length > 1 ? { AND: extraFilters } : {}),
       },
       include: listingInclude,
       orderBy: { createdAt: "desc" },
@@ -247,6 +259,12 @@ router.post(
     }
 
     const parsedCatalogType = parseCatalogType(req.body.catalogType);
+    let parsedCategories;
+    try {
+      parsedCategories = parseListingCategories(req.body, { required: true });
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
 
     const listing = await prisma.listing.create({
       data: {
@@ -263,7 +281,7 @@ router.post(
         weightValue: weightValue || null,
         tags: listingTags,
         foodType: parsedFoodType,
-        category: category || null,
+        ...categoryWriteFields(parsedCategories),
         catalogType: parsedCatalogType,
       },
       include: listingInclude,
@@ -371,9 +389,18 @@ router.patch(
       ...(weightUnit !== undefined && { weightUnit: weightUnit || null }),
       ...(weightValue !== undefined && { weightValue: weightValue || null }),
       ...(tags !== undefined && { tags: Array.isArray(tags) ? tags : [] }),
-      ...(category !== undefined && { category: category || null }),
       ...(status !== undefined && { status }),
     };
+
+    let parsedCategories;
+    try {
+      parsedCategories = parseListingCategories(req.body, { required: false });
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+    if (parsedCategories !== undefined) {
+      Object.assign(data, categoryWriteFields(parsedCategories));
+    }
 
     if (foodType !== undefined) {
       data.foodType = parseFoodType(foodType, { required: true });
