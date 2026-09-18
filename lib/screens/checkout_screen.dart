@@ -5,6 +5,7 @@ import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
 import '../models/data.dart';
 import '../models/seller_fulfilment.dart';
+import '../models/seller_payment_preference.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import 'login_screen.dart';
@@ -16,6 +17,7 @@ class CheckoutScreen extends StatefulWidget {
     this.isCrossSociety = false,
     this.sellerFulfilment,
     this.sellerSocietyName,
+    this.sellerPaymentPreference,
     this.placeOrder,
   });
 
@@ -23,6 +25,7 @@ class CheckoutScreen extends StatefulWidget {
   final bool isCrossSociety;
   final SellerFulfilment? sellerFulfilment;
   final String? sellerSocietyName;
+  final String? sellerPaymentPreference;
   final Future<Map<String, dynamic>> Function({
     required String societyId,
     required List<Map<String, dynamic>> items,
@@ -48,6 +51,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.initState();
     _items = List<CartItem>.from(widget.cartItems);
     _loadPlatformFee();
+    if (!_allowsCash) {
+      _payment = PaymentMethod.upi;
+    }
     final fulfilment = widget.sellerFulfilment;
     if (widget.isCrossSociety && fulfilment != null) {
       if (fulfilment.mode == FulfilmentMode.buyerPickup) {
@@ -66,6 +72,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (_) {
       // Keep default 0 if settings unavailable.
     }
+  }
+
+  bool get _allowsCash {
+    final raw = widget.sellerPaymentPreference ??
+        (_items.isEmpty
+            ? 'UPI_AND_COD'
+            : _items.first.food.sellerPaymentPreference);
+    return parseSellerPaymentPreference(raw).allowsCod;
   }
 
   double get _subtotal =>
@@ -505,22 +519,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
         const SizedBox(height: 14),
         _PaymentOption(
+          key: const Key('payment-upi'),
           icon: Icons.account_balance_wallet_rounded,
           iconColor: const Color(0xFF0E5A47),
-          title: 'UPI Payment',
+          title: 'UPI',
           subtitle: "Instant transfer to seller's wallet",
           isSelected: _payment == PaymentMethod.upi,
           onTap: () => setState(() => _payment = PaymentMethod.upi),
         ),
-        const SizedBox(height: 10),
-        _PaymentOption(
-          icon: Icons.money_rounded,
-          iconColor: const Color(0xFF8A9491),
-          title: 'Cash on Pickup',
-          subtitle: 'Pay when you collect your food',
-          isSelected: _payment == PaymentMethod.cash,
-          onTap: () => setState(() => _payment = PaymentMethod.cash),
-        ),
+        if (_allowsCash) ...[
+          const SizedBox(height: 10),
+          _PaymentOption(
+            key: const Key('payment-cash'),
+            icon: Icons.money_rounded,
+            iconColor: const Color(0xFF8A9491),
+            title: 'Cash on Delivery',
+            subtitle: 'Pay when you collect your food',
+            isSelected: _payment == PaymentMethod.cash,
+            onTap: () => setState(() => _payment = PaymentMethod.cash),
+          ),
+        ],
       ],
     );
   }
@@ -817,6 +835,7 @@ class _QuantityButton extends StatelessWidget {
 
 class _PaymentOption extends StatelessWidget {
   const _PaymentOption({
+    super.key,
     required this.icon,
     required this.iconColor,
     required this.title,

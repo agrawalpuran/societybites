@@ -1,8 +1,8 @@
 ﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../widgets/app_header.dart';
+import '../widgets/listing_image.dart';
 import '../widgets/order_items_list.dart';
 import '../widgets/order_fulfilment_banner.dart';
 import '../models/data.dart';
@@ -242,9 +242,16 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         ),
       );
 
-      // Optional Ready-by: never blocks accept; Skip leaves NULL.
+      // Optional Ready-by: COD keeps current accept-time picker. UPI waits for payment confirm.
       if (nextStatus == 'accepted') {
-        await _promptReadyBy(order.id, order.orderId);
+        final payment = SellerPaymentActions.fromOrder(
+          status: nextStatus,
+          paymentMethod: order.paymentMethod,
+          paymentStatus: order.paymentStatus,
+        );
+        if (payment.promptReadyByOnAccept) {
+          await _promptReadyBy(order.id, order.orderId);
+        }
       }
     } catch (e) {
       debugPrint('SELLER STATUS FAILED ${order.orderId}: $e');
@@ -627,7 +634,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             ...orders.map((order) => _SellerPastOrderCard(order: order))
           else
             ...orders.map(
-              (order) => _ActiveOrderCard(
+              (order) => SellerActiveOrderCard(
                 key: ValueKey(order.id),
                 order: order,
                 onAction: _updateStatus,
@@ -1136,8 +1143,8 @@ class _SatisfactionCard extends StatelessWidget {
   }
 }
 
-class _ActiveOrderCard extends StatefulWidget {
-  const _ActiveOrderCard({
+class SellerActiveOrderCard extends StatefulWidget {
+  const SellerActiveOrderCard({
     super.key,
     required this.order,
     required this.onAction,
@@ -1155,10 +1162,10 @@ class _ActiveOrderCard extends StatefulWidget {
   final Future<void> Function(Order order) onReadyBy;
 
   @override
-  State<_ActiveOrderCard> createState() => _ActiveOrderCardState();
+  State<SellerActiveOrderCard> createState() => _SellerActiveOrderCardState();
 }
 
-class _ActiveOrderCardState extends State<_ActiveOrderCard> {
+class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
   bool _isUpdating = false;
   bool _isConfirmingPayment = false;
 
@@ -1176,9 +1183,34 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
   }
 
   Future<void> _confirmPayment() async {
+    final result = await showModalBottomSheet<Object?>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _ReadyBySheet(
+        orderId: widget.order.orderId,
+        allowClear: false,
+        initial: widget.order.expectedReadyAt,
+      ),
+    );
+    if (!mounted || result == null) return;
+
     setState(() => _isConfirmingPayment = true);
     try {
-      final json = await ApiService.confirmPayment(orderId: widget.order.id);
+      DateTime? expectedReadyAt;
+      num? readyInMinutes;
+      if (result is DateTime) {
+        expectedReadyAt = result;
+      } else if (result is num) {
+        readyInMinutes = result;
+      }
+      final json = await ApiService.confirmPayment(
+        orderId: widget.order.id,
+        expectedReadyAt: expectedReadyAt,
+        readyInMinutes: readyInMinutes,
+      );
       widget.onOrderUpdated(Order.fromJson(json));
       await widget.onPaymentConfirmed();
       if (!mounted) return;
@@ -1259,36 +1291,16 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
     }
   }
 
-  Future<void> _callBuyer() async {
-    final phone = widget.order.buyerPhone?.trim();
-    if (phone == null || phone.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Buyer phone is not available')),
-      );
-      return;
-    }
-    final uri = Uri(scheme: 'tel', path: phone);
-    try {
-      final launched = await launchUrl(uri);
-      if (!launched && mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Could not dial $phone')));
-      }
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not dial $phone')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
     final lifecycle = SellerOrderLifecycle.forStatus(order.status);
-    final isCash = (order.paymentMethod ?? 'upi').toLowerCase() == 'cash';
+    final payment = SellerPaymentActions.fromOrder(
+      status: order.status,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+    );
+    final isCash = payment.isCash;
     final cashPaid = order.paymentStatus == 'paid';
     final needsCashConfirm = isCash &&
         lifecycle.treatAsReady &&
@@ -1296,11 +1308,11 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
         order.paymentStatus != 'failed';
     final canComplete = lifecycle.showComplete && (!isCash || cashPaid);
     final hasSellerAction =
-        lifecycle.showAccept || lifecycle.showMarkReady || canComplete;
+        lifecycle.showAccept || payment.showMarkReady || canComplete;
     final canReject = lifecycle.showReject;
-    final canSetReadyBy = lifecycle.showMarkReady;
-    final showUpiConfirm =
-        !isCash && order.paymentStatus == 'buyer_marked_paid';
+    final canSetReadyBy = payment.canSetReadyBy;
+    final showUpiConfirm = payment.showConfirmOrderAndChooseTime;
+    final showUpiPaymentPending = payment.showPaymentPending;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1315,6 +1327,16 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
         children: [
           Row(
             children: [
+              if (order.items.isNotEmpty) ...[
+                ListingImage(
+                  food: order.items.first.food,
+                  width: 56,
+                  height: 56,
+                  borderRadius: 14,
+                  iconSize: 26,
+                ),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1434,6 +1456,28 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
               ),
             ],
           ],
+          if (showUpiPaymentPending) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E8),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFE0A3)),
+              ),
+              child: Text(
+                order.paymentStatus == 'buyer_marked_paid'
+                    ? 'Payment Pending — buyer marked paid'
+                    : 'Payment Pending',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFB8860B),
+                ),
+              ),
+            ),
+          ],
           if (showUpiConfirm) ...[
             const SizedBox(height: 12),
             SizedBox(
@@ -1460,7 +1504,9 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                       )
                     : const Icon(Icons.check_circle_rounded, size: 18),
                 label: Text(
-                  _isConfirmingPayment ? 'Confirming...' : 'Confirm Payment',
+                  _isConfirmingPayment
+                      ? 'Confirming...'
+                      : 'Confirm Order & Choose Time',
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
@@ -1570,80 +1616,52 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
               ),
             ),
           ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              if (hasSellerAction) ...[
-              Expanded(
-                child: SizedBox(
-                  height: 42,
-                  child: ElevatedButton(
-                    onPressed: _isUpdating
-                        ? null
-                        : () {
-                            if (canComplete) {
-                              _completeOrder();
-                            } else if (lifecycle.showMarkReady) {
-                              _handleAction('ready');
-                            } else if (lifecycle.showAccept) {
-                              _handleAction('accepted');
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0E5A47),
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: const Color(0xFFE8EDEB),
-                      disabledForegroundColor: const Color(0xFF6A7774),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+          if (hasSellerAction) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: ElevatedButton(
+                onPressed: _isUpdating
+                    ? null
+                    : () {
+                        if (canComplete) {
+                          _completeOrder();
+                        } else if (lifecycle.showMarkReady) {
+                          _handleAction('ready');
+                        } else if (lifecycle.showAccept) {
+                          _handleAction('accepted');
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0E5A47),
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFE8EDEB),
+                  disabledForegroundColor: const Color(0xFF6A7774),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: _isUpdating
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        lifecycle.primaryLabel,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
                       ),
-                      elevation: 0,
-                    ),
-                    child: _isUpdating
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                          : Text(
-                            lifecycle.primaryLabel,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
-                          ),
-                  ),
-                ),
               ),
-              const SizedBox(width: 10),
-              ],
-              Material(
-                color: const Color(0xFFF5F7F6),
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  onTap: _callBuyer,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    width: 42,
-                    height: 42,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE0E5E3)),
-                    ),
-                    child: const Icon(
-                      Icons.phone_rounded,
-                      size: 20,
-                      color: Color(0xFF3A4644),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
           if (canSetReadyBy) ...[
             const SizedBox(height: 8),
             if (order.showExpectedReadyAt) ...[
@@ -1842,6 +1860,16 @@ class _SellerPastOrderCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (order.items.isNotEmpty) ...[
+                ListingImage(
+                  food: order.items.first.food,
+                  width: 56,
+                  height: 56,
+                  borderRadius: 14,
+                  iconSize: 26,
+                ),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

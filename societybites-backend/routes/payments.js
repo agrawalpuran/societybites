@@ -6,7 +6,9 @@ const { serializeOrder } = require("../utils/listingSerializer");
 const {
   notifyBuyerMarkedPaid,
   notifyPaymentConfirmed,
+  notifyReadyBy,
 } = require("../utils/notifications");
+const { parseOptionalReadyAt } = require("../lib/orderReadyTime");
 
 const router = express.Router();
 
@@ -106,11 +108,22 @@ router.post(
       return res.status(400).json({ error: "Payment has not been marked by buyer" });
     }
 
+    let readyPatch = {};
+    try {
+      const parsed = parseOptionalReadyAt(req.body || {});
+      if (!parsed.omit) {
+        readyPatch = { expectedReadyAt: parsed.readyAt };
+      }
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+
     const updated = await prisma.order.update({
       where: { id: order.id },
       data: {
         paymentStatus: "seller_confirmed",
         sellerConfirmedPaidAt: new Date(),
+        ...readyPatch,
       },
       include: orderInclude,
     });
@@ -118,6 +131,9 @@ router.post(
     console.log(`[PAYMENT] Confirmed for ${order.orderNumber} by seller ${req.user.phone}`);
 
     notifyPaymentConfirmed(updated);
+    if (Object.prototype.hasOwnProperty.call(readyPatch, "expectedReadyAt")) {
+      notifyReadyBy(updated, readyPatch.expectedReadyAt == null);
+    }
 
     res.json(serializeOrder(updated));
   })

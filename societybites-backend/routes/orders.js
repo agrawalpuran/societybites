@@ -22,6 +22,10 @@ const {
   authorizeListingForBuyer,
   snapshotRegularFulfilment,
 } = require("../lib/crossSocietyOrder");
+const {
+  assertPaymentMethodAllowed,
+  upiBlocksPreparation,
+} = require("../lib/sellerPaymentPreference");
 
 const router = express.Router();
 
@@ -439,6 +443,21 @@ router.post(
       });
     }
 
+    const sellerForPayment =
+      preparedItems.find((item) => item.seller)?.seller ||
+      (await prisma.user.findUnique({
+        where: { id: preparedItems[0].listing.sellerId },
+        select: { paymentPreference: true },
+      }));
+    try {
+      assertPaymentMethodAllowed({
+        preference: sellerForPayment && sellerForPayment.paymentPreference,
+        paymentMethod,
+      });
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+
     let campaign = null;
     let fulfilmentMethod = null;
     let deliveryCharge = 0;
@@ -706,6 +725,13 @@ router.patch(
       }
     }
 
+    if (status === "ready" && upiBlocksPreparation(order)) {
+      return res.status(400).json({
+        error:
+          "Confirm UPI payment before marking this order ready. The buyer must use I Have Paid first.",
+      });
+    }
+
     if (status === "cancelled" && !["pending", "accepted"].includes(order.status)) {
       return res.status(400).json({
         error: "Can only cancel before preparation begins",
@@ -873,6 +899,13 @@ router.patch(
     if (!["accepted", "preparing"].includes(order.status)) {
       return res.status(400).json({
         error: `Ready by can only be set while the order is accepted or preparing (current: "${order.status}")`,
+      });
+    }
+
+    if (upiBlocksPreparation(order)) {
+      return res.status(400).json({
+        error:
+          "Ready by can be set after UPI payment is confirmed. Use Confirm Order & Choose Time.",
       });
     }
 

@@ -16,6 +16,9 @@ const {
 const { rateLimit } = require("../middleware/rateLimit");
 const { attachSellingReach, assertSellerSellingReachLevel } = require("../lib/sellingReach");
 const { assertSellerFulfilmentUpdate } = require("../lib/sellerFulfilment");
+const {
+  assertSellerPaymentPreferenceUpdate,
+} = require("../lib/sellerPaymentPreference");
 const { deleteAuthenticatedAccount } = require("../lib/accountDeletion");
 
 const router = express.Router();
@@ -277,6 +280,7 @@ router.patch(
       sellingReachLevel,
       fulfilmentMode,
       deliveryCharge,
+      paymentPreference,
     } = req.body;
 
     const data = {};
@@ -334,6 +338,13 @@ router.patch(
     }
     if (paymentEnabled !== undefined && upiId === undefined) {
       data.paymentEnabled = Boolean(paymentEnabled);
+    }
+    if (paymentPreference !== undefined) {
+      const nextRole = data.role || req.user.role;
+      data.paymentPreference = assertSellerPaymentPreferenceUpdate({
+        requested: paymentPreference,
+        role: nextRole,
+      });
     }
 
     const user = await prisma.user.update({

@@ -48,6 +48,7 @@ Future<void> _pumpProfile(
     String? sellingReachLevel,
     String? fulfilmentMode,
     double? deliveryCharge,
+    String? paymentPreference,
   })? updateProfile,
 }) async {
   SharedPreferences.setMockInitialValues({
@@ -93,7 +94,12 @@ void main() {
     await _pumpProfile(
       tester,
       profile: _sellerMe(nearby: 5, extended: 10),
-      updateProfile: ({sellingReachLevel, fulfilmentMode, deliveryCharge}) async {
+      updateProfile: ({
+        sellingReachLevel,
+        fulfilmentMode,
+        deliveryCharge,
+        paymentPreference,
+      }) async {
         savedLevel = sellingReachLevel ?? savedLevel;
         return _sellerMe(level: savedLevel, nearby: 5, extended: 10);
       },
@@ -130,7 +136,12 @@ void main() {
     await _pumpProfile(
       tester,
       profile: _sellerMe(nearby: 5, extended: 10),
-      updateProfile: ({sellingReachLevel, fulfilmentMode, deliveryCharge}) async {
+      updateProfile: ({
+        sellingReachLevel,
+        fulfilmentMode,
+        deliveryCharge,
+        paymentPreference,
+      }) async {
         throw Exception('city config missing');
       },
     );
@@ -153,7 +164,12 @@ void main() {
     await _pumpProfile(
       tester,
       profile: _sellerMe(),
-      updateProfile: ({sellingReachLevel, fulfilmentMode, deliveryCharge}) async {
+      updateProfile: ({
+        sellingReachLevel,
+        fulfilmentMode,
+        deliveryCharge,
+        paymentPreference,
+      }) async {
         updateCalls++;
         return _sellerMe(level: sellingReachLevel ?? 'MY_SOCIETY');
       },
@@ -204,6 +220,7 @@ void main() {
 
     expect(find.text('Start Selling'), findsOneWidget);
     expect(find.text('SELLER SETTINGS'), findsNothing);
+    expect(find.text('PAYMENT METHODS'), findsNothing);
     expect(find.text('Edit Profile'), findsOneWidget);
     expect(find.text('My Orders'), findsOneWidget);
   });

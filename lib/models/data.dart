@@ -63,6 +63,7 @@ class FoodItem {
   final String? campaignId;
   final String? societyId;
   final String catalogType;
+  final String sellerPaymentPreference;
 
   const FoodItem({
     required this.id,
@@ -94,6 +95,7 @@ class FoodItem {
     this.campaignId,
     this.societyId,
     this.catalogType = listingCatalogRegular,
+    this.sellerPaymentPreference = 'UPI_AND_COD',
   });
 
   List<String> get listingCategories {
@@ -177,7 +179,11 @@ class FoodItem {
       rating: _asDouble(json['avgRating']),
       pickupTime: _formatPickupTime(availableAtRaw),
       description: json['description']?.toString() ?? '',
-      imageUrl: json['imageUrl']?.toString(),
+      imageUrl: () {
+        final raw = json['imageUrl']?.toString().trim();
+        if (raw == null || raw.isEmpty || raw == 'null') return null;
+        return raw;
+      }(),
       imageCacheKey:
           json['updatedAt']?.toString() ?? json['imageCacheKey']?.toString(),
       quantity: _asInt(json['quantity'], 1),
@@ -201,6 +207,8 @@ class FoodItem {
       }(),
       societyId: json['societyId']?.toString(),
       catalogType: parseListingCatalogType(json['catalogType']),
+      sellerPaymentPreference:
+          json['sellerPaymentPreference']?.toString() ?? 'UPI_AND_COD',
     );
   }
 
@@ -653,6 +661,7 @@ class PreOrderCampaign {
   final int totalOrders;
   final int totalItems;
   final double foodSubtotal;
+  final String sellerPaymentPreference;
 
   const PreOrderCampaign({
     required this.id,
@@ -671,6 +680,7 @@ class PreOrderCampaign {
     this.totalOrders = 0,
     this.totalItems = 0,
     this.foodSubtotal = 0,
+    this.sellerPaymentPreference = 'UPI_AND_COD',
   });
 
   bool get isOpen =>
@@ -714,6 +724,13 @@ class PreOrderCampaign {
       totalOrders: (json['totalOrders'] as num?)?.toInt() ?? 0,
       totalItems: (json['totalItems'] as num?)?.toInt() ?? 0,
       foodSubtotal: (json['foodSubtotal'] as num?)?.toDouble() ?? 0,
+      sellerPaymentPreference:
+          json['sellerPaymentPreference']?.toString() ??
+          (rawProducts.isNotEmpty
+              ? Map<String, dynamic>.from(rawProducts.first as Map)['sellerPaymentPreference']
+                    ?.toString()
+              : null) ??
+          'UPI_AND_COD',
     );
   }
 }

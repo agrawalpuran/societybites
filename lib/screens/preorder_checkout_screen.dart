@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/data.dart';
+import '../models/seller_payment_preference.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
@@ -36,6 +37,10 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
         : 'seller_delivery';
     _loadPlatformFee();
   }
+
+  bool get _allowsCash =>
+      parseSellerPaymentPreference(widget.campaign.sellerPaymentPreference)
+          .allowsCod;
 
   Future<void> _loadPlatformFee() async {
     try {
@@ -224,18 +229,20 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
                 _paymentOption(
                   PreOrderPaymentMethod.upi,
                   Icons.account_balance_wallet_rounded,
-                  'UPI payment',
+                  'UPI',
                   "Direct transfer to the seller's UPI",
                 ),
-                const SizedBox(height: 10),
-                _paymentOption(
-                  PreOrderPaymentMethod.cash,
-                  Icons.money_rounded,
-                  'Cash',
-                  _fulfilmentMethod == 'pickup'
-                      ? 'Pay when you collect your order'
-                      : 'Settle directly with the seller',
-                ),
+                if (_allowsCash) ...[
+                  const SizedBox(height: 10),
+                  _paymentOption(
+                    PreOrderPaymentMethod.cash,
+                    Icons.money_rounded,
+                    'Cash on Delivery',
+                    _fulfilmentMethod == 'pickup'
+                        ? 'Pay when you collect your order'
+                        : 'Settle directly with the seller',
+                  ),
+                ],
                 const SizedBox(height: 22),
                 _section('ORDER TOTAL'),
                 _bill(),

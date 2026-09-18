@@ -21,15 +21,15 @@ class ListingImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = food.imageUrl;
-    final isAsset = imageUrl != null &&
-        imageUrl.isNotEmpty &&
+    final imageUrl = food.imageUrl?.trim();
+    final hasUrl = imageUrl != null && imageUrl.isNotEmpty && imageUrl != 'null';
+    final isAsset = hasUrl &&
         (imageUrl.startsWith('asset:') ||
             imageUrl.startsWith('assets/') ||
             imageUrl.startsWith('pics/'));
     final assetPath =
         isAsset && imageUrl.startsWith('asset:') ? imageUrl.substring(6) : imageUrl;
-    final resolvedUrl = !isAsset && imageUrl != null && imageUrl.isNotEmpty
+    final resolvedUrl = !isAsset && hasUrl
         ? ApiService.imageUrl(imageUrl, cacheKey: food.imageCacheKey)
         : null;
 
@@ -53,6 +53,8 @@ class ListingImage extends StatelessWidget {
                     width: width,
                     height: height,
                     fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                     errorBuilder: (_, _, _) => _iconFallback(),
                   )
                 : _iconFallback(),

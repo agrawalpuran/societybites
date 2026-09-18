@@ -1,4 +1,5 @@
 const prisma = require("./prisma");
+const { serializePaymentPreference } = require("./sellerPaymentPreference");
 
 const CAMPAIGN_STATUSES = ["draft", "open", "closed", "cancelled"];
 const FULFILMENT_METHODS = ["pickup", "seller_delivery"];
@@ -106,6 +107,10 @@ async function campaignHasOrders(campaignId) {
 
 function serializeCampaign(campaign) {
   if (!campaign) return null;
+  const sellerPrefSource =
+    campaign.seller ||
+    (campaign.products && campaign.products[0] && campaign.products[0].seller) ||
+    null;
   return {
     id: campaign.id,
     sellerId: campaign.sellerId,
@@ -120,6 +125,7 @@ function serializeCampaign(campaign) {
     status: campaign.status,
     offeredFulfilmentMethods: campaign.offeredFulfilmentMethods || ["pickup"],
     defaultDeliveryCharge: campaign.defaultDeliveryCharge || 0,
+    sellerPaymentPreference: serializePaymentPreference(sellerPrefSource),
     createdAt: campaign.createdAt,
     updatedAt: campaign.updatedAt,
     products: Array.isArray(campaign.products) ? campaign.products : undefined,

@@ -4,6 +4,7 @@ const { isValidSocietyLocation } = require("./geoDistance");
 const { evaluateSellerDiscoveryEligibility } = require("./sellingReachEligibility");
 const { serializeSellingReach } = require("./sellingReach");
 const { serializeFulfilment } = require("./sellerFulfilment");
+const { serializePaymentPreference } = require("./sellerPaymentPreference");
 const { serializeListing } = require("../utils/listingSerializer");
 const { expireDueListings } = require("../utils/listingExpiry");
 
@@ -73,8 +74,10 @@ function serializeNearbySeller(seller, eligibility) {
       societyName: (seller.society && seller.society.name) || null,
       distanceKm: roundKm(eligibility.distanceKm),
       sellingReachLevel: seller.sellingReachLevel || "MY_SOCIETY",
+      paymentPreference: serializePaymentPreference(seller),
     },
     fulfilment: serializeFulfilment(seller),
+    paymentPreference: serializePaymentPreference(seller),
     listings,
   };
 }

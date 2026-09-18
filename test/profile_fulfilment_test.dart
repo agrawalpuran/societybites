@@ -51,6 +51,7 @@ Future<void> _pumpSeller(
     String? sellingReachLevel,
     String? fulfilmentMode,
     double? deliveryCharge,
+    String? paymentPreference,
   })? updateProfile,
 }) async {
   SharedPreferences.setMockInitialValues({
@@ -104,7 +105,12 @@ void main() {
     await _pumpSeller(
       tester,
       profile: _sellerMe(),
-      updateProfile: ({sellingReachLevel, fulfilmentMode, deliveryCharge}) async {
+      updateProfile: ({
+        sellingReachLevel,
+        fulfilmentMode,
+        deliveryCharge,
+        paymentPreference,
+      }) async {
         savedMode = fulfilmentMode ?? savedMode;
         savedCharge = deliveryCharge ?? savedCharge;
         return _sellerMe(fulfilmentMode: savedMode, deliveryCharge: savedCharge);
@@ -112,6 +118,8 @@ void main() {
     );
 
     expect(find.text('SELLER FULFILMENT'), findsOneWidget);
+    expect(find.text('PAYMENT METHODS'), findsOneWidget);
+    expect(find.text('UPI + Cash on Delivery'), findsOneWidget);
     expect(find.text('Buyer Pickup'), findsOneWidget);
     expect(find.text('SELLER SETTINGS'), findsOneWidget);
     expect(find.text('My Society'), findsOneWidget);
@@ -145,7 +153,12 @@ void main() {
     await _pumpSeller(
       tester,
       profile: _sellerMe(),
-      updateProfile: ({sellingReachLevel, fulfilmentMode, deliveryCharge}) async {
+      updateProfile: ({
+        sellingReachLevel,
+        fulfilmentMode,
+        deliveryCharge,
+        paymentPreference,
+      }) async {
         throw Exception('rejected');
       },
     );
@@ -191,6 +204,7 @@ void main() {
 
     expect(find.text('Start Selling'), findsOneWidget);
     expect(find.text('SELLER FULFILMENT'), findsNothing);
+    expect(find.text('PAYMENT METHODS'), findsNothing);
     expect(find.text('SELLER SETTINGS'), findsNothing);
   });
 }

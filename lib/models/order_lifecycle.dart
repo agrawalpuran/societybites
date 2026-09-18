@@ -81,6 +81,45 @@ class SellerOrderLifecycle {
   bool get hasPrimaryAction => showAccept || showMarkReady || showComplete;
 }
 
+class SellerPaymentActions {
+  const SellerPaymentActions({
+    required this.isCash,
+    required this.showPaymentPending,
+    required this.showConfirmOrderAndChooseTime,
+    required this.showMarkReady,
+    required this.canSetReadyBy,
+    required this.promptReadyByOnAccept,
+  });
+
+  final bool isCash;
+  final bool showPaymentPending;
+  final bool showConfirmOrderAndChooseTime;
+  final bool showMarkReady;
+  final bool canSetReadyBy;
+  final bool promptReadyByOnAccept;
+
+  factory SellerPaymentActions.fromOrder({
+    required String status,
+    String? paymentMethod,
+    required String paymentStatus,
+  }) {
+    final lifecycle = SellerOrderLifecycle.forStatus(status);
+    final cash = (paymentMethod ?? 'upi').toLowerCase() == 'cash';
+    final confirmed =
+        paymentStatus == 'seller_confirmed' || paymentStatus == 'paid';
+    final inPrepWindow = lifecycle.showMarkReady;
+    return SellerPaymentActions(
+      isCash: cash,
+      showPaymentPending: !cash && inPrepWindow && !confirmed,
+      showConfirmOrderAndChooseTime:
+          !cash && paymentStatus == 'buyer_marked_paid',
+      showMarkReady: lifecycle.showMarkReady && (cash || confirmed),
+      canSetReadyBy: lifecycle.showMarkReady && (cash || confirmed),
+      promptReadyByOnAccept: cash,
+    );
+  }
+}
+
 class BuyerOrderLifecycle {
   static const progressSteps = [
     'Order Placed',

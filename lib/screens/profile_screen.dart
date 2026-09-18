@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/seller_fulfilment.dart';
+import '../models/seller_payment_preference.dart';
 import '../models/selling_reach.dart';
 import '../services/api_service.dart';
 import '../services/seller_onboarding.dart';
@@ -37,6 +38,7 @@ class ProfileScreen extends StatefulWidget {
     String? sellingReachLevel,
     String? fulfilmentMode,
     double? deliveryCharge,
+    String? paymentPreference,
   })? updateProfile;
 
   /// Test seam. Production uses [ApiService.deleteMyAccount].
@@ -58,6 +60,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   SellingReachLevel _sellingReachLevel = SellingReachLevel.mySociety;
   SellingReach _sellingReach = const SellingReach();
   SellerFulfilment _fulfilment = const SellerFulfilment();
+  SellerPaymentPreference _paymentPreference = defaultSellerPaymentPreference;
 
   @override
   void initState() {
@@ -99,6 +102,7 @@ class ProfileScreenState extends State<ProfileScreen> {
         _sellingReachLevel = parseSellingReachLevel(profile['sellingReachLevel']);
         _sellingReach = SellingReach.fromAuthMe(profile);
         _fulfilment = SellerFulfilment.fromAuthMe(profile);
+        _paymentPreference = paymentPreferenceFromAuthMe(profile);
       } catch (_) {}
     }
 
@@ -735,6 +739,39 @@ class ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _changePaymentPreference() async {
+    final selected = await showModalBottomSheet<SellerPaymentPreference>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _PaymentPreferenceSheet(initial: _paymentPreference),
+    );
+
+    if (selected == null || !mounted || selected == _paymentPreference) return;
+
+    final previous = _paymentPreference;
+    try {
+      final updated = widget.updateProfile != null
+          ? await widget.updateProfile!(paymentPreference: selected.apiValue)
+          : await ApiService.updateMyProfile(paymentPreference: selected.apiValue);
+      if (!mounted) return;
+      setState(() {
+        _paymentPreference = paymentPreferenceFromAuthMe(updated);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment methods updated')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _paymentPreference = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update payment methods: $e')),
+      );
+    }
+  }
+
   void _openLegal(String title, String content) {
     Navigator.push(
       context,
@@ -900,6 +937,24 @@ class ProfileScreenState extends State<ProfileScreen> {
                               subtitle: _sellingReach.subtitleFor(_sellingReachLevel),
                               trailingLabel: 'Change',
                               onTap: _changeSellingReach,
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'PAYMENT METHODS',
+                              style: TextStyle(
+                                fontSize: 12,
+                                letterSpacing: 1.4,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF8A9491),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            _MenuTile(
+                              icon: Icons.payments_outlined,
+                              title: _paymentPreference.title,
+                              subtitle: _paymentPreference.profileSubtitle,
+                              trailingLabel: 'Change',
+                              onTap: _changePaymentPreference,
                             ),
                             const SizedBox(height: 10),
                             const Text(
@@ -1258,6 +1313,126 @@ class _FulfilmentSheetState extends State<_FulfilmentSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PaymentPreferenceSheet extends StatefulWidget {
+  const _PaymentPreferenceSheet({required this.initial});
+  final SellerPaymentPreference initial;
+
+  @override
+  State<_PaymentPreferenceSheet> createState() =>
+      _PaymentPreferenceSheetState();
+}
+
+class _PaymentPreferenceSheetState extends State<_PaymentPreferenceSheet> {
+  late SellerPaymentPreference _value;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.initial;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        24,
+        24,
+        24 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'PAYMENT METHODS',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF101617),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...SellerPaymentPreference.values.map((option) {
+            final selected = option == _value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
+                color: const Color(0xFFF5F7F6),
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => setState(() => _value = option),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          selected
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_off_rounded,
+                          color: selected
+                              ? const Color(0xFF0E5A47)
+                              : const Color(0xFF8A9491),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                option.optionTitle,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF101617),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                option.optionSubtitle,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF6A7774),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context, _value),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0E5A47),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Save',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

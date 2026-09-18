@@ -375,6 +375,7 @@ class ApiService {
     String? sellingReachLevel,
     String? fulfilmentMode,
     double? deliveryCharge,
+    String? paymentPreference,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/auth/me/profile'),
@@ -390,6 +391,7 @@ class ApiService {
         if (sellingReachLevel != null) 'sellingReachLevel': sellingReachLevel,
         if (fulfilmentMode != null) 'fulfilmentMode': fulfilmentMode,
         if (deliveryCharge != null) 'deliveryCharge': deliveryCharge,
+        if (paymentPreference != null) 'paymentPreference': paymentPreference,
       }),
     );
 
@@ -1245,10 +1247,17 @@ class ApiService {
 
   static Future<Map<String, dynamic>> confirmPayment({
     required String orderId,
+    DateTime? expectedReadyAt,
+    num? readyInMinutes,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/payments/$orderId/confirm'),
       headers: await _authHeaders(),
+      body: jsonEncode({
+        if (expectedReadyAt != null)
+          'expectedReadyAt': expectedReadyAt.toUtc().toIso8601String(),
+        if (readyInMinutes != null) 'readyInMinutes': readyInMinutes,
+      }),
     );
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);

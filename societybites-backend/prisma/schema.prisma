@@ -23,6 +23,8 @@ model User {
   fulfilmentMode    String   @default("BUYER_PICKUP")
   /// Seller-stated delivery charge. Money uses Float like Listing.price / Order.total.
   deliveryCharge    Float    @default(0)
+  /// UPI_ONLY | UPI_AND_COD. Controls NEW checkout options only; orders snapshot paymentMethod.
+  paymentPreference String   @default("UPI_AND_COD")
   suspended       Boolean    @default(false)
   createdAt       DateTime   @default(now())
   societyId       String?
