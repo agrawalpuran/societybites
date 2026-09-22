@@ -1,12 +1,12 @@
 const prisma = require("./prisma");
 const { listingCategoriesFromRecord } = require("../utils/listingCategories");
 const { canonicalCityKey } = require("./launchCity");
-const { expireDueListings } = require("../utils/listingExpiry");
+const { expireDueListings, DISCOVERABLE_STATUSES } = require("../utils/listingExpiry");
 
 const GUEST_REACH_LEVELS = ["NEARBY", "EXTENDED"];
 
 const ACTIVE_REGULAR_LISTING_WHERE = {
-  status: "active",
+  status: { in: DISCOVERABLE_STATUSES },
   campaignId: null,
   catalogType: "REGULAR",
 };
@@ -53,6 +53,13 @@ function serializeGuestListing(listing, seller) {
     categories: listingCategoriesFromRecord(listing),
     status: listing.status,
     catalogType: listing.catalogType || "REGULAR",
+    availabilityMode: listing.availabilityMode || "READY_NOW",
+    preparationTimeMinutes:
+      listing.preparationTimeMinutes == null
+        ? null
+        : listing.preparationTimeMinutes,
+    maxDailyOrders: listing.maxDailyOrders == null ? null : listing.maxDailyOrders,
+    madeToOrderUnavailableToday: Boolean(listing.madeToOrderUnavailableToday),
     sellerId: listing.sellerId,
     sellerName: (seller && seller.name) || "Neighbor",
     avgRating: Math.round(avgRating * 10) / 10,

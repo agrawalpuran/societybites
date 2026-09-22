@@ -201,6 +201,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             );
           };
 
+      if (_items.any((item) => item.food.isExpired)) {
+        throw Exception(
+          'One or more items are temporarily not available and cannot be ordered.',
+        );
+      }
+
       await place(
         societyId: societyId,
         paymentMethod: _payment == PaymentMethod.upi ? 'upi' : 'cash',

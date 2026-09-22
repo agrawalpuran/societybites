@@ -40,6 +40,13 @@ function serializeListing(listing) {
     categories: listingCategoriesFromRecord(listing),
     status: listing.status,
     catalogType: listing.catalogType || "REGULAR",
+    availabilityMode: listing.availabilityMode || "READY_NOW",
+    preparationTimeMinutes:
+      listing.preparationTimeMinutes == null
+        ? null
+        : listing.preparationTimeMinutes,
+    maxDailyOrders: listing.maxDailyOrders == null ? null : listing.maxDailyOrders,
+    madeToOrderUnavailableToday: Boolean(listing.madeToOrderUnavailableToday),
     societyId: listing.societyId,
     sellerId: listing.sellerId,
     sellerName: seller.name || "Neighbor",

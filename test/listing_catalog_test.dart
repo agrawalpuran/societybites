@@ -49,7 +49,7 @@ void main() {
     });
   });
 
-  testWidgets('My Listings shows Regular Orders and Pre-orders tabs', (
+  testWidgets('My Listings shows All, Regular, Made to Order, and Pre-orders tabs', (
     tester,
   ) async {
     _ignoreKnownLayoutNoise();
@@ -69,12 +69,19 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.textContaining('Regular Orders'), findsOneWidget);
+    expect(find.textContaining('All'), findsWidgets);
+    expect(find.textContaining('Regular'), findsWidgets);
+    expect(find.textContaining('Made to Order'), findsWidgets);
     expect(find.textContaining('Pre-orders'), findsWidgets);
+    expect(find.text('Samosa'), findsOneWidget);
+    expect(find.text('Sunday Biryani'), findsOneWidget);
+
+    await tester.tap(find.textContaining('Regular (').first);
+    await tester.pumpAndSettle();
     expect(find.text('Samosa'), findsOneWidget);
     expect(find.text('Sunday Biryani'), findsNothing);
 
-    await tester.tap(find.textContaining('Pre-orders').first);
+    await tester.tap(find.textContaining('Pre-orders (').first);
     await tester.pumpAndSettle();
 
     expect(find.text('Sunday Biryani'), findsOneWidget);
@@ -156,6 +163,8 @@ void main() {
     await tester.tap(find.text('Move'));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.textContaining('Regular (').first);
+    await tester.pumpAndSettle();
     expect(find.text('No regular listings yet'), findsOneWidget);
 
     await tester.tap(find.textContaining('Pre-orders').first);
@@ -200,7 +209,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No pre-order items yet'), findsOneWidget);
-    await tester.tap(find.textContaining('Regular Orders').first);
+    await tester.tap(find.textContaining('Regular (').first);
     await tester.pumpAndSettle();
     expect(find.text('Sunday Biryani'), findsOneWidget);
   });

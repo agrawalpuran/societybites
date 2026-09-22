@@ -620,6 +620,9 @@ class ApiService {
     List<String>? categories,
     required String foodType,
     String catalogType = 'REGULAR',
+    String availabilityMode = 'READY_NOW',
+    int? preparationTimeMinutes,
+    int? maxDailyOrders,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/listings'),
@@ -643,6 +646,10 @@ class ApiService {
         if (categories != null && categories.isNotEmpty) 'categories': categories,
         'foodType': foodType,
         'catalogType': catalogType,
+        'availabilityMode': availabilityMode,
+        if (preparationTimeMinutes != null)
+          'preparationTimeMinutes': preparationTimeMinutes,
+        if (maxDailyOrders != null) 'maxDailyOrders': maxDailyOrders,
       }),
     );
 
@@ -718,6 +725,10 @@ class ApiService {
     String? category,
     List<String>? categories,
     required String foodType,
+    String? availabilityMode,
+    int? preparationTimeMinutes,
+    int? maxDailyOrders,
+    bool clearMaxDailyOrders = false,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/listings/$listingId'),
@@ -737,6 +748,12 @@ class ApiService {
         if (category != null) 'category': category,
         if (categories != null) 'categories': categories,
         'foodType': foodType,
+        if (availabilityMode != null) 'availabilityMode': availabilityMode,
+        if (preparationTimeMinutes != null)
+          'preparationTimeMinutes': preparationTimeMinutes,
+        if (clearMaxDailyOrders) 'maxDailyOrders': null,
+        if (!clearMaxDailyOrders && maxDailyOrders != null)
+          'maxDailyOrders': maxDailyOrders,
       }),
     );
 
@@ -769,6 +786,28 @@ class ApiService {
 
     if (response.statusCode == 200) {
       return;
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> pauseAllListings() async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/listings/bulk/pause'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> resumeAllListings() async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/listings/bulk/resume'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
     }
     _throwFromResponse(response);
   }

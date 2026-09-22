@@ -109,6 +109,12 @@ model Listing {
   featured       Boolean     @default(false)
   /// REGULAR | PREORDER. Marketplace vs seller pre-order catalog. Independent of campaignId.
   catalogType    String      @default("REGULAR")
+  /// READY_NOW | MADE_TO_ORDER. Only meaningful for REGULAR catalog listings.
+  availabilityMode String    @default("READY_NOW")
+  /// Estimate in minutes for MADE_TO_ORDER. Seller still confirms the actual ready time.
+  preparationTimeMinutes Int?
+  /// Optional cap on accepted MADE_TO_ORDER orders per UTC day. Null = no cap.
+  maxDailyOrders Int?
   /// When set, this listing is a pre-order campaign product, not a regular listing.
   campaignId     String?
   /// Catalog listing this campaign product was copied from. Null for ad-hoc / historical copies.

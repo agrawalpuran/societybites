@@ -6,6 +6,7 @@ import '../models/data.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../models/food_type.dart';
+import '../models/listing_availability.dart';
 import '../models/listing_categories.dart';
 import '../widgets/available_in_selector.dart';
 import '../widgets/food_type_selector.dart';
@@ -15,10 +16,12 @@ class AddListingScreen extends StatefulWidget {
     super.key,
     this.existingListing,
     this.catalogType = listingCatalogRegular,
+    this.initialAvailabilityMode = listingAvailabilityReadyNow,
   });
 
   final FoodItem? existingListing;
   final String catalogType;
+  final String initialAvailabilityMode;
 
   @override
   State<AddListingScreen> createState() => _AddListingScreenState();
@@ -43,8 +46,171 @@ class _AddListingScreenState extends State<AddListingScreen> {
   String _imageMime = 'image/jpeg';
   String? _existingImageUrl;
   final ImagePicker _picker = ImagePicker();
+  late String _availabilityMode;
+  int _prepPresetMinutes = 60;
+  final _customPrepDaysController = TextEditingController();
+  final _maxDailyController = TextEditingController();
 
   bool get _isEditing => widget.existingListing != null;
+  bool get _isPreorderCatalog =>
+      widget.catalogType == listingCatalogPreorder ||
+      (widget.existingListing?.isPreOrderCatalog ?? false);
+  bool get _isMadeToOrder =>
+      !_isPreorderCatalog &&
+      _availabilityMode == listingAvailabilityMadeToOrder;
+
+  int? get _selectedPrepMinutes {
+    if (!_isMadeToOrder) return null;
+    final daysRaw = _customPrepDaysController.text.trim();
+    if (daysRaw.isNotEmpty) {
+      final days = int.tryParse(daysRaw);
+      if (days == null) return null;
+      return preparationMinutesFromDays(days);
+    }
+    return _prepPresetMinutes;
+  }
+
+  Widget _buildFulfilmentSection() {
+    return _buildField(
+      label: 'HOW WILL YOU FULFIL THIS?',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _FulfilmentOption(
+            selected: !_isMadeToOrder,
+            title: 'Available Now',
+            subtitle: 'Normally available for regular orders',
+            onTap: () => setState(() {
+              _availabilityMode = listingAvailabilityReadyNow;
+            }),
+          ),
+          const SizedBox(height: 8),
+          _FulfilmentOption(
+            selected: _isMadeToOrder,
+            title: 'Made to Order',
+            subtitle: 'Prepare this after a buyer places an order',
+            onTap: () => setState(() {
+              _availabilityMode = listingAvailabilityMadeToOrder;
+            }),
+          ),
+          if (_isMadeToOrder) ...[
+            const SizedBox(height: 14),
+            const Text(
+              'PREPARATION TIME',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.1,
+                color: Color(0xFF8A9491),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _prepChip(30, '30 minutes'),
+                _prepChip(60, '1 hour'),
+                _prepChip(120, '2 hours'),
+                _prepChip(240, '4 hours'),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _customPrepDaysController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(2),
+                    ],
+                    decoration: _inputDeco('e.g. 1'),
+                    onChanged: (_) => setState(() {}),
+                    validator: (value) {
+                      if (!_isMadeToOrder) return null;
+                      final raw = value?.trim() ?? '';
+                      if (raw.isEmpty) return null;
+                      final days = int.tryParse(raw);
+                      if (days == null) {
+                        return 'Enter a number of days';
+                      }
+                      if (days < 1 || days > maxPreparationDays) {
+                        return 'Enter 1 to $maxPreparationDays days';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Padding(
+                  padding: EdgeInsets.only(top: 16),
+                  child: Text(
+                    'days',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF3A4644),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'This is an estimate. You still confirm the actual ready time after accepting.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: Color(0xFF6A7774),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'MAXIMUM ORDERS PER DAY (OPTIONAL)',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.1,
+                color: Color(0xFF8A9491),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _maxDailyController,
+              keyboardType: TextInputType.number,
+              decoration: _inputDeco('Leave blank for no daily limit'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _prepChip(int minutes, String label) {
+    final selected = _customPrepDaysController.text.trim().isEmpty &&
+        _prepPresetMinutes == minutes;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) {
+        setState(() {
+          _prepPresetMinutes = minutes;
+          _customPrepDaysController.clear();
+        });
+      },
+      selectedColor: const Color(0xFFD6F0E4),
+      labelStyle: TextStyle(
+        fontWeight: FontWeight.w700,
+        color: selected ? const Color(0xFF0E5A47) : const Color(0xFF3A4644),
+      ),
+      side: BorderSide(
+        color: selected ? const Color(0xFF0E5A47) : const Color(0xFFE0E5E3),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -75,6 +241,23 @@ class _AddListingScreenState extends State<AddListingScreen> {
           .toList();
       _foodType = parseFoodType(listing.foodType);
       _dateTime = listing.availableAt;
+      _availabilityMode = listing.isMadeToOrder
+          ? listingAvailabilityMadeToOrder
+          : listingAvailabilityReadyNow;
+      if (listing.preparationTimeMinutes != null) {
+        _prepPresetMinutes = listing.preparationTimeMinutes!;
+        final days = preparationDaysFromMinutes(_prepPresetMinutes);
+        if (days != null) {
+          _customPrepDaysController.text = days.toString();
+        }
+      }
+      if (listing.maxDailyOrders != null) {
+        _maxDailyController.text = listing.maxDailyOrders.toString();
+      }
+    } else {
+      _availabilityMode = parseListingAvailabilityMode(
+        widget.initialAvailabilityMode,
+      );
     }
   }
 
@@ -85,6 +268,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
     _qtyController.dispose();
     _weightPerUnitController.dispose();
     _descController.dispose();
+    _customPrepDaysController.dispose();
+    _maxDailyController.dispose();
     super.dispose();
   }
 
@@ -237,6 +422,34 @@ class _AddListingScreenState extends State<AddListingScreen> {
       return;
     }
 
+    int? prepMinutes;
+    int? maxDaily;
+    if (_isMadeToOrder) {
+      prepMinutes = _selectedPrepMinutes;
+      if (prepMinutes == null ||
+          prepMinutes < 15 ||
+          prepMinutes > maxPreparationTimeMinutes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Choose a preparation time between 15 minutes and $maxPreparationDays days.',
+            ),
+          ),
+        );
+        return;
+      }
+      final maxRaw = _maxDailyController.text.trim();
+      if (maxRaw.isNotEmpty) {
+        maxDaily = int.tryParse(maxRaw);
+        if (maxDaily == null || maxDaily < 1) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Maximum orders per day must be a positive number.')),
+          );
+          return;
+        }
+      }
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -268,6 +481,12 @@ class _AddListingScreenState extends State<AddListingScreen> {
           tags: _selectedTags,
           categories: [..._selectedCategories, ..._legacyCategories],
           foodType: _foodType!,
+          availabilityMode: _isPreorderCatalog
+              ? listingAvailabilityReadyNow
+              : _availabilityMode,
+          preparationTimeMinutes: prepMinutes,
+          maxDailyOrders: maxDaily,
+          clearMaxDailyOrders: !_isMadeToOrder || maxDaily == null,
         );
       } else {
         await ApiService.createListing(
@@ -285,6 +504,11 @@ class _AddListingScreenState extends State<AddListingScreen> {
           categories: [..._selectedCategories, ..._legacyCategories],
           foodType: _foodType!,
           catalogType: widget.catalogType,
+          availabilityMode: _isPreorderCatalog
+              ? listingAvailabilityReadyNow
+              : _availabilityMode,
+          preparationTimeMinutes: prepMinutes,
+          maxDailyOrders: maxDaily,
         );
       }
 
@@ -606,6 +830,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           ),
                         ),
                       ),
+                      if (!_isPreorderCatalog) ...[
+                        const SizedBox(height: 18),
+                        _buildFulfilmentSection(),
+                      ],
                       const SizedBox(height: 18),
                       _buildField(
                         label: 'DESCRIPTION & INGREDIENTS',
@@ -1002,6 +1230,79 @@ class _PhotoSourceOption extends StatelessWidget {
                         fontSize: 12,
                         color: Color(0xFF8A9491),
                         fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FulfilmentOption extends StatelessWidget {
+  const _FulfilmentOption({
+    required this.selected,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? const Color(0xFFE8F5EE) : Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? const Color(0xFF0E5A47) : const Color(0xFFE0E5E3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                size: 22,
+                color: selected
+                    ? const Color(0xFF0E5A47)
+                    : const Color(0xFF8A9491),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF101617),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF6A7774),
                       ),
                     ),
                   ],

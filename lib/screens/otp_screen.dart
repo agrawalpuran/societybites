@@ -9,6 +9,9 @@ import 'main_shell_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_config.dart';
 import '../services/session_service.dart';
+import '../widgets/otp_verify_heading.dart';
+
+export '../widgets/otp_verify_heading.dart';
 
 class OtpScreen extends StatefulWidget {
   const OtpScreen({
@@ -368,15 +371,7 @@ class _OtpScreenState extends State<OtpScreen> {
                   const SizedBox(height: 22),
                   _SecurityBadge(),
                   const SizedBox(height: 18),
-                  const Text(
-                    'Verify your number',
-                    style: TextStyle(
-                      fontSize: 52,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF101617),
-                      height: 1,
-                    ),
-                  ),
+                  const OtpVerifyHeading(),
                   const SizedBox(height: 12),
                   Text(
                     'Enter the code sent to your mobile.\n'
@@ -410,7 +405,7 @@ class _OtpScreenState extends State<OtpScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 36),
                   _PrimaryActionButton(
                     text: 'Verify & Continue  →',
                     isLoading: _isVerifying,
@@ -570,7 +565,7 @@ class _PrimaryActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 64,
+      height: otpVerifyButtonHeight,
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
@@ -578,11 +573,12 @@ class _PrimaryActionButton extends StatelessWidget {
           foregroundColor: Colors.white,
           elevation: 0,
           shape: const StadiumBorder(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         ),
         child: isLoading
             ? const SizedBox(
-                width: 26,
-                height: 26,
+                width: 22,
+                height: 22,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.4,
                   color: Colors.white,
@@ -590,9 +586,13 @@ class _PrimaryActionButton extends StatelessWidget {
               )
             : Text(
                 text,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 34,
+                  fontSize: 24,
                   fontWeight: FontWeight.w700,
+                  height: 1.1,
                 ),
               ),
       ),

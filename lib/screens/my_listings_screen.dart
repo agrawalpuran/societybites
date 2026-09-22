@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../models/data.dart';
+import '../models/listing_availability.dart';
 import '../services/api_service.dart';
 import '../services/my_listings_cache.dart';
 import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
+import '../widgets/made_to_order_hint.dart';
 import 'add_listing_screen.dart';
 
 class MyListingsScreen extends StatefulWidget {
@@ -14,6 +16,8 @@ class MyListingsScreen extends StatefulWidget {
     super.key,
     this.fetchListings,
     this.updateCatalog,
+    this.pauseAllListings,
+    this.resumeAllListings,
   });
 
   /// Test seam. Production uses [ApiService.getListings].
@@ -22,6 +26,12 @@ class MyListingsScreen extends StatefulWidget {
   /// Test seam. Production uses [ApiService.updateListingCatalog].
   final Future<void> Function(String listingId, String catalogType)?
       updateCatalog;
+
+  /// Test seam. Production uses [ApiService.pauseAllListings].
+  final Future<Map<String, dynamic>> Function()? pauseAllListings;
+
+  /// Test seam. Production uses [ApiService.resumeAllListings].
+  final Future<Map<String, dynamic>> Function()? resumeAllListings;
 
   @override
   MyListingsScreenState createState() => MyListingsScreenState();
@@ -32,13 +42,14 @@ class MyListingsScreenState extends State<MyListingsScreen>
   List<FoodItem> _listings = [];
   bool _isLoading = true;
   bool _hasSuccessfullyLoaded = false;
+  bool _bulkBusy = false;
   String? _error;
   late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (mounted && !_tabController.indexIsChanging) setState(() {});
     });
@@ -56,13 +67,18 @@ class MyListingsScreenState extends State<MyListingsScreen>
     super.dispose();
   }
 
-  List<FoodItem> get _regularListings =>
-      _listings.where((item) => !item.isPreOrderCatalog).toList();
+  List<FoodItem> get _regularReadyNowListings => _listings
+      .where((item) => !item.isPreOrderCatalog && !item.isMadeToOrder)
+      .toList();
+
+  List<FoodItem> get _madeToOrderListings =>
+      _listings.where((item) => item.isMadeToOrder).toList();
 
   List<FoodItem> get _preorderListings =>
       _listings.where((item) => item.isPreOrderCatalog).toList();
 
-  bool get _isPreorderTab => _tabController.index == 1;
+  bool get _isPreorderTab => _tabController.index == 3;
+  bool get _isMadeToOrderTab => _tabController.index == 2;
 
   Future<void> reload() => _loadListings();
 
@@ -298,6 +314,9 @@ class MyListingsScreenState extends State<MyListingsScreen>
         builder: (_) => AddListingScreen(
           existingListing: listing,
           catalogType: catalogType,
+          initialAvailabilityMode: listing == null && _isMadeToOrderTab
+              ? listingAvailabilityMadeToOrder
+              : listingAvailabilityReadyNow,
         ),
       ),
     );
@@ -367,6 +386,106 @@ class MyListingsScreenState extends State<MyListingsScreen>
     }
   }
 
+  Future<void> _pauseAllListings() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pause all listings?'),
+        content: const Text(
+          'Your kitchen will temporarily stop accepting new orders.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            key: const Key('confirm-pause-all'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Pause All'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _bulkBusy = true);
+    try {
+      final pauseAll =
+          widget.pauseAllListings ?? ApiService.pauseAllListings;
+      final result = await pauseAll();
+      await _loadListings();
+      if (!mounted) return;
+      final count = result['pausedCount'];
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            count is num && count > 0
+                ? 'Paused $count listing${count == 1 ? '' : 's'}.'
+                : 'Listings paused.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_cleanError(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _bulkBusy = false);
+    }
+  }
+
+  Future<void> _renewAllListings() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Renew all listings?'),
+        content: const Text(
+          'Eligible paused listings will become available again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            key: const Key('confirm-renew-all'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Renew All'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _bulkBusy = true);
+    try {
+      final resumeAll =
+          widget.resumeAllListings ?? ApiService.resumeAllListings;
+      final result = await resumeAll();
+      await _loadListings();
+      if (!mounted) return;
+      final count = result['resumedCount'];
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            count is num && count > 0
+                ? 'Renewed $count listing${count == 1 ? '' : 's'}.'
+                : 'Eligible listings renewed.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_cleanError(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _bulkBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -405,6 +524,43 @@ class MyListingsScreenState extends State<MyListingsScreen>
                     ),
                     style: TextButton.styleFrom(
                       foregroundColor: const Color(0xFF0E5A47),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _bulkBusy ? null : _pauseAllListings,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF0E5A47),
+                        side: const BorderSide(color: Color(0xFF0E5A47)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text(
+                        'Pause All',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _bulkBusy ? null : _renewAllListings,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0E5A47),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text(
+                        'Renew All',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ),
                 ],
@@ -452,12 +608,32 @@ class MyListingsScreenState extends State<MyListingsScreen>
                                 controller: _tabController,
                                 children: [
                                   _buildCatalogPane(
-                                    listings: _regularListings,
-                                    isPreorder: false,
+                                    listings: _listings,
+                                    emptyTitle: 'No listings yet',
+                                    emptyBody:
+                                        'Add food items for regular orders, made to order, or pre-orders.',
+                                    addLabel: 'Add Listing',
+                                  ),
+                                  _buildCatalogPane(
+                                    listings: _regularReadyNowListings,
+                                    emptyTitle: 'No regular listings yet',
+                                    emptyBody:
+                                        'Add food items that customers can order anytime.',
+                                    addLabel: 'Add Listing',
+                                  ),
+                                  _buildCatalogPane(
+                                    listings: _madeToOrderListings,
+                                    emptyTitle: 'No made-to-order listings yet',
+                                    emptyBody:
+                                        'Add items you will prepare after a buyer places an order.',
+                                    addLabel: 'Add Listing',
                                   ),
                                   _buildCatalogPane(
                                     listings: _preorderListings,
-                                    isPreorder: true,
+                                    emptyTitle: 'No pre-order items yet',
+                                    emptyBody:
+                                        'Add food items that customers can order through your pre-order campaigns.',
+                                    addLabel: 'Add Pre-order Item',
                                   ),
                                 ],
                               ),
@@ -482,6 +658,8 @@ class MyListingsScreenState extends State<MyListingsScreen>
         ),
         child: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           indicator: BoxDecoration(
             color: const Color(0xFF0E5A47),
             borderRadius: BorderRadius.circular(12),
@@ -495,7 +673,9 @@ class MyListingsScreenState extends State<MyListingsScreen>
             fontSize: 13,
           ),
           tabs: [
-            Tab(text: 'Regular Orders (${_regularListings.length})'),
+            Tab(text: 'All (${_listings.length})'),
+            Tab(text: 'Regular (${_regularReadyNowListings.length})'),
+            Tab(text: 'Made to Order (${_madeToOrderListings.length})'),
             Tab(text: 'Pre-orders (${_preorderListings.length})'),
           ],
         ),
@@ -505,7 +685,9 @@ class MyListingsScreenState extends State<MyListingsScreen>
 
   Widget _buildCatalogPane({
     required List<FoodItem> listings,
-    required bool isPreorder,
+    required String emptyTitle,
+    required String emptyBody,
+    required String addLabel,
   }) {
     if (listings.isEmpty) {
       return Center(
@@ -515,9 +697,7 @@ class MyListingsScreenState extends State<MyListingsScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                isPreorder
-                    ? 'No pre-order items yet'
-                    : 'No regular listings yet',
+                emptyTitle,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontWeight: FontWeight.w700,
@@ -526,9 +706,7 @@ class MyListingsScreenState extends State<MyListingsScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                isPreorder
-                    ? 'Add food items that customers can order through your pre-order campaigns.'
-                    : 'Add food items that customers can order anytime.',
+                emptyBody,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Color(0xFF6A7774),
@@ -542,9 +720,7 @@ class MyListingsScreenState extends State<MyListingsScreen>
                   backgroundColor: const Color(0xFF0E5A47),
                   foregroundColor: Colors.white,
                 ),
-                child: Text(
-                  isPreorder ? 'Add Pre-order Item' : 'Add Listing',
-                ),
+                child: Text(addLabel),
               ),
             ],
           ),
@@ -654,6 +830,22 @@ class _SellerListingCard extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      listing.isPreOrderCatalog
+                          ? 'PRE-ORDER'
+                          : listing.isMadeToOrder
+                              ? 'MADE TO ORDER'
+                              : 'REGULAR',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        letterSpacing: 0.6,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF6A7774),
+                      ),
+                    ),
+                    if (listing.isMadeToOrder)
+                      MadeToOrderHint(food: listing, compact: true),
                   ],
                 ),
               ),

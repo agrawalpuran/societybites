@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/app_header.dart';
+import '../widgets/made_to_order_hint.dart';
+import '../widgets/temporarily_unavailable_label.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
 import 'checkout_screen.dart';
@@ -154,6 +156,11 @@ class _HeroSection extends StatelessWidget {
                   height: 1.1,
                 ),
               ),
+              MadeToOrderHint(food: food),
+              if (food.isExpired) ...[
+                const SizedBox(height: 8),
+                const TemporarilyUnavailableLabel(),
+              ],
               const SizedBox(height: 6),
               Text(
                 '₹${food.price.toStringAsFixed(0)} / portion',
@@ -402,12 +409,14 @@ class _StorySection extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Cooked for over 12 hours on a low flame, this ${food.name} is a signature recipe. '
-              'We use whole black lentils and kidney beans, enriched with white butter '
-              'and a touch of smoky charcoal flavor (dhungar). No artificial cream—just slow-cooked perfection.',
-              style: const TextStyle(
+              food.description.trim().isEmpty
+                  ? 'The seller has not added a description yet.'
+                  : food.description.trim(),
+              style: TextStyle(
                 fontSize: 15,
-                color: Color(0xFF3A4644),
+                color: food.description.trim().isEmpty
+                    ? const Color(0xFF8A9491)
+                    : const Color(0xFF3A4644),
                 height: 1.55,
                 fontWeight: FontWeight.w500,
               ),
@@ -753,10 +762,12 @@ class _BottomCta extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            SizedBox(
-              height: 54,
-              child: ElevatedButton.icon(
-                onPressed: food.quantity <= 0
+            Flexible(
+              child: SizedBox(
+                height: 54,
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                onPressed: !food.canAddToCart
                     ? null
                     : () async {
                         if (requireAuthToOrder) {
@@ -782,22 +793,27 @@ class _BottomCta extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
                 icon: Icon(
-                  food.quantity <= 0
+                  !food.canAddToCart
                       ? Icons.block_rounded
                       : Icons.shopping_cart_rounded,
                   size: 20,
                 ),
                 label: Text(
-                  food.quantity <= 0 ? 'Sold out' : 'Order Now',
+                  food.isExpired
+                      ? 'Temporarily not available'
+                      : food.quantity <= 0
+                      ? 'Sold out'
+                      : 'Order Now',
                   style: const TextStyle(
-                    fontSize: 17,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
+            ),
             ),
           ],
         ),

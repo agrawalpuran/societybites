@@ -117,6 +117,7 @@ async function main() {
     });
     assert(regular.status === 201, `create regular failed: ${JSON.stringify(regular.json)}`);
     assert(regular.json.catalogType === "REGULAR", "new listing must default to REGULAR");
+    assert(regular.json.availabilityMode === "READY_NOW", "new listing must default to READY_NOW");
     created.listingIds.push(regular.json.id);
 
     const preorder = await jsonRequest(server, {

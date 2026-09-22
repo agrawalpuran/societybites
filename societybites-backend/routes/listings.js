@@ -10,6 +10,7 @@ const {
 const {
   expireDueListings,
   expireListingIfDue,
+  DISCOVERABLE_STATUSES,
 } = require("../utils/listingExpiry");
 const { campaignHasOrders } = require("../lib/preorder");
 const {
@@ -33,6 +34,11 @@ const {
   ACTIVE_CAMPAIGN_MOVE_ERROR,
   ACTIVE_CAMPAIGN_DELETE_ERROR,
 } = require("../lib/listingCatalog");
+const {
+  availabilityWriteFields,
+  availabilityUpdateFields,
+  attachMadeToOrderCapacity,
+} = require("../lib/listingAvailability");
 
 const router = express.Router();
 
@@ -128,6 +134,9 @@ router.get(
       statusFilter = {
         status: { in: ["active", "paused", "sold_out", "expired"] },
       };
+    } else if (status === "discoverable") {
+      // Buyer marketplace: currently orderable plus expired (visible, not orderable)
+      statusFilter = { status: { in: DISCOVERABLE_STATUSES } };
     } else if (status) {
       statusFilter = { status: String(status) };
     } else {
@@ -170,7 +179,8 @@ router.get(
       orderBy: { createdAt: "desc" },
     });
 
-    res.json(listings.map((listing) => serializeListing(listing)));
+    const withCapacity = await attachMadeToOrderCapacity(prisma, listings);
+    res.json(withCapacity.map((listing) => serializeListing(listing)));
   })
 );
 
@@ -196,8 +206,8 @@ router.get(
     }
 
     listing = await expireListingIfDue(prisma, listing, { include: listingInclude });
-
-    res.json(serializeListing(listing));
+    const [withCapacity] = await attachMadeToOrderCapacity(prisma, [listing]);
+    res.json(serializeListing(withCapacity || listing));
   })
 );
 
@@ -260,8 +270,15 @@ router.post(
 
     const parsedCatalogType = parseCatalogType(req.body.catalogType);
     let parsedCategories;
+    let availabilityFields;
     try {
       parsedCategories = parseListingCategories(req.body, { required: true });
+      availabilityFields = availabilityWriteFields({
+        catalogType: parsedCatalogType,
+        availabilityMode: req.body.availabilityMode,
+        preparationTimeMinutes: req.body.preparationTimeMinutes,
+        maxDailyOrders: req.body.maxDailyOrders,
+      });
     } catch (err) {
       return res.status(err.statusCode || 400).json({ error: err.message });
     }
@@ -283,6 +300,7 @@ router.post(
         foodType: parsedFoodType,
         ...categoryWriteFields(parsedCategories),
         catalogType: parsedCatalogType,
+        ...availabilityFields,
       },
       include: listingInclude,
     });
@@ -335,7 +353,15 @@ router.patch(
 
     const updated = await prisma.listing.update({
       where: { id: listing.id },
-      data: { catalogType: nextType },
+      data:
+        nextType === "PREORDER"
+          ? {
+              catalogType: nextType,
+              availabilityMode: "READY_NOW",
+              preparationTimeMinutes: null,
+              maxDailyOrders: null,
+            }
+          : { catalogType: nextType },
       include: listingInclude,
     });
 
@@ -402,6 +428,13 @@ router.patch(
       Object.assign(data, categoryWriteFields(parsedCategories));
     }
 
+    try {
+      const availabilityFields = availabilityUpdateFields(req.body, listing);
+      if (availabilityFields) Object.assign(data, availabilityFields);
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+
     if (foodType !== undefined) {
       data.foodType = parseFoodType(foodType, { required: true });
     }
@@ -432,6 +465,98 @@ router.patch(
     });
 
     res.json(serializeListing(updated));
+  })
+);
+
+router.patch(
+  "/bulk/pause",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const role = req.user.role || "buyer";
+    if (!["seller", "super_admin"].includes(role)) {
+      return res.status(403).json({
+        error: "Enable selling in Profile before managing listings",
+        code: "SELLER_REQUIRED",
+      });
+    }
+
+    const sellerId = req.user.id;
+    await expireDueListings(prisma, { sellerId });
+
+    const candidates = await prisma.listing.findMany({
+      where: {
+        sellerId,
+        campaignId: null,
+        status: { in: ["active", "sold_out"] },
+      },
+      select: { id: true },
+    });
+
+    const eligibleIds = [];
+    for (const listing of candidates) {
+      if (await listingInActiveCampaign(prisma, listing)) continue;
+      eligibleIds.push(listing.id);
+    }
+
+    if (eligibleIds.length === 0) {
+      return res.status(400).json({
+        error: "No listings are currently available to pause.",
+        pausedCount: 0,
+      });
+    }
+
+    const result = await prisma.listing.updateMany({
+      where: { id: { in: eligibleIds }, sellerId },
+      data: { status: "paused" },
+    });
+
+    res.json({ pausedCount: result.count });
+  })
+);
+
+router.patch(
+  "/bulk/resume",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const role = req.user.role || "buyer";
+    if (!["seller", "super_admin"].includes(role)) {
+      return res.status(403).json({
+        error: "Enable selling in Profile before managing listings",
+        code: "SELLER_REQUIRED",
+      });
+    }
+
+    const sellerId = req.user.id;
+    await expireDueListings(prisma, { sellerId });
+
+    const candidates = await prisma.listing.findMany({
+      where: {
+        sellerId,
+        campaignId: null,
+        status: "paused",
+      },
+      select: { id: true },
+    });
+
+    const eligibleIds = [];
+    for (const listing of candidates) {
+      if (await listingInActiveCampaign(prisma, listing)) continue;
+      eligibleIds.push(listing.id);
+    }
+
+    if (eligibleIds.length === 0) {
+      return res.status(400).json({
+        error: "No paused listings are eligible to renew.",
+        resumedCount: 0,
+      });
+    }
+
+    const result = await prisma.listing.updateMany({
+      where: { id: { in: eligibleIds }, sellerId },
+      data: { status: "active" },
+    });
+
+    res.json({ resumedCount: result.count });
   })
 );
 

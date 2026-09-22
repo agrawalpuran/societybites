@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/app_header.dart';
+import '../widgets/made_to_order_hint.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
@@ -19,6 +20,7 @@ import '../services/seller_onboarding.dart';
 import 'home_listing_filter.dart';
 import '../widgets/food_type_selector.dart';
 import '../widgets/one_seller_cart.dart';
+import '../widgets/listing_purchase_slot.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -174,6 +176,7 @@ class HomeScreenState extends State<HomeScreen> {
         raw = await ApiService.getListings(
           societyId: societyId,
           catalogType: 'REGULAR',
+          status: 'discoverable',
         );
       }
       final listings = raw.map(FoodItem.fromJson).toList();
@@ -217,11 +220,17 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _addToCart(FoodItem food) async {
-    if (food.quantity <= 0) {
+    if (!food.canAddToCart) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${food.name} is sold out'),
+          content: Text(
+            food.isExpired
+                ? '${food.name} is temporarily not available'
+                : food.madeToOrderUnavailableToday
+                ? '${food.name} is currently unavailable'
+                : '${food.name} is sold out',
+          ),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -1247,6 +1256,11 @@ class _SpecialCard extends StatelessWidget {
                 ),
               ),
             ),
+            if (food.isMadeToOrder)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
+                child: MadeToOrderHint(food: food, compact: true),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
               child: Row(
@@ -1295,7 +1309,7 @@ class _SpecialCard extends StatelessWidget {
                       color: isDark ? Colors.white : const Color(0xFF101617),
                     ),
                   ),
-                  if (food.quantity > 0) ...[
+                  if (food.quantity > 0 && !food.isExpired) ...[
                     const SizedBox(width: 8),
                     Text(
                       '${food.quantity} left',
@@ -1308,9 +1322,14 @@ class _SpecialCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                  const Spacer(),
-                  food.quantity <= 0
-                      ? Container(
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: MarketplacePurchaseSlot(
+                    food: food,
+                    cartQty: cartQty,
+                    soldOut: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 7,
@@ -1328,9 +1347,8 @@ class _SpecialCard extends StatelessWidget {
                               letterSpacing: 0.5,
                             ),
                           ),
-                        )
-                      : cartQty == 0
-                      ? GestureDetector(
+                        ),
+                    addButton: GestureDetector(
                           onTap: onAdd,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -1350,8 +1368,8 @@ class _SpecialCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                        )
-                      : Container(
+                        ),
+                    qtyStepper: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 6,
                             vertical: 4,
@@ -1395,6 +1413,9 @@ class _SpecialCard extends StatelessWidget {
                             ],
                           ),
                         ),
+                  ),
+                  ),
+                  ),
                 ],
               ),
             ),
@@ -1464,7 +1485,7 @@ class _AvailableItemTile extends StatelessWidget {
                           color: Color(0xFF0E5A47),
                         ),
                       ),
-                      if (food.quantity > 0) ...[
+                      if (food.quantity > 0 && !food.isExpired) ...[
                         const SizedBox(height: 2),
                         Text(
                           '${food.quantity} left',
@@ -1477,6 +1498,7 @@ class _AvailableItemTile extends StatelessWidget {
                       ],
                     ],
                   ),
+                  MadeToOrderHint(food: food, compact: true),
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -1558,9 +1580,14 @@ class _AvailableItemTile extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const Spacer(),
-                      food.quantity <= 0
-                          ? Container(
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: MarketplacePurchaseSlot(
+                        food: food,
+                        cartQty: cartQty,
+                        soldOut: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
                                 vertical: 6,
@@ -1578,9 +1605,8 @@ class _AvailableItemTile extends StatelessWidget {
                                   letterSpacing: 0.5,
                                 ),
                               ),
-                            )
-                          : cartQty == 0
-                          ? GestureDetector(
+                            ),
+                        addButton: GestureDetector(
                               onTap: onAdd,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -1600,8 +1626,8 @@ class _AvailableItemTile extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                            )
-                          : Container(
+                            ),
+                        qtyStepper: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 6,
                                 vertical: 4,
@@ -1645,6 +1671,9 @@ class _AvailableItemTile extends StatelessWidget {
                                 ],
                               ),
                             ),
+                      ),
+                      ),
+                      ),
                     ],
                   ),
                 ],

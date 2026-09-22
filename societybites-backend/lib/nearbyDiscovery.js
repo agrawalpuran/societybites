@@ -6,10 +6,10 @@ const { serializeSellingReach } = require("./sellingReach");
 const { serializeFulfilment } = require("./sellerFulfilment");
 const { serializePaymentPreference } = require("./sellerPaymentPreference");
 const { serializeListing } = require("../utils/listingSerializer");
-const { expireDueListings } = require("../utils/listingExpiry");
+const { expireDueListings, DISCOVERABLE_STATUSES } = require("../utils/listingExpiry");
 
 const ACTIVE_LISTING_WHERE = {
-  status: "active",
+  status: { in: DISCOVERABLE_STATUSES },
   campaignId: null,
   catalogType: "REGULAR",
 };

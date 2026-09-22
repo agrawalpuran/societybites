@@ -7,6 +7,7 @@ const { generateOrderNumber } = require("../utils/orderNumber");
 const { serializeOrder } = require("../utils/listingSerializer");
 const { getPlatformFee } = require("../lib/platformFee");
 const { expireListingIfDue } = require("../utils/listingExpiry");
+const { assertMadeToOrderCapacity } = require("../lib/listingAvailability");
 const {
   notifyOrderCreated,
   notifyStatusChange,
@@ -389,6 +390,17 @@ router.post(
         return res.status(400).json({
           error: `"${current.name}" is paused and cannot be ordered`,
         });
+      }
+
+      if (orderType === "regular") {
+        try {
+          await assertMadeToOrderCapacity(prisma, current);
+        } catch (err) {
+          return res.status(err.statusCode || 400).json({
+            error: err.message,
+            code: err.code,
+          });
+        }
       }
 
       if (orderType === "regular") {

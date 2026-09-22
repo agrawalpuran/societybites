@@ -4,6 +4,7 @@
  */
 
 const EXPIREABLE_STATUSES = ["active", "paused", "sold_out"];
+const DISCOVERABLE_STATUSES = ["active", "expired"];
 
 /**
  * Persist status=expired for due listings matching optional filters.
@@ -47,6 +48,7 @@ function isPastAvailableAt(listing, now = new Date()) {
 
 module.exports = {
   EXPIREABLE_STATUSES,
+  DISCOVERABLE_STATUSES,
   expireDueListings,
   expireListingIfDue,
   isPastAvailableAt,

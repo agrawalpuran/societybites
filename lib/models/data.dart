@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'food_type.dart';
+import 'listing_availability.dart';
 import 'listing_categories.dart';
 
 const listingCatalogRegular = 'REGULAR';
@@ -63,6 +64,10 @@ class FoodItem {
   final String? campaignId;
   final String? societyId;
   final String catalogType;
+  final String availabilityMode;
+  final int? preparationTimeMinutes;
+  final int? maxDailyOrders;
+  final bool madeToOrderUnavailableToday;
   final String sellerPaymentPreference;
 
   const FoodItem({
@@ -95,6 +100,10 @@ class FoodItem {
     this.campaignId,
     this.societyId,
     this.catalogType = listingCatalogRegular,
+    this.availabilityMode = listingAvailabilityReadyNow,
+    this.preparationTimeMinutes,
+    this.maxDailyOrders,
+    this.madeToOrderUnavailableToday = false,
     this.sellerPaymentPreference = 'UPI_AND_COD',
   });
 
@@ -107,6 +116,11 @@ class FoodItem {
 
   bool get isPreOrderCatalog => catalogType == listingCatalogPreorder;
 
+  bool get isMadeToOrder =>
+      !isPreOrderCatalog &&
+      !isPreOrder &&
+      availabilityMode == listingAvailabilityMadeToOrder;
+
   bool get isPreOrder {
     final id = campaignId?.trim();
     return id != null && id.isNotEmpty;
@@ -115,6 +129,9 @@ class FoodItem {
   bool get isPaused => status == 'paused';
   bool get isActive => status == 'active';
   bool get isExpired => status == 'expired';
+
+  bool get canAddToCart =>
+      isActive && quantity > 0 && !madeToOrderUnavailableToday;
 
   /// Human-readable pickup / seller location for cards and detail.
   String get locationLabel {
@@ -207,6 +224,13 @@ class FoodItem {
       }(),
       societyId: json['societyId']?.toString(),
       catalogType: parseListingCatalogType(json['catalogType']),
+      availabilityMode: parseListingAvailabilityMode(json['availabilityMode']),
+      preparationTimeMinutes: parsePreparationTimeMinutes(
+        json['preparationTimeMinutes'],
+      ),
+      maxDailyOrders: parsePreparationTimeMinutes(json['maxDailyOrders']),
+      madeToOrderUnavailableToday:
+          json['madeToOrderUnavailableToday'] == true,
       sellerPaymentPreference:
           json['sellerPaymentPreference']?.toString() ?? 'UPI_AND_COD',
     );

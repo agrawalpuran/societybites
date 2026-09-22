@@ -654,44 +654,50 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const AppHeader(),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFE5D6),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: const Text(
-            'SELLER OVERVIEW',
-            style: TextStyle(
-              fontSize: 10,
-              letterSpacing: 1.3,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF4E2A20),
-            ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE5D6),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'SELLER OVERVIEW',
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 1.3,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF4E2A20),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Good morning,\nChef.',
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF101617),
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                "Your community kitchen is buzzing.\nHere's what's happening in your\nneighborhood today.",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6A7774),
+                  fontWeight: FontWeight.w500,
+                  height: 1.45,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 10),
-        const Text(
-          'Good morning,\nChef.',
-          style: TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF101617),
-            height: 1.15,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          "Your community kitchen is buzzing.\nHere's what's happening in your\nneighborhood today.",
-          style: TextStyle(
-            fontSize: 14,
-            color: Color(0xFF6A7774),
-            fontWeight: FontWeight.w500,
-            height: 1.45,
-          ),
-        ),
-        const SizedBox(height: 4),
       ],
     );
   }

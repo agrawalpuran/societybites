@@ -6,6 +6,8 @@ import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../widgets/guest_order_auth.dart';
 import '../widgets/listing_image.dart';
+import '../widgets/made_to_order_hint.dart';
+import '../widgets/listing_purchase_slot.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/preorder_widgets.dart';
 import 'buyer_preorder_detail_screen.dart';
@@ -190,6 +192,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
               societyId: societyId,
               sellerId: widget.seller.id,
               catalogType: 'REGULAR',
+              status: 'discoverable',
             ),
             ApiService.getPreOrderCampaigns(
               societyId: societyId,
@@ -203,7 +206,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       }
       final products = listingRaw
           .map(FoodItem.fromJson)
-          .where((item) => item.isActive && !item.isPreOrder)
+          .where((item) => (item.isActive || item.isExpired) && !item.isPreOrder)
           .toList();
       final now = DateTime.now();
       final campaigns =
@@ -251,8 +254,14 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       await showGuestOrderAuthDialog(context);
       return;
     }
-    if (delta > 0 && food.quantity <= 0) {
-      _show('${food.name} is sold out.');
+    if (delta > 0 && !food.canAddToCart) {
+      _show(
+        food.isExpired
+            ? '${food.name} is temporarily not available.'
+            : food.madeToOrderUnavailableToday
+            ? '${food.name} is currently unavailable.'
+            : '${food.name} is sold out.',
+      );
       return;
     }
     if (_cart.isNotEmpty && _cart.first.food.sellerId != food.sellerId) {
@@ -686,6 +695,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              MadeToOrderHint(food: food, compact: true),
               const SizedBox(height: 4),
               Row(
                 children: [
@@ -697,48 +707,56 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   if (widget.browseOnly)
                     const SizedBox.shrink()
-                  else if (food.quantity <= 0)
-                    const Text(
-                      'Sold out',
-                      style: TextStyle(
-                        color: Color(0xFFD94F4F),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    )
-                  else if (quantity == 0)
-                    _smallButton(
-                      label: 'Add',
-                      onTap: () => _changeCart(food, 1),
-                    )
                   else
-                    Row(
-                      children: [
-                        _quantityButton(
-                          Icons.remove,
-                          () => _changeCart(food, -1),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: MarketplacePurchaseSlot(
+                      food: food,
+                      cartQty: quantity,
+                      compact: true,
+                      soldOut: const Text(
+                        'Sold out',
+                        style: TextStyle(
+                          color: Color(0xFFD94F4F),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
                         ),
-                        SizedBox(
-                          width: 28,
-                          child: Text(
-                            '$quantity',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      addButton: _smallButton(
+                        label: 'Add',
+                        onTap: () => _changeCart(food, 1),
+                      ),
+                      qtyStepper: Row(
+                        children: [
+                          _quantityButton(
+                            Icons.remove,
+                            () => _changeCart(food, -1),
                           ),
-                        ),
-                        _quantityButton(
-                          Icons.add,
-                          () => _changeCart(food, 1),
-                          filled: true,
-                        ),
-                      ],
+                          SizedBox(
+                            width: 28,
+                            child: Text(
+                              '$quantity',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                          _quantityButton(
+                            Icons.add,
+                            () => _changeCart(food, 1),
+                            filled: true,
+                          ),
+                        ],
+                      ),
                     ),
+                      ),
+                      ),
                 ],
               ),
-              if (food.quantity > 0) ...[
+              if (food.quantity > 0 && !food.isExpired) ...[
                 const SizedBox(height: 5),
                 Text(
                   '${food.quantity} available',
