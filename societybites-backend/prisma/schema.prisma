@@ -36,6 +36,7 @@ model User {
   preOrderCampaigns    PreOrderCampaign[]
   orders               Order[]            @relation("BuyerOrders")
   reviews              Review[]
+  sentMessages         Message[]
   flat                 Flat?              @relation(fields: [flatId], references: [id])
   society              Society?           @relation(fields: [societyId], references: [id])
 }
@@ -209,6 +210,7 @@ model Order {
   campaign              PreOrderCampaign? @relation(fields: [campaignId], references: [id])
   items                 OrderItem[]
   reviews               Review[]
+  messages              Message[]
 
   @@index([buyerId, createdAt])
   @@index([societyId, status])
@@ -246,6 +248,21 @@ model Review {
 
   @@unique([orderId, reviewerId])
   @@index([listingId])
+}
+
+model Message {
+  id        String    @id @default(uuid())
+  orderId   String
+  senderId  String
+  message   String
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sender    User      @relation(fields: [senderId], references: [id])
+
+  @@index([orderId, createdAt])
+  @@index([orderId, readAt])
+  @@index([senderId])
 }
 
 model AuditLog {

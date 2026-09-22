@@ -82,6 +82,23 @@ void main() {
     expect(nonVeg.single.isExpired, isTrue);
   });
 
+  test('available listings appear before unavailable listings', () {
+    final expired = FoodItem.fromJson(
+      _listingJson(name: 'Chicken Biryani', status: 'expired'),
+    );
+    final soldOut = FoodItem.fromJson(
+      _listingJson(name: 'Sold Dosa', quantity: 0),
+    );
+    final active = FoodItem.fromJson(_listingJson(name: 'Dal'));
+
+    final ordered = applyHomeListingFilters([expired, soldOut, active]);
+    expect(ordered.map((item) => item.name), [
+      'Dal',
+      'Chicken Biryani',
+      'Sold Dosa',
+    ]);
+  });
+
   testWidgets('expired listing shows unavailable label and no Add button', (
     tester,
   ) async {
@@ -103,6 +120,8 @@ void main() {
 
     expect(find.text('Chicken Biryani'), findsWidgets);
     expect(find.text('Not available now'), findsWidgets);
+    expect(find.text('All Items'), findsOneWidget);
+    expect(find.text('Available Now'), findsNothing);
     expect(find.text('Add'), findsNothing);
     expect(find.byType(MarketplacePurchaseSlot), findsWidgets);
   });

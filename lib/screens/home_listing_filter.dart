@@ -47,5 +47,11 @@ List<FoodItem> applyHomeListingFilters(
     }).toList();
   }
 
+  results.sort((a, b) {
+    final aRank = a.canAddToCart ? 0 : 1;
+    final bRank = b.canAddToCart ? 0 : 1;
+    return aRank.compareTo(bRank);
+  });
+
   return results;
 }

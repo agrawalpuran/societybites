@@ -1194,7 +1194,7 @@ class _RenewListingDialogState extends State<_RenewListingDialog> {
           ? DateTime.now()
           : _dateTime,
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 7)),
+      lastDate: DateTime.now().add(const Duration(days: 180)),
     );
     if (date == null || !mounted) return;
 

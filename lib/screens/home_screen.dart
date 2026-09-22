@@ -625,7 +625,7 @@ class HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             const Text(
-              'No sellers available yet',
+              'No sellers available in your society yet',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 22,
@@ -907,7 +907,7 @@ class HomeScreenState extends State<HomeScreen> {
     return const Padding(
       padding: EdgeInsets.fromLTRB(20, 24, 20, 14),
       child: Text(
-        'Available Now',
+        'All Items',
         style: TextStyle(
           fontSize: 19,
           fontWeight: FontWeight.w800,
@@ -1310,7 +1310,7 @@ class _SpecialCard extends StatelessWidget {
                     ),
                   ),
                   if (food.quantity > 0 && !food.isExpired) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Text(
                       '${food.quantity} left',
                       style: TextStyle(
@@ -1464,6 +1464,7 @@ class _AvailableItemTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Text(
@@ -1477,25 +1478,31 @@ class _AvailableItemTile extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Text(
-                        '₹${food.price.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0E5A47),
-                        ),
-                      ),
-                      if (food.quantity > 0 && !food.isExpired) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          '${food.quantity} left',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF6A7774),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '₹${food.price.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0E5A47),
+                            ),
                           ),
-                        ),
-                      ],
+                          if (food.quantity > 0 && !food.isExpired) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              '${food.quantity} left',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF6A7774),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                   MadeToOrderHint(food: food, compact: true),

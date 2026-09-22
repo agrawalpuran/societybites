@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/app_header.dart';
 import '../widgets/order_fulfilment_banner.dart';
 import '../widgets/order_items_list.dart';
+import '../widgets/order_messages_button.dart';
 import '../models/data.dart';
 import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
@@ -660,6 +661,12 @@ class _ActiveOrderCard extends StatelessWidget {
             order.isPreOrder
                 ? _PreOrderFulfilmentCard(order: order)
                 : _PickupInfoCard(order: order),
+            const SizedBox(height: 10),
+            OrderMessagesButton(
+              order: order,
+              isSellerView: false,
+              onClosed: onRefresh,
+            ),
             const SizedBox(height: 10),
             if ((!order.isPreOrder &&
                     (order.status == 'pending' ||
@@ -1362,6 +1369,12 @@ class _PastOrderTile extends StatelessWidget {
               ],
             ),
           ],
+          const SizedBox(height: 10),
+          OrderMessagesButton(
+            order: order,
+            isSellerView: isSellerView,
+            onClosed: onRefresh,
+          ),
         ],
       ),
     );

@@ -124,7 +124,7 @@ void main() {
       onExploreNearby: () => explore = true,
     );
 
-    expect(find.text('No sellers available yet'), findsOneWidget);
+    expect(find.text('No sellers available in your society yet'), findsOneWidget);
     expect(
       find.textContaining('Be the first one to share homemade food'),
       findsOneWidget,
@@ -361,7 +361,7 @@ void main() {
   ) async {
     _ignoreOverflow();
     await _pumpHomeEmpty(tester, listings: [_listing('Paneer Wrap')]);
-    expect(find.text('No sellers available yet'), findsNothing);
+    expect(find.text('No sellers available in your society yet'), findsNothing);
     expect(find.text('Explore Nearby'), findsNothing);
     expect(find.text('Paneer Wrap'), findsOneWidget);
   });

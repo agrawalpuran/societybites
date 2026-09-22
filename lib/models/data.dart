@@ -372,6 +372,7 @@ class Order {
   final String? buyerBlock;
   final String? buyerSocietyName;
   final String? sellerSocietyName;
+  final int unreadMessageCount;
 
   const Order({
     required this.id,
@@ -403,6 +404,7 @@ class Order {
     this.buyerBlock,
     this.buyerSocietyName,
     this.sellerSocietyName,
+    this.unreadMessageCount = 0,
   });
 
   bool get isRejected => status == 'rejected';
@@ -493,6 +495,7 @@ class Order {
       buyerBlock: buyerBlock,
       buyerSocietyName: buyerSocietyName,
       sellerSocietyName: sellerSocietyName,
+      unreadMessageCount: unreadMessageCount,
     );
   }
 
@@ -558,6 +561,7 @@ class Order {
       buyerBlock: json['buyerBlock'] as String?,
       buyerSocietyName: json['buyerSocietyName'] as String?,
       sellerSocietyName: json['sellerSocietyName'] as String?,
+      unreadMessageCount: (json['unreadMessageCount'] as num?)?.toInt() ?? 0,
     );
   }
 

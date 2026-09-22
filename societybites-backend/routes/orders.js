@@ -27,6 +27,12 @@ const {
   assertPaymentMethodAllowed,
   upiBlocksPreparation,
 } = require("../lib/sellerPaymentPreference");
+const {
+  assertOrderParticipant,
+  parseMessageBody,
+  serializeMessage,
+  attachUnreadCounts,
+} = require("../lib/orderMessages");
 
 const router = express.Router();
 
@@ -145,7 +151,9 @@ router.get(
         orderBy: { createdAt: "desc" },
       });
 
-      return res.json(orders.map(serializeOrder));
+      return res.json(
+        await attachUnreadCounts(prisma, orders.map(serializeOrder), req.user.id)
+      );
     }
 
     const orders = await prisma.order.findMany({
@@ -157,7 +165,9 @@ router.get(
       orderBy: { createdAt: "desc" },
     });
 
-    res.json(orders.map(serializeOrder));
+    res.json(
+      await attachUnreadCounts(prisma, orders.map(serializeOrder), req.user.id)
+    );
   })
 );
 
@@ -271,6 +281,63 @@ router.get(
 );
 
 router.get(
+  "/:id/messages",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: {
+        items: { select: { listing: { select: { sellerId: true } } } },
+      },
+    });
+
+    assertOrderParticipant(order, req.user.id);
+
+    await prisma.message.updateMany({
+      where: {
+        orderId: order.id,
+        senderId: { not: req.user.id },
+        readAt: null,
+      },
+      data: { readAt: new Date() },
+    });
+
+    const rows = await prisma.message.findMany({
+      where: { orderId: order.id },
+      orderBy: { createdAt: "asc" },
+    });
+
+    res.json(rows.map((row) => serializeMessage(row, order)));
+  })
+);
+
+router.post(
+  "/:id/messages",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: {
+        items: { select: { listing: { select: { sellerId: true } } } },
+      },
+    });
+
+    assertOrderParticipant(order, req.user.id);
+    const message = parseMessageBody(req.body && req.body.message);
+
+    const created = await prisma.message.create({
+      data: {
+        orderId: order.id,
+        senderId: req.user.id,
+        message,
+      },
+    });
+
+    res.status(201).json(serializeMessage(created, order));
+  })
+);
+
+router.get(
   "/:id",
   requireUser,
   asyncHandler(async (req, res) => {
@@ -292,7 +359,11 @@ router.get(
       return res.status(403).json({ error: "Not allowed to view this order" });
     }
 
-    res.json(serializeOrder(order));
+    res.json(
+      await attachUnreadCounts(prisma, [serializeOrder(order)], req.user.id).then(
+        (rows) => rows[0]
+      )
+    );
   })
 );
 

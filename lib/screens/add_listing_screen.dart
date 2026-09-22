@@ -117,43 +117,48 @@ class _AddListingScreenState extends State<AddListingScreen> {
             ),
             const SizedBox(height: 10),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
+                SizedBox(
+                  width: 64,
                   child: TextFormField(
+                    key: const Key('prep-days-field'),
                     controller: _customPrepDaysController,
                     keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
                     inputFormatters: [
                       FilteringTextInputFormatter.digitsOnly,
                       LengthLimitingTextInputFormatter(2),
                     ],
-                    decoration: _inputDeco('e.g. 1'),
+                    decoration: _inputDeco('1').copyWith(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 12,
+                      ),
+                      errorStyle: const TextStyle(fontSize: 11, height: 1.2),
+                    ),
                     onChanged: (_) => setState(() {}),
                     validator: (value) {
                       if (!_isMadeToOrder) return null;
                       final raw = value?.trim() ?? '';
                       if (raw.isEmpty) return null;
                       final days = int.tryParse(raw);
-                      if (days == null) {
-                        return 'Enter a number of days';
-                      }
-                      if (days < 1 || days > maxPreparationDays) {
-                        return 'Enter 1 to $maxPreparationDays days';
+                      if (days == null ||
+                          days < 1 ||
+                          days > maxPreparationDays) {
+                        return '1–$maxPreparationDays';
                       }
                       return null;
                     },
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Padding(
-                  padding: EdgeInsets.only(top: 16),
-                  child: Text(
-                    'days',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF3A4644),
-                    ),
+                const Text(
+                  'days',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF3A4644),
                   ),
                 ),
               ],
@@ -279,7 +284,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
       context: context,
       initialDate: initial.isBefore(DateTime.now()) ? DateTime.now() : initial,
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 7)),
+      lastDate: DateTime.now().add(const Duration(days: 180)),
     );
     if (date == null || !mounted) return;
 

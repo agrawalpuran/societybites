@@ -881,6 +881,37 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<List<Map<String, dynamic>>> getOrderMessages(
+    String orderId,
+  ) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/orders/$orderId/messages'),
+      headers: await _authHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response) as List;
+      return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> sendOrderMessage({
+    required String orderId,
+    required String message,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/orders/$orderId/messages'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'message': message}),
+    );
+
+    if (response.statusCode == 201) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> updateOrderStatus({
     required String orderId,
     required String status,

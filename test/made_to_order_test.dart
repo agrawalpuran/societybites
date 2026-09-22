@@ -97,26 +97,32 @@ void main() {
     await tester.tap(find.text('Made to Order'));
     await tester.pump();
 
-    final daysField = find.byWidgetPredicate(
-      (widget) => widget is TextField && widget.decoration?.hintText == 'e.g. 1',
-    );
+    final daysField = find.byKey(const Key('prep-days-field'));
     expect(daysField, findsOneWidget);
 
     await tester.enterText(daysField, 'ab12cd');
     await tester.pump();
-    expect(tester.widget<TextField>(daysField).controller?.text, '12');
+    expect(
+      tester
+          .widget<TextField>(
+            find.descendant(of: daysField, matching: find.byType(TextField)),
+          )
+          .controller
+          ?.text,
+      '12',
+    );
 
     await tester.enterText(daysField, '0');
     await tester.ensureVisible(find.text('List Item'));
     await tester.tap(find.text('List Item'));
     await tester.pump();
-    expect(find.text('Enter 1 to 7 days'), findsOneWidget);
+    expect(find.text('1–7'), findsOneWidget);
 
     await tester.enterText(daysField, '8');
     await tester.ensureVisible(find.text('List Item'));
     await tester.tap(find.text('List Item'));
     await tester.pump();
-    expect(find.text('Enter 1 to 7 days'), findsOneWidget);
+    expect(find.text('1–7'), findsOneWidget);
   });
 
   testWidgets('switching back to Ready Now hides Made-to-Order fields', (

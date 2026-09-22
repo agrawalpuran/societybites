@@ -12,6 +12,7 @@ import '../widgets/order_lifecycle_dialogs.dart';
 import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
+import '../widgets/order_messages_button.dart';
 import 'add_listing_screen.dart';
 import 'my_listings_screen.dart';
 import 'preorder_detail_screen.dart';
@@ -631,7 +632,12 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               ),
             )
           else if (showingPast)
-            ...orders.map((order) => _SellerPastOrderCard(order: order))
+            ...orders.map(
+              (order) => _SellerPastOrderCard(
+                order: order,
+                onRefresh: _loadOrders,
+              ),
+            )
           else
             ...orders.map(
               (order) => SellerActiveOrderCard(
@@ -1440,6 +1446,12 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
               ],
             ],
           ),
+          const SizedBox(height: 12),
+          OrderMessagesButton(
+            order: order,
+            isSellerView: true,
+            onClosed: widget.onPaymentConfirmed,
+          ),
           if (lifecycle.headline != null) ...[
             const SizedBox(height: 12),
             Text(
@@ -1832,9 +1844,10 @@ class _OrdersSegment extends StatelessWidget {
 }
 
 class _SellerPastOrderCard extends StatelessWidget {
-  const _SellerPastOrderCard({required this.order});
+  const _SellerPastOrderCard({required this.order, this.onRefresh});
 
   final Order order;
+  final Future<void> Function()? onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -1965,6 +1978,12 @@ class _SellerPastOrderCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          OrderMessagesButton(
+            order: order,
+            isSellerView: true,
+            onClosed: onRefresh,
           ),
           if (isRejected &&
               order.rejectReason != null &&
