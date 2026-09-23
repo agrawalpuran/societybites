@@ -179,6 +179,29 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
+  static String userFacingError(Object error) {
+    var message = error.toString().trim();
+    const prefixes = ['Exception: ', 'HttpException: ', 'ClientException: '];
+    for (final prefix in prefixes) {
+      if (message.startsWith(prefix)) {
+        message = message.substring(prefix.length).trim();
+      }
+    }
+    final lower = message.toLowerCase();
+    if (lower.contains('failed to fetch') ||
+        lower.contains('xmlhttprequest') ||
+        lower.contains('connection refused') ||
+        lower.contains('network is unreachable') ||
+        lower.contains('socketexception') ||
+        lower.contains('clientexception')) {
+      return 'Could not reach the server. Please try again.';
+    }
+    if (message.isEmpty) {
+      return 'Something went wrong. Please try again.';
+    }
+    return message;
+  }
+
   static Never _throwFromResponse(http_client.Response response) {
     final body = _decodeResponse(response);
     final message = body is Map && body['error'] != null

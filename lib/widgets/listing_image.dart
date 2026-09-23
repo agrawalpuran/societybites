@@ -50,10 +50,13 @@ class ListingImage extends StatelessWidget {
             : resolvedUrl != null
                 ? Image.network(
                     resolvedUrl,
+                    key: ValueKey(
+                      '${food.id}|$resolvedUrl|${food.imageCacheKey ?? ''}',
+                    ),
                     width: width,
                     height: height,
                     fit: BoxFit.cover,
-                    gaplessPlayback: true,
+                    gaplessPlayback: false,
                     webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                     errorBuilder: (_, _, _) => _iconFallback(),
                   )

@@ -13,6 +13,7 @@ import '../services/upi_payment_service.dart';
 
 typedef PaymentApiCall = Future<Map<String, dynamic>> Function(String orderId);
 typedef UpiLauncher = Future<bool> Function(Uri uri);
+typedef UpiAvailabilityChecker = Future<bool> Function(Uri uri);
 
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({
@@ -22,6 +23,7 @@ class PaymentScreen extends StatefulWidget {
     this.fetchPaymentInfo,
     this.markPaid,
     this.launchUpi,
+    this.canLaunchUpi,
     this.pollInterval = const Duration(seconds: 8),
   });
 
@@ -30,6 +32,7 @@ class PaymentScreen extends StatefulWidget {
   final PaymentApiCall? fetchPaymentInfo;
   final PaymentApiCall? markPaid;
   final UpiLauncher? launchUpi;
+  final UpiAvailabilityChecker? canLaunchUpi;
   final Duration pollInterval;
 
   @override
@@ -48,8 +51,14 @@ class _PaymentScreenState extends State<PaymentScreen>
   String? _sellerUpiDisplayName;
   String? _loadError;
   String? _upiLaunchError;
+  List<UpiAppOption> _availableApps = const [];
 
   bool get _hasUpi => _sellerUpiId != null && isValidUpiId(_sellerUpiId!);
+
+  bool get _showUpiAppShortcuts => shouldOfferUpiAppShortcuts(
+    isWeb: kIsWeb,
+    platform: defaultTargetPlatform,
+  );
 
   bool get _isCashOrder =>
       (_order.paymentMethod ?? 'upi').toLowerCase() == 'cash';
@@ -174,6 +183,7 @@ class _PaymentScreenState extends State<PaymentScreen>
         _sellerUpiDisplayName = data['sellerUpiDisplayName'] as String?;
         _isLoadingUpi = false;
       });
+      await _refreshAvailableApps();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -213,6 +223,55 @@ class _PaymentScreenState extends State<PaymentScreen>
       return await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {
       return false;
+    }
+  }
+
+  Future<bool> _canLaunchUpiUri(Uri uri) async {
+    final checker = widget.canLaunchUpi;
+    if (checker != null) return checker(uri);
+    try {
+      return await canLaunchUrl(uri);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _refreshAvailableApps() async {
+    if (!_hasUpi || !_showUpiAppShortcuts) {
+      if (mounted) setState(() => _availableApps = const []);
+      return;
+    }
+    final apps = await getAvailableUpiApps(
+      _upiPaymentUri,
+      canLaunch: _canLaunchUpiUri,
+      isWeb: kIsWeb,
+      platform: defaultTargetPlatform,
+    );
+    if (!mounted) return;
+    setState(() => _availableApps = apps);
+  }
+
+  Future<void> _launchSelectedUpiApp(UpiAppOption app) async {
+    final resolved = app.resolvedLaunchUri;
+    if (resolved == null || _order.orderTotal <= 0) return;
+    final uri = Uri(
+      scheme: resolved.scheme,
+      host: resolved.host,
+      path: resolved.path,
+      queryParameters: _upiPaymentUri.queryParameters,
+    );
+    try {
+      setState(() => _upiLaunchError = null);
+      final launch = widget.launchUpi;
+      final launched = launch != null
+          ? await launch(uri)
+          : await _launchUpiUri(uri);
+      if (!launched && mounted) {
+        setState(() => _upiLaunchError = _noUpiAppMessage);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _upiLaunchError = _noUpiAppMessage);
     }
   }
 
@@ -285,16 +344,6 @@ class _PaymentScreenState extends State<PaymentScreen>
                 child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
               )
             else if (_hasUpi) ...[
-              if (_showUpiIntentButton) ...[
-                _buildUpiButton(),
-                if (_upiLaunchError != null) ...[
-                  const SizedBox(height: 12),
-                  _buildUpiLaunchError(),
-                ],
-                const SizedBox(height: 20),
-                _buildOrDivider(),
-                const SizedBox(height: 20),
-              ],
               _buildQrSection(),
               const SizedBox(height: 16),
               _buildMarkPaidButton(label: "I've Paid via UPI"),
@@ -479,6 +528,7 @@ class _PaymentScreenState extends State<PaymentScreen>
           GestureDetector(
             onTap: _showUpiIntentButton ? _launchUpiApp : null,
             child: QrImageView(
+              key: const ValueKey('upi-qr'),
               data: _upiPaymentUri.toString(),
               version: QrVersions.auto,
               size: 200,
@@ -493,6 +543,32 @@ class _PaymentScreenState extends State<PaymentScreen>
               ),
             ),
           ),
+          if (_availableApps.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildOrDivider(),
+            const SizedBox(height: 12),
+            const Text(
+              'Pay using your UPI app',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF101617),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final app in _availableApps) _buildUpiAppShortcut(app),
+              ],
+            ),
+          ],
+          if (_upiLaunchError != null) ...[
+            const SizedBox(height: 12),
+            _buildUpiLaunchError(),
+          ],
           const SizedBox(height: 16),
           _buildCopyUpiIdRow(),
         ],
@@ -500,39 +576,39 @@ class _PaymentScreenState extends State<PaymentScreen>
     );
   }
 
-  Widget _buildUpiButton() {
-    return Column(
-      children: [
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton.icon(
-            onPressed: _order.orderTotal > 0 ? _launchUpiApp : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0E5A47),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              elevation: 0,
-            ),
-            icon: const Icon(Icons.account_balance_wallet_rounded, size: 20),
-            label: const Text(
-              'Pay with UPI App',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+  Widget _buildUpiAppShortcut(UpiAppOption app) {
+    return SizedBox(
+      width: 72,
+      child: Material(
+        color: const Color(0xFFF5F7F6),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          key: ValueKey('upi-app-${app.id}'),
+          onTap: () => _launchSelectedUpiApp(app),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(app.icon, size: 20, color: app.accent),
+                const SizedBox(height: 4),
+                Text(
+                  app.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF101617),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        const Text(
-          'Google Pay, PhonePe, BHIM & more',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF6A7774),
-          ),
-        ),
-      ],
+      ),
     );
   }
 

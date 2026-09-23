@@ -5,6 +5,7 @@ import '../models/seller_payment_preference.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
+import '../widgets/order_timing_notice.dart';
 
 enum PreOrderPaymentMethod { upi, cash }
 
@@ -192,8 +193,23 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
                     }).toList(),
                   ),
                 ),
+                const SizedBox(height: 12),
+                OrderTimingNotice(
+                  foods: const [],
+                  preOrderFulfilmentAt: widget.campaign.fulfilmentAt,
+                ),
                 const SizedBox(height: 20),
-                _section('HOW WOULD YOU LIKE TO RECEIVE YOUR ORDER?'),
+                _section('DELIVERY MECHANISM'),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    'As per the seller\'s preference',
+                    style: TextStyle(
+                      color: preorderMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
                 if (widget.campaign.offeredFulfilmentMethods.contains('pickup'))
                   _option(
                     value: 'pickup',

@@ -9,6 +9,7 @@ Map<String, dynamic> _orderJson({
   required String status,
   String itemName = 'Test Dosa',
   String paymentStatus = 'pending',
+  String paymentMethod = 'upi',
   int? statusStep,
 }) {
   return {
@@ -17,7 +18,7 @@ Map<String, dynamic> _orderJson({
     'status': status,
     'statusStep': statusStep ?? BuyerOrderLifecycle.progressStep(status),
     'paymentStatus': paymentStatus,
-    'paymentMethod': 'upi',
+    'paymentMethod': paymentMethod,
     'total': 120,
     'subtotal': 115,
     'communityFee': 5,
@@ -52,6 +53,10 @@ void main() {
     WidgetTester tester,
     List<Map<String, dynamic>> orders,
   ) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
         home: OrdersScreen(
@@ -140,4 +145,70 @@ void main() {
       expect(find.text('Complete Order'), findsNothing);
     },
   );
+
+  testWidgets('UPI pending shows Cancel Order', (tester) async {
+    await pumpOrders(tester, [
+      _orderJson(id: 'up', status: 'pending', paymentMethod: 'upi'),
+    ]);
+    expect(find.text('Cancel Order'), findsOneWidget);
+  });
+
+  testWidgets('UPI accepted unpaid shows Cancel Order', (tester) async {
+    await pumpOrders(tester, [
+      _orderJson(id: 'ua', status: 'accepted', paymentMethod: 'upi'),
+    ]);
+    expect(find.text('Cancel Order'), findsOneWidget);
+    expect(find.text('Pay Now'), findsOneWidget);
+  });
+
+  testWidgets('UPI buyer_marked_paid hides Cancel Order', (tester) async {
+    await pumpOrders(tester, [
+      _orderJson(
+        id: 'um',
+        status: 'accepted',
+        paymentMethod: 'upi',
+        paymentStatus: 'buyer_marked_paid',
+      ),
+    ]);
+    expect(find.text('Cancel Order'), findsNothing);
+    expect(find.text('Awaiting Seller Confirmation'), findsOneWidget);
+  });
+
+  testWidgets('UPI seller_confirmed hides Cancel Order', (tester) async {
+    await pumpOrders(tester, [
+      _orderJson(
+        id: 'uc',
+        status: 'accepted',
+        paymentMethod: 'upi',
+        paymentStatus: 'seller_confirmed',
+      ),
+    ]);
+    expect(find.text('Cancel Order'), findsNothing);
+  });
+
+  testWidgets('COD pending shows Cancel Order', (tester) async {
+    await pumpOrders(tester, [
+      _orderJson(id: 'cp', status: 'pending', paymentMethod: 'cash'),
+    ]);
+    expect(find.text('Cancel Order'), findsOneWidget);
+  });
+
+  testWidgets('COD accepted hides Cancel Order', (tester) async {
+    await pumpOrders(tester, [
+      _orderJson(id: 'ca', status: 'accepted', paymentMethod: 'cash'),
+    ]);
+    expect(find.text('Cancel Order'), findsNothing);
+  });
+
+  testWidgets('ready hides Cancel Order', (tester) async {
+    await pumpOrders(tester, [_orderJson(id: 'rr', status: 'ready')]);
+    expect(find.text('Cancel Order'), findsNothing);
+  });
+
+  testWidgets('completed hides Cancel Order', (tester) async {
+    await pumpOrders(tester, [_orderJson(id: 'cc', status: 'completed')]);
+    await tester.tap(find.textContaining('Past'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cancel Order'), findsNothing);
+  });
 }

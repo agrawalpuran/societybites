@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/models/listing_availability.dart';
 import 'package:societybites/screens/add_listing_screen.dart';
+import 'package:societybites/screens/checkout_screen.dart';
+import 'package:societybites/widgets/order_timing_notice.dart';
 import 'package:societybites/screens/food_detail_screen.dart';
 import 'package:societybites/screens/home_listing_filter.dart';
 import 'package:societybites/screens/my_listings_screen.dart';
@@ -279,5 +281,44 @@ void main() {
     expect(food.isMadeToOrder, isFalse);
     expect(food.availabilityMode, listingAvailabilityReadyNow);
     expect(food.isPreOrderCatalog, isFalse);
+  });
+
+  testWidgets('checkout explains Made to Order timeline', (tester) async {
+    final previous = FlutterError.onError;
+    FlutterError.onError = (details) {
+      final text = '${details.exception}\n${details.summary}';
+      if (text.contains('A RenderFlex overflowed')) return;
+      previous?.call(details);
+    };
+    addTearDown(() => FlutterError.onError = previous);
+
+    await tester.binding.setSurfaceSize(const Size(400, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CheckoutScreen(
+          cartItems: [
+            CartItem(
+              food: FoodItem.fromJson(
+                _listingJson(
+                  'Birthday Cakes',
+                  availabilityMode: listingAvailabilityMadeToOrder,
+                  preparationTimeMinutes: 240,
+                  category: 'Desserts',
+                ),
+              ),
+              quantity: 1,
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(OrderTimingNotice), findsOneWidget);
+    expect(find.text('This is not a regular ready-now order'), findsOneWidget);
+    expect(find.textContaining('Usually takes about 4 hours'), findsWidgets);
+    expect(find.text('How would you like to receive your order?'), findsNothing);
   });
 }

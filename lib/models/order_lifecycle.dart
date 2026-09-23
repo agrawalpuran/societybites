@@ -185,6 +185,23 @@ class BuyerOrderLifecycle {
   /// Cancel remains a separate existing action, not a status-progress action.
   static bool hasProgressAction(String status) => false;
 
+  /// UPI: until the buyer taps I've Paid. COD: until the seller accepts.
+  static bool canCancel({
+    required String status,
+    required String paymentStatus,
+    String? paymentMethod,
+  }) {
+    final method = (paymentMethod ?? 'upi').toLowerCase();
+    final isCash = method == 'cash';
+    if (isCash) return status == 'pending';
+
+    final paymentLocked = paymentStatus == 'buyer_marked_paid' ||
+        paymentStatus == 'seller_confirmed' ||
+        paymentStatus == 'paid';
+    if (paymentLocked) return false;
+    return status == 'pending' || status == 'accepted';
+  }
+
   static bool canPayNow({
     required String status,
     required String paymentStatus,

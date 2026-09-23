@@ -8,10 +8,12 @@ class SellerListScreen extends StatelessWidget {
     super.key,
     required this.sellers,
     required this.onSellerTap,
+    this.title = 'Sellers',
   });
 
   final List<Seller> sellers;
   final ValueChanged<Seller> onSellerTap;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
@@ -21,9 +23,9 @@ class SellerListScreen extends StatelessWidget {
         backgroundColor: preorderBackground,
         foregroundColor: preorderText,
         elevation: 0,
-        title: const Text(
-          'Sellers',
-          style: TextStyle(fontWeight: FontWeight.w800),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: ListView.separated(

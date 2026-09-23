@@ -15,6 +15,7 @@ FoodItem _food({
   required String sellerId,
   required String sellerName,
   String name = 'Paneer',
+  String societyId = 'society-b',
 }) {
   return FoodItem.fromJson({
     'id': id,
@@ -24,7 +25,7 @@ FoodItem _food({
     'price': 80,
     'quantity': 4,
     'status': 'active',
-    'societyId': 'society-b',
+    'societyId': societyId,
   });
 }
 
@@ -246,6 +247,40 @@ void main() {
     expect(find.text('🛵 Seller Delivery'), findsOneWidget);
   });
 
+  testWidgets('checkout infers nearby order from listing societyId', (
+    tester,
+  ) async {
+    _ignoreOverflow();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CheckoutScreen(
+          cartItems: [
+            CartItem(
+              food: FoodItem.fromJson({
+                'id': 'sushi',
+                'name': 'veg Sushi',
+                'sellerId': 'aarav',
+                'sellerName': 'Aarav',
+                'price': 80,
+                'quantity': 4,
+                'status': 'active',
+                'societyId': 'society-b',
+                'fulfilmentMode': 'BOTH',
+                'deliveryCharge': 30,
+              }),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Delivery mechanism'), findsOneWidget);
+    expect(find.text("As per the seller's preference"), findsOneWidget);
+    expect(find.text('🏠 Buyer Pickup'), findsOneWidget);
+    expect(find.text('🛵 Seller Delivery'), findsOneWidget);
+  });
+
   testWidgets('cross-society checkout sends selected fulfilment', (tester) async {
     String? sent;
     await tester.pumpWidget(
@@ -321,7 +356,12 @@ void main() {
       MaterialApp(
         home: CheckoutScreen(
           cartItems: [
-            _cartItem(_food(id: '1', sellerId: 's', sellerName: 'Anita')),
+            _cartItem(_food(
+              id: '1',
+              sellerId: 's',
+              sellerName: 'Anita',
+              societyId: 'society-a',
+            )),
           ],
           placeOrder: ({
             required societyId,

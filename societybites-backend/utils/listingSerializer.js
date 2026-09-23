@@ -1,5 +1,6 @@
 const { listingCategoriesFromRecord } = require("./listingCategories");
 const { serializePaymentPreference } = require("../lib/sellerPaymentPreference");
+const { serializeFulfilment } = require("../lib/sellerFulfilment");
 
 const ORDER_STATUS_TO_STEP = {
   pending: 0,
@@ -17,9 +18,10 @@ function serializeListing(listing) {
   const flat = seller.flat;
   const reviews = listing.reviews || [];
   const reviewCount = reviews.length;
-  const avgRating = reviewCount > 0
-    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
-    : 0;
+    const fulfilment = serializeFulfilment(seller);
+    const avgRating = reviewCount > 0
+      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+      : 0;
 
   return {
     id: listing.id,
@@ -53,6 +55,9 @@ function serializeListing(listing) {
     sellerUpiId: seller.upiId || null,
     sellerUpiDisplayName: seller.upiDisplayName || null,
     sellerPaymentPreference: serializePaymentPreference(seller),
+    fulfilment,
+    fulfilmentMode: fulfilment.mode,
+    deliveryCharge: fulfilment.deliveryCharge,
     block: flat ? `Block ${flat.block}` : null,
     flatNumber: flat?.flatNumber || null,
     avgRating: Math.round(avgRating * 10) / 10,

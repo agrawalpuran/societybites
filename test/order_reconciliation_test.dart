@@ -51,6 +51,7 @@ Widget _paymentApp({
   required PaymentApiCall fetchOrder,
   PaymentApiCall? markPaid,
   UpiLauncher? launchUpi,
+  UpiAvailabilityChecker? canLaunchUpi,
   Order order = _initialOrder,
   Duration pollInterval = const Duration(milliseconds: 20),
 }) {
@@ -70,6 +71,7 @@ Widget _paymentApp({
                     fetchPaymentInfo: _paymentInfo,
                     markPaid: markPaid,
                     launchUpi: launchUpi,
+                    canLaunchUpi: canLaunchUpi,
                     pollInterval: pollInterval,
                   ),
                 ),
@@ -286,11 +288,13 @@ void main() {
         ),
       );
 
-      final payButton = find.text('Pay with UPI App');
-      await tester.ensureVisible(payButton);
-      await tester.tap(payButton);
+      expect(find.text('Pay with UPI App'), findsNothing);
+      await tester.ensureVisible(find.byKey(const ValueKey('upi-qr')));
+      await tester.tap(find.byKey(const ValueKey('upi-qr')));
       await tester.pump();
 
+      expect(launchedUri?.scheme, 'upi');
+      expect(launchedUri?.host, 'pay');
       expect(launchedUri?.queryParameters['am'], '245.00');
       expect(launchedUri?.queryParameters['pa'], 'seller@upi');
       expect(launchedUri?.queryParameters['pn'], 'Test Seller');
@@ -308,6 +312,64 @@ void main() {
     }
   });
 
+  testWidgets('direct UPI app shortcut preserves payment query parameters', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    Uri? launchedUri;
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    try {
+      await _openPayment(
+        tester,
+        _paymentApp(
+          order: const Order(
+            id: 'order-1',
+            orderId: 'SB-1001',
+            items: [],
+            date: 'Today',
+            status: 'accepted',
+            statusStep: 1,
+            orderTotal: 245,
+            subtotal: 220,
+            communityFee: 0,
+            deliveryCharge: 25,
+            paymentMethod: 'upi',
+            paymentStatus: 'pending',
+          ),
+          fetchOrder: (_) async => _orderJson(total: 245),
+          launchUpi: (uri) async {
+            launchedUri = uri;
+            return true;
+          },
+          canLaunchUpi: (_) async => true,
+          pollInterval: const Duration(hours: 1),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Pay using your UPI app'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const ValueKey('upi-app-gpay')));
+      await tester.tap(find.byKey(const ValueKey('upi-app-gpay')));
+      await tester.pump();
+
+      expect(launchedUri?.scheme, 'gpay');
+      expect(launchedUri?.host, 'upi');
+      expect(launchedUri?.path, '/pay');
+      expect(launchedUri?.queryParameters['pa'], 'seller@upi');
+      expect(launchedUri?.queryParameters['pn'], 'Test Seller');
+      expect(launchedUri?.queryParameters['am'], '245.00');
+      expect(launchedUri?.queryParameters['cu'], 'INR');
+      expect(launchedUri?.queryParameters['tr'], 'SB1001');
+      expect(launchedUri?.queryParameters['tn'], 'SocietyBites Order SB-1001');
+      expect(find.text("I've Paid via UPI"), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('failed UPI launch keeps QR fallback visible', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
@@ -320,9 +382,8 @@ void main() {
         ),
       );
 
-      final payButton = find.text('Pay with UPI App');
-      await tester.ensureVisible(payButton);
-      await tester.tap(payButton);
+      await tester.ensureVisible(find.byKey(const ValueKey('upi-qr')));
+      await tester.tap(find.byKey(const ValueKey('upi-qr')));
       await tester.pump();
 
       expect(
@@ -382,16 +443,24 @@ void main() {
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     try {
       await _openPayment(
         tester,
         _paymentApp(
           fetchOrder: (_) async => _orderJson(),
+          canLaunchUpi: (_) async => true,
           pollInterval: const Duration(hours: 1),
         ),
       );
+      await tester.pump();
 
       expect(find.text('Pay with UPI App'), findsNothing);
+      expect(find.text('Pay using your UPI app'), findsOneWidget);
+      expect(find.byKey(const ValueKey('upi-app-gpay')), findsOneWidget);
       expect(find.byKey(const ValueKey('copy-upi-id')), findsOneWidget);
       expect(find.text('Scan QR code'), findsOneWidget);
       expect(find.text("I've Paid via UPI"), findsOneWidget);

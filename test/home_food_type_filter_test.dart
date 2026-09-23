@@ -100,6 +100,28 @@ void main() {
     expect(result.map((e) => e.id), ['1']);
   });
 
+  test('search ignores category so matches appear as the user types', () {
+    final listings = [
+      _item(id: '1', name: 'Birthday Cake', category: 'Desserts'),
+      _item(id: '2', name: 'Masala Dosa', category: 'Lunch'),
+    ];
+    final result = applyHomeListingFilters(
+      listings,
+      category: 'Desserts',
+      searchQuery: 'dosa',
+    );
+    expect(result.map((e) => e.name), ['Masala Dosa']);
+  });
+
+  test('search ranks name prefix matches first', () {
+    final listings = [
+      _item(id: '1', name: 'Hyderabadi Chicken Biryani'),
+      _item(id: '2', name: 'Biryani rice'),
+    ];
+    final result = applyHomeListingFilters(listings, searchQuery: 'bir');
+    expect(result.map((e) => e.name), ['Biryani rice', 'Hyderabadi Chicken Biryani']);
+  });
+
   test('search and food type filtering work together', () {
     final listings = [
       _item(id: '1', name: 'Veg Samosa', foodType: foodTypeVeg),
@@ -294,5 +316,132 @@ void main() {
     expect(selected, isNull);
     expect(find.text('All'), findsOneWidget);
     expect(fetches, 0);
+  });
+
+  test('nearby payload flattens listings and merge keeps society first', () {
+    final society = [
+      {'id': 'local-1', 'name': 'Society Dal'},
+    ];
+    final nearby = listingMapsFromNearbyPayload({
+      'available': true,
+      'sellers': [
+        {
+          'seller': {'id': 'aarav', 'distanceKm': 8.2},
+          'listings': [
+            {'id': 'local-1', 'name': 'Duplicate Dal'},
+            {'id': 'aarav-sushi', 'name': 'veg Sushi'},
+          ],
+        },
+      ],
+    });
+    final merged = mergeSocietyAndNearbyListingMaps(society, nearby);
+    expect(merged.map((item) => item['id']), ['local-1', 'aarav-sushi']);
+    expect(merged.first['name'], 'Society Dal');
+  });
+
+  test('copies seller sellingReachLevel and distanceKm onto flattened nearby listings', () {
+    final nearby = listingMapsFromNearbyPayload({
+      'available': true,
+      'sellers': [
+        {
+          'seller': {
+            'id': 'aarav',
+            'sellingReachLevel': 'EXTENDED',
+            'distanceKm': 0.16,
+          },
+          'listings': [
+            {'id': 'sushi', 'name': 'veg Sushi'},
+          ],
+        },
+      ],
+    });
+    expect(nearby.single['sellingReachLevel'], 'EXTENDED');
+    expect(nearby.single['distanceKm'], 0.16);
+  });
+
+  test('home reach buckets use societyId then distance vs nearby radius', () {
+    FoodItem item({
+      required String id,
+      String? societyId,
+      String? sellingReachLevel,
+      double? distanceKm,
+    }) {
+      return FoodItem.fromJson({
+        'id': id,
+        'name': id,
+        'sellerId': 's-$id',
+        'sellerName': 'Cook',
+        'price': 10,
+        'societyId': ?societyId,
+        'sellingReachLevel': ?sellingReachLevel,
+        'distanceKm': ?distanceKm,
+      });
+    }
+
+    const nearbyKm = 8.0;
+    final society = item(id: 'dal', societyId: 'mine');
+    final nextDoorExtended = item(
+      id: 'cake',
+      societyId: 'notting',
+      sellingReachLevel: 'EXTENDED',
+      distanceKm: 0.16,
+    );
+    final furtherExtended = item(
+      id: 'sushi',
+      societyId: 'ferns',
+      sellingReachLevel: 'EXTENDED',
+      distanceKm: 8.33,
+    );
+    final optedNearbyNoDistance = item(
+      id: 'idli',
+      societyId: 'other',
+      sellingReachLevel: 'NEARBY',
+    );
+    expect(
+      homeListingReachFor(society, buyerSocietyId: 'mine', nearbyRadiusKm: nearbyKm),
+      HomeListingReach.inSociety,
+    );
+    expect(
+      homeListingReachFor(
+        nextDoorExtended,
+        buyerSocietyId: 'mine',
+        nearbyRadiusKm: nearbyKm,
+      ),
+      HomeListingReach.nearby,
+    );
+    expect(
+      homeListingReachFor(
+        furtherExtended,
+        buyerSocietyId: 'mine',
+        nearbyRadiusKm: nearbyKm,
+      ),
+      HomeListingReach.extended,
+    );
+    expect(
+      homeListingReachFor(
+        optedNearbyNoDistance,
+        buyerSocietyId: 'mine',
+        nearbyRadiusKm: nearbyKm,
+      ),
+      HomeListingReach.nearby,
+    );
+  });
+
+  test('unavailable nearby payload contributes no listings', () {
+    expect(
+      listingMapsFromNearbyPayload({'available': false, 'sellers': []}),
+      isEmpty,
+    );
+  });
+
+  test('nearby seller card payload extracts listings', () {
+    expect(
+      listingMapsFromNearbySellerCard({
+        'listings': [
+          {'id': 'sushi', 'name': 'veg Sushi'},
+        ],
+      }).map((item) => item['id']),
+      ['sushi'],
+    );
   });
 }

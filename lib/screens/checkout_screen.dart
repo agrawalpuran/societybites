@@ -3,6 +3,8 @@ import 'main_shell_screen.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
+import '../widgets/made_to_order_hint.dart';
+import '../widgets/order_timing_notice.dart';
 import '../models/data.dart';
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
@@ -45,23 +47,50 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double _platformFee = 0;
   bool _isSubmitting = false;
   String? _fulfilmentMethod;
+  late bool _isCrossSociety;
+  SellerFulfilment? _sellerFulfilment;
 
   @override
   void initState() {
     super.initState();
     _items = List<CartItem>.from(widget.cartItems);
+    _isCrossSociety = widget.isCrossSociety;
+    _sellerFulfilment = widget.sellerFulfilment;
     _loadPlatformFee();
     if (!_allowsCash) {
       _payment = PaymentMethod.upi;
     }
-    final fulfilment = widget.sellerFulfilment;
-    if (widget.isCrossSociety && fulfilment != null) {
-      if (fulfilment.mode == FulfilmentMode.buyerPickup) {
-        _fulfilmentMethod = 'pickup';
-      } else if (fulfilment.mode == FulfilmentMode.sellerDelivery) {
-        _fulfilmentMethod = 'seller_delivery';
-      }
+    _applyDefaultFulfilmentMethod();
+    _inferCrossSocietyFromCart();
+  }
+
+  void _applyDefaultFulfilmentMethod() {
+    final fulfilment = _sellerFulfilment;
+    if (!_isCrossSociety || fulfilment == null) return;
+    if (fulfilment.mode == FulfilmentMode.buyerPickup) {
+      _fulfilmentMethod = 'pickup';
+    } else if (fulfilment.mode == FulfilmentMode.sellerDelivery) {
+      _fulfilmentMethod = 'seller_delivery';
     }
+  }
+
+  Future<void> _inferCrossSocietyFromCart() async {
+    if (_isCrossSociety && _sellerFulfilment != null) return;
+    final societyId = await SessionService.getSocietyId();
+    final mismatch = _items.any((item) {
+      final listingSociety = item.food.societyId;
+      return listingSociety != null &&
+          listingSociety.isNotEmpty &&
+          societyId != null &&
+          listingSociety != societyId;
+    });
+    if (!mismatch || !mounted) return;
+    setState(() {
+      _isCrossSociety = true;
+      _sellerFulfilment ??=
+          _items.isEmpty ? null : _items.first.food.sellerFulfilment;
+      _applyDefaultFulfilmentMethod();
+    });
   }
 
   Future<void> _loadPlatformFee() async {
@@ -86,9 +115,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _items.fold<double>(0, (sum, item) => sum + item.total);
 
   double get _deliveryCharge {
-    if (!widget.isCrossSociety) return 0;
+    if (!_isCrossSociety) return 0;
     if (_fulfilmentMethod != 'seller_delivery') return 0;
-    return widget.sellerFulfilment?.deliveryCharge ?? 0;
+    return _sellerFulfilment?.deliveryCharge ?? 0;
   }
 
   double get _grandTotal => _subtotal + _platformFee + _deliveryCharge;
@@ -98,8 +127,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   bool get _canConfirm {
     if (_isSubmitting || _items.isEmpty || _totalQuantity <= 0) return false;
-    if (widget.isCrossSociety &&
-        widget.sellerFulfilment?.mode == FulfilmentMode.both &&
+    if (_isCrossSociety &&
+        _sellerFulfilment?.mode == FulfilmentMode.both &&
         _fulfilmentMethod == null) {
       return false;
     }
@@ -216,14 +245,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   'quantity': item.quantity,
                 })
             .toList(),
-        fulfilmentMethod: widget.isCrossSociety ? _fulfilmentMethod : null,
+        fulfilmentMethod: _isCrossSociety ? _fulfilmentMethod : null,
       );
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Order confirmed! Your food is being prepared.'),
+          content: const Text('Order placed! track your order in the orders page.'),
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -306,8 +335,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     onDecrement: () =>
                                         _updateQuantity(e.key, -1),
                                   )),
+                          OrderTimingNotice(
+                            foods: _items.map((item) => item.food),
+                          ),
                           const SizedBox(height: 24),
-                          if (widget.isCrossSociety) ...[
+                          if (_isCrossSociety) ...[
                             _buildFulfilmentSection(),
                             const SizedBox(height: 24),
                           ],
@@ -362,17 +394,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildFulfilmentSection() {
-    final fulfilment = widget.sellerFulfilment ?? const SellerFulfilment();
+    final fulfilment = _sellerFulfilment ?? const SellerFulfilment();
     final society = widget.sellerSocietyName;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'How would you like to receive your order?',
+          'Delivery mechanism',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w800,
             color: Color(0xFF101617),
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'As per the seller\'s preference',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF6A7774),
           ),
         ),
         if (society != null && society.isNotEmpty) ...[
@@ -387,7 +428,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _fulfilmentTile(
             value: 'pickup',
             title: '🏠 Buyer Pickup',
-            subtitle: 'Pick up your order from the seller\'s society.',
+            subtitle: 'Pick up from the seller\'s society.',
           )
         else if (fulfilment.mode == FulfilmentMode.sellerDelivery)
           _fulfilmentTile(
@@ -400,7 +441,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _fulfilmentTile(
             value: 'pickup',
             title: '🏠 Buyer Pickup',
-            subtitle: 'Pick up your order from the seller\'s society.',
+            subtitle: 'Pick up from the seller\'s society.',
           ),
           const SizedBox(height: 8),
           _fulfilmentTile(
@@ -750,6 +791,10 @@ class _OrderItemCard extends StatelessWidget {
                 fontWeight: FontWeight.w500,
               ),
             ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: MadeToOrderHint(food: item.food),
           ),
           const SizedBox(height: 16),
           Row(

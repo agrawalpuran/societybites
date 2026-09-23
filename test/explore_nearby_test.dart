@@ -363,7 +363,7 @@ void main() {
     await _pumpHomeEmpty(tester, listings: [_listing('Paneer Wrap')]);
     expect(find.text('No sellers available in your society yet'), findsNothing);
     expect(find.text('Explore Nearby'), findsNothing);
-    expect(find.text('Paneer Wrap'), findsOneWidget);
+    expect(find.text('Paneer Wrap'), findsWidgets);
   });
 
   testWidgets('Orders screen still shows buyer orders', (tester) async {

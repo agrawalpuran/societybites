@@ -280,11 +280,16 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   Future<void> _pickDateTime() async {
     final initial = _dateTime ?? DateTime.now().add(const Duration(hours: 1));
+    final firstDate = listingAvailableUntilFirstDate();
+    final lastDate = listingAvailableUntilLastDate();
+    var initialDate = initial.isBefore(firstDate) ? firstDate : initial;
+    if (initialDate.isAfter(lastDate)) initialDate = lastDate;
     final date = await showDatePicker(
       context: context,
-      initialDate: initial.isBefore(DateTime.now()) ? DateTime.now() : initial,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 180)),
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: 'Available until (up to $listingAvailableUntilMaxDays days)',
     );
     if (date == null || !mounted) return;
 

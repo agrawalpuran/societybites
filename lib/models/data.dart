@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'food_type.dart';
 import 'listing_availability.dart';
 import 'listing_categories.dart';
+import 'order_lifecycle.dart';
+import 'seller_fulfilment.dart';
+import 'selling_reach.dart';
 
 const listingCatalogRegular = 'REGULAR';
 const listingCatalogPreorder = 'PREORDER';
@@ -69,6 +72,10 @@ class FoodItem {
   final int? maxDailyOrders;
   final bool madeToOrderUnavailableToday;
   final String sellerPaymentPreference;
+  final SellerFulfilment sellerFulfilment;
+  final SellingReachLevel? sellerSellingReachLevel;
+  /// Great-circle km from the buyer's society. Set from nearby-sellers cards.
+  final double? distanceKm;
 
   const FoodItem({
     required this.id,
@@ -105,6 +112,9 @@ class FoodItem {
     this.maxDailyOrders,
     this.madeToOrderUnavailableToday = false,
     this.sellerPaymentPreference = 'UPI_AND_COD',
+    this.sellerFulfilment = const SellerFulfilment(),
+    this.sellerSellingReachLevel,
+    this.distanceKm,
   });
 
   List<String> get listingCategories {
@@ -233,6 +243,13 @@ class FoodItem {
           json['madeToOrderUnavailableToday'] == true,
       sellerPaymentPreference:
           json['sellerPaymentPreference']?.toString() ?? 'UPI_AND_COD',
+      sellerFulfilment: SellerFulfilment.fromAuthMe(json),
+      sellerSellingReachLevel: json['sellingReachLevel'] == null
+          ? null
+          : parseSellingReachLevel(json['sellingReachLevel']),
+      distanceKm: json['distanceKm'] == null
+          ? null
+          : _asDouble(json['distanceKm']),
     );
   }
 
@@ -415,6 +432,20 @@ class Order {
       campaignOrderCutoffAt != null &&
       DateTime.now().isBefore(campaignOrderCutoffAt!) &&
       (status == 'pending' || status == 'accepted');
+
+  bool get canBuyerCancel {
+    if (isPreOrder) {
+      if (campaignOrderCutoffAt == null ||
+          !DateTime.now().isBefore(campaignOrderCutoffAt!)) {
+        return false;
+      }
+    }
+    return BuyerOrderLifecycle.canCancel(
+      status: status,
+      paymentStatus: paymentStatus,
+      paymentMethod: paymentMethod,
+    );
+  }
   bool get isTerminal =>
       status == 'completed' || status == 'cancelled' || status == 'rejected';
 
@@ -532,8 +563,14 @@ class Order {
     );
 
     return Order(
-      id: json['id'] as String,
-      orderId: (json['orderId'] as String?) ?? (json['orderNumber'] as String),
+      id: json['id']?.toString() ??
+          json['orderId']?.toString() ??
+          json['orderNumber']?.toString() ??
+          '',
+      orderId: (json['orderId'] as String?) ??
+          (json['orderNumber'] as String?) ??
+          json['id']?.toString() ??
+          '',
       items: items,
       date: date,
       status: (json['status'] as String?) ?? 'pending',

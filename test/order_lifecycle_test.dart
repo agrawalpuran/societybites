@@ -143,6 +143,65 @@ void main() {
     );
   });
 
+  test('buyer cancel is allowed only before UPI I\'ve Paid or COD accept', () {
+    expect(
+      BuyerOrderLifecycle.canCancel(
+        status: 'pending',
+        paymentStatus: 'pending',
+        paymentMethod: 'upi',
+      ),
+      isTrue,
+    );
+    expect(
+      BuyerOrderLifecycle.canCancel(
+        status: 'accepted',
+        paymentStatus: 'pending',
+        paymentMethod: 'upi',
+      ),
+      isTrue,
+    );
+    expect(
+      BuyerOrderLifecycle.canCancel(
+        status: 'accepted',
+        paymentStatus: 'buyer_marked_paid',
+        paymentMethod: 'upi',
+      ),
+      isFalse,
+    );
+    expect(
+      BuyerOrderLifecycle.canCancel(
+        status: 'accepted',
+        paymentStatus: 'seller_confirmed',
+        paymentMethod: 'upi',
+      ),
+      isFalse,
+    );
+    expect(
+      BuyerOrderLifecycle.canCancel(
+        status: 'pending',
+        paymentStatus: 'pending',
+        paymentMethod: 'cash',
+      ),
+      isTrue,
+    );
+    expect(
+      BuyerOrderLifecycle.canCancel(
+        status: 'accepted',
+        paymentStatus: 'pending',
+        paymentMethod: 'cash',
+      ),
+      isFalse,
+    );
+    expect(
+      BuyerOrderLifecycle.canCancel(
+        status: 'ready',
+        paymentStatus: 'pending',
+        paymentMethod: 'upi',
+      ),
+      isFalse,
+    );
+  });
+
   test('buyer does not need to perform lifecycle actions', () {
     for (final status in [
       'pending',

@@ -33,6 +33,7 @@ const {
   serializeMessage,
   attachUnreadCounts,
 } = require("../lib/orderMessages");
+const { buyerCancelDeniedReason } = require("../lib/buyerCancel");
 
 const router = express.Router();
 
@@ -96,6 +97,24 @@ async function updateOrderIfCurrentStatus(client, { id, fromStatus, data }) {
     where: { id },
     include: orderInclude,
   });
+}
+
+async function findOrderForUpdate(id) {
+  const byId = await prisma.order.findUnique({
+    where: { id },
+    include: orderInclude,
+  });
+  if (byId) return byId;
+  return prisma.order.findUnique({
+    where: { orderNumber: id },
+    include: orderInclude,
+  });
+}
+
+function isOrderSeller(order, userId) {
+  return (order.items || []).some(
+    (item) => item.listing && item.listing.sellerId === userId
+  );
 }
 
 async function restoreReservedInventory(tx, items) {
@@ -757,19 +776,14 @@ router.patch(
       });
     }
 
-    const order = await prisma.order.findUnique({
-      where: { id: req.params.id },
-      include: orderInclude,
-    });
+    const order = await findOrderForUpdate(req.params.id);
 
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
     }
 
     const isBuyer = order.buyerId === req.user.id;
-    const isSeller = order.items.some(
-      (item) => item.listing.sellerId === req.user.id
-    );
+    const isSeller = isOrderSeller(order, req.user.id);
 
     if (!isBuyer && !isSeller) {
       return res.status(403).json({ error: "Not allowed to update this order" });
@@ -815,10 +829,11 @@ router.patch(
       });
     }
 
-    if (status === "cancelled" && !["pending", "accepted"].includes(order.status)) {
-      return res.status(400).json({
-        error: "Can only cancel before preparation begins",
-      });
+    if (status === "cancelled") {
+      const cancelDenied = buyerCancelDeniedReason(order);
+      if (cancelDenied) {
+        return res.status(400).json({ error: cancelDenied });
+      }
     }
 
     if (status === "cancelled" && (order.type || "regular") === "pre_order") {

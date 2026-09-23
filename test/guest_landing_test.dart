@@ -33,7 +33,7 @@ void main() {
     expect(find.textContaining('Now serving $currentServingCity'), findsOneWidget);
     expect(find.text('Sign In'), findsOneWidget);
     expect(
-      find.text('Taste what your neighbors are baking today.'),
+      find.text('Taste what your neighbors are cooking today.'),
       findsOneWidget,
     );
     expect(find.text('Explore Menus →'), findsOneWidget);

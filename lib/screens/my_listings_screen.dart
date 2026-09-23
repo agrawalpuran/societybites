@@ -1188,13 +1188,17 @@ class _RenewListingDialogState extends State<_RenewListingDialog> {
   }
 
   Future<void> _pickDateTime() async {
+    final firstDate = listingAvailableUntilFirstDate();
+    final lastDate = listingAvailableUntilLastDate();
+    var initialDate =
+        _dateTime.isBefore(firstDate) ? firstDate : _dateTime;
+    if (initialDate.isAfter(lastDate)) initialDate = lastDate;
     final date = await showDatePicker(
       context: context,
-      initialDate: _dateTime.isBefore(DateTime.now())
-          ? DateTime.now()
-          : _dateTime,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 180)),
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: 'Available until (up to $listingAvailableUntilMaxDays days)',
     );
     if (date == null || !mounted) return;
 

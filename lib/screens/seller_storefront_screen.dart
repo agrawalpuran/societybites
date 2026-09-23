@@ -116,7 +116,8 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
     super.initState();
     final cached = SellerStorefrontMemoryCache._read(widget.seller.id);
     final initial = widget.initialProducts;
-    if (cached != null) {
+    if (cached != null &&
+        (cached.products.isNotEmpty || cached.campaigns.isNotEmpty)) {
       _products = cached.products;
       _campaigns = cached.campaigns;
       _hasSuccessfullyLoaded = true;
@@ -139,8 +140,8 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       });
     }
     try {
-      late final List<Map<String, dynamic>> listingRaw;
-      late final List<Map<String, dynamic>> campaignRaw;
+      late List<Map<String, dynamic>> listingRaw;
+      late List<Map<String, dynamic>> campaignRaw;
       final fetchListings = widget.fetchListings;
       final fetchCampaigns = widget.fetchCampaigns;
       if (fetchListings != null && fetchCampaigns != null) {
@@ -202,12 +203,29 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
           ]);
           listingRaw = responses[0];
           campaignRaw = responses[1];
+          if (listingRaw.isEmpty) {
+            try {
+              listingRaw = listingMapsFromNearbySellerCard(
+                await ApiService.getNearbySellerStorefront(widget.seller.id),
+              );
+            } catch (_) {
+              // Same-society catalog stays empty when nearby is unavailable.
+            }
+          }
         }
       }
-      final products = listingRaw
+      var products = listingRaw
           .map(FoodItem.fromJson)
           .where((item) => (item.isActive || item.isExpired) && !item.isPreOrder)
           .toList();
+      if (products.isEmpty) {
+        final seeded = widget.initialProducts;
+        if (seeded != null && seeded.isNotEmpty) {
+          products = seeded
+              .where((item) => (item.isActive || item.isExpired) && !item.isPreOrder)
+              .toList();
+        }
+      }
       final now = DateTime.now();
       final campaigns =
           campaignRaw

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/app_header.dart';
 import '../widgets/order_fulfilment_banner.dart';
+import '../widgets/order_timing_notice.dart';
 import '../widgets/order_items_list.dart';
 import '../widgets/order_messages_button.dart';
 import '../models/data.dart';
@@ -658,6 +659,11 @@ class _ActiveOrderCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
             ],
+            OrderTimingNotice(
+              foods: order.items.map((item) => item.food),
+              preOrderFulfilmentAt: order.fulfilmentAt,
+            ),
+            const SizedBox(height: 10),
             order.isPreOrder
                 ? _PreOrderFulfilmentCard(order: order)
                 : _PickupInfoCard(order: order),
@@ -668,10 +674,7 @@ class _ActiveOrderCard extends StatelessWidget {
               onClosed: onRefresh,
             ),
             const SizedBox(height: 10),
-            if ((!order.isPreOrder &&
-                    (order.status == 'pending' ||
-                        order.status == 'accepted')) ||
-                order.canCancelPreOrder) ...[
+            if (order.canBuyerCancel) ...[
               const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
@@ -705,33 +708,33 @@ class _ActiveOrderCard extends StatelessWidget {
                     if (confirmed != true || !context.mounted) return;
                     try {
                       await ApiService.updateOrderStatus(
-                        orderId: order.id,
+                        orderId: order.id.isNotEmpty ? order.id : order.orderId,
                         status: 'cancelled',
-                      );
-                      await onRefresh();
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Order cancelled'),
-                          backgroundColor: Color(0xFF0E5A47),
-                        ),
                       );
                     } catch (e) {
                       if (!context.mounted) return;
-                      final cutoffRejected = e
-                          .toString()
-                          .toLowerCase()
-                          .contains('cutoff');
+                      final raw = e.toString().toLowerCase();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            cutoffRejected
+                            raw.contains('cutoff')
                                 ? 'Pre-orders can no longer be cancelled because the order cutoff has passed.'
-                                : 'Could not cancel the order. Please try again.',
+                                : ApiService.userFacingError(e),
                           ),
                         ),
                       );
+                      return;
                     }
+                    try {
+                      await onRefresh();
+                    } catch (_) {}
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Order cancelled'),
+                        backgroundColor: Color(0xFF0E5A47),
+                      ),
+                    );
                   },
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFFE8B4B4)),

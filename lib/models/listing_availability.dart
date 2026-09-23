@@ -5,6 +5,19 @@ const preparationMinutesPerDay = 24 * 60;
 const maxPreparationTimeMinutes = 10080;
 const maxPreparationDays = maxPreparationTimeMinutes ~/ preparationMinutesPerDay;
 
+/// How far ahead DATE/TIME AVAILABLE (listing `availableAt`) may be set.
+const listingAvailableUntilMaxDays = 180;
+
+DateTime listingAvailableUntilFirstDate([DateTime? now]) {
+  final n = now ?? DateTime.now();
+  return DateTime(n.year, n.month, n.day);
+}
+
+DateTime listingAvailableUntilLastDate([DateTime? now]) {
+  return listingAvailableUntilFirstDate(now)
+      .add(const Duration(days: listingAvailableUntilMaxDays));
+}
+
 int preparationMinutesFromDays(int days) => days * preparationMinutesPerDay;
 
 int? preparationDaysFromMinutes(int? minutes) {

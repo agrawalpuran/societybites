@@ -18,6 +18,7 @@ import 'seller_storefront_screen.dart';
 import 'tab_preload.dart';
 import '../services/seller_onboarding.dart';
 import 'home_listing_filter.dart';
+import '../models/selling_reach.dart';
 import '../widgets/food_type_selector.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/listing_purchase_slot.dart';
@@ -27,6 +28,7 @@ class HomeScreen extends StatefulWidget {
     super.key,
     this.onInitialLoadSuccess,
     this.fetchListings,
+    this.fetchNearbySellers,
     this.onStartSelling,
     this.onExploreNearby,
     this.initialCategory,
@@ -38,6 +40,9 @@ class HomeScreen extends StatefulWidget {
 
   /// Test seam. Production uses [ApiService.getListings].
   final Future<List<Map<String, dynamic>>> Function()? fetchListings;
+
+  /// Test seam. Production uses [ApiService.getNearbySellers] after society listings.
+  final Future<Map<String, dynamic>> Function()? fetchNearbySellers;
 
   final VoidCallback? onStartSelling;
   final VoidCallback? onExploreNearby;
@@ -61,6 +66,10 @@ class HomeScreenState extends State<HomeScreen> {
   String? _selectedCategory;
   String? _selectedFoodType;
   bool _didNotifyInitialSuccess = false;
+  bool _showAllItems = false;
+  String? _buyerSocietyId;
+  HomeListingReach? _expandedReach;
+  SellingReach _cityReach = const SellingReach();
 
   bool get isLoadInProgress => _isLoading;
   bool get hasSuccessfullyLoaded => _hasSuccessfullyLoaded;
@@ -144,8 +153,6 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  List<Seller> get _sellers => sellersFromListings(_filteredListings);
-
   Future<void> _loadListings() async {
     final showSpinner = !_hasSuccessfullyLoaded;
     if (showSpinner) {
@@ -179,17 +186,43 @@ class HomeScreenState extends State<HomeScreen> {
           status: 'discoverable',
         );
       }
+
+      final shouldLoadNearby =
+          fetchListings == null || widget.fetchNearbySellers != null;
+      SellingReach cityReach = _cityReach;
+      if (shouldLoadNearby) {
+        try {
+          final nearbyRaw = widget.fetchNearbySellers != null
+              ? await widget.fetchNearbySellers!()
+              : await ApiService.getNearbySellers();
+          cityReach = SellingReach.fromAuthMe(nearbyRaw);
+          raw = mergeSocietyAndNearbyListingMaps(
+            raw,
+            listingMapsFromNearbyPayload(nearbyRaw),
+          );
+        } catch (_) {
+          // Home still works if nearby discovery is unavailable.
+        }
+      }
       final listings = raw.map(FoodItem.fromJson).toList();
 
       if (!mounted) return;
 
       setState(() {
         _listings = listings;
+        _cityReach = cityReach;
         _isLoading = false;
         _hasSuccessfullyLoaded = true;
         _error = null;
       });
       _notifyInitialLoadSuccess();
+      try {
+        final societyId = await SessionService.getSocietyId();
+        if (!mounted) return;
+        if (societyId != _buyerSocietyId) {
+          setState(() => _buyerSocietyId = societyId);
+        }
+      } catch (_) {}
     } catch (e) {
       if (!mounted) return;
       if (!_hasSuccessfullyLoaded) {
@@ -212,11 +245,21 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  List<FoodItem> get _specials => _filteredListings.take(3).toList();
+  List<FoodItem> get _available => _filteredListings;
 
-  List<FoodItem> get _available {
-    final filtered = _filteredListings;
-    return filtered.length > 3 ? filtered.sublist(3) : filtered;
+  bool get _isBrowsingUnfiltered =>
+      _searchQuery.isEmpty &&
+      _selectedCategory == null &&
+      _selectedFoodType == null;
+
+  bool get _shouldPreviewAllItems =>
+      !_showAllItems &&
+      _isBrowsingUnfiltered &&
+      _available.length > homeAllItemsPreviewCount;
+
+  List<FoodItem> get _visibleAvailable {
+    if (!_shouldPreviewAllItems) return _available;
+    return _available.take(homeAllItemsPreviewCount).toList();
   }
 
   Future<void> _addToCart(FoodItem food) async {
@@ -322,6 +365,8 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _openSeller(Seller seller) {
+    final sellerListings =
+        _listings.where((food) => food.sellerId == seller.id).toList();
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -332,6 +377,8 @@ class HomeScreenState extends State<HomeScreen> {
             if (mounted) setState(() {});
           },
           foodTypeFilter: _selectedFoodType,
+          initialProducts:
+              sellerListings.isEmpty ? null : sellerListings,
         ),
       ),
     ).then((_) {
@@ -405,14 +452,15 @@ class HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     SliverToBoxAdapter(child: _buildSearchBar()),
-                    SliverToBoxAdapter(child: _buildCategoryChips()),
-                    SliverToBoxAdapter(child: _buildPreOrdersSection()),
-                    if (_sellers.isNotEmpty)
-                      SliverToBoxAdapter(child: _buildSellersSection()),
-                    if (_specials.isNotEmpty)
-                      SliverToBoxAdapter(child: _buildSpecialsSection()),
+                    if (_searchQuery.isEmpty) ...[
+                      SliverToBoxAdapter(child: _buildCategoryChips()),
+                      SliverToBoxAdapter(child: _buildPreOrdersSection()),
+                      SliverToBoxAdapter(child: _buildHomeDiscoverySections()),
+                    ],
                     SliverToBoxAdapter(child: _buildAvailableHeader()),
                     _buildAvailableList(),
+                    if (_shouldPreviewAllItems)
+                      SliverToBoxAdapter(child: _buildSeeAllItemsButton()),
                     const SliverToBoxAdapter(child: SizedBox(height: 24)),
                     ],
                   ],
@@ -707,6 +755,7 @@ class HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
+                      key: const Key('home-search-field'),
                       controller: _searchController,
                       decoration: const InputDecoration(
                         hintText: 'Search meals, sellers, blocks…',
@@ -833,30 +882,103 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSellersSection() {
+  List<Seller> get _societySellers =>
+      sellersFromListings(_listingsForReach(HomeListingReach.inSociety));
+
+  List<Seller> get _nearbySellers =>
+      sellersFromListings(_listingsForReach(HomeListingReach.nearby));
+
+  List<Seller> get _extendedSellers =>
+      sellersFromListings(_listingsForReach(HomeListingReach.extended));
+
+  Widget _buildHomeDiscoverySections() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildSellerReachCarousel(
+          key: const Key('home-sellers-in-society'),
+          title: 'Top Sellers in Your Society',
+          sellers: _societySellers,
+        ),
+        _buildSpecialsSection(),
+        _buildSellerReachCarousel(
+          key: const Key('home-sellers-nearby'),
+          title: 'Nearby Societies',
+          subtitle: _cityReach.nearbyRadiusKm == null
+              ? null
+              : 'Sellers within ~${formatReachRadiusKm(_cityReach.nearbyRadiusKm!)} km',
+          sellers: _nearbySellers,
+        ),
+        _buildReachSection(
+          reach: HomeListingReach.nearby,
+          listings: _listingsForReach(HomeListingReach.nearby),
+        ),
+        _buildSellerReachCarousel(
+          key: const Key('home-sellers-extended'),
+          title: 'More Around You',
+          subtitle: _cityReach.extendedRadiusKm == null
+              ? null
+              : 'From other societies (within ~${formatReachRadiusKm(_cityReach.extendedRadiusKm!)} km)',
+          sellers: _extendedSellers,
+        ),
+        _buildReachSection(
+          reach: HomeListingReach.extended,
+          listings: _listingsForReach(HomeListingReach.extended),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSellerReachCarousel({
+    Key? key,
+    required String title,
+    String? subtitle,
+    required List<Seller> sellers,
+  }) {
+    if (sellers.isEmpty) return const SizedBox.shrink();
+    return Column(
+      key: key,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 14),
+          padding: const EdgeInsets.fromLTRB(20, 22, 8, 14),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Top Rated Sellers',
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF101617),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF101617),
+                      ),
+                    ),
+                    if (subtitle != null && subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF6A7774),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              const Spacer(),
               TextButton(
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => SellerListScreen(
-                        sellers: _sellers,
+                        title: title,
+                        sellers: sellers,
                         onSellerTap: _openSeller,
                       ),
                     ),
@@ -880,11 +1002,11 @@ class HomeScreenState extends State<HomeScreen> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: _sellers.length,
+            itemCount: sellers.length,
             separatorBuilder: (context, index) => const SizedBox(width: 16),
             itemBuilder: (_, i) => _SellerChip(
-              seller: _sellers[i],
-              onTap: () => _openSeller(_sellers[i]),
+              seller: sellers[i],
+              onTap: () => _openSeller(sellers[i]),
             ),
           ),
         ),
@@ -893,8 +1015,20 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSpecialsSection() {
+    final listings = _listingsForReach(HomeListingReach.inSociety);
+    if (listings.isEmpty) return const SizedBox.shrink();
+    if (_expandedReach == HomeListingReach.inSociety) {
+      return _buildReachSection(
+        reach: HomeListingReach.inSociety,
+        title: "Today's Specials in Your Society",
+        listings: listings,
+      );
+    }
     return _TodaysSpecialsSection(
-      specials: _specials,
+      specials: listings.take(homeReachPreviewCount).toList(),
+      showSeeAll: listings.length > homeReachPreviewCount,
+      onSeeAll: () =>
+          setState(() => _expandedReach = HomeListingReach.inSociety),
       cartQtyFor: _cartQtyFor,
       onAdd: _addToCart,
       onRemove: _removeFromCart,
@@ -903,15 +1037,172 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  List<FoodItem> _listingsForReach(HomeListingReach reach) {
+    return listingsForHomeReach(
+      _filteredListings,
+      reach: reach,
+      buyerSocietyId: _buyerSocietyId,
+      nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+    );
+  }
+
+  Widget _buildReachSection({
+    required HomeListingReach reach,
+    String? title,
+    required List<FoodItem> listings,
+  }) {
+    if (listings.isEmpty) return const SizedBox.shrink();
+    final expanded = _expandedReach == reach;
+    final preview = !expanded && listings.length > homeReachPreviewCount;
+    final visible = expanded
+        ? listings
+        : listings.take(homeReachPreviewCount).toList();
+    final seeAllKey = switch (reach) {
+      HomeListingReach.inSociety => const Key('home-see-all-in-society'),
+      HomeListingReach.nearby => const Key('home-see-all-nearby'),
+      HomeListingReach.extended => const Key('home-see-all-extended'),
+    };
+    final showTitle = title != null && title.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showTitle || preview)
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, showTitle ? 22 : 8, 8, 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: showTitle
+                      ? Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF101617),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                if (preview)
+                  TextButton(
+                    key: seeAllKey,
+                    onPressed: () => setState(() => _expandedReach = reach),
+                    child: const Text(
+                      'SEE ALL',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0E5A47),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          )
+        else
+          const SizedBox(height: 12),
+        if (expanded)
+          ...visible.map(
+            (food) => _AvailableItemTile(
+              key: ValueKey('home-reach-tile-${food.id}'),
+              food: food,
+              cartQty: _cartQtyFor(food),
+              onAdd: () => _addToCart(food),
+              onRemove: () => _removeFromCart(food),
+              onTap: () => _openDetail(food),
+              onSellerTap: () => _openSeller(sellerFromListing(food)),
+            ),
+          )
+        else
+          SizedBox(
+            height: 268,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: visible.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 14),
+              itemBuilder: (_, i) {
+                final food = visible[i];
+                return _SpecialCard(
+                  key: ValueKey('home-reach-card-${food.id}'),
+                  food: food,
+                  cartQty: _cartQtyFor(food),
+                  onAdd: () => _addToCart(food),
+                  onRemove: () => _removeFromCart(food),
+                  onTap: () => _openDetail(food),
+                  onSellerTap: () => _openSeller(sellerFromListing(food)),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildAvailableHeader() {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 24, 20, 14),
-      child: Text(
-        'All Items',
-        style: TextStyle(
-          fontSize: 19,
-          fontWeight: FontWeight.w800,
-          color: Color(0xFF101617),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 8, 14),
+      child: Row(
+        children: [
+              Expanded(
+                child: Text(
+                  _searchQuery.isEmpty
+                      ? 'All Items'
+                      : _available.isEmpty
+                      ? 'No matches'
+                      : _available.length == 1
+                      ? '1 match'
+                      : '${_available.length} matches',
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF101617),
+                  ),
+                ),
+              ),
+          if (_shouldPreviewAllItems)
+            TextButton(
+              key: const Key('home-see-all-items'),
+              onPressed: () => setState(() => _showAllItems = true),
+              child: const Text(
+                'SEE ALL',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0E5A47),
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeeAllItemsButton() {
+    final remaining = _available.length - homeAllItemsPreviewCount;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+      child: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: OutlinedButton(
+          key: const Key('home-see-all-items-bottom'),
+          onPressed: () => setState(() => _showAllItems = true),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF0E5A47),
+            side: const BorderSide(color: Color(0xFFD4E8DF)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          child: Text(
+            remaining == 1
+                ? 'See all ($remaining more listing)'
+                : 'See all ($remaining more listings)',
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
         ),
       ),
     );
@@ -940,14 +1231,15 @@ class HomeScreenState extends State<HomeScreen> {
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, i) => _AvailableItemTile(
-          food: _available[i],
-          cartQty: _cartQtyFor(_available[i]),
-          onAdd: () => _addToCart(_available[i]),
-          onRemove: () => _removeFromCart(_available[i]),
-          onTap: () => _openDetail(_available[i]),
-          onSellerTap: () => _openSeller(sellerFromListing(_available[i])),
+          key: ValueKey('home-all-item-${_visibleAvailable[i].id}'),
+          food: _visibleAvailable[i],
+          cartQty: _cartQtyFor(_visibleAvailable[i]),
+          onAdd: () => _addToCart(_visibleAvailable[i]),
+          onRemove: () => _removeFromCart(_visibleAvailable[i]),
+          onTap: () => _openDetail(_visibleAvailable[i]),
+          onSellerTap: () => _openSeller(sellerFromListing(_visibleAvailable[i])),
         ),
-        childCount: _available.length,
+        childCount: _visibleAvailable.length,
       ),
     );
   }
@@ -1014,6 +1306,8 @@ class _TodaysSpecialsSection extends StatefulWidget {
     required this.onRemove,
     required this.onTap,
     required this.onSellerTap,
+    this.showSeeAll = false,
+    this.onSeeAll,
   });
 
   final List<FoodItem> specials;
@@ -1022,6 +1316,8 @@ class _TodaysSpecialsSection extends StatefulWidget {
   final void Function(FoodItem food) onRemove;
   final void Function(FoodItem food) onTap;
   final void Function(FoodItem food) onSellerTap;
+  final bool showSeeAll;
+  final VoidCallback? onSeeAll;
 
   @override
   State<_TodaysSpecialsSection> createState() => _TodaysSpecialsSectionState();
@@ -1093,37 +1389,53 @@ class _TodaysSpecialsSectionState extends State<_TodaysSpecialsSection> {
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 2),
           child: Row(
             children: [
-              const Text(
-                "Today's Specials",
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF101617),
+              const Expanded(
+                child: Text(
+                  "Today's Specials in Your Society",
+                  style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF101617),
+                  ),
                 ),
               ),
-              const Spacer(),
-              ValueListenableBuilder<_SpecialsPageInfo>(
-                valueListenable: _pageInfo,
-                builder: (context, info, _) {
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(
-                      info.pageCount,
-                      (i) => Container(
-                        width: 8,
-                        height: 8,
-                        margin: const EdgeInsets.only(left: 5),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: i == info.activePage
-                              ? const Color(0xFF0E5A47)
-                              : const Color(0xFFD4DBD8),
+              if (widget.showSeeAll)
+                TextButton(
+                  key: const Key('home-see-all-in-society'),
+                  onPressed: widget.onSeeAll,
+                  child: const Text(
+                    'SEE ALL',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0E5A47),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                )
+              else
+                ValueListenableBuilder<_SpecialsPageInfo>(
+                  valueListenable: _pageInfo,
+                  builder: (context, info, _) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(
+                        info.pageCount,
+                        (i) => Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.only(left: 5),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: i == info.activePage
+                                ? const Color(0xFF0E5A47)
+                                : const Color(0xFFD4DBD8),
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                ),
             ],
           ),
         ),
@@ -1139,6 +1451,7 @@ class _TodaysSpecialsSectionState extends State<_TodaysSpecialsSection> {
             itemBuilder: (_, i) {
               final food = widget.specials[i];
               return _SpecialCard(
+                key: ValueKey('home-special-card-${food.id}'),
                 food: food,
                 cartQty: widget.cartQtyFor(food),
                 onAdd: () => widget.onAdd(food),
@@ -1172,6 +1485,7 @@ class _SpecialsPageInfo {
 
 class _SpecialCard extends StatelessWidget {
   const _SpecialCard({
+    super.key,
     required this.food,
     required this.cartQty,
     required this.onAdd,
@@ -1428,6 +1742,7 @@ class _SpecialCard extends StatelessWidget {
 
 class _AvailableItemTile extends StatelessWidget {
   const _AvailableItemTile({
+    super.key,
     required this.food,
     required this.cartQty,
     required this.onAdd,

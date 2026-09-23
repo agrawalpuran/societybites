@@ -381,7 +381,7 @@ const helpCategories = <HelpCategory>[
         id: 'issues-empty-home',
         question: 'I don\'t see any food on Home',
         answer:
-            'Home only shows cooks in your society. If nobody is listing yet, use Explore Nearby or start selling yourself.',
+            'Home shows cooks in your society plus nearby cooks who opted into Nearby or Extended selling. If the feed is empty, pull to refresh, try Explore Nearby, or start selling yourself.',
         keywords: ['blank home', 'no food', 'empty'],
       ),
       HelpFaq(

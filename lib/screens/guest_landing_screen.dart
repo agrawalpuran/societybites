@@ -268,7 +268,7 @@ class _HeroSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Taste what your neighbors are baking today.',
+            'Taste what your neighbors are cooking today.',
             style: TextStyle(
               fontSize: 28,
               height: 1.18,

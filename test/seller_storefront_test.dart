@@ -261,6 +261,35 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
+  testWidgets(
+    'seeded nearby listings stay visible when society catalog is empty',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SellerStorefrontScreen(
+            seller: _seller('aarav', 'Aarav'),
+            fetchListings: () async => [],
+            fetchCampaigns: () async => [],
+            initialProducts: [
+              FoodItem.fromJson(
+                _listingJson(
+                  id: 'sushi',
+                  name: 'veg Sushi',
+                  sellerId: 'aarav',
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('veg Sushi'), findsOneWidget);
+      expect(find.text('Nothing available right now'), findsNothing);
+    },
+  );
+
   testWidgets('seller A cache never appears for seller B', (tester) async {
     await _openStorefront(
       tester,
