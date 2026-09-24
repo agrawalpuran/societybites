@@ -9,6 +9,7 @@ import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../services/push_notification_service.dart';
 import '../widgets/app_header.dart';
+import '../widgets/confirm_upi_id_dialog.dart';
 import 'admin/admin_shell_screen.dart';
 import 'guest_landing_screen.dart';
 import 'help_center_screen.dart';
@@ -24,6 +25,7 @@ class ProfileScreen extends StatefulWidget {
     this.onSelectTab,
     this.fetchProfile,
     this.updateProfile,
+    this.saveUpiDetails,
     this.deleteAccount,
   });
 
@@ -40,6 +42,12 @@ class ProfileScreen extends StatefulWidget {
     double? deliveryCharge,
     String? paymentPreference,
   })? updateProfile;
+
+  /// Test seam. Production uses [ApiService.updateMyProfile] for UPI.
+  final Future<void> Function({
+    required String upiId,
+    String? upiDisplayName,
+  })? saveUpiDetails;
 
   /// Test seam. Production uses [ApiService.deleteMyAccount].
   final Future<void> Function()? deleteAccount;
@@ -472,7 +480,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         final upi = upiController.text.trim();
                         if (upi.isEmpty || !upi.contains('@')) {
                           setSheetState(() {
@@ -481,7 +489,13 @@ class ProfileScreenState extends State<ProfileScreen> {
                           });
                           return;
                         }
-                        Navigator.pop(ctx, true);
+                        final confirmed = await confirmUpiIdBeforeSave(
+                          ctx,
+                          upiId: upi,
+                        );
+                        if (confirmed && ctx.mounted) {
+                          Navigator.pop(ctx, true);
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0E5A47),
@@ -520,10 +534,17 @@ class ProfileScreenState extends State<ProfileScreen> {
     nameController.dispose();
 
     try {
-      await ApiService.updateMyProfile(
-        upiId: upi,
-        upiDisplayName: displayName.isEmpty ? null : displayName,
-      );
+      if (widget.saveUpiDetails != null) {
+        await widget.saveUpiDetails!(
+          upiId: upi,
+          upiDisplayName: displayName.isEmpty ? null : displayName,
+        );
+      } else {
+        await ApiService.updateMyProfile(
+          upiId: upi,
+          upiDisplayName: displayName.isEmpty ? null : displayName,
+        );
+      }
       await _loadProfile();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
