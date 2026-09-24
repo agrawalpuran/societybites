@@ -152,25 +152,42 @@ String formatOrderByLabel(DateTime value) {
 }
 
 class PreOrderBadge extends StatelessWidget {
-  const PreOrderBadge({super.key, this.compact = false});
+  const PreOrderBadge({
+    super.key,
+    this.compact = false,
+    this.label = 'PRE-ORDER',
+  });
 
   final bool compact;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
+    final closed = label == 'ORDERS CLOSED';
+    final upcoming = label == 'COMING SOON';
+    final background = closed
+        ? const Color(0xFFFFF0F0)
+        : upcoming
+        ? const Color(0xFFFFF8E8)
+        : const Color(0xFFFFE5D6);
+    final foreground = closed
+        ? const Color(0xFFD94F4F)
+        : upcoming
+        ? const Color(0xFF9A6B00)
+        : const Color(0xFFB85C3A);
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 7 : 9,
         vertical: compact ? 3 : 4,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFE5D6),
+        color: background,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        'PRE-ORDER',
+        label,
         style: TextStyle(
-          color: const Color(0xFFB85C3A),
+          color: foreground,
           fontSize: compact ? 9 : 10,
           letterSpacing: compact ? .5 : .7,
           fontWeight: FontWeight.w800,
@@ -180,12 +197,32 @@ class PreOrderBadge extends StatelessWidget {
   }
 }
 
+String buyerHomeBadgeLabel(PreOrderCampaign campaign, [DateTime? now]) {
+  switch (campaign.homePhase(now)) {
+    case BuyerCampaignHomePhase.upcoming:
+      return 'COMING SOON';
+    case BuyerCampaignHomePhase.ordersClosed:
+      return 'ORDERS CLOSED';
+    case BuyerCampaignHomePhase.open:
+    case BuyerCampaignHomePhase.hidden:
+      return 'PRE-ORDER';
+  }
+}
+
 String campaignDisplayStatus(PreOrderCampaign campaign) {
+  final phase = campaign.homePhase();
+  if (phase == BuyerCampaignHomePhase.upcoming) return 'upcoming';
+  if (phase == BuyerCampaignHomePhase.ordersClosed) return 'closed';
   if (campaign.status == 'open' &&
       !DateTime.now().isBefore(campaign.orderCutoffAt)) {
     return 'closed';
   }
   return campaign.status;
+}
+
+bool campaignShowsInKitchen(PreOrderCampaign campaign) {
+  final status = campaignDisplayStatus(campaign);
+  return status != 'draft' && status != 'cancelled';
 }
 
 String productionHeading({
@@ -208,6 +245,7 @@ class PreOrderStatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final normalized = status.toLowerCase();
     final (background, foreground) = switch (normalized) {
+      'upcoming' => (const Color(0xFFFFF8E8), const Color(0xFF9A6B00)),
       'open' => (const Color(0xFFE8F5EE), preorderGreen),
       'draft' => (const Color(0xFFFFF8E8), const Color(0xFF9A6B00)),
       'cancelled' => (const Color(0xFFFFF0F0), const Color(0xFFD94F4F)),
@@ -405,17 +443,27 @@ class HomePreOrderCampaignCard extends StatelessWidget {
     super.key,
     required this.campaign,
     required this.onTap,
+    this.isOwn = false,
   });
 
-  static const double cardWidth = 160;
-  static const double cardHeight = 178;
-  static const double coverHeight = 88;
+  static const double cardWidth = 148;
+  static const double cardHeight = 156;
+  static const double coverHeight = 76;
 
   final PreOrderCampaign campaign;
   final VoidCallback onTap;
+  final bool isOwn;
 
   @override
   Widget build(BuildContext context) {
+    final phase = campaign.homePhase();
+    final footer = switch (phase) {
+      BuyerCampaignHomePhase.upcoming =>
+        'Opens ${formatTime(campaign.orderOpenAt)}',
+      BuyerCampaignHomePhase.ordersClosed =>
+        formatReadyAt(campaign.fulfilmentAt),
+      _ => formatReadyAt(campaign.fulfilmentAt),
+    };
     return SizedBox(
       width: cardWidth,
       height: cardHeight,
@@ -442,16 +490,42 @@ class HomePreOrderCampaignCard extends StatelessWidget {
                       height: coverHeight,
                       borderRadius: 0,
                     ),
-                    const Positioned(
+                    Positioned(
                       left: 8,
                       top: 8,
-                      child: PreOrderBadge(compact: true),
+                      child: PreOrderBadge(
+                        compact: true,
+                        label: buyerHomeBadgeLabel(campaign),
+                      ),
                     ),
+                    if (isOwn)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5EE),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text(
+                            'Yours',
+                            style: TextStyle(
+                              color: preorderGreen,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -461,7 +535,7 @@ class HomePreOrderCampaignCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: preorderText,
-                            fontSize: 13,
+                            fontSize: 12,
                             height: 1.15,
                             fontWeight: FontWeight.w800,
                           ),
@@ -479,7 +553,7 @@ class HomePreOrderCampaignCard extends StatelessWidget {
                         ),
                         const Spacer(),
                         Text(
-                          formatReadyAt(campaign.fulfilmentAt),
+                          footer,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -545,7 +619,7 @@ class BuyerPreOrderCampaignCard extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const PreOrderBadge(),
+                  PreOrderBadge(label: buyerHomeBadgeLabel(campaign)),
                   const Spacer(),
                   if (campaign.startingPrice > 0)
                     Text(

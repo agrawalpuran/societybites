@@ -10,6 +10,7 @@ import '../models/listing_availability.dart';
 import '../models/listing_categories.dart';
 import '../widgets/available_in_selector.dart';
 import '../widgets/food_type_selector.dart';
+import '../widgets/required_field_label.dart';
 
 class AddListingScreen extends StatefulWidget {
   const AddListingScreen({
@@ -49,7 +50,6 @@ class _AddListingScreenState extends State<AddListingScreen> {
   late String _availabilityMode;
   int _prepPresetMinutes = 60;
   final _customPrepDaysController = TextEditingController();
-  final _maxDailyController = TextEditingController();
 
   bool get _isEditing => widget.existingListing != null;
   bool get _isPreorderCatalog =>
@@ -58,6 +58,17 @@ class _AddListingScreenState extends State<AddListingScreen> {
   bool get _isMadeToOrder =>
       !_isPreorderCatalog &&
       _availabilityMode == listingAvailabilityMadeToOrder;
+  bool get _showFulfilmentChoice => _isEditing && !_isPreorderCatalog;
+  bool get _showFulfilmentSection =>
+      !_isPreorderCatalog && (_showFulfilmentChoice || _isMadeToOrder);
+  bool get _showStockAndExpiryFields =>
+      !_isMadeToOrder && !_isPreorderCatalog;
+
+  String get _orderTypeTitle {
+    if (_isPreorderCatalog) return 'Pre-order';
+    if (_isMadeToOrder) return 'Made to order';
+    return 'Available now order';
+  }
 
   int? get _selectedPrepMinutes {
     if (!_isMadeToOrder) return null;
@@ -72,39 +83,47 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   Widget _buildFulfilmentSection() {
     return _buildField(
-      label: 'HOW WILL YOU FULFIL THIS?',
+      label: _showFulfilmentChoice
+          ? 'HOW WILL YOU FULFIL THIS?'
+          : 'PREPARATION TIME',
+      isRequired: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _FulfilmentOption(
-            selected: !_isMadeToOrder,
-            title: 'Available Now',
-            subtitle: 'Normally available for regular orders',
-            onTap: () => setState(() {
-              _availabilityMode = listingAvailabilityReadyNow;
-            }),
-          ),
-          const SizedBox(height: 8),
-          _FulfilmentOption(
-            selected: _isMadeToOrder,
-            title: 'Made to Order',
-            subtitle: 'Prepare this after a buyer places an order',
-            onTap: () => setState(() {
-              _availabilityMode = listingAvailabilityMadeToOrder;
-            }),
-          ),
-          if (_isMadeToOrder) ...[
-            const SizedBox(height: 14),
-            const Text(
-              'PREPARATION TIME',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.1,
-                color: Color(0xFF8A9491),
-              ),
+          if (_showFulfilmentChoice) ...[
+            _FulfilmentOption(
+              selected: !_isMadeToOrder,
+              title: 'Available Now',
+              subtitle: 'Normally available for regular orders',
+              onTap: () => setState(() {
+                _availabilityMode = listingAvailabilityReadyNow;
+              }),
             ),
             const SizedBox(height: 8),
+            _FulfilmentOption(
+              selected: _isMadeToOrder,
+              title: 'Made to Order',
+              subtitle: 'Prepare this after a buyer places an order',
+              onTap: () => setState(() {
+                _availabilityMode = listingAvailabilityMadeToOrder;
+              }),
+            ),
+          ],
+          if (_isMadeToOrder) ...[
+            if (_showFulfilmentChoice) ...[
+              const SizedBox(height: 14),
+              RequiredFieldLabel(
+                'PREPARATION TIME',
+                required: true,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.1,
+                  color: Color(0xFF8A9491),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -171,22 +190,6 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 height: 1.4,
                 color: Color(0xFF6A7774),
               ),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'MAXIMUM ORDERS PER DAY (OPTIONAL)',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.1,
-                color: Color(0xFF8A9491),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _maxDailyController,
-              keyboardType: TextInputType.number,
-              decoration: _inputDeco('Leave blank for no daily limit'),
             ),
           ],
         ],
@@ -256,9 +259,6 @@ class _AddListingScreenState extends State<AddListingScreen> {
           _customPrepDaysController.text = days.toString();
         }
       }
-      if (listing.maxDailyOrders != null) {
-        _maxDailyController.text = listing.maxDailyOrders.toString();
-      }
     } else {
       _availabilityMode = parseListingAvailabilityMode(
         widget.initialAvailabilityMode,
@@ -274,7 +274,6 @@ class _AddListingScreenState extends State<AddListingScreen> {
     _weightPerUnitController.dispose();
     _descController.dispose();
     _customPrepDaysController.dispose();
-    _maxDailyController.dispose();
     super.dispose();
   }
 
@@ -433,7 +432,6 @@ class _AddListingScreenState extends State<AddListingScreen> {
     }
 
     int? prepMinutes;
-    int? maxDaily;
     if (_isMadeToOrder) {
       prepMinutes = _selectedPrepMinutes;
       if (prepMinutes == null ||
@@ -447,16 +445,6 @@ class _AddListingScreenState extends State<AddListingScreen> {
           ),
         );
         return;
-      }
-      final maxRaw = _maxDailyController.text.trim();
-      if (maxRaw.isNotEmpty) {
-        maxDaily = int.tryParse(maxRaw);
-        if (maxDaily == null || maxDaily < 1) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Maximum orders per day must be a positive number.')),
-          );
-          return;
-        }
       }
     }
 
@@ -476,14 +464,21 @@ class _AddListingScreenState extends State<AddListingScreen> {
         );
       }
 
+      final quantity = (_isMadeToOrder || _isPreorderCatalog)
+          ? (_isEditing && widget.existingListing!.quantity > 0
+              ? widget.existingListing!.quantity
+              : 99)
+          : int.parse(_qtyController.text.trim());
+
       if (_isEditing) {
         await ApiService.updateListing(
           listingId: widget.existingListing!.id,
           name: _nameController.text.trim(),
           price: double.parse(_priceController.text.trim()),
-          quantity: int.parse(_qtyController.text.trim()),
+          quantity: quantity,
           description: _descController.text.trim(),
-          availableAt: _dateTime,
+          availableAt: _showStockAndExpiryFields ? _dateTime : null,
+          clearAvailableAt: !_showStockAndExpiryFields,
           pickupLocation: _pickup,
           imageUrl: imageUrl,
           weightUnit: _weightUnit,
@@ -495,17 +490,17 @@ class _AddListingScreenState extends State<AddListingScreen> {
               ? listingAvailabilityReadyNow
               : _availabilityMode,
           preparationTimeMinutes: prepMinutes,
-          maxDailyOrders: maxDaily,
-          clearMaxDailyOrders: !_isMadeToOrder || maxDaily == null,
+          maxDailyOrders: null,
+          clearMaxDailyOrders: true,
         );
       } else {
         await ApiService.createListing(
           societyId: societyId,
           name: _nameController.text.trim(),
           price: double.parse(_priceController.text.trim()),
-          quantity: int.parse(_qtyController.text.trim()),
+          quantity: quantity,
           description: _descController.text.trim(),
-          availableAt: _dateTime,
+          availableAt: _showStockAndExpiryFields ? _dateTime : null,
           pickupLocation: _pickup,
           imageUrl: imageUrl,
           weightUnit: _weightUnit,
@@ -518,7 +513,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
               ? listingAvailabilityReadyNow
               : _availabilityMode,
           preparationTimeMinutes: prepMinutes,
-          maxDailyOrders: maxDaily,
+          maxDailyOrders: null,
         );
       }
 
@@ -593,11 +588,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        _isEditing
-                            ? 'Edit listing'
-                            : widget.catalogType == listingCatalogPreorder
-                                ? 'Add a pre-order item'
-                                : 'List a New Bite',
+                        _orderTypeTitle,
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
@@ -609,9 +600,11 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       Text(
                         _isEditing
                             ? 'Update this item. It stays in the same catalog.'
-                            : widget.catalogType == listingCatalogPreorder
+                            : _isPreorderCatalog
                                 ? 'Customers can order this through your pre-order campaigns.'
-                                : 'Share your culinary creations with the\nneighborhood.',
+                                : _isMadeToOrder
+                                    ? 'You prepare this after a buyer places an order. You can still accept or reject each order.'
+                                    : 'Share your culinary creations with the\nneighborhood.',
                         style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF6A7774),
@@ -619,11 +612,14 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           height: 1.4,
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      const RequiredFieldsLegend(),
                       const SizedBox(height: 24),
                       _buildImageUpload(),
                       const SizedBox(height: 24),
                       _buildField(
                         label: 'ITEM NAME',
+                        isRequired: true,
                         child: TextFormField(
                           controller: _nameController,
                           validator: (v) =>
@@ -635,6 +631,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       const SizedBox(height: 18),
                       _buildField(
                         label: 'PRICE PER PORTION',
+                        isRequired: true,
                         child: TextFormField(
                           controller: _priceController,
                           keyboardType: TextInputType.number,
@@ -650,28 +647,33 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           decoration: _inputDeco('₹ 0.00'),
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      _buildField(
-                        label: 'QUANTITY AVAILABLE',
-                        child: TextFormField(
-                          controller: _qtyController,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Required';
-                            final n = int.tryParse(v.trim());
-                            if (n == null || n < 1) return 'Enter at least 1';
-                            return null;
-                          },
-                          decoration: _inputDeco(
-                            _isEditing
-                                ? 'Remaining portions (current stock)'
-                                : '1',
+                      if (_showStockAndExpiryFields) ...[
+                        const SizedBox(height: 18),
+                        _buildField(
+                          label: 'QUANTITY AVAILABLE',
+                          isRequired: true,
+                          child: TextFormField(
+                            controller: _qtyController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Required';
+                              }
+                              final n = int.tryParse(v.trim());
+                              if (n == null || n < 1) return 'Enter at least 1';
+                              return null;
+                            },
+                            decoration: _inputDeco(
+                              _isEditing
+                                  ? 'Remaining portions (current stock)'
+                                  : '1',
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: 18),
                       _buildField(
                         label: 'WEIGHT PER PORTION',
@@ -746,10 +748,11 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      _buildField(
-                        label: 'DATE/TIME AVAILABLE',
-                        child: GestureDetector(
+                      if (_showStockAndExpiryFields) ...[
+                        const SizedBox(height: 18),
+                        _buildField(
+                          label: 'DATE/TIME AVAILABLE UNTIL',
+                          child: GestureDetector(
                           onTap: _pickDateTime,
                           child: Container(
                             height: 52,
@@ -787,6 +790,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           ),
                         ),
                       ),
+                      ],
                       const SizedBox(height: 18),
                       _buildField(
                         label: 'PICKUP LOCATION',
@@ -840,7 +844,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           ),
                         ),
                       ),
-                      if (!_isPreorderCatalog) ...[
+                      if (_showFulfilmentSection) ...[
                         const SizedBox(height: 18),
                         _buildFulfilmentSection(),
                       ],
@@ -858,6 +862,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       const SizedBox(height: 18),
                       _buildField(
                         label: 'AVAILABLE IN',
+                        isRequired: true,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -888,6 +893,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       const SizedBox(height: 18),
                       _buildField(
                         label: 'FOOD TYPE',
+                        isRequired: true,
                         child: FoodTypeSelector(
                           value: _foodType,
                           onChanged: (value) {
@@ -1084,19 +1090,15 @@ class _AddListingScreenState extends State<AddListingScreen> {
     );
   }
 
-  Widget _buildField({required String label, required Widget child}) {
+  Widget _buildField({
+    required String label,
+    required Widget child,
+    bool isRequired = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            letterSpacing: 1.2,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF6A7774),
-          ),
-        ),
+        RequiredFieldLabel(label, required: isRequired),
         const SizedBox(height: 8),
         child,
       ],

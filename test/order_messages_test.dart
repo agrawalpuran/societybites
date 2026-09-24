@@ -95,6 +95,31 @@ void main() {
     );
 
     expect(find.text('Message Buyer'), findsOneWidget);
+    expect(find.text('UNPAID'), findsOneWidget);
+    expect(find.text('Qty 1'), findsOneWidget);
+    final unpaid = tester.getRect(find.text('UNPAID'));
+    final message = tester.getRect(find.text('Message Buyer'));
+    expect(message.center.dy, closeTo(unpaid.center.dy, 16));
+    expect(message.left, greaterThan(unpaid.right));
+  });
+
+  testWidgets('compact message button is not full width', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            child: OrderMessagesButton(
+              order: Order.fromJson(_orderJson()),
+              isSellerView: false,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final button = tester.getSize(find.byKey(const Key('order-messages-button')));
+    expect(button.width, lessThan(280));
   });
 
   testWidgets('unread indicator shows on message button', (tester) async {
@@ -110,6 +135,7 @@ void main() {
     );
 
     expect(find.byKey(const Key('order-unread-dot')), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
   });
 
   testWidgets('conversation screen opens', (tester) async {

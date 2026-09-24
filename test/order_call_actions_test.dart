@@ -53,7 +53,7 @@ Finder get _callActions => find.byWidgetPredicate((widget) {
       return false;
     });
 
-Widget _sellerCard(Order order) {
+Widget _sellerCard(Order order, {bool rejectBusy = false}) {
   return MaterialApp(
     home: Scaffold(
       body: SellerActiveOrderCard(
@@ -63,6 +63,7 @@ Widget _sellerCard(Order order) {
         onPaymentConfirmed: () async {},
         onReject: (_) async {},
         onReadyBy: (_) async {},
+        rejectBusy: rejectBusy,
       ),
     ),
   );
@@ -169,5 +170,43 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(_callActions, findsNothing);
+  });
+
+  testWidgets('pending order has an enabled Reject button', (tester) async {
+    await tester.pumpWidget(
+      _sellerCard(Order.fromJson(_orderJson(status: 'pending'))),
+    );
+    final button = tester.widget<OutlinedButton>(
+      find.byKey(const Key('seller-reject-button')),
+    );
+    expect(button.onPressed, isNotNull);
+  });
+
+  testWidgets('rejected order greys out Reject so it cannot be pressed again', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _sellerCard(Order.fromJson(_orderJson(status: 'rejected'))),
+    );
+    final button = tester.widget<OutlinedButton>(
+      find.byKey(const Key('seller-reject-button')),
+    );
+    expect(button.onPressed, isNull);
+    expect(find.text('Reject'), findsOneWidget);
+  });
+
+  testWidgets('Reject is disabled while a rejection is in progress', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _sellerCard(
+        Order.fromJson(_orderJson(status: 'pending')),
+        rejectBusy: true,
+      ),
+    );
+    final button = tester.widget<OutlinedButton>(
+      find.byKey(const Key('seller-reject-button')),
+    );
+    expect(button.onPressed, isNull);
   });
 }

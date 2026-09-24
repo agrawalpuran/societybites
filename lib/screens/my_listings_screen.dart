@@ -10,6 +10,7 @@ import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/made_to_order_hint.dart';
 import 'add_listing_screen.dart';
+import 'add_listing_type_screen.dart';
 
 class MyListingsScreen extends StatefulWidget {
   const MyListingsScreen({
@@ -18,6 +19,7 @@ class MyListingsScreen extends StatefulWidget {
     this.updateCatalog,
     this.pauseAllListings,
     this.resumeAllListings,
+    this.ensureCanCreateListing,
   });
 
   /// Test seam. Production uses [ApiService.getListings].
@@ -32,6 +34,9 @@ class MyListingsScreen extends StatefulWidget {
 
   /// Test seam. Production uses [ApiService.resumeAllListings].
   final Future<Map<String, dynamic>> Function()? resumeAllListings;
+
+  /// Test seam. Production uses [SellerOnboarding.ensureCanCreateListing].
+  final Future<bool> Function(BuildContext context)? ensureCanCreateListing;
 
   @override
   MyListingsScreenState createState() => MyListingsScreenState();
@@ -50,9 +55,6 @@ class MyListingsScreenState extends State<MyListingsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _tabController.addListener(() {
-      if (mounted && !_tabController.indexIsChanging) setState(() {});
-    });
     if (MyListingsCache.hasSnapshot) {
       _listings = MyListingsCache.listings;
       _isLoading = false;
@@ -76,9 +78,6 @@ class MyListingsScreenState extends State<MyListingsScreen>
 
   List<FoodItem> get _preorderListings =>
       _listings.where((item) => item.isPreOrderCatalog).toList();
-
-  bool get _isPreorderTab => _tabController.index == 3;
-  bool get _isMadeToOrderTab => _tabController.index == 2;
 
   Future<void> reload() => _loadListings();
 
@@ -299,14 +298,30 @@ class MyListingsScreenState extends State<MyListingsScreen>
     }
   }
 
+  Future<void> _openCreateListing({bool preorderItem = false}) async {
+    final canList = await (widget.ensureCanCreateListing ??
+        SellerOnboarding.ensureCanCreateListing)(context);
+    if (!canList || !mounted) return;
+
+    final destination = preorderItem
+        ? const AddListingScreen(catalogType: listingCatalogPreorder)
+        : const AddListingTypeScreen();
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => destination),
+    );
+    if (changed == true) {
+      await _loadListings();
+    }
+  }
+
   Future<void> _openEditor([FoodItem? listing]) async {
     if (listing == null) {
-      final canList = await SellerOnboarding.ensureCanCreateListing(context);
-      if (!canList || !mounted) return;
+      await _openCreateListing();
+      return;
     }
 
-    final catalogType = listing?.catalogType ??
-        (_isPreorderTab ? listingCatalogPreorder : listingCatalogRegular);
+    final catalogType = listing.catalogType;
 
     final changed = await Navigator.push<bool>(
       context,
@@ -314,9 +329,6 @@ class MyListingsScreenState extends State<MyListingsScreen>
         builder: (_) => AddListingScreen(
           existingListing: listing,
           catalogType: catalogType,
-          initialAvailabilityMode: listing == null && _isMadeToOrderTab
-              ? listingAvailabilityMadeToOrder
-              : listingAvailabilityReadyNow,
         ),
       ),
     );
@@ -517,11 +529,9 @@ class MyListingsScreenState extends State<MyListingsScreen>
                     ),
                   ),
                   TextButton.icon(
-                    onPressed: () => _openEditor(),
+                    onPressed: () => _openCreateListing(),
                     icon: const Icon(Icons.add_rounded, size: 20),
-                    label: Text(
-                      _isPreorderTab ? 'Add Pre-order Item' : 'Add Listing',
-                    ),
+                    label: const Text('Add Listing'),
                     style: TextButton.styleFrom(
                       foregroundColor: const Color(0xFF0E5A47),
                     ),
@@ -633,7 +643,9 @@ class MyListingsScreenState extends State<MyListingsScreen>
                                     emptyTitle: 'No pre-order items yet',
                                     emptyBody:
                                         'Add food items that customers can order through your pre-order campaigns.',
-                                    addLabel: 'Add Pre-order Item',
+                                    addLabel: 'Add catalog',
+                                    createPreorderItem: true,
+                                    showAddCatalog: true,
                                   ),
                                 ],
                               ),
@@ -688,68 +700,111 @@ class MyListingsScreenState extends State<MyListingsScreen>
     required String emptyTitle,
     required String emptyBody,
     required String addLabel,
+    bool createPreorderItem = false,
+    bool showAddCatalog = false,
   }) {
+    final addCatalogButton = showAddCatalog
+        ? Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const Key('create-preorder-catalog'),
+                onPressed: () =>
+                    _openCreateListing(preorderItem: true),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0E5A47),
+                  side: const BorderSide(color: Color(0xFFD4E8DF)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.menu_book_outlined, size: 18),
+                label: const Text(
+                  'Add catalog',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          )
+        : const SizedBox.shrink();
+
     if (listings.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                emptyTitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
+      return Column(
+        children: [
+          addCatalogButton,
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      emptyTitle,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      emptyBody,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color(0xFF6A7774),
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () =>
+                          _openCreateListing(preorderItem: createPreorderItem),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0E5A47),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text(addLabel),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                emptyBody,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF6A7774),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => _openEditor(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0E5A47),
-                  foregroundColor: Colors.white,
-                ),
-                child: Text(addLabel),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       );
     }
 
-    return RefreshIndicator(
-      color: const Color(0xFF0E5A47),
-      onRefresh: _loadListings,
-      child: ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
+    return Column(
+      children: [
+        addCatalogButton,
+        Expanded(
+          child: RefreshIndicator(
+            color: const Color(0xFF0E5A47),
+            onRefresh: _loadListings,
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              padding: const EdgeInsets.all(20),
+              itemCount: listings.length,
+              itemBuilder: (_, index) {
+                final listing = listings[index];
+                return _SellerListingCard(
+                  listing: listing,
+                  onEdit: () => _openEditor(listing),
+                  onDelete: () => _deleteListing(listing),
+                  onPause: () => _pauseListing(listing),
+                  onResume: () => _resumeListing(listing),
+                  onRenew: () => _renewListing(listing),
+                  onMove: () => _moveListing(listing),
+                );
+              },
+            ),
+          ),
         ),
-        padding: const EdgeInsets.all(20),
-        itemCount: listings.length,
-        itemBuilder: (_, index) {
-          final listing = listings[index];
-          return _SellerListingCard(
-            listing: listing,
-            onEdit: () => _openEditor(listing),
-            onDelete: () => _deleteListing(listing),
-            onPause: () => _pauseListing(listing),
-            onResume: () => _resumeListing(listing),
-            onRenew: () => _renewListing(listing),
-            onMove: () => _moveListing(listing),
-          );
-        },
-      ),
+      ],
     );
   }
 }

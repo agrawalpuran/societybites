@@ -181,6 +181,7 @@ void main() {
             required items,
             required paymentMethod,
             fulfilmentMethod,
+            requestedReadyAt,
           }) async =>
               {'id': 'o1'},
         ),
@@ -209,6 +210,7 @@ void main() {
             required items,
             required paymentMethod,
             fulfilmentMethod,
+            requestedReadyAt,
           }) async =>
               {'id': 'o1'},
         ),
@@ -237,6 +239,7 @@ void main() {
             required items,
             required paymentMethod,
             fulfilmentMethod,
+            requestedReadyAt,
           }) async =>
               {'id': 'o1'},
         ),
@@ -299,6 +302,7 @@ void main() {
             required items,
             required paymentMethod,
             fulfilmentMethod,
+            requestedReadyAt,
           }) async {
             sent = fulfilmentMethod;
             return {'id': 'o1'};
@@ -330,6 +334,7 @@ void main() {
             required items,
             required paymentMethod,
             fulfilmentMethod,
+            requestedReadyAt,
           }) async {
             throw Exception(
               'This seller is no longer available for delivery to your society.',
@@ -368,6 +373,7 @@ void main() {
             required items,
             required paymentMethod,
             fulfilmentMethod,
+            requestedReadyAt,
           }) async =>
               {'id': 'o1'},
         ),

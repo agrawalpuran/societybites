@@ -214,13 +214,79 @@ void main() {
     }
   });
 
+  test('buyer terminal orders stay active for 24 hours then move to past', () {
+    final now = DateTime.utc(2026, 9, 25, 10, 30);
+    expect(
+      BuyerOrderVisibility.isInBuyerActiveTab(
+        status: 'accepted',
+        now: now,
+      ),
+      isTrue,
+    );
+    expect(
+      BuyerOrderVisibility.isInBuyerActiveTab(
+        status: 'completed',
+        completedAt: now.subtract(const Duration(hours: 3)),
+        now: now,
+      ),
+      isTrue,
+    );
+    expect(
+      BuyerOrderVisibility.isInBuyerActiveTab(
+        status: 'completed',
+        completedAt: now.subtract(const Duration(hours: 24)),
+        now: now,
+      ),
+      isFalse,
+    );
+    expect(
+      BuyerOrderVisibility.isInBuyerActiveTab(
+        status: 'rejected',
+        rejectedAt: now.subtract(const Duration(hours: 5)),
+        now: now,
+      ),
+      isTrue,
+    );
+    expect(
+      BuyerOrderVisibility.isInBuyerActiveTab(
+        status: 'cancelled',
+        cancelledAt: now.subtract(const Duration(hours: 48)),
+        now: now,
+      ),
+      isFalse,
+    );
+    expect(
+      BuyerOrderVisibility.isInBuyerActiveTab(status: 'completed', now: now),
+      isFalse,
+    );
+  });
+
+  test('reject reason splits optional seller note', () {
+    expect(
+      BuyerOrderVisibility.rejectReasonLabel('Ingredients unavailable\nSold out'),
+      'Ingredients unavailable',
+    );
+    expect(
+      BuyerOrderVisibility.rejectNote('Ingredients unavailable\nSold out'),
+      'Sold out',
+    );
+    expect(BuyerOrderVisibility.rejectNote('Ingredients unavailable'), isNull);
+  });
+
   testWidgets('reject confirmation works', (tester) async {
+    tester.view.physicalSize = const Size(400, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    RejectOrderResult? captured;
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
           builder: (context) => Scaffold(
             body: TextButton(
-              onPressed: () => confirmRejectOrder(context),
+              onPressed: () async {
+                captured = await confirmRejectOrder(context);
+              },
               child: const Text('Open reject'),
             ),
           ),
@@ -231,23 +297,22 @@ void main() {
     await tester.tap(find.text('Open reject'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Reject this order?'), findsOneWidget);
-    expect(
-      find.text(
-        'The buyer will be notified that the order could not be fulfilled.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Reject Order?'), findsOneWidget);
+    expect(find.text("Why can't you fulfil this order?"), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(find.text('Reject this order?'), findsNothing);
+    expect(find.text('Reject Order?'), findsNothing);
 
     await tester.tap(find.text('Open reject'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Reject Order'));
+    await tester.tap(find.text('Ingredients unavailable'));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('reject-order-confirm')));
     await tester.pumpAndSettle();
-    expect(find.text('Reject this order?'), findsNothing);
+    expect(find.text('Reject Order?'), findsNothing);
+    expect(captured?.reason, 'Ingredients unavailable');
+    expect(captured?.note, isNull);
   });
 
   testWidgets('complete confirmation works', (tester) async {

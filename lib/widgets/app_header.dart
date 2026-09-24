@@ -2,15 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../services/session_service.dart';
+import 'cart_header_button.dart';
 
 class AppHeader extends StatefulWidget {
   const AppHeader({
     super.key,
     this.leading,
+    this.actions,
+    this.showCart = true,
     this.padding = const EdgeInsets.fromLTRB(20, 14, 20, 0),
   });
 
   final Widget? leading;
+  final Widget? actions;
+  final bool showCart;
   final EdgeInsets padding;
 
   @override
@@ -78,6 +83,14 @@ class _AppHeaderState extends State<AppHeader> {
             ),
           ],
           const Spacer(),
+          if (widget.actions != null) ...[
+            widget.actions!,
+            const SizedBox(width: 10),
+          ],
+          if (widget.showCart) ...[
+            const CartHeaderButton(),
+            const SizedBox(width: 10),
+          ],
           _UserInfoColumn(
             name: _name,
             flatNumber: _flatNumber,

@@ -2,17 +2,26 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../services/api_service.dart';
+import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/preorder_widgets.dart';
+import 'add_listing_screen.dart';
 import 'create_preorder_screen.dart';
 import 'preorder_detail_screen.dart';
 
 class SellerPreOrdersScreen extends StatefulWidget {
-  const SellerPreOrdersScreen({super.key, this.fetchCampaigns});
+  const SellerPreOrdersScreen({
+    super.key,
+    this.fetchCampaigns,
+    this.ensureCanCreateListing,
+  });
 
   /// Test seam. Production uses [ApiService.getPreOrderCampaigns].
   final Future<List<Map<String, dynamic>>> Function()? fetchCampaigns;
+
+  /// Test seam. Production uses [SellerOnboarding.ensureCanCreateListing].
+  final Future<bool> Function(BuildContext context)? ensureCanCreateListing;
 
   @override
   SellerPreOrdersScreenState createState() => SellerPreOrdersScreenState();
@@ -112,11 +121,39 @@ class SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
   }
 
   Future<void> _create() async {
-    final changed = await Navigator.push<bool>(
+    final result = await Navigator.push<Object?>(
       context,
       MaterialPageRoute(builder: (_) => const CreatePreOrderScreen()),
     );
-    if (changed == true) await _load();
+    if (!mounted) return;
+    if (result is PreOrderCampaignCreated) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PreOrderDetailScreen(
+            campaignId: result.campaignId,
+            promptToAddProduct: true,
+          ),
+        ),
+      );
+      await _load();
+      return;
+    }
+    if (result == true) await _load();
+  }
+
+  Future<void> _createCatalog() async {
+    final canList = await (widget.ensureCanCreateListing ??
+        SellerOnboarding.ensureCanCreateListing)(context);
+    if (!canList || !mounted) return;
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AddListingScreen(
+          catalogType: listingCatalogPreorder,
+        ),
+      ),
+    );
   }
 
   Future<void> _open(PreOrderCampaign campaign) async {
@@ -184,6 +221,23 @@ class SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
                                 color: preorderMuted,
                                 height: 1.4,
                                 fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              key: const Key('create-preorder-catalog'),
+                              onPressed: _createCatalog,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: preorderGreen,
+                                side: const BorderSide(color: Color(0xFFD4E8DF)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              icon: const Icon(Icons.menu_book_outlined, size: 18),
+                              label: const Text(
+                                'Create catalog',
+                                style: TextStyle(fontWeight: FontWeight.w800),
                               ),
                             ),
                             const SizedBox(height: 22),

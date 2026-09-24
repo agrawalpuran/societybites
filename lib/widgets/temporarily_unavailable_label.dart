@@ -11,7 +11,7 @@ class TemporarilyUnavailableLabel extends StatelessWidget {
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerRight,
       child: Text(
-        compact ? 'Not available now' : 'Temporarily not available',
+        'Out of stock',
         maxLines: 1,
         softWrap: false,
         overflow: TextOverflow.fade,

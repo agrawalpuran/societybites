@@ -120,6 +120,74 @@ class SellerPaymentActions {
   }
 }
 
+class BuyerOrderVisibility {
+  static const recentTerminalWindow = Duration(seconds: 24 * 60 * 60);
+
+  static const rejectReasons = [
+    'Not available today',
+    'Ingredients unavailable',
+    'Too many orders',
+    'Not enough time',
+    'Unable to fulfil by requested date',
+    'Other',
+  ];
+
+  static DateTime? terminalAt({
+    required String status,
+    DateTime? completedAt,
+    DateTime? rejectedAt,
+    DateTime? cancelledAt,
+  }) {
+    switch (status) {
+      case 'completed':
+        return completedAt;
+      case 'rejected':
+        return rejectedAt;
+      case 'cancelled':
+        return cancelledAt;
+      default:
+        return null;
+    }
+  }
+
+  /// Buyer Active/Past only. Seller still uses [Order.isTerminal].
+  static bool isInBuyerActiveTab({
+    required String status,
+    DateTime? completedAt,
+    DateTime? rejectedAt,
+    DateTime? cancelledAt,
+    DateTime? now,
+  }) {
+    if (status != 'completed' &&
+        status != 'rejected' &&
+        status != 'cancelled') {
+      return true;
+    }
+    final at = terminalAt(
+      status: status,
+      completedAt: completedAt,
+      rejectedAt: rejectedAt,
+      cancelledAt: cancelledAt,
+    );
+    if (at == null) return false;
+    final n = now ?? DateTime.now();
+    return n.difference(at) < recentTerminalWindow;
+  }
+
+  static String? rejectReasonLabel(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    return raw.split('\n').first.trim();
+  }
+
+  static String? rejectNote(String? raw) {
+    if (raw == null) return null;
+    final index = raw.indexOf('\n');
+    if (index < 0) return null;
+    final note = raw.substring(index + 1).trim();
+    return note.isEmpty ? null : note;
+  }
+}
+
 class BuyerOrderLifecycle {
   static const progressSteps = [
     'Order Placed',

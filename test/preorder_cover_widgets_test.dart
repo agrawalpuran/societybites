@@ -3,16 +3,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/widgets/preorder_widgets.dart';
 
-PreOrderCampaign _campaign({String? coverImageUrl}) {
+PreOrderCampaign _campaign({
+  String? coverImageUrl,
+  String status = 'open',
+  DateTime? orderOpenAt,
+  DateTime? orderCutoffAt,
+  DateTime? fulfilmentAt,
+}) {
+  final now = DateTime.now();
   return PreOrderCampaign(
     id: 'campaign-1',
     sellerId: 'seller-1',
     title: 'Friday Evening Specials',
     coverImageUrl: coverImageUrl,
-    status: 'open',
-    orderOpenAt: DateTime(2026, 8, 22, 10),
-    orderCutoffAt: DateTime(2026, 8, 22, 20),
-    fulfilmentAt: DateTime(2026, 8, 23, 10),
+    status: status,
+    orderOpenAt: orderOpenAt ?? now.subtract(const Duration(hours: 1)),
+    orderCutoffAt: orderCutoffAt ?? now.add(const Duration(hours: 5)),
+    fulfilmentAt: fulfilmentAt ?? now.add(const Duration(days: 1)),
     products: const [
       PreOrderProduct(
         listingId: 'listing-1',
@@ -104,6 +111,25 @@ void main() {
     expect(find.textContaining('Samosa'), findsNothing);
   });
 
+  testWidgets('home compact card marks the seller own campaign', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HomePreOrderCampaignCard(
+            campaign: _campaign(),
+            isOwn: true,
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Yours'), findsOneWidget);
+    final size = tester.getSize(find.byType(HomePreOrderCampaignCard));
+    expect(size.width, HomePreOrderCampaignCard.cardWidth);
+    expect(size.height, HomePreOrderCampaignCard.cardHeight);
+  });
+
   testWidgets('home compact card uses cover placeholder when missing', (
     tester,
   ) async {
@@ -137,5 +163,52 @@ void main() {
       find.byType(PreOrderCoverImage),
     );
     expect(cover.imageUrl, '/uploads/buyer-cover.jpg');
+  });
+
+  testWidgets('home compact card shows coming soon before order open', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HomePreOrderCampaignCard(
+            campaign: _campaign(
+              orderOpenAt: now.add(const Duration(days: 1)),
+              orderCutoffAt: now.add(const Duration(days: 2)),
+              fulfilmentAt: now.add(const Duration(days: 3)),
+            ),
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('COMING SOON'), findsOneWidget);
+    expect(find.textContaining('Opens'), findsOneWidget);
+  });
+
+  testWidgets('home compact card shows orders closed until fulfilment', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HomePreOrderCampaignCard(
+            campaign: _campaign(
+              status: 'closed',
+              orderOpenAt: now.subtract(const Duration(days: 3)),
+              orderCutoffAt: now.subtract(const Duration(hours: 1)),
+              fulfilmentAt: now.add(const Duration(days: 1)),
+            ),
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('ORDERS CLOSED'), findsOneWidget);
+    expect(find.textContaining('Ready'), findsOneWidget);
   });
 }

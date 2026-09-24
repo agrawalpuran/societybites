@@ -57,4 +57,46 @@ void main() {
     expect(title.bottom, lessThan(footer.top));
     expect(footer.bottom, lessThanOrEqualTo(screenHeight));
   });
+
+  testWidgets('closed campaign stays viewable without add actions', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final closed = PreOrderCampaign(
+      id: 'campaign-1',
+      sellerId: 'seller-1',
+      title: 'Sunday Cake Special',
+      status: 'closed',
+      orderOpenAt: now.subtract(const Duration(days: 3)),
+      orderCutoffAt: now.subtract(const Duration(hours: 2)),
+      fulfilmentAt: now.add(const Duration(days: 1)),
+      products: const [
+        PreOrderProduct(
+          listingId: 'listing-1',
+          name: 'Chocolate Truffle Cake',
+          sellerId: 'seller-1',
+          sellerName: 'Puran Agrawal',
+          price: 900,
+          inventoryMode: 'demand',
+          quantity: 0,
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BuyerPreOrderDetailScreen(
+          campaignId: 'campaign-1',
+          initialCampaign: closed,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('ORDERS CLOSED'), findsWidgets);
+    expect(find.text('Chocolate Truffle Cake'), findsOneWidget);
+    final continueButton = tester.widget<ElevatedButton>(
+      find.widgetWithText(ElevatedButton, 'Continue Pre-order'),
+    );
+    expect(continueButton.onPressed, isNull);
+  });
 }

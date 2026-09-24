@@ -812,7 +812,7 @@ class _BottomCta extends StatelessWidget {
                 ),
                 label: Text(
                   food.isExpired
-                      ? 'Temporarily not available'
+                      ? 'Out of stock'
                       : food.quantity <= 0
                       ? 'Sold out'
                       : 'Order Now',

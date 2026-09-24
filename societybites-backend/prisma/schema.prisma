@@ -195,6 +195,8 @@ model Order {
   readyAt               DateTime?
   /// Optional seller estimate for when order will be ready (informational only).
   expectedReadyAt       DateTime?
+  /// Optional buyer request for when they need the order (Made to Order only).
+  requestedReadyAt      DateTime?
   pickedUpAt            DateTime?
   completedAt           DateTime?
   cancelledAt           DateTime?

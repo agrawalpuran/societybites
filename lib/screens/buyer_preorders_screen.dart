@@ -63,21 +63,11 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
       final userId = await SessionService.getUserId();
       final raw = await ApiService.getPreOrderCampaigns(
         societyId: societyId,
-        status: 'open',
       );
-      final now = DateTime.now();
-      final campaigns =
-          raw
-              .map(PreOrderCampaign.fromJson)
-              .where(
-                (campaign) =>
-                    campaign.sellerId != userId &&
-                    campaign.products.isNotEmpty &&
-                    campaign.status == 'open' &&
-                    now.isBefore(campaign.orderCutoffAt),
-              )
-              .toList()
-            ..sort((a, b) => a.orderCutoffAt.compareTo(b.orderCutoffAt));
+      final campaigns = filterBuyerDiscoverableCampaigns(
+        raw.map(PreOrderCampaign.fromJson),
+        viewerUserId: userId,
+      );
       if (!mounted) return;
       setState(() {
         _campaigns = campaigns;

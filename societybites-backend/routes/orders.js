@@ -8,7 +8,7 @@ const { serializeOrder } = require("../utils/listingSerializer");
 const { loadSellerInsights } = require("../lib/sellerInsights");
 const { getPlatformFee } = require("../lib/platformFee");
 const { expireListingIfDue } = require("../utils/listingExpiry");
-const { assertMadeToOrderCapacity } = require("../lib/listingAvailability");
+const { assertMadeToOrderCapacity, isMadeToOrderListing } = require("../lib/listingAvailability");
 const {
   notifyOrderCreated,
   notifyStatusChange,
@@ -35,6 +35,7 @@ const {
   attachUnreadCounts,
 } = require("../lib/orderMessages");
 const { buyerCancelDeniedReason } = require("../lib/buyerCancel");
+const { parseRequestedReadyAt } = require("../lib/orderReadyTime");
 
 const router = express.Router();
 
@@ -52,10 +53,11 @@ const VALID_STATUSES = [
 const RETIRED_STATUSES = new Set(["preparing", "picked_up"]);
 
 const REJECT_REASONS = [
-  "Food sold out",
-  "Unable to prepare today",
-  "Kitchen closed",
+  "Not available today",
   "Ingredients unavailable",
+  "Too many orders",
+  "Not enough time",
+  "Unable to fulfil by requested date",
   "Other",
 ];
 
@@ -515,7 +517,7 @@ router.post(
         }
       }
 
-      if (orderType === "regular") {
+      if (orderType === "regular" && !isMadeToOrderListing(current)) {
         if (current.status === "expired") {
           return res.status(400).json({
             error: `"${current.name}" has expired and cannot be ordered`,
@@ -541,7 +543,8 @@ router.post(
       }
 
       const enforceStock =
-        orderType === "regular" || current.inventoryMode === "limited";
+        (orderType === "regular" || current.inventoryMode === "limited") &&
+        !isMadeToOrderListing(current);
       if (enforceStock && quantity > current.quantity) {
         return res.status(409).json({
           error:
@@ -592,6 +595,16 @@ router.post(
         : null;
     void req.body.deliveryCharge;
     void req.body.nearbyRadiusKm;
+
+    let requestedReadyAt = null;
+    try {
+      requestedReadyAt = parseRequestedReadyAt(req.body.requestedReadyAt, {
+        listings: preparedItems.map(({ listing }) => listing),
+        orderType,
+      });
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
 
     const isCrossSocietyRegular =
       orderType === "regular" && preparedItems.some((item) => item.crossSociety);
@@ -690,7 +703,8 @@ router.post(
       order = await prisma.$transaction(async (tx) => {
         for (const { listing, quantity } of preparedItems) {
           const reserveStock =
-            orderType === "regular" || listing.inventoryMode === "limited";
+            (orderType === "regular" || listing.inventoryMode === "limited") &&
+            !isMadeToOrderListing(listing);
           if (!reserveStock) continue;
 
           const updated = await tx.listing.updateMany({
@@ -740,6 +754,7 @@ router.post(
             deliveryCharge,
             fulfilmentNotes,
             fulfilmentAt,
+            requestedReadyAt,
             status: "pending",
             paymentMethod,
             subtotal,
@@ -914,27 +929,23 @@ router.post(
   "/:id/reject",
   requireUser,
   asyncHandler(async (req, res) => {
-    const { reason, otherText } = req.body || {};
+    const { reason, otherText, rejectReason } = req.body || {};
+    const rawReason = String(reason || rejectReason || "").trim();
+    const matchedReason = REJECT_REASONS.includes(rawReason)
+      ? rawReason
+      : REJECT_REASONS.find((item) => rawReason.startsWith(item)) || "";
 
-    let rejectReason = null;
-    if (reason) {
-      if (!REJECT_REASONS.includes(reason)) {
-        return res.status(400).json({
-          error: `reason must be one of: ${REJECT_REASONS.join(", ")}`,
-        });
-      }
-      rejectReason = reason;
-      if (reason === "Other") {
-        const text = typeof otherText === "string" ? otherText.trim() : "";
-        if (!text) {
-          return res.status(400).json({ error: "otherText is required when reason is Other" });
-        }
-        if (text.length > 200) {
-          return res.status(400).json({ error: "otherText must be at most 200 characters" });
-        }
-        rejectReason = text;
-      }
+    if (!matchedReason) {
+      return res.status(400).json({
+        error: `reason is required and must be one of: ${REJECT_REASONS.join(", ")}`,
+      });
     }
+
+    const note = typeof otherText === "string" ? otherText.trim() : "";
+    if (note.length > 200) {
+      return res.status(400).json({ error: "otherText must be at most 200 characters" });
+    }
+    const storedReason = note ? `${matchedReason}\n${note}` : matchedReason;
 
     const order = await prisma.order.findUnique({
       where: { id: req.params.id },
@@ -965,7 +976,7 @@ router.post(
         fromStatus: order.status,
         data: {
           status: "rejected",
-          rejectReason,
+          rejectReason: storedReason,
           rejectedAt: new Date(),
           rejectedBy: req.user.id,
           paymentStatus:
@@ -981,7 +992,7 @@ router.post(
       logger.info(
         "order",
         `Rejected ${order.orderNumber} by ${req.user.phone}${
-          rejectReason ? ` — ${rejectReason}` : ""
+          storedReason ? ` — ${storedReason}` : ""
         }`
       );
       return result;

@@ -24,7 +24,18 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   bool _wouldOrderAgain = true;
   bool _isSubmitting = false;
 
-  static const _allTags = ['Tasty', 'Fresh', 'Value for money', 'On time'];
+  static const _allTags = [
+    'Tasty',
+    'Fresh',
+    'Value for money',
+    'On time',
+    'Needs more flavour',
+    'Too oily',
+    'Small portion',
+    'Late',
+    'Could be hotter',
+    'Needs improvement',
+  ];
 
   @override
   void dispose() {
@@ -262,6 +273,15 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Tap what you liked and what could be better.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF8A9491),
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 14),
           Wrap(

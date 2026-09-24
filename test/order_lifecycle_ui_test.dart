@@ -11,6 +11,11 @@ Map<String, dynamic> _orderJson({
   String paymentStatus = 'pending',
   String paymentMethod = 'upi',
   int? statusStep,
+  String? completedAt,
+  String? rejectedAt,
+  String? cancelledAt,
+  String? rejectReason,
+  bool hasReview = false,
 }) {
   return {
     'id': id,
@@ -23,6 +28,11 @@ Map<String, dynamic> _orderJson({
     'subtotal': 115,
     'communityFee': 5,
     'createdAt': '2026-09-12T10:00:00.000Z',
+    'completedAt': completedAt,
+    'rejectedAt': rejectedAt,
+    'cancelledAt': cancelledAt,
+    'rejectReason': rejectReason,
+    'hasReview': hasReview,
     'items': [
       {
         'quantity': 1,
@@ -210,5 +220,127 @@ void main() {
     await tester.tap(find.textContaining('Past'));
     await tester.pumpAndSettle();
     expect(find.text('Cancel Order'), findsNothing);
+  });
+
+  testWidgets('recent completed stays in Active with review action', (
+    tester,
+  ) async {
+    final completedAt = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(hours: 3))
+        .toIso8601String();
+    await pumpOrders(tester, [
+      _orderJson(id: 'c-recent', status: 'completed', completedAt: completedAt),
+    ]);
+    expect(find.text('Active (1)'), findsOneWidget);
+    expect(find.text('Past (0)'), findsOneWidget);
+    expect(find.text('COMPLETED'), findsOneWidget);
+    expect(find.text('Rate\nExperience'), findsOneWidget);
+  });
+
+  testWidgets('old completed stays in Past', (tester) async {
+    final completedAt = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(hours: 25))
+        .toIso8601String();
+    await pumpOrders(tester, [
+      _orderJson(id: 'c-old', status: 'completed', completedAt: completedAt),
+    ]);
+    expect(find.text('Active (0)'), findsOneWidget);
+    await tester.tap(find.textContaining('Past'));
+    await tester.pumpAndSettle();
+    expect(find.text('COMPLETED'), findsOneWidget);
+    expect(find.text('Rate\nExperience'), findsOneWidget);
+  });
+
+  testWidgets('reviewed completed in Active shows Reviewed', (tester) async {
+    final completedAt = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(hours: 2))
+        .toIso8601String();
+    await pumpOrders(tester, [
+      _orderJson(
+        id: 'c-reviewed',
+        status: 'completed',
+        completedAt: completedAt,
+        hasReview: true,
+      ),
+    ]);
+    expect(find.text('Reviewed ✓'), findsOneWidget);
+    expect(find.text('Rate\nExperience'), findsNothing);
+    expect(find.text('Message Seller'), findsOneWidget);
+  });
+
+  testWidgets('recent rejected stays in Active with reason', (tester) async {
+    final rejectedAt = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(hours: 5))
+        .toIso8601String();
+    await pumpOrders(tester, [
+      _orderJson(
+        id: 'r-recent',
+        status: 'rejected',
+        rejectedAt: rejectedAt,
+        rejectReason: 'Ingredients unavailable\nSorry, out of stock',
+      ),
+    ]);
+    expect(find.text('ORDER REJECTED'), findsOneWidget);
+    expect(find.textContaining('Ingredients unavailable'), findsOneWidget);
+    expect(find.textContaining('Sorry, out of stock'), findsOneWidget);
+    expect(find.textContaining('Past (0)'), findsOneWidget);
+    expect(find.text('Order\nAgain'), findsNothing);
+    expect(find.text('Message Seller'), findsOneWidget);
+  });
+
+  testWidgets('old rejected stays in Past', (tester) async {
+    final rejectedAt = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(hours: 26))
+        .toIso8601String();
+    await pumpOrders(tester, [
+      _orderJson(
+        id: 'r-old',
+        status: 'rejected',
+        rejectedAt: rejectedAt,
+        rejectReason: 'Too many orders',
+      ),
+    ]);
+    expect(find.text('Active (0)'), findsOneWidget);
+    await tester.tap(find.textContaining('Past'));
+    await tester.pumpAndSettle();
+    expect(find.text('ORDER REJECTED'), findsOneWidget);
+    expect(find.textContaining('Too many orders'), findsOneWidget);
+    expect(find.text('Order\nAgain'), findsNothing);
+  });
+
+  testWidgets('buyer Active/Past counts include 24-hour terminal orders', (
+    tester,
+  ) async {
+    final recent = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(hours: 3))
+        .toIso8601String();
+    final old = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(hours: 30))
+        .toIso8601String();
+    await pumpOrders(tester, [
+      _orderJson(id: 'a1', status: 'accepted'),
+      _orderJson(id: 'c1', status: 'completed', completedAt: recent),
+      _orderJson(
+        id: 'r1',
+        status: 'rejected',
+        rejectedAt: recent,
+        rejectReason: 'Not available today',
+      ),
+      _orderJson(id: 'c-old', status: 'completed', completedAt: old),
+      _orderJson(
+        id: 'x-old',
+        status: 'cancelled',
+        cancelledAt: old,
+      ),
+    ]);
+    expect(find.text('Active (3)'), findsOneWidget);
+    expect(find.text('Past (2)'), findsOneWidget);
   });
 }

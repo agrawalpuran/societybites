@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../widgets/app_header.dart';
+import '../widgets/listing_image.dart';
 import '../widgets/order_fulfilment_banner.dart';
 import '../widgets/order_timing_notice.dart';
 import '../widgets/order_items_list.dart';
+import '../widgets/order_lifecycle_dialogs.dart';
 import '../widgets/order_messages_button.dart';
+import '../widgets/requested_ready_summary.dart';
 import '../models/data.dart';
 import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
@@ -119,8 +122,13 @@ class OrdersScreenState extends State<OrdersScreen>
       if (!mounted) return;
 
       setState(() {
-        bucket.active = parsed.where((o) => !o.isTerminal).toList();
-        bucket.past = parsed.where((o) => o.isTerminal).toList();
+        if (selling) {
+          bucket.active = parsed.where((o) => !o.isTerminal).toList();
+          bucket.past = parsed.where((o) => o.isTerminal).toList();
+        } else {
+          bucket.active = parsed.where((o) => o.isInBuyerActiveTab()).toList();
+          bucket.past = parsed.where((o) => !o.isInBuyerActiveTab()).toList();
+        }
         bucket.isLoading = false;
         bucket.hasSuccessfullyLoaded = true;
         bucket.error = null;
@@ -392,11 +400,16 @@ class _ActiveTab extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20),
         children: orders
             .map(
-              (o) => _ActiveOrderCard(
-                order: o,
-                onRefresh: onRefresh,
-                isSellerView: isSellerView,
-              ),
+              (o) => !isSellerView && o.isTerminal
+                  ? _PastOrderTile(
+                      order: o,
+                      onRefresh: onRefresh,
+                    )
+                  : _ActiveOrderCard(
+                      order: o,
+                      onRefresh: onRefresh,
+                      isSellerView: isSellerView,
+                    ),
             )
             .toList(),
       ),
@@ -541,6 +554,13 @@ class _ActiveOrderCard extends StatelessWidget {
           const SizedBox(height: 14),
           OrderFulfilmentBanner(order: order, isSellerView: isSellerView),
           OrderItemsList(items: order.items),
+          if (order.requestedReadyAt != null) ...[
+            const SizedBox(height: 10),
+            RequestedReadySummary(
+              order: order,
+              isSellerView: isSellerView,
+            ),
+          ],
           const SizedBox(height: 12),
           OrderTotalRow(order: order),
           const SizedBox(height: 20),
@@ -591,7 +611,9 @@ class _ActiveOrderCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Ready by ${Order.formatReadyBy(order.expectedReadyAt!)}',
+                      order.requestedReadyAt != null
+                          ? 'Seller confirmed ready by:\n${Order.formatNeedBy(order.expectedReadyAt!)}'
+                          : 'Ready by ${Order.formatReadyBy(order.expectedReadyAt!)}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -1082,6 +1104,16 @@ class _PastOrderTile extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (order.items.isNotEmpty) ...[
+                ListingImage(
+                  food: order.items.first.food,
+                  width: 52,
+                  height: 52,
+                  borderRadius: 14,
+                  iconSize: 26,
+                ),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1115,6 +1147,17 @@ class _PastOrderTile extends StatelessWidget {
                         color: Color(0xFF101617),
                       ),
                     ),
+                    if (isSellerView && order.items.length == 1) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        'Qty ${order.items.first.quantity}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6A7774),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 3),
                     Text(
                       isSellerView
@@ -1163,7 +1206,11 @@ class _PastOrderTile extends StatelessWidget {
           ),
           if (order.items.length > 1) ...[
             const SizedBox(height: 12),
-            OrderItemsList(items: order.items, compact: true),
+            OrderItemsList(
+              items: order.items,
+              compact: true,
+              showSellerName: !isSellerView,
+            ),
           ],
           const SizedBox(height: 10),
           if (isSellerView) ...[
@@ -1183,39 +1230,7 @@ class _PastOrderTile extends StatelessWidget {
                 ),
               ),
             ),
-            if (isRejected) ...[
-              const SizedBox(height: 10),
-              Text(
-                BuyerOrderLifecycle.detail('rejected')!,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF8A3030),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-            if (isRejected &&
-                order.rejectReason != null &&
-                order.rejectReason!.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF5F5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFFD4D4)),
-                ),
-                child: Text(
-                  'Reason: ${order.rejectReason}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF8A3030),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+            if (isRejected) OrderRejectReasonBlock(order: order),
           ] else ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -1233,43 +1248,14 @@ class _PastOrderTile extends StatelessWidget {
                 ),
               ),
             ),
-            if (isRejected) ...[
-              const SizedBox(height: 10),
-              Text(
-                BuyerOrderLifecycle.detail('rejected')!,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF8A3030),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-            if (isRejected &&
-                order.rejectReason != null &&
-                order.rejectReason!.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF5F5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFFD4D4)),
-                ),
-                child: Text(
-                  'Reason: ${order.rejectReason}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF8A3030),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+            if (isRejected) OrderRejectReasonBlock(order: order),
             const SizedBox(height: 10),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                if (order.status == 'completed' && !order.hasReview) ...[
+                if (order.status == 'completed' && !order.hasReview)
                   GestureDetector(
                     onTap: () async {
                       await Navigator.push(
@@ -1303,9 +1289,8 @@ class _PastOrderTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                ] else if (order.status == 'completed' && order.hasReview) ...[
+                  )
+                else if (order.status == 'completed' && order.hasReview)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -1324,9 +1309,7 @@ class _PastOrderTile extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                ],
-                if (!isCancelled)
+                if (!isCancelled && !isRejected)
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -1369,15 +1352,23 @@ class _PastOrderTile extends StatelessWidget {
                       ),
                     ),
                   ),
+                OrderMessagesButton(
+                  order: order,
+                  isSellerView: false,
+                  inline: true,
+                  onClosed: onRefresh,
+                ),
               ],
             ),
           ],
-          const SizedBox(height: 10),
-          OrderMessagesButton(
-            order: order,
-            isSellerView: isSellerView,
-            onClosed: onRefresh,
-          ),
+          if (isSellerView) ...[
+            const SizedBox(height: 10),
+            OrderMessagesButton(
+              order: order,
+              isSellerView: true,
+              onClosed: onRefresh,
+            ),
+          ],
         ],
       ),
     );

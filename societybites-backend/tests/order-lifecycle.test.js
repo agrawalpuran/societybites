@@ -213,15 +213,39 @@ async function main() {
       paymentMethod: "cash",
     });
     orderIds.push(rejectOrder.id);
-    const rejected = await jsonRequest(server, {
+    const missingReason = await jsonRequest(server, {
       method: "POST",
       path: `/orders/${rejectOrder.id}/reject`,
       token: sellerToken,
       body: {},
     });
+    assert(missingReason.status === 400, "reject without reason must fail");
+
+    const rejected = await jsonRequest(server, {
+      method: "POST",
+      path: `/orders/${rejectOrder.id}/reject`,
+      token: sellerToken,
+      body: { reason: "Ingredients unavailable", otherText: "Ran out of filling" },
+    });
     assert(rejected.status === 200, "PENDING → REJECTED must work");
     assert(rejected.json.status === "rejected", "rejected status not stored");
     assert(rejected.json.paymentStatus === "failed", "unpaid reject should fail payment");
+    assert(
+      rejected.json.rejectReason === "Ingredients unavailable\nRan out of filling",
+      "reject reason must be stored"
+    );
+    assert(rejected.json.rejectedAt, "rejectedAt must be stored");
+
+    const buyerRejected = await jsonRequest(server, {
+      method: "GET",
+      path: `/orders/${rejectOrder.id}`,
+      token: buyerToken,
+    });
+    assert(buyerRejected.status === 200, "buyer can load rejected order");
+    assert(
+      buyerRejected.json.rejectReason === "Ingredients unavailable\nRan out of filling",
+      "buyer must receive reject reason"
+    );
 
     const rejectThenAccept = await patchStatus(server, {
       token: sellerToken,
@@ -443,7 +467,7 @@ async function main() {
       method: "POST",
       path: `/orders/${rejectAccepted.id}/reject`,
       token: sellerToken,
-      body: {},
+      body: { reason: "Too many orders" },
     });
     assert(lateReject.status === 400, "reject after accept must not be allowed");
 

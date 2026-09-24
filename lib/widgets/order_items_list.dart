@@ -4,10 +4,16 @@ import '../widgets/listing_image.dart';
 import '../models/data.dart';
 
 class OrderItemsList extends StatelessWidget {
-  const OrderItemsList({super.key, required this.items, this.compact = false});
+  const OrderItemsList({
+    super.key,
+    required this.items,
+    this.compact = false,
+    this.showSellerName = true,
+  });
 
   final List<OrderLineItem> items;
   final bool compact;
+  final bool showSellerName;
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +52,9 @@ class OrderItemsList extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Qty ${item.quantity} • ${item.food.sellerName}',
+                      showSellerName
+                          ? 'Qty ${item.quantity} • ${item.food.sellerName}'
+                          : 'Qty ${item.quantity}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF8A9491),

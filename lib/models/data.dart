@@ -390,7 +390,11 @@ class Order {
   final bool hasReview;
   final String? rejectReason;
   final DateTime? rejectedAt;
+  final DateTime? completedAt;
+  final DateTime? cancelledAt;
   final DateTime? expectedReadyAt;
+  final DateTime? requestedReadyAt;
+  final DateTime? createdAt;
   final String? buyerName;
   final String? buyerPhone;
   final String? buyerFlatNumber;
@@ -422,7 +426,11 @@ class Order {
     this.hasReview = false,
     this.rejectReason,
     this.rejectedAt,
+    this.completedAt,
+    this.cancelledAt,
     this.expectedReadyAt,
+    this.requestedReadyAt,
+    this.createdAt,
     this.buyerName,
     this.buyerPhone,
     this.buyerFlatNumber,
@@ -457,10 +465,43 @@ class Order {
   bool get isTerminal =>
       status == 'completed' || status == 'cancelled' || status == 'rejected';
 
+  bool isInBuyerActiveTab([DateTime? now]) =>
+      BuyerOrderVisibility.isInBuyerActiveTab(
+        status: status,
+        completedAt: completedAt,
+        rejectedAt: rejectedAt,
+        cancelledAt: cancelledAt,
+        now: now,
+      );
+
   /// Show Ready-by estimate only before the order is actually marked ready.
   bool get showExpectedReadyAt =>
       expectedReadyAt != null &&
       (status == 'accepted' || status == 'preparing');
+
+  bool get hasMadeToOrderItems => items.any((item) => item.food.isMadeToOrder);
+
+  int? get usualPreparationMinutes {
+    final mins = items
+        .where((item) => item.food.isMadeToOrder)
+        .map((item) => item.food.preparationTimeMinutes ?? 0)
+        .where((value) => value > 0);
+    if (mins.isEmpty) return null;
+    return mins.reduce((a, b) => a > b ? a : b);
+  }
+
+  String get usualLeadTimeLabel =>
+      formatUsualLeadTime(usualPreparationMinutes);
+
+  bool get requestedEarlierThanUsualLead {
+    final requested = requestedReadyAt;
+    final placedAt = createdAt;
+    final minutes = usualPreparationMinutes;
+    if (requested == null || placedAt == null || minutes == null) {
+      return false;
+    }
+    return requested.isBefore(placedAt.add(Duration(minutes: minutes)));
+  }
 
   /// Seller-facing buyer label: name + flat/block.
   String get buyerLabel {
@@ -527,7 +568,11 @@ class Order {
       hasReview: hasReview,
       rejectReason: rejectReason,
       rejectedAt: rejectedAt,
+      completedAt: completedAt,
+      cancelledAt: cancelledAt,
       expectedReadyAt: expectedReadyAt,
+      requestedReadyAt: requestedReadyAt,
+      createdAt: createdAt,
       buyerName: buyerName,
       buyerPhone: buyerPhone,
       buyerFlatNumber: buyerFlatNumber,
@@ -596,10 +641,12 @@ class Order {
       paymentStatus: (json['paymentStatus'] as String?) ?? 'pending',
       hasReview: json['hasReview'] == true,
       rejectReason: json['rejectReason'] as String?,
-      rejectedAt: DateTime.tryParse(json['rejectedAt']?.toString() ?? ''),
-      expectedReadyAt: DateTime.tryParse(
-        json['expectedReadyAt']?.toString() ?? '',
-      ),
+      rejectedAt: _jsonDate(json, 'rejectedAt'),
+      completedAt: _jsonDate(json, 'completedAt'),
+      cancelledAt: _jsonDate(json, 'cancelledAt'),
+      expectedReadyAt: _jsonDate(json, 'expectedReadyAt'),
+      requestedReadyAt: _jsonDate(json, 'requestedReadyAt'),
+      createdAt: createdAt,
       buyerName: json['buyerName'] as String?,
       buyerPhone: json['buyerPhone'] as String?,
       buyerFlatNumber: json['buyerFlatNumber'] as String?,
@@ -639,6 +686,41 @@ class Order {
       'Dec',
     ];
     return '${local.day} ${months[local.month - 1]}, $time';
+  }
+
+  static String formatNeedBy(DateTime dt) {
+    final local = dt.toLocal();
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final hour = local.hour > 12
+        ? local.hour - 12
+        : (local.hour == 0 ? 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    final time =
+        '$hour:${local.minute.toString().padLeft(2, '0')} $ampm';
+    return '${local.day} ${months[local.month - 1]} · $time';
+  }
+
+  static DateTime? _jsonDate(Map<String, dynamic> json, String key) {
+    final direct = DateTime.tryParse(json[key]?.toString() ?? '');
+    if (direct != null) return direct;
+    final timeline = json['timeline'];
+    if (timeline is Map) {
+      return DateTime.tryParse(timeline[key]?.toString() ?? '');
+    }
+    return null;
   }
 
   static String _formatDate(DateTime dt) {
@@ -756,8 +838,30 @@ class PreOrderCampaign {
     this.sellerPaymentPreference = 'UPI_AND_COD',
   });
 
-  bool get isOpen =>
-      status == 'open' && DateTime.now().isBefore(orderCutoffAt.toLocal());
+  bool get isOpen => acceptsNewOrders();
+
+  /// There is no fulfilment-end field; [fulfilmentAt] is the completion instant.
+  BuyerCampaignHomePhase homePhase([DateTime? now]) {
+    if (status == 'draft' || status == 'cancelled') {
+      return BuyerCampaignHomePhase.hidden;
+    }
+    if (status != 'open' && status != 'closed') {
+      return BuyerCampaignHomePhase.hidden;
+    }
+    final n = now ?? DateTime.now();
+    if (!n.isBefore(fulfilmentAt)) return BuyerCampaignHomePhase.hidden;
+    if (n.isBefore(orderOpenAt)) return BuyerCampaignHomePhase.upcoming;
+    if (!n.isBefore(orderCutoffAt) || status == 'closed') {
+      return BuyerCampaignHomePhase.ordersClosed;
+    }
+    return BuyerCampaignHomePhase.open;
+  }
+
+  bool isVisibleOnBuyerHome([DateTime? now]) =>
+      homePhase(now) != BuyerCampaignHomePhase.hidden;
+
+  bool acceptsNewOrders([DateTime? now]) =>
+      homePhase(now) == BuyerCampaignHomePhase.open;
 
   String get sellerName =>
       products.isNotEmpty ? products.first.sellerName : 'Neighbor';
@@ -806,6 +910,29 @@ class PreOrderCampaign {
           'UPI_AND_COD',
     );
   }
+}
+
+enum BuyerCampaignHomePhase { hidden, upcoming, open, ordersClosed }
+
+List<PreOrderCampaign> filterBuyerDiscoverableCampaigns(
+  Iterable<PreOrderCampaign> campaigns, {
+  String? viewerUserId,
+  DateTime? now,
+}) {
+  final reference = now ?? DateTime.now();
+  return campaigns
+      .where(
+        (campaign) =>
+            campaign.products.isNotEmpty &&
+            campaign.isVisibleOnBuyerHome(reference),
+      )
+      .toList()
+    ..sort((a, b) {
+      final aOwn = viewerUserId != null && a.sellerId == viewerUserId;
+      final bOwn = viewerUserId != null && b.sellerId == viewerUserId;
+      if (aOwn != bOwn) return aOwn ? -1 : 1;
+      return a.fulfilmentAt.compareTo(b.fulfilmentAt);
+    });
 }
 
 class PreOrderProductionItem {

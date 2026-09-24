@@ -5,14 +5,13 @@ import '../widgets/app_header.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
+import '../services/cart_controller.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
 import 'buyer_preorder_detail_screen.dart';
 import 'buyer_preorders_screen.dart';
-import 'checkout_screen.dart';
 import 'food_detail_screen.dart';
 import 'explore_nearby_screen.dart';
-import 'login_screen.dart';
 import 'seller_list_screen.dart';
 import 'seller_storefront_screen.dart';
 import 'tab_preload.dart';
@@ -22,6 +21,7 @@ import '../models/selling_reach.dart';
 import '../widgets/food_type_selector.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/listing_purchase_slot.dart';
+import '../widgets/floating_cart_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -53,11 +53,12 @@ class HomeScreen extends StatefulWidget {
 }
 
 class HomeScreenState extends State<HomeScreen> {
-  final List<CartItem> _cart = [];
+  List<CartItem> get _cart => CartController.instance.items;
   final TextEditingController _searchController = TextEditingController();
 
   List<FoodItem> _listings = [];
   List<PreOrderCampaign> _preOrderCampaigns = [];
+  String? _viewerUserId;
   bool _preOrdersLoading = true;
   bool _isLoading = true;
   bool _hasSuccessfullyLoaded = false;
@@ -80,6 +81,8 @@ class HomeScreenState extends State<HomeScreen> {
     _selectedCategory = widget.initialCategory;
     debugPreloadLog('HOME INITIAL LOAD');
     _searchController.addListener(_onSearchChanged);
+    CartController.instance.addListener(_onCartUpdated);
+    CartController.instance.onOrderPlaced = _onCartOrderPlaced;
     _loadListings();
     _loadPreOrders();
   }
@@ -108,23 +111,14 @@ class HomeScreenState extends State<HomeScreen> {
       final userId = await SessionService.getUserId();
       final raw = await ApiService.getPreOrderCampaigns(
         societyId: societyId,
-        status: 'open',
       );
-      final now = DateTime.now();
-      final campaigns =
-          raw
-              .map(PreOrderCampaign.fromJson)
-              .where(
-                (campaign) =>
-                    campaign.sellerId != userId &&
-                    campaign.products.isNotEmpty &&
-                    campaign.status == 'open' &&
-                    now.isBefore(campaign.orderCutoffAt),
-              )
-              .toList()
-            ..sort((a, b) => a.fulfilmentAt.compareTo(b.fulfilmentAt));
+      final campaigns = filterBuyerDiscoverableCampaigns(
+        raw.map(PreOrderCampaign.fromJson),
+        viewerUserId: userId,
+      );
       if (!mounted) return;
       setState(() {
+        _viewerUserId = userId;
         _preOrderCampaigns = campaigns.take(3).toList();
         _preOrdersLoading = false;
       });
@@ -137,7 +131,19 @@ class HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    CartController.instance.removeListener(_onCartUpdated);
+    if (identical(CartController.instance.onOrderPlaced, _onCartOrderPlaced)) {
+      CartController.instance.onOrderPlaced = null;
+    }
     super.dispose();
+  }
+
+  void _onCartUpdated() {
+    if (mounted) setState(() {});
+  }
+
+  void _onCartOrderPlaced() {
+    if (mounted) _loadListings();
   }
 
   void _onSearchChanged() {
@@ -269,7 +275,7 @@ class HomeScreenState extends State<HomeScreen> {
         SnackBar(
           content: Text(
             food.isExpired
-                ? '${food.name} is temporarily not available'
+                ? '${food.name} is out of stock'
                 : food.madeToOrderUnavailableToday
                 ? '${food.name} is currently unavailable'
                 : '${food.name} is sold out',
@@ -294,6 +300,7 @@ class HomeScreenState extends State<HomeScreen> {
         );
         if (!replace || !mounted) return;
         setState(_cart.clear);
+        CartController.instance.notify();
       }
     }
 
@@ -323,13 +330,20 @@ class HomeScreenState extends State<HomeScreen> {
         _cart.add(CartItem(food: food));
       }
     });
+    CartController.instance.notify();
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${food.name} added to cart'),
+        content: const Text(
+          'Item added',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        ),
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        width: 120,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }
@@ -345,6 +359,7 @@ class HomeScreenState extends State<HomeScreen> {
         }
       }
     });
+    CartController.instance.notify();
   }
 
   int _cartQtyFor(FoodItem food) {
@@ -374,6 +389,7 @@ class HomeScreenState extends State<HomeScreen> {
           seller: seller,
           cartItems: _cart,
           onCartChanged: () {
+            CartController.instance.notify();
             if (mounted) setState(() {});
           },
           foodTypeFilter: _selectedFoodType,
@@ -390,6 +406,8 @@ class HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
+      floatingActionButton: const FloatingCartBar(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
@@ -461,53 +479,16 @@ class HomeScreenState extends State<HomeScreen> {
                     _buildAvailableList(),
                     if (_shouldPreviewAllItems)
                       SliverToBoxAdapter(child: _buildSeeAllItemsButton()),
-                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: _cart.isEmpty ? 24 : 88,
+                      ),
+                    ),
                     ],
                   ],
                 ),
               ),
             ),
-      floatingActionButton: _cart.isNotEmpty
-          ? FloatingActionButton.extended(
-              onPressed: () async {
-                final signedIn = await SessionService.isSignedIn();
-                if (!context.mounted) return;
-                if (!signedIn) {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  );
-                  return;
-                }
-                final placed = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CheckoutScreen(cartItems: List.from(_cart)),
-                  ),
-                );
-
-                if (placed == true && mounted) {
-                  setState(() => _cart.clear());
-                  _loadListings();
-                }
-              },
-              backgroundColor: const Color(0xFF0E5A47),
-              foregroundColor: Colors.white,
-              icon: const Icon(
-                Icons.shopping_bag_rounded,
-                size: 20,
-                color: Colors.white,
-              ),
-              label: Text(
-                '${_cart.fold<int>(0, (sum, c) => sum + c.quantity)} items  •  ₹${_cart.fold<double>(0, (sum, c) => sum + c.total).toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
@@ -538,7 +519,7 @@ class HomeScreenState extends State<HomeScreen> {
             children: [
               const Expanded(
                 child: Text(
-                  'Pre-orders',
+                  'Pre-orders Campaign in Your Society',
                   style: TextStyle(
                     fontSize: 19,
                     fontWeight: FontWeight.w800,
@@ -571,6 +552,7 @@ class HomeScreenState extends State<HomeScreen> {
               final campaign = _preOrderCampaigns[index];
               return HomePreOrderCampaignCard(
                 campaign: campaign,
+                isOwn: campaign.sellerId == _viewerUserId,
                 onTap: () => _openBuyerPreOrderDetail(campaign),
               );
             },
@@ -589,6 +571,7 @@ class HomeScreenState extends State<HomeScreen> {
           cartItems: _cart,
           initialCampaigns: List<PreOrderCampaign>.from(_preOrderCampaigns),
           onCartChanged: () {
+            CartController.instance.notify();
             if (mounted) setState(() {});
           },
         ),
@@ -606,6 +589,7 @@ class HomeScreenState extends State<HomeScreen> {
           regularCartHasItems: _cart.isNotEmpty,
           cartItems: _cart,
           onCartChanged: () {
+            CartController.instance.notify();
             if (mounted) setState(() {});
           },
         ),

@@ -20,7 +20,7 @@ void main() {
 
       expect(find.text('Home'), findsOneWidget);
       expect(find.text('Orders'), findsOneWidget);
-      expect(find.text('Dashboard'), findsOneWidget);
+      expect(find.text('My Kitchen'), findsOneWidget);
       expect(find.text('Profile'), findsOneWidget);
       expect(find.byIcon(Icons.home_rounded), findsOneWidget);
       expect(find.byIcon(Icons.shopping_bag_rounded), findsOneWidget);
@@ -71,10 +71,42 @@ void main() {
     );
 
     await tester.tap(find.text('Orders'));
-    await tester.tap(find.text('Dashboard'));
+    await tester.tap(find.text('My Kitchen'));
     await tester.tap(find.text('Profile'));
     await tester.tap(find.text('Home'));
 
     expect(taps, [1, 2, 3, 0]);
+  });
+
+  testWidgets('My Kitchen shows a small badge only when attention count > 0', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          bottomNavigationBar: AppBottomNav(
+            selectedIndex: 0,
+            kitchenAttentionCount: 0,
+            onTap: (_) {},
+          ),
+        ),
+      ),
+    );
+    expect(find.byKey(const Key('kitchen-attention-badge')), findsNothing);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          bottomNavigationBar: AppBottomNav(
+            selectedIndex: 0,
+            kitchenAttentionCount: 2,
+            onTap: (_) {},
+          ),
+        ),
+      ),
+    );
+    expect(find.byKey(const Key('kitchen-attention-badge')), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('My Kitchen'), findsOneWidget);
   });
 }

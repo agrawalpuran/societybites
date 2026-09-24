@@ -70,6 +70,24 @@ async function lazyCloseCampaign(campaign, now = new Date()) {
   });
 }
 
+function campaignBuyerHomePhase(campaign, now = new Date()) {
+  const status = campaign.status;
+  if (status === "draft" || status === "cancelled") return "hidden";
+  if (status !== "open" && status !== "closed") return "hidden";
+  const openAt = new Date(campaign.orderOpenAt);
+  const cutoffAt = new Date(campaign.orderCutoffAt);
+  const fulfilmentAt = new Date(campaign.fulfilmentAt);
+  if (now >= fulfilmentAt) return "hidden";
+  if (now < openAt) return "upcoming";
+  if (now >= cutoffAt || status === "closed") return "orders_closed";
+  return "open";
+}
+
+function isCampaignVisibleOnBuyerHome(campaign, now = new Date()) {
+  const phase = campaignBuyerHomePhase(campaign, now);
+  return phase === "upcoming" || phase === "open" || phase === "orders_closed";
+}
+
 function assertCampaignAcceptsOrders(campaign, now = new Date()) {
   if (!campaign) {
     const err = new Error("Pre-order campaign not found");
@@ -243,6 +261,8 @@ module.exports = {
   isLimitedCampaignListing,
   shouldRestoreListingInventory,
   lazyCloseCampaign,
+  campaignBuyerHomePhase,
+  isCampaignVisibleOnBuyerHome,
   assertCampaignAcceptsOrders,
   campaignHasOrders,
   serializeCampaign,

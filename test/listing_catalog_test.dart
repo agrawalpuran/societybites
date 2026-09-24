@@ -3,8 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/screens/add_listing_screen.dart';
+import 'package:societybites/screens/add_listing_type_screen.dart';
 import 'package:societybites/screens/create_preorder_screen.dart';
 import 'package:societybites/screens/my_listings_screen.dart';
+import 'package:societybites/screens/seller_preorders_screen.dart';
 import 'package:societybites/services/my_listings_cache.dart';
 
 Map<String, dynamic> _listingJson(
@@ -86,7 +88,67 @@ void main() {
 
     expect(find.text('Sunday Biryani'), findsOneWidget);
     expect(find.text('Samosa'), findsNothing);
-    expect(find.text('Add Pre-order Item'), findsWidgets);
+    expect(find.text('Add Listing'), findsWidgets);
+    expect(find.text('Add catalog'), findsWidgets);
+  });
+
+  testWidgets('header Add Listing stays a type picker on the Pre-orders tab', (
+    tester,
+  ) async {
+    _ignoreKnownLayoutNoise();
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MyListingsScreen(
+          fetchListings: () async => [_listingJson('Samosa')],
+          ensureCanCreateListing: (_) async => true,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.textContaining('Pre-orders (').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add Listing'), findsWidgets);
+    expect(find.text('Add catalog'), findsWidgets);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Add Listing'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AddListingTypeScreen), findsOneWidget);
+    expect(find.text('What type of order is this?'), findsOneWidget);
+  });
+
+  testWidgets('empty-state Add Pre-order Item skips the type picker', (
+    tester,
+  ) async {
+    _ignoreKnownLayoutNoise();
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MyListingsScreen(
+          fetchListings: () async => [_listingJson('Samosa')],
+          ensureCanCreateListing: (_) async => true,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.textContaining('Pre-orders (').first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add catalog').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AddListingTypeScreen), findsNothing);
+    expect(find.text('What type of order is this?'), findsNothing);
+    expect(find.byType(AddListingScreen), findsOneWidget);
+    expect(find.text('Pre-order'), findsOneWidget);
   });
 
   testWidgets('Add Listing copy depends on catalog', (tester) async {
@@ -94,7 +156,7 @@ void main() {
       const MaterialApp(home: AddListingScreen()),
     );
     await tester.pump();
-    expect(find.text('List a New Bite'), findsOneWidget);
+    expect(find.text('Available now order'), findsOneWidget);
 
     await tester.pumpWidget(
       const MaterialApp(
@@ -102,7 +164,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('Add a pre-order item'), findsOneWidget);
+    expect(find.text('Pre-order'), findsOneWidget);
   });
 
   testWidgets('Add Listing photo picker offers camera and gallery', (
@@ -314,5 +376,32 @@ void main() {
     await tester.pump();
 
     expect(find.text('No pre-order items yet'), findsOneWidget);
+  });
+
+  testWidgets('Create catalog from Pre-orders opens the catalog listing form', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SellerPreOrdersScreen(
+          fetchCampaigns: () async => [],
+          ensureCanCreateListing: (_) async => true,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('create-preorder-catalog')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('create-preorder-catalog')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AddListingScreen), findsOneWidget);
+    expect(find.text('Pre-order'), findsWidgets);
+    expect(find.text('QUANTITY AVAILABLE'), findsNothing);
+    expect(find.text('DATE/TIME AVAILABLE UNTIL'), findsNothing);
+    expect(find.byType(AddListingTypeScreen), findsNothing);
   });
 }

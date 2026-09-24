@@ -80,10 +80,10 @@ flutter:
   assets:
     - pics/logo.png
     - assets/branding/societybites_launcher_icon.png
-    - assets/images/guest/hero_food_1.jpg
-    - assets/images/guest/hero_food_2.jpg
-    - assets/images/guest/hero_food_3.jpg
-    - assets/images/guest/hero_food_4.jpg
+    - assets/images/available_now.jpg
+    - assets/images/made_to_order.jpg
+    - assets/images/pre_order.jpg
+    - assets/images/guest/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/cart_controller.dart';
 import '../services/push_notification_service.dart';
 import '../widgets/app_bottom_nav.dart';
 import 'home_screen.dart';
@@ -29,6 +30,7 @@ class _MainShellScreenState extends State<MainShellScreen>
   var _ordersMounted = false;
   var _dashboardMounted = false;
   var _profileMounted = false;
+  var _kitchenAttentionCount = 0;
 
   @override
   void initState() {
@@ -43,6 +45,7 @@ class _MainShellScreenState extends State<MainShellScreen>
       onMountDashboard: _mountDashboard,
     );
     PushNotificationService.onForegroundOrderUpdate = _refreshVisibleTab;
+    CartController.instance.onShowOrdersAfterPlace = _showOrdersAfterCheckout;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.registerIfPossible();
     });
@@ -53,6 +56,12 @@ class _MainShellScreenState extends State<MainShellScreen>
     _preload.dispose();
     if (PushNotificationService.onForegroundOrderUpdate == _refreshVisibleTab) {
       PushNotificationService.onForegroundOrderUpdate = null;
+    }
+    if (identical(
+      CartController.instance.onShowOrdersAfterPlace,
+      _showOrdersAfterCheckout,
+    )) {
+      CartController.instance.onShowOrdersAfterPlace = null;
     }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -73,6 +82,21 @@ class _MainShellScreenState extends State<MainShellScreen>
   void _mountDashboard() {
     if (!mounted || _dashboardMounted) return;
     setState(() => _dashboardMounted = true);
+  }
+
+  /// After Home checkout, land on Orders. Refresh only if that tab already loaded.
+  void _showOrdersAfterCheckout() {
+    if (!mounted) return;
+    final wasMounted = _ordersMounted;
+    setState(() {
+      _navIndex = 1;
+      _ordersMounted = true;
+    });
+    if (!wasMounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _ordersKey.currentState?.refresh();
+    });
   }
 
   void _refreshVisibleTab() {
@@ -123,8 +147,9 @@ class _MainShellScreenState extends State<MainShellScreen>
         }
         break;
       case 2:
-        if (!wasDashboardMounted) break;
         final dashboard = _dashboardKey.currentState;
+        dashboard?.showKitchenOrders();
+        if (!wasDashboardMounted) break;
         if (dashboard != null &&
             shouldFetchOnTabSelect(
               hasSuccessfullyLoaded: dashboard.hasSuccessfullyLoaded,
@@ -157,6 +182,10 @@ class _MainShellScreenState extends State<MainShellScreen>
               ? SellerDashboardScreen(
                   key: _dashboardKey,
                   onInitialLoadSettled: _preload.onDashboardInitialLoadSettled,
+                  onKitchenAttentionCount: (count) {
+                    if (!mounted || count == _kitchenAttentionCount) return;
+                    setState(() => _kitchenAttentionCount = count);
+                  },
                 )
               : const SizedBox.shrink(),
           _profileMounted
@@ -166,6 +195,7 @@ class _MainShellScreenState extends State<MainShellScreen>
       ),
       bottomNavigationBar: AppBottomNav(
         selectedIndex: _navIndex,
+        kitchenAttentionCount: _kitchenAttentionCount,
         onTap: _selectTab,
       ),
     );

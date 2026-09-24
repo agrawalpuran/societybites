@@ -13,18 +13,27 @@ import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/order_messages_button.dart';
+import '../widgets/requested_ready_summary.dart';
 import '../widgets/seller_insights_panel.dart';
 import 'add_listing_screen.dart';
+import 'add_listing_type_screen.dart';
 import 'my_listings_screen.dart';
 import 'preorder_detail_screen.dart';
 import 'seller_preorders_screen.dart';
 import 'seller_feedback_screen.dart';
 
 class SellerDashboardScreen extends StatefulWidget {
-  const SellerDashboardScreen({super.key, this.onInitialLoadSettled});
+  const SellerDashboardScreen({
+    super.key,
+    this.onInitialLoadSettled,
+    this.onKitchenAttentionCount,
+  });
 
   /// Fired once when the first orders load finishes (success or failure).
   final VoidCallback? onInitialLoadSettled;
+
+  /// Pending seller orders that still need accept/reject.
+  final ValueChanged<int>? onKitchenAttentionCount;
 
   @override
   SellerDashboardScreenState createState() => SellerDashboardScreenState();
@@ -43,8 +52,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   int _ordersLoadGen = 0;
   bool _ordersRefreshInFlight = false;
 
-  /// 0 = Orders, 1 = Dashboard. Dashboard is the default seller landing tab.
-  int _areaTab = 1;
+  /// 0 = Orders, 1 = Dashboard. Orders is the default My Kitchen landing tab.
+  int _areaTab = 0;
 
   /// 0 = Active, 1 = Past
   int _ordersTab = 0;
@@ -65,6 +74,12 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     _loadOrders();
     _loadStats();
     _loadPreOrders();
+  }
+
+  /// Bottom-nav entry into My Kitchen always lands on seller orders.
+  void showKitchenOrders() {
+    if (!mounted || _areaTab == 0) return;
+    setState(() => _areaTab = 0);
   }
 
   Future<void> _loadPreOrders() async {
@@ -113,9 +128,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           }
         }),
       );
-      campaigns.removeWhere(
-        (campaign) => campaignDisplayStatus(campaign) == 'cancelled',
-      );
+      campaigns.removeWhere((campaign) => !campaignShowsInKitchen(campaign));
       campaigns.sort((a, b) {
         const rank = {'open': 0, 'draft': 1, 'closed': 2};
         final statusCompare = (rank[campaignDisplayStatus(a)] ?? 3).compareTo(
@@ -132,6 +145,28 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       });
     } catch (_) {
       if (mounted) setState(() => _preOrdersLoading = false);
+    }
+  }
+
+  Future<void> _createPreOrderCatalog() async {
+    final canList = await SellerOnboarding.ensureCanCreateListing(context);
+    if (!canList || !mounted) return;
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AddListingScreen(
+          catalogType: listingCatalogPreorder,
+        ),
+      ),
+    );
+    if (created == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Catalog item saved. Add it to a campaign when you are ready.',
+          ),
+        ),
+      );
     }
   }
 
@@ -173,6 +208,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         _hasSuccessfullyLoaded = true;
         _ordersRefreshInFlight = false;
       });
+      _publishKitchenAttention();
       _loadStats();
     } catch (e) {
       if (!mounted || gen != _ordersLoadGen) return;
@@ -211,6 +247,13 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         _activeOrders = [updated, ..._activeOrders];
       }
     });
+    _publishKitchenAttention();
+  }
+
+  void _publishKitchenAttention() {
+    final count =
+        _activeOrders.where((order) => order.status == 'pending').length;
+    widget.onKitchenAttentionCount?.call(count);
   }
 
   void _notifyInitialLoadSettled() {
@@ -347,15 +390,22 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   bool _isRejecting = false;
+  String? _rejectingOrderId;
 
   Future<void> _rejectOrder(Order order) async {
     if (_isRejecting) return;
-    final confirmed = await confirmRejectOrder(context);
-    if (!confirmed || !mounted) return;
+    final result = await confirmRejectOrder(context);
+    if (result == null || !mounted) return;
 
     _isRejecting = true;
+    setState(() => _rejectingOrderId = order.id);
     try {
-      await ApiService.rejectOrder(orderId: order.id);
+      final json = await ApiService.rejectOrder(
+        orderId: order.id,
+        reason: result.reason,
+        otherText: result.note,
+      );
+      if (mounted) _upsertOrder(Order.fromJson(json));
       await _loadOrders();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -371,6 +421,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       ).showSnackBar(SnackBar(content: Text('Could not reject order: $e')));
     } finally {
       _isRejecting = false;
+      if (mounted) setState(() => _rejectingOrderId = null);
     }
   }
 
@@ -540,26 +591,41 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   Widget _buildOrdersHeader() {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 18, 20, 0),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Orders',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF101617),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Orders',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF101617),
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Accept, prepare, and complete neighbor orders.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6A7774),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
-          SizedBox(height: 4),
-          Text(
-            'Accept, prepare, and complete neighbor orders.',
-            style: TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6A7774),
-              fontWeight: FontWeight.w500,
+          TextButton(
+            key: const Key('my-kitchen-listings'),
+            onPressed: _openMyListings,
+            child: const Text(
+              'My Listings',
+              style: TextStyle(fontWeight: FontWeight.w800),
             ),
           ),
         ],
@@ -632,6 +698,26 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const Key('create-preorder-catalog'),
+              onPressed: _createPreOrderCatalog,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: preorderGreen,
+                side: const BorderSide(color: Color(0xFFD4E8DF)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.menu_book_outlined, size: 18),
+              label: const Text(
+                'Create catalog',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           if (_preOrdersLoading)
@@ -775,6 +861,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 onPaymentConfirmed: _loadOrders,
                 onReject: _rejectOrder,
                 onReadyBy: _editReadyBy,
+                rejectBusy: _rejectingOrderId == order.id,
               ),
             ),
         ],
@@ -852,6 +939,14 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     );
   }
 
+  Future<void> _openMyListings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MyListingsScreen()),
+    );
+    if (mounted) _loadOrders();
+  }
+
   Widget _buildAddListingCta(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -861,13 +956,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             width: double.infinity,
             height: 52,
             child: OutlinedButton.icon(
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const MyListingsScreen()),
-                );
-                _loadOrders();
-              },
+              onPressed: _openMyListings,
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF0E5A47),
                 side: const BorderSide(color: Color(0xFF0E5A47)),
@@ -895,7 +984,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
                 final created = await Navigator.push<bool>(
                   context,
-                  MaterialPageRoute(builder: (_) => const AddListingScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const AddListingTypeScreen(),
+                  ),
                 );
                 if (created == true) {
                   _loadOrders();
@@ -998,6 +1089,7 @@ class SellerActiveOrderCard extends StatefulWidget {
     required this.onPaymentConfirmed,
     required this.onReject,
     required this.onReadyBy,
+    this.rejectBusy = false,
   });
 
   final Order order;
@@ -1006,6 +1098,7 @@ class SellerActiveOrderCard extends StatefulWidget {
   final Future<void> Function() onPaymentConfirmed;
   final Future<void> Function(Order order) onReject;
   final Future<void> Function(Order order) onReadyBy;
+  final bool rejectBusy;
 
   @override
   State<SellerActiveOrderCard> createState() => _SellerActiveOrderCardState();
@@ -1018,6 +1111,18 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
   Future<void> _handleAction(String nextStatus) async {
     if (_isUpdating) return;
     final order = widget.order;
+    if (nextStatus == 'accepted' &&
+        order.requestedEarlierThanUsualLead &&
+        order.requestedReadyAt != null) {
+      final confirmed = await confirmEarlierThanUsualLead(
+        context,
+        requestedReadyAt: order.requestedReadyAt!,
+        usualLeadLabel: order.usualLeadTimeLabel.isEmpty
+            ? 'your usual preparation time'
+            : order.usualLeadTimeLabel,
+      );
+      if (!confirmed) return;
+    }
     setState(() => _isUpdating = true);
     try {
       await widget.onAction(order, nextStatus);
@@ -1155,7 +1260,8 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     final canComplete = lifecycle.showComplete && (!isCash || cashPaid);
     final hasSellerAction =
         lifecycle.showAccept || payment.showMarkReady || canComplete;
-    final canReject = lifecycle.showReject;
+    final rejectLocked = widget.rejectBusy || order.isRejected;
+    final canReject = lifecycle.showReject || rejectLocked;
     final canSetReadyBy = payment.canSetReadyBy;
     final showUpiConfirm = payment.showConfirmOrderAndChooseTime;
     final showUpiPaymentPending = payment.showPaymentPending;
@@ -1188,13 +1294,26 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      order.itemsSummary,
+                      order.items.length == 1
+                          ? order.items.first.food.name
+                          : order.itemsSummary,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF101617),
                       ),
                     ),
+                    if (order.items.length == 1) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        'Qty ${order.items.first.quantity}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6A7774),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 3),
                     Text(
                       '${order.orderId} • ${order.date}',
@@ -1213,6 +1332,13 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (order.requestedReadyAt != null) ...[
+                      const SizedBox(height: 8),
+                      RequestedReadySummary(
+                        order: order,
+                        isSellerView: true,
+                      ),
+                    ],
                     if (order.fulfilmentMethod != null &&
                         order.fulfilmentMethod!.isNotEmpty) ...[
                       const SizedBox(height: 8),
@@ -1236,10 +1362,15 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
           ),
           if (order.items.length > 1) ...[
             const SizedBox(height: 10),
-            OrderItemsList(items: order.items, compact: true),
+            OrderItemsList(
+              items: order.items,
+              compact: true,
+              showSellerName: false,
+            ),
           ],
           const SizedBox(height: 12),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -1278,13 +1409,15 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                   ),
                 ),
               ],
+              const Spacer(),
+              const SizedBox(width: 8),
+              OrderMessagesButton(
+                order: order,
+                isSellerView: true,
+                inline: true,
+                onClosed: widget.onPaymentConfirmed,
+              ),
             ],
-          ),
-          const SizedBox(height: 12),
-          OrderMessagesButton(
-            order: order,
-            isSellerView: true,
-            onClosed: widget.onPaymentConfirmed,
           ),
           if (lifecycle.headline != null) ...[
             const SizedBox(height: 12),
@@ -1474,7 +1607,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
               width: double.infinity,
               height: 42,
               child: ElevatedButton(
-                onPressed: _isUpdating
+                onPressed: _isUpdating || rejectLocked
                     ? null
                     : () {
                         if (canComplete) {
@@ -1570,10 +1703,23 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
               width: double.infinity,
               height: 42,
               child: OutlinedButton.icon(
-                onPressed: _isUpdating ? null : () => widget.onReject(order),
+                key: const Key('seller-reject-button'),
+                onPressed: rejectLocked || _isUpdating
+                    ? null
+                    : () => widget.onReject(order),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFD94F4F),
-                  side: const BorderSide(color: Color(0xFFFFD4D4)),
+                  foregroundColor: rejectLocked
+                      ? const Color(0xFF8A9491)
+                      : const Color(0xFFD94F4F),
+                  disabledForegroundColor: const Color(0xFF8A9491),
+                  side: BorderSide(
+                    color: rejectLocked
+                        ? const Color(0xFFE0E5E3)
+                        : const Color(0xFFFFD4D4),
+                  ),
+                  backgroundColor: rejectLocked
+                      ? const Color(0xFFF0F2F1)
+                      : Colors.transparent,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -1729,13 +1875,26 @@ class _SellerPastOrderCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      order.itemsSummary,
+                      order.items.length == 1
+                          ? order.items.first.food.name
+                          : order.itemsSummary,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF101617),
                       ),
                     ),
+                    if (order.items.length == 1) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        'Qty ${order.items.first.quantity}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6A7774),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 3),
                     Text(
                       '${order.orderId} • ${order.date}',
@@ -1754,6 +1913,13 @@ class _SellerPastOrderCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (order.requestedReadyAt != null) ...[
+                      const SizedBox(height: 8),
+                      RequestedReadySummary(
+                        order: order,
+                        isSellerView: true,
+                      ),
+                    ],
                     if (order.fulfilmentMethod != null &&
                         order.fulfilmentMethod!.isNotEmpty) ...[
                       const SizedBox(height: 8),
@@ -1777,10 +1943,15 @@ class _SellerPastOrderCard extends StatelessWidget {
           ),
           if (order.items.length > 1) ...[
             const SizedBox(height: 10),
-            OrderItemsList(items: order.items, compact: true),
+            OrderItemsList(
+              items: order.items,
+              compact: true,
+              showSellerName: false,
+            ),
           ],
           const SizedBox(height: 12),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -1804,21 +1975,14 @@ class _SellerPastOrderCard extends StatelessWidget {
               const SizedBox(width: 8),
               _PaymentBadge(paymentStatus: order.paymentStatus),
               const Spacer(),
-              Text(
-                (order.paymentMethod ?? 'upi').toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF8A9491),
-                ),
+              const SizedBox(width: 8),
+              OrderMessagesButton(
+                order: order,
+                isSellerView: true,
+                inline: true,
+                onClosed: onRefresh,
               ),
             ],
-          ),
-          const SizedBox(height: 10),
-          OrderMessagesButton(
-            order: order,
-            isSellerView: true,
-            onClosed: onRefresh,
           ),
           if (isRejected &&
               order.rejectReason != null &&

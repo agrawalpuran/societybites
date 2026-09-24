@@ -8,8 +8,14 @@ import '../services/session_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/food_type_selector.dart';
+import '../widgets/required_field_label.dart';
 import '../models/food_type.dart';
-import 'preorder_detail_screen.dart';
+
+class PreOrderCampaignCreated {
+  const PreOrderCampaignCreated(this.campaignId);
+
+  final String campaignId;
+}
 
 class CreatePreOrderScreen extends StatefulWidget {
   const CreatePreOrderScreen({
@@ -188,17 +194,7 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
       );
       if (!mounted) return;
       final campaign = PreOrderCampaign.fromJson(raw);
-      final changed = await Navigator.pushReplacement<bool, bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PreOrderDetailScreen(
-            campaignId: campaign.id,
-            promptToAddProduct: true,
-          ),
-        ),
-        result: true,
-      );
-      if (mounted && changed == true) Navigator.pop(context, true);
+      Navigator.pop(context, PreOrderCampaignCreated(campaign.id));
     } catch (e) {
       if (mounted) _show(cleanApiError(e));
     } finally {
@@ -238,9 +234,7 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _isEditing
-                                ? 'Edit pre-order campaign'
-                                : 'Create pre-order',
+                            'Pre-order',
                             style: const TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w800,
@@ -296,9 +290,11 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
                             ),
                           ],
                           const SizedBox(height: 24),
+                          const RequiredFieldsLegend(),
+                          const SizedBox(height: 16),
                           _buildCoverImageInput(),
                           const SizedBox(height: 24),
-                          _label('CAMPAIGN TITLE'),
+                          _label('CAMPAIGN TITLE', isRequired: true),
                           TextFormField(
                             controller: _title,
                             enabled: !_settingsLocked,
@@ -316,20 +312,34 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
                             decoration: _input('What are you preparing?'),
                           ),
                           const SizedBox(height: 18),
-                          _dateField('ORDER OPENS', _opensAt, () async {
+                          _dateField(
+                            'ORDER OPENS',
+                            _opensAt,
+                            () async {
                             final value = await _pickDateTime(_opensAt);
                             if (value != null) setState(() => _opensAt = value);
-                          }, enabled: !_settingsLocked),
+                          },
+                            enabled: !_settingsLocked,
+                            isRequired: true,
+                            fieldKey: const Key('order-opens-date'),
+                          ),
                           const SizedBox(height: 14),
-                          _dateField('ORDER CUTOFF', _cutoffAt, () async {
+                          _dateField(
+                            'ORDER CUTOFF',
+                            _cutoffAt,
+                            () async {
                             final value = await _pickDateTime(_cutoffAt);
                             if (value != null) {
                               setState(() => _cutoffAt = value);
                             }
-                          }, enabled: !_settingsLocked),
+                          },
+                            enabled: !_settingsLocked,
+                            isRequired: true,
+                            fieldKey: const Key('order-cutoff-date'),
+                          ),
                           const SizedBox(height: 14),
                           _dateField(
-                            'FULFILMENT DATE & TIME',
+                            'DELIVERY DATE & TIME',
                             _fulfilmentAt,
                             () async {
                               final value = await _pickDateTime(_fulfilmentAt);
@@ -338,9 +348,11 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
                               }
                             },
                             enabled: !_settingsLocked,
+                            isRequired: true,
+                            fieldKey: const Key('order-fulfilment-date'),
                           ),
                           const SizedBox(height: 22),
-                          _label('FULFILMENT METHOD'),
+                          _label('FULFILMENT METHOD', isRequired: true),
                           CheckboxListTile(
                             value: _pickup,
                             onChanged: _settingsLocked
@@ -374,7 +386,10 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
                           ),
                           if (_sellerDelivery) ...[
                             const SizedBox(height: 8),
-                            _label('DEFAULT DELIVERY CHARGE PER SELLER ORDER'),
+                            _label(
+                              'DEFAULT DELIVERY CHARGE PER SELLER ORDER',
+                              isRequired: true,
+                            ),
                             TextFormField(
                               controller: _deliveryCharge,
                               enabled: !_settingsLocked,
@@ -577,10 +592,11 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
     );
   }
 
-  Widget _label(String text) => Padding(
+  Widget _label(String text, {bool isRequired = false}) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
-    child: Text(
+    child: RequiredFieldLabel(
       text,
+      required: isRequired,
       style: const TextStyle(
         fontSize: 11,
         letterSpacing: 1.1,
@@ -595,15 +611,18 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
     DateTime? value,
     VoidCallback onTap, {
     bool enabled = true,
+    bool isRequired = false,
+    Key? fieldKey,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _label(label),
+        _label(label, isRequired: isRequired),
         Material(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
+            key: fieldKey,
             onTap: enabled ? onTap : null,
             borderRadius: BorderRadius.circular(14),
             child: Container(
@@ -905,9 +924,12 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const RequiredFieldsLegend(),
+                        const SizedBox(height: 16),
                         if (_isEditing) ...[
-                          const Text(
+                          const RequiredFieldLabel(
                             'PRODUCT NAME',
+                            required: true,
                             style: TextStyle(
                               fontSize: 11,
                               letterSpacing: 1.1,
@@ -945,7 +967,18 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
                               message:
                                   'Add food items under My Listings → Pre-orders, then come back to add them to this campaign.',
                             )
-                          else
+                          else ...[
+                            const RequiredFieldLabel(
+                              'PRE-ORDER ITEM',
+                              required: true,
+                              style: TextStyle(
+                                fontSize: 11,
+                                letterSpacing: 1.1,
+                                fontWeight: FontWeight.w800,
+                                color: preorderMuted,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
                             DropdownButtonFormField<FoodItem>(
                               initialValue: _selected,
                               decoration: _input('Select product'),
@@ -968,10 +1001,12 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
                               validator: (value) =>
                                   value == null ? 'Choose a product' : null,
                             ),
+                          ],
                         ],
                         const SizedBox(height: 18),
-                        const Text(
+                        const RequiredFieldLabel(
                           'FOOD TYPE',
+                          required: true,
                           style: TextStyle(
                             fontSize: 11,
                             letterSpacing: 1.1,
@@ -987,8 +1022,9 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
                           },
                         ),
                         const SizedBox(height: 18),
-                        const Text(
+                        const RequiredFieldLabel(
                           'PRICE FOR THIS CAMPAIGN',
+                          required: true,
                           style: TextStyle(
                             fontSize: 11,
                             letterSpacing: 1.1,
@@ -1036,6 +1072,17 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
                               'Stop accepting this product after this quantity is reached.',
                         ),
                         if (_mode == 'limited') ...[
+                          const SizedBox(height: 8),
+                          const RequiredFieldLabel(
+                            'MAXIMUM QUANTITY',
+                            required: true,
+                            style: TextStyle(
+                              fontSize: 11,
+                              letterSpacing: 1.1,
+                              fontWeight: FontWeight.w800,
+                              color: preorderMuted,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _quantity,
@@ -1089,6 +1136,7 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: TextButton.icon(
+                              key: const Key('remove-campaign-product'),
                               onPressed: _submitting ? null : _remove,
                               icon: const Icon(Icons.delete_outline_rounded),
                               label: const Text('Remove product'),

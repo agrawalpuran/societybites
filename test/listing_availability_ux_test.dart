@@ -482,7 +482,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Chicken Biryani'), findsWidgets);
-    expect(find.text('Not available now'), findsWidgets);
+    expect(find.text('Out of stock'), findsWidgets);
     expect(find.text('All Items'), findsOneWidget);
     expect(find.text('Available Now'), findsNothing);
     expect(find.text('Add'), findsNothing);
@@ -503,7 +503,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Temporarily not available'), findsWidgets);
+    expect(find.text('Out of stock'), findsWidgets);
     final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
     expect(button.onPressed, isNull);
     expect(find.text('Order Now'), findsNothing);

@@ -71,3 +71,18 @@ String formatPreparationShort(int? minutes) {
   }
   return '~${(minutes / 60).toStringAsFixed(1)} hrs';
 }
+
+String formatUsualLeadTime(int? minutes) {
+  if (minutes == null || minutes <= 0) return '';
+  final days = preparationDaysFromMinutes(minutes);
+  if (days != null) {
+    return days == 1 ? '1 day' : '$days days';
+  }
+  if (minutes < 60) return '$minutes minutes';
+  if (minutes == 60) return '1 hour';
+  if (minutes % 60 == 0) {
+    final hours = minutes ~/ 60;
+    return hours == 1 ? '1 hour' : '$hours hours';
+  }
+  return '${(minutes / 60).toStringAsFixed(1)} hours';
+}

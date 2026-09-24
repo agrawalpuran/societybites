@@ -51,35 +51,45 @@ void main() {
     });
   });
 
-  Future<void> _openAddListing(WidgetTester tester) async {
+  Future<void> _openAddListing(
+    WidgetTester tester, {
+    String availabilityMode = listingAvailabilityReadyNow,
+  }) async {
     await tester.binding.setSurfaceSize(const Size(800, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(const MaterialApp(home: AddListingScreen()));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AddListingScreen(initialAvailabilityMode: availabilityMode),
+      ),
+    );
     await tester.pump();
   }
 
-  testWidgets('Add Listing defaults to Available Now', (tester) async {
-    await _openAddListing(tester);
-
-    expect(find.text('Available Now'), findsOneWidget);
-    expect(find.text('Made to Order'), findsOneWidget);
-    expect(find.text('PREPARATION TIME'), findsNothing);
-  });
-
-  testWidgets('selecting Made to Order shows preparation-time controls', (
+  testWidgets('Add Listing does not ask fulfilment again after type is chosen', (
     tester,
   ) async {
     await _openAddListing(tester);
 
-    await tester.tap(find.text('Made to Order'));
-    await tester.pump();
+    expect(find.text('HOW WILL YOU FULFIL THIS?'), findsNothing);
+    expect(find.text('Available now order'), findsOneWidget);
+    expect(find.text('Made to Order'), findsNothing);
+    expect(find.text('PREPARATION TIME'), findsNothing);
+  });
 
+  testWidgets('Made to Order form shows preparation-time controls', (
+    tester,
+  ) async {
+    await _openAddListing(
+      tester,
+      availabilityMode: listingAvailabilityMadeToOrder,
+    );
+
+    expect(find.text('HOW WILL YOU FULFIL THIS?'), findsNothing);
+    expect(find.text('Made to order'), findsOneWidget);
     expect(find.text('PREPARATION TIME'), findsOneWidget);
-    expect(find.text('30 minutes'), findsOneWidget);
-    expect(find.text('1 hour'), findsOneWidget);
-    expect(find.text('days'), findsOneWidget);
-    expect(find.text('Custom minutes (optional)'), findsNothing);
-    expect(find.text('MAXIMUM ORDERS PER DAY (OPTIONAL)'), findsOneWidget);
+    expect(find.text('QUANTITY AVAILABLE'), findsNothing);
+    expect(find.text('DATE/TIME AVAILABLE UNTIL'), findsNothing);
+    expect(find.text('MAXIMUM ORDERS PER DAY (OPTIONAL)'), findsNothing);
   });
 
   test('day-based preparation estimates format correctly', () {
@@ -95,9 +105,10 @@ void main() {
   testWidgets('Made to Order days field accepts numbers only and validates range', (
     tester,
   ) async {
-    await _openAddListing(tester);
-    await tester.tap(find.text('Made to Order'));
-    await tester.pump();
+    await _openAddListing(
+      tester,
+      availabilityMode: listingAvailabilityMadeToOrder,
+    );
 
     final daysField = find.byKey(const Key('prep-days-field'));
     expect(daysField, findsOneWidget);
@@ -127,12 +138,32 @@ void main() {
     expect(find.text('1–7'), findsOneWidget);
   });
 
-  testWidgets('switching back to Ready Now hides Made-to-Order fields', (
+  testWidgets('editing can switch from Made to Order back to Ready Now', (
     tester,
   ) async {
-    await _openAddListing(tester);
-
-    await tester.tap(find.text('Made to Order'));
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AddListingScreen(
+          existingListing: FoodItem(
+            id: 'l1',
+            name: 'Cake',
+            sellerId: 's1',
+            sellerName: 'Anita',
+            block: 'A',
+            price: 250,
+            rating: 5,
+            pickupTime: '5 PM',
+            description: '',
+            icon: Icons.cake,
+            bgColor: const Color(0xFFE8F5EE),
+            availabilityMode: listingAvailabilityMadeToOrder,
+            preparationTimeMinutes: 60,
+          ),
+        ),
+      ),
+    );
     await tester.pump();
     expect(find.text('PREPARATION TIME'), findsOneWidget);
 
@@ -150,6 +181,8 @@ void main() {
     await tester.pump();
     expect(find.textContaining('HOW WILL YOU FULFIL THIS?'), findsNothing);
     expect(find.text('Available Now'), findsNothing);
+    expect(find.text('QUANTITY AVAILABLE'), findsNothing);
+    expect(find.text('DATE/TIME AVAILABLE UNTIL'), findsNothing);
   });
 
   testWidgets('My Kitchen filters Made to Order separately', (tester) async {

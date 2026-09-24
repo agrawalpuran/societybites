@@ -275,7 +275,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
     if (delta > 0 && !food.canAddToCart) {
       _show(
         food.isExpired
-            ? '${food.name} is temporarily not available.'
+            ? '${food.name} is out of stock.'
             : food.madeToOrderUnavailableToday
             ? '${food.name} is currently unavailable.'
             : '${food.name} is sold out.',

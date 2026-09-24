@@ -256,7 +256,7 @@ async function main() {
       method: "POST",
       path: `/orders/${cashOrder.json.id}/reject`,
       token: sellerToken,
-      body: {},
+      body: { reason: "Not available today" },
     });
     assert(rejected.status === 200, "seller can reject MADE_TO_ORDER request");
     assert(rejected.json.status === "rejected", "rejected status");

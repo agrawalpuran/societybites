@@ -231,4 +231,117 @@ void main() {
       'FINAL QUANTITY TO PREPARE',
     );
   });
+
+  test('buyer home keeps campaigns until fulfilmentAt, not cutoff', () {
+    const product = PreOrderProduct(
+      listingId: 'listing-1',
+      name: 'Cake',
+      sellerId: 'seller-1',
+      sellerName: 'Puran',
+      price: 900,
+      inventoryMode: 'demand',
+      quantity: 0,
+    );
+    final now = DateTime.utc(2026, 9, 28, 21);
+    PreOrderCampaign campaign({
+      required String status,
+      required DateTime open,
+      required DateTime cutoff,
+      required DateTime fulfilment,
+      String sellerId = 'seller-1',
+    }) {
+      return PreOrderCampaign(
+        id: 'c1',
+        sellerId: sellerId,
+        title: 'Sunday Cake Special',
+        status: status,
+        orderOpenAt: open,
+        orderCutoffAt: cutoff,
+        fulfilmentAt: fulfilment,
+        products: const [product],
+      );
+    }
+
+    final openAt = DateTime.utc(2026, 9, 25, 10);
+    final cutoff = DateTime.utc(2026, 9, 28, 20);
+    final fulfilment = DateTime.utc(2026, 9, 30, 19);
+
+    expect(
+      campaign(
+        status: 'open',
+        open: openAt,
+        cutoff: cutoff,
+        fulfilment: fulfilment,
+      ).homePhase(DateTime.utc(2026, 9, 24, 12)),
+      BuyerCampaignHomePhase.upcoming,
+    );
+    expect(
+      campaign(
+        status: 'open',
+        open: openAt,
+        cutoff: cutoff,
+        fulfilment: fulfilment,
+      ).acceptsNewOrders(DateTime.utc(2026, 9, 26, 12)),
+      isTrue,
+    );
+    final closed = campaign(
+      status: 'closed',
+      open: openAt,
+      cutoff: cutoff,
+      fulfilment: fulfilment,
+    );
+    expect(closed.homePhase(now), BuyerCampaignHomePhase.ordersClosed);
+    expect(closed.acceptsNewOrders(now), isFalse);
+    expect(closed.isVisibleOnBuyerHome(now), isTrue);
+    expect(
+      closed.isVisibleOnBuyerHome(DateTime.utc(2026, 9, 30, 19)),
+      isFalse,
+    );
+
+    final visible = filterBuyerDiscoverableCampaigns(
+      [
+        closed,
+        campaign(
+          status: 'draft',
+          open: openAt,
+          cutoff: cutoff,
+          fulfilment: fulfilment,
+        ),
+        campaign(
+          status: 'open',
+          open: openAt,
+          cutoff: cutoff,
+          fulfilment: fulfilment,
+          sellerId: 'me',
+        ),
+      ],
+      viewerUserId: 'me',
+      now: now,
+    );
+    expect(visible, hasLength(2));
+    expect(
+      visible.map((campaign) => campaign.sellerId),
+      containsAll(['me', 'seller-1']),
+    );
+    expect(visible.first.sellerId, 'me');
+  });
+
+  test('draft campaigns stay off My Kitchen', () {
+    final now = DateTime.now();
+    PreOrderCampaign make(String status) {
+      return PreOrderCampaign(
+        id: status,
+        title: status,
+        status: status,
+        orderOpenAt: now.subtract(const Duration(hours: 1)),
+        orderCutoffAt: now.add(const Duration(hours: 5)),
+        fulfilmentAt: now.add(const Duration(days: 1)),
+      );
+    }
+
+    expect(campaignShowsInKitchen(make('draft')), isFalse);
+    expect(campaignShowsInKitchen(make('cancelled')), isFalse);
+    expect(campaignShowsInKitchen(make('open')), isTrue);
+    expect(campaignShowsInKitchen(make('closed')), isTrue);
+  });
 }

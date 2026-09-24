@@ -73,18 +73,11 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
   }
 
   bool get _acceptingOrders {
-    final campaign = _campaign;
-    if (campaign == null || campaign.status != 'open') return false;
-    final now = DateTime.now();
-    return !now.isBefore(campaign.orderOpenAt) &&
-        now.isBefore(campaign.orderCutoffAt);
+    return _campaign?.acceptsNewOrders() ?? false;
   }
 
   bool get _upcoming {
-    final campaign = _campaign;
-    return campaign != null &&
-        campaign.status == 'open' &&
-        DateTime.now().isBefore(campaign.orderOpenAt);
+    return _campaign?.homePhase() == BuyerCampaignHomePhase.upcoming;
   }
 
   int _quantity(PreOrderProduct product) => _quantities[product.listingId] ?? 0;
@@ -231,7 +224,7 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                   borderRadius: 20,
                 ),
                 const SizedBox(height: 16),
-                const PreOrderBadge(),
+                PreOrderBadge(label: buyerHomeBadgeLabel(campaign)),
                 const SizedBox(height: 10),
                 Text(
                   campaign.title,
@@ -298,8 +291,8 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                   const SizedBox(height: 14),
                   _notice(
                     _upcoming
-                        ? 'Ordering opens ${formatDateTime(campaign.orderOpenAt)}.'
-                        : 'This pre-order is no longer accepting orders.',
+                        ? 'COMING SOON. Ordering opens ${formatDateTime(campaign.orderOpenAt)}.'
+                        : 'ORDERS CLOSED. Fulfilment ${formatDateTime(campaign.fulfilmentAt)}.',
                     Icons.info_outline_rounded,
                   ),
                 ],

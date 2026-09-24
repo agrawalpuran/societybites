@@ -710,6 +710,7 @@ class ApiService {
     String? campaignId,
     String? fulfilmentMethod,
     String? fulfilmentNotes,
+    DateTime? requestedReadyAt,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/orders'),
@@ -722,6 +723,8 @@ class ApiService {
         if (fulfilmentMethod != null) 'fulfilmentMethod': fulfilmentMethod,
         if (fulfilmentNotes != null && fulfilmentNotes.trim().isNotEmpty)
           'fulfilmentNotes': fulfilmentNotes.trim(),
+        if (requestedReadyAt != null)
+          'requestedReadyAt': requestedReadyAt.toUtc().toIso8601String(),
         'items': items,
       }),
     );
@@ -752,6 +755,7 @@ class ApiService {
     int? preparationTimeMinutes,
     int? maxDailyOrders,
     bool clearMaxDailyOrders = false,
+    bool clearAvailableAt = false,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/listings/$listingId'),
@@ -761,7 +765,10 @@ class ApiService {
         if (description != null) 'description': description,
         if (price != null) 'price': price,
         if (quantity != null) 'quantity': quantity,
-        if (availableAt != null) 'availableAt': availableAt.toIso8601String(),
+        if (clearAvailableAt)
+          'availableAt': null
+        else if (availableAt != null)
+          'availableAt': availableAt.toIso8601String(),
         if (pickupLocation != null) 'pickupLocation': pickupLocation,
         if (imageUrl != null) 'imageUrl': imageUrl,
         if (status != null) 'status': status,
@@ -1009,14 +1016,15 @@ class ApiService {
 
   static Future<Map<String, dynamic>> rejectOrder({
     required String orderId,
-    String? reason,
+    required String reason,
     String? otherText,
   }) async {
+    final trimmedReason = reason.trim();
     final response = await http.post(
       Uri.parse('$baseUrl/orders/$orderId/reject'),
       headers: await _authHeaders(),
       body: jsonEncode({
-        if (reason != null && reason.trim().isNotEmpty) 'reason': reason,
+        'reason': trimmedReason,
         if (otherText != null && otherText.trim().isNotEmpty)
           'otherText': otherText.trim(),
       }),

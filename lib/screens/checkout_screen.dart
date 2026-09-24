@@ -5,6 +5,7 @@ import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/order_timing_notice.dart';
+import '../widgets/requested_ready_summary.dart';
 import '../models/data.dart';
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
@@ -33,6 +34,7 @@ class CheckoutScreen extends StatefulWidget {
     required List<Map<String, dynamic>> items,
     required String paymentMethod,
     String? fulfilmentMethod,
+    DateTime? requestedReadyAt,
   })? placeOrder;
 
   @override
@@ -49,6 +51,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _fulfilmentMethod;
   late bool _isCrossSociety;
   SellerFulfilment? _sellerFulfilment;
+  bool _needBySpecified = false;
+  DateTime? _needBy;
 
   @override
   void initState() {
@@ -125,8 +129,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   int get _totalQuantity =>
       _items.fold<int>(0, (sum, item) => sum + item.quantity);
 
+  bool get _showNeedBy => _items.any((item) => item.food.isMadeToOrder);
+
   bool get _canConfirm {
     if (_isSubmitting || _items.isEmpty || _totalQuantity <= 0) return false;
+    if (_showNeedBy && _needBySpecified && _needBy == null) return false;
     if (_isCrossSociety &&
         _sellerFulfilment?.mode == FulfilmentMode.both &&
         _fulfilmentMethod == null) {
@@ -193,6 +200,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  Future<void> _pickNeedBy() async {
+    final now = DateTime.now();
+    final initial = _needBy ?? now.add(const Duration(hours: 2));
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial.isAfter(now) ? initial : now,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: now.add(const Duration(days: 180)),
+    );
+    if (!mounted || date == null) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (!mounted || time == null) return;
+    final selected = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+    if (selected.isBefore(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Need by time must be in the future')),
+      );
+      return;
+    }
+    setState(() {
+      _needBySpecified = true;
+      _needBy = selected;
+    });
+  }
+
   Future<void> _confirmOrder() async {
     if (!_canConfirm) return;
 
@@ -221,18 +262,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             required List<Map<String, dynamic>> items,
             required String paymentMethod,
             String? fulfilmentMethod,
+            DateTime? requestedReadyAt,
           }) {
             return ApiService.createOrder(
               societyId: societyId,
               paymentMethod: paymentMethod,
               items: items,
               fulfilmentMethod: fulfilmentMethod,
+              requestedReadyAt: requestedReadyAt,
             );
           };
 
       if (_items.any((item) => item.food.isExpired)) {
         throw Exception(
-          'One or more items are temporarily not available and cannot be ordered.',
+          'One or more items are out of stock and cannot be ordered.',
         );
       }
 
@@ -246,6 +289,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 })
             .toList(),
         fulfilmentMethod: _isCrossSociety ? _fulfilmentMethod : null,
+        requestedReadyAt:
+            _showNeedBy && _needBySpecified ? _needBy : null,
       );
 
       if (!mounted) return;
@@ -338,6 +383,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           OrderTimingNotice(
                             foods: _items.map((item) => item.food),
                           ),
+                          if (_showNeedBy)
+                            NeedByCheckoutField(
+                              specified: _needBySpecified,
+                              value: _needBy,
+                              onSpecifiedChanged: (next) {
+                                setState(() {
+                                  _needBySpecified = next;
+                                  if (!next) _needBy = null;
+                                });
+                              },
+                              onPickDateTime: _pickNeedBy,
+                            ),
                           const SizedBox(height: 24),
                           if (_isCrossSociety) ...[
                             _buildFulfilmentSection(),
@@ -362,7 +419,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildHeader() {
-    return const AppHeader();
+    return const AppHeader(showCart: false);
   }
 
   String _friendlyOrderError(String raw) {
