@@ -2,7 +2,7 @@ const express = require("express");
 const prisma = require("../lib/prisma");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser, requireJoinedSociety } = require("../middleware/requireUser");
-const { serializeListing } = require("../utils/listingSerializer");
+const { serializeListing, attachQuantitySold } = require("../utils/listingSerializer");
 const {
   parseFoodType,
   assertFoodTypeTagCompatibility,
@@ -180,6 +180,7 @@ router.get(
     });
 
     const withCapacity = await attachMadeToOrderCapacity(prisma, listings);
+    await attachQuantitySold(prisma, withCapacity);
     res.json(withCapacity.map((listing) => serializeListing(listing)));
   })
 );
@@ -207,7 +208,9 @@ router.get(
 
     listing = await expireListingIfDue(prisma, listing, { include: listingInclude });
     const [withCapacity] = await attachMadeToOrderCapacity(prisma, [listing]);
-    res.json(serializeListing(withCapacity || listing));
+    const payload = withCapacity || listing;
+    await attachQuantitySold(prisma, [payload]);
+    res.json(serializeListing(payload));
   })
 );
 

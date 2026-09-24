@@ -5,7 +5,7 @@ const { evaluateSellerDiscoveryEligibility } = require("./sellingReachEligibilit
 const { serializeSellingReach } = require("./sellingReach");
 const { serializeFulfilment } = require("./sellerFulfilment");
 const { serializePaymentPreference } = require("./sellerPaymentPreference");
-const { serializeListing } = require("../utils/listingSerializer");
+const { serializeListing, attachQuantitySold } = require("../utils/listingSerializer");
 const { expireDueListings, DISCOVERABLE_STATUSES } = require("../utils/listingExpiry");
 
 const ACTIVE_LISTING_WHERE = {
@@ -126,6 +126,11 @@ async function discoverNearbySellers({ buyer, query } = {}) {
     },
   });
 
+  await attachQuantitySold(
+    prisma,
+    candidates.flatMap((candidate) => candidate.listings || [])
+  );
+
   const sellers = [];
   for (const candidate of candidates) {
     if (!candidate.listings || candidate.listings.length === 0) continue;
@@ -213,6 +218,7 @@ async function getNearbySellerStorefront({ buyer, sellerId, query } = {}) {
     throw err;
   }
 
+  await attachQuantitySold(prisma, seller.listings);
   return serializeNearbySeller(seller, eligibility);
 }
 

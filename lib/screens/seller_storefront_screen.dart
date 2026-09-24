@@ -713,6 +713,15 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              if (listingSoldCaption(food.quantitySold).isNotEmpty)
+                Text(
+                  listingSoldCaption(food.quantitySold),
+                  style: const TextStyle(
+                    color: preorderMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               MadeToOrderHint(food: food, compact: true),
               const SizedBox(height: 4),
               Row(

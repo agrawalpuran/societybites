@@ -344,6 +344,15 @@ class _SellerCard extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    if (listingSoldCaption(food.quantitySold).isNotEmpty)
+                      Text(
+                        listingSoldCaption(food.quantitySold),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6A7774),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     Container(
                       margin: const EdgeInsets.only(top: 4),
                       padding: const EdgeInsets.symmetric(

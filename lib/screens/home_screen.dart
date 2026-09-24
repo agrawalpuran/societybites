@@ -1636,6 +1636,19 @@ class _SpecialCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                  if (listingSoldCaption(food.quantitySold).isNotEmpty) ...[
+                    const SizedBox(width: 10),
+                    Text(
+                      listingSoldCaption(food.quantitySold),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? Colors.white70
+                            : const Color(0xFF6A7774),
+                      ),
+                    ),
+                  ],
                   const SizedBox(width: 8),
                   Flexible(
                     child: Align(
@@ -1809,6 +1822,17 @@ class _AvailableItemTile extends StatelessWidget {
                             const SizedBox(height: 2),
                             Text(
                               '${food.quantity} left',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF6A7774),
+                              ),
+                            ),
+                          ],
+                          if (listingSoldCaption(food.quantitySold).isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              listingSoldCaption(food.quantitySold),
                               style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,

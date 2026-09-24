@@ -5,6 +5,7 @@ const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser } = require("../middleware/requireUser");
 const { generateOrderNumber } = require("../utils/orderNumber");
 const { serializeOrder } = require("../utils/listingSerializer");
+const { loadSellerInsights } = require("../lib/sellerInsights");
 const { getPlatformFee } = require("../lib/platformFee");
 const { expireListingIfDue } = require("../utils/listingExpiry");
 const { assertMadeToOrderCapacity } = require("../lib/listingAvailability");
@@ -296,6 +297,27 @@ router.get(
       totalReviews: reviews.length,
       pendingPaymentConfirmations,
     });
+  })
+);
+
+router.get(
+  "/seller/insights",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    try {
+      const insights = await loadSellerInsights(prisma, {
+        sellerId: req.user.id,
+        preset: req.query.preset,
+        from: req.query.from,
+        to: req.query.to,
+      });
+      res.json(insights);
+    } catch (err) {
+      if (err.statusCode) {
+        return res.status(err.statusCode).json({ error: err.message });
+      }
+      throw err;
+    }
   })
 );
 

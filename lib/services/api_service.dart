@@ -1040,6 +1040,24 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> getSellerInsights({
+    String preset = 'last_7_days',
+    String? from,
+    String? to,
+  }) async {
+    final query = <String, String>{'preset': preset};
+    if (from != null && from.isNotEmpty) query['from'] = from;
+    if (to != null && to.isNotEmpty) query['to'] = to;
+    final uri = Uri.parse(
+      '$baseUrl/orders/seller/insights',
+    ).replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<List<Map<String, dynamic>>> getPreOrderCampaigns({
     required String societyId,
     String? sellerId,

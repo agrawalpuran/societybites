@@ -62,9 +62,35 @@ function serializeListing(listing) {
     flatNumber: flat?.flatNumber || null,
     avgRating: Math.round(avgRating * 10) / 10,
     reviewCount,
+    quantitySold: Number(listing.quantitySold) || 0,
     createdAt: listing.createdAt,
     updatedAt: listing.updatedAt,
   };
+}
+
+/** Cumulative completed OrderItem quantities. Does not change listing.quantity. */
+async function attachQuantitySold(prisma, listings) {
+  const list = Array.isArray(listings) ? listings : [];
+  const ids = [...new Set(list.map((listing) => listing && listing.id).filter(Boolean))];
+  if (ids.length === 0) return list;
+
+  const groups = await prisma.orderItem.groupBy({
+    by: ["listingId"],
+    where: {
+      listingId: { in: ids },
+      order: { status: "completed" },
+    },
+    _sum: { quantity: true },
+  });
+  const soldByListing = Object.fromEntries(
+    groups.map((row) => [row.listingId, Number(row._sum && row._sum.quantity) || 0])
+  );
+  for (const listing of list) {
+    if (listing && listing.id) {
+      listing.quantitySold = soldByListing[listing.id] || 0;
+    }
+  }
+  return list;
 }
 
 function serializeOrder(order) {
@@ -175,4 +201,5 @@ module.exports = {
   serializeListing,
   serializeOrder,
   serializeReview,
+  attachQuantitySold,
 };

@@ -13,6 +13,7 @@ import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/order_messages_button.dart';
+import '../widgets/seller_insights_panel.dart';
 import 'add_listing_screen.dart';
 import 'my_listings_screen.dart';
 import 'preorder_detail_screen.dart';
@@ -41,6 +42,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   bool _didNotifyInitialSettle = false;
   int _ordersLoadGen = 0;
   bool _ordersRefreshInFlight = false;
+
+  /// 0 = Orders, 1 = Dashboard. Dashboard is the default seller landing tab.
+  int _areaTab = 1;
 
   /// 0 = Active, 1 = Past
   int _ordersTab = 0;
@@ -395,46 +399,187 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFF8FAF9),
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       body: SafeArea(
-        child: RefreshIndicator(
-          color: const Color(0xFF0E5A47),
-          onRefresh: _refreshDashboard,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
-            ),
-            slivers: [
-              SliverToBoxAdapter(child: _buildHeader(context)),
-              SliverToBoxAdapter(child: _buildStatsGrid()),
-              SliverToBoxAdapter(child: _buildPreOrdersSection()),
-              if (_error != null)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Color(0xFFD94F4F)),
+        child: Column(
+          children: [
+            const AppHeader(),
+            _buildAreaTabs(),
+            Expanded(
+              child: IndexedStack(
+                index: _areaTab,
+                children: [
+                  RefreshIndicator(
+                    color: const Color(0xFF0E5A47),
+                    onRefresh: _refreshDashboard,
+                    child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      slivers: [
+                        SliverToBoxAdapter(child: _buildOrdersHeader()),
+                        SliverToBoxAdapter(child: _buildPreOrdersSection()),
+                        if (_error != null)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Text(
+                                _error!,
+                                style: const TextStyle(color: Color(0xFFD94F4F)),
+                              ),
+                            ),
+                          ),
+                        if (_isLoading)
+                          const SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 48),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFF0E5A47),
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          SliverToBoxAdapter(child: _buildOrdersSection(context)),
+                        SliverToBoxAdapter(child: _buildExpandCard()),
+                        SliverToBoxAdapter(child: _buildAddListingCta(context)),
+                        const SliverToBoxAdapter(child: SizedBox(height: 30)),
+                      ],
                     ),
                   ),
-                ),
-              SliverToBoxAdapter(child: _buildOrdersSection(context)),
-              SliverToBoxAdapter(child: _buildExpandCard()),
-              SliverToBoxAdapter(child: _buildAddListingCta(context)),
-              const SliverToBoxAdapter(child: SizedBox(height: 30)),
-            ],
-          ),
+                  RefreshIndicator(
+                    color: const Color(0xFF0E5A47),
+                    onRefresh: _refreshDashboard,
+                    child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      slivers: [
+                        SliverToBoxAdapter(child: _buildDashboardHeader()),
+                        SliverToBoxAdapter(child: _buildSatisfactionRow()),
+                        SliverToBoxAdapter(
+                          child: SellerInsightsPanel(
+                            showHeading: false,
+                            onSeeAllOrders: () => setState(() => _areaTab = 0),
+                          ),
+                        ),
+                        const SliverToBoxAdapter(child: SizedBox(height: 30)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAreaTabs() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      child: Container(
+        height: 46,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F2F1),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _OrdersSegment(
+                key: const Key('seller-area-orders-tab'),
+                label: 'Orders',
+                selected: _areaTab == 0,
+                onTap: () => setState(() => _areaTab = 0),
+              ),
+            ),
+            Expanded(
+              child: _OrdersSegment(
+                key: const Key('seller-area-dashboard-tab'),
+                label: 'Dashboard',
+                selected: _areaTab == 1,
+                onTap: () => setState(() => _areaTab = 1),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardHeader() {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Dashboard',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF101617),
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'How your kitchen performed in this period.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6A7774),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrdersHeader() {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Orders',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF101617),
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Accept, prepare, and complete neighbor orders.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6A7774),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSatisfactionRow() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      child: _SatisfactionCard(
+        rating: (_stats['avgRating'] as num?)?.toDouble() ?? 0,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const SellerFeedbackScreen(),
+            ),
+          );
+        },
       ),
     );
   }
@@ -561,28 +706,10 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     final orders = showingPast ? _pastOrders : _activeOrders;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Orders',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF101617),
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Active sales and completed history for your kitchen.',
-            style: TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6A7774),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 14),
           Container(
             height: 44,
             decoration: BoxDecoration(
@@ -650,97 +777,6 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 onReadyBy: _editReadyBy,
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const AppHeader(),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFE5D6),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Text(
-                  'SELLER OVERVIEW',
-                  style: TextStyle(
-                    fontSize: 10,
-                    letterSpacing: 1.3,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF4E2A20),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Good morning,\nChef.',
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF101617),
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Your community kitchen is buzzing.\nHere's what's happening in your\nneighborhood today.",
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF6A7774),
-                  fontWeight: FontWeight.w500,
-                  height: 1.45,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatsGrid() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-      child: Column(
-        children: [
-          _OrdersStatCard(
-            count: _activeOrders.length,
-            activeListings: (_stats['activeListings'] as num?)?.toInt(),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _EarningsCard(
-                  amount: (_stats['todayRevenue'] as num?)?.toDouble() ?? 0,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _SatisfactionCard(
-                  rating: (_stats['avgRating'] as num?)?.toDouble() ?? 0,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const SellerFeedbackScreen(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -886,180 +922,6 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 }
 
-class _OrdersStatCard extends StatelessWidget {
-  const _OrdersStatCard({required this.count, this.activeListings});
-
-  final int count;
-  final int? activeListings;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFEAEFED)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0F7F4),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.shopping_bag_rounded,
-                    color: Color(0xFF0E5A47),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  '$count',
-                  style: const TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF101617),
-                  ),
-                ),
-                const Text(
-                  'Orders Today',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF6A7774),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F7F4),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.restaurant_rounded,
-                  color: const Color(0xFF0E5A47).withAlpha(120),
-                  size: 28,
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0F0EA),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    activeListings != null
-                        ? '$activeListings listed'
-                        : '0 listed',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0E5A47),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EarningsCard extends StatelessWidget {
-  const _EarningsCard({this.amount = 0});
-
-  final double amount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFEAEFED)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0F7F4),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: const Icon(
-                  Icons.play_circle_fill_rounded,
-                  color: Color(0xFF0E5A47),
-                  size: 18,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0E5A47),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  'DAILY GOAL',
-                  style: TextStyle(
-                    fontSize: 9,
-                    letterSpacing: 0.8,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            '₹${amount.toStringAsFixed(0)}',
-            style: const TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF101617),
-            ),
-          ),
-          const Text(
-            'Earnings',
-            style: TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6A7774),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SatisfactionCard extends StatelessWidget {
   const _SatisfactionCard({this.rating = 0, this.onTap});
 
@@ -1075,78 +937,50 @@ class _SatisfactionCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(22),
         child: Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(color: const Color(0xFFEAEFED)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF8E8),
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: const Icon(
-                      Icons.star_rounded,
-                      color: Colors.amber,
-                      size: 18,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (onTap != null)
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: Color(0xFFADB5B2),
-                      size: 20,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    rating > 0 ? rating.toString() : '—',
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF101617),
-                    ),
-                  ),
-                  const Text(
-                    '/5',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF8A9491),
-                    ),
-                  ),
-                ],
-              ),
-              const Text(
-                'Satisfaction Score',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF6A7774),
-                  fontWeight: FontWeight.w600,
+              const Icon(Icons.star_rounded, color: Colors.amber, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                rating > 0 ? '${rating.toString()}/5' : '—/5',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF101617),
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Satisfaction Score',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6A7774),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
               const Text(
                 'View feedback',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: Color(0xFF0E5A47),
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              if (onTap != null)
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF0E5A47),
+                  size: 20,
+                ),
             ],
           ),
         ),
@@ -1808,6 +1642,7 @@ class _PaymentBadge extends StatelessWidget {
 
 class _OrdersSegment extends StatelessWidget {
   const _OrdersSegment({
+    super.key,
     required this.label,
     required this.selected,
     required this.onTap,

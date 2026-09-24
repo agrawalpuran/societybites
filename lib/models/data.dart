@@ -10,6 +10,11 @@ import 'selling_reach.dart';
 const listingCatalogRegular = 'REGULAR';
 const listingCatalogPreorder = 'PREORDER';
 
+String listingSoldCaption(int quantitySold) {
+  if (quantitySold <= 0) return '';
+  return quantitySold == 1 ? '1 sold' : '$quantitySold sold';
+}
+
 String parseListingCatalogType(dynamic value) {
   final raw = value?.toString().trim().toUpperCase();
   return raw == listingCatalogPreorder
@@ -61,6 +66,7 @@ class FoodItem {
   final String status;
   final DateTime? availableAt;
   final int reviewCount;
+  final int quantitySold;
   final IconData icon;
   final Color bgColor;
   final String? sellerUpiId;
@@ -101,6 +107,7 @@ class FoodItem {
     this.status = 'active',
     this.availableAt,
     this.reviewCount = 0,
+    this.quantitySold = 0,
     required this.icon,
     required this.bgColor,
     this.sellerUpiId,
@@ -225,6 +232,7 @@ class FoodItem {
       status: json['status']?.toString() ?? 'active',
       availableAt: availableAt,
       reviewCount: _asInt(json['reviewCount'], 0),
+      quantitySold: _asInt(json['quantitySold'], 0),
       icon: _icons[hash % _icons.length],
       bgColor: _colors[hash % _colors.length],
       sellerUpiId: json['sellerUpiId']?.toString(),

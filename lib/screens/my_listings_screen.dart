@@ -844,6 +844,18 @@ class _SellerListingCard extends StatelessWidget {
                         color: Color(0xFF6A7774),
                       ),
                     ),
+                    if (listingSoldCaption(listing.quantitySold).isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          listingSoldCaption(listing.quantitySold),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF6A7774),
+                          ),
+                        ),
+                      ),
                     if (listing.isMadeToOrder)
                       MadeToOrderHint(food: listing, compact: true),
                   ],
