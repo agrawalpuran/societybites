@@ -270,7 +270,10 @@ void main() {
     await tester.tap(find.text('Move'));
     await tester.pumpAndSettle();
 
-    expect(find.text('No pre-order items yet'), findsOneWidget);
+    expect(
+      find.text('There is nothing in the pre-order catalog'),
+      findsOneWidget,
+    );
     await tester.tap(find.textContaining('Regular (').first);
     await tester.pumpAndSettle();
     expect(find.text('Sunday Biryani'), findsOneWidget);
@@ -375,7 +378,18 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('No pre-order items yet'), findsOneWidget);
+    expect(
+      find.text('There is nothing in the pre-order catalog'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('create-preorder-catalog-from-nudge')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('create-preorder-catalog-from-nudge')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AddListingScreen), findsOneWidget);
+    expect(find.text('Pre-order'), findsWidgets);
   });
 
   testWidgets('Create catalog from Pre-orders opens the catalog listing form', (
@@ -403,5 +417,65 @@ void main() {
     expect(find.text('QUANTITY AVAILABLE'), findsNothing);
     expect(find.text('DATE/TIME AVAILABLE UNTIL'), findsNothing);
     expect(find.byType(AddListingTypeScreen), findsNothing);
+  });
+
+  testWidgets('Pre-orders empty catalog shows create-first message', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SellerPreOrdersScreen(
+          fetchCampaigns: () async => [],
+          fetchCatalog: () async => [],
+          ensureCanCreateListing: (_) async => true,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.text('There is nothing in the pre-order catalog'),
+      findsWidgets,
+    );
+    expect(
+      find.byKey(const Key('create-preorder-catalog-from-nudge')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Pre-orders with catalog shows reuse note', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SellerPreOrdersScreen(
+          fetchCampaigns: () async => [],
+          fetchCatalog: () async => [
+            {
+              'id': 'ladoo',
+              'name': 'Ladoo',
+              'sellerId': 's1',
+              'sellerName': 'Anita',
+              'price': 80,
+              'status': 'active',
+              'catalogType': listingCatalogPreorder,
+            },
+          ],
+          ensureCanCreateListing: (_) async => true,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.text(
+        'You can create a pre-order from items already in your pre-order catalog.',
+      ),
+      findsOneWidget,
+    );
   });
 }

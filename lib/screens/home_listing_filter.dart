@@ -136,6 +136,67 @@ List<FoodItem> listingsForHomeReach(
       .toList();
 }
 
+HomeListingReach? homeCampaignReachFor(
+  PreOrderCampaign campaign, {
+  required String? buyerSocietyId,
+  String? viewerUserId,
+  double? nearbyRadiusKm,
+}) {
+  if (viewerUserId != null &&
+      viewerUserId.isNotEmpty &&
+      campaign.sellerId == viewerUserId) {
+    return HomeListingReach.inSociety;
+  }
+  switch (campaign.discoveryReach) {
+    case 'inSociety':
+      return HomeListingReach.inSociety;
+    case 'nearby':
+      return HomeListingReach.nearby;
+    case 'extended':
+      return HomeListingReach.extended;
+  }
+  final campaignSociety = campaign.societyId?.trim();
+  final buyer = buyerSocietyId?.trim();
+  if (buyer != null &&
+      buyer.isNotEmpty &&
+      campaignSociety != null &&
+      campaignSociety.isNotEmpty &&
+      campaignSociety == buyer) {
+    return HomeListingReach.inSociety;
+  }
+  final distance = campaign.distanceKm;
+  if (distance != null && distance <= 0) {
+    return HomeListingReach.inSociety;
+  }
+  final nearbyKm = nearbyRadiusKm;
+  if (distance != null && nearbyKm != null) {
+    if (distance <= nearbyKm) return HomeListingReach.nearby;
+    return HomeListingReach.extended;
+  }
+  return null;
+}
+
+List<PreOrderCampaign> campaignsForHomeReach(
+  Iterable<PreOrderCampaign> campaigns, {
+  required HomeListingReach reach,
+  required String? buyerSocietyId,
+  String? viewerUserId,
+  double? nearbyRadiusKm,
+}) {
+  return campaigns
+      .where(
+        (campaign) =>
+            homeCampaignReachFor(
+              campaign,
+              buyerSocietyId: buyerSocietyId,
+              viewerUserId: viewerUserId,
+              nearbyRadiusKm: nearbyRadiusKm,
+            ) ==
+            reach,
+      )
+      .toList();
+}
+
 /// Flatten Explore Nearby seller cards into listing maps for the Home feed.
 List<Map<String, dynamic>> listingMapsFromNearbyPayload(
   Map<String, dynamic> payload,

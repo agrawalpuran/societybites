@@ -288,6 +288,10 @@ void main() {
     expect(dy('Nearby Societies'), lessThan(dy('Nearby Idli')));
     expect(dy('Nearby Idli'), lessThan(dy('More Around You')));
     expect(dy('More Around You'), lessThan(dy('Extended Dosa')));
+    expect(
+      dy('Top Sellers in Your Society'),
+      lessThan(dy('Nearby Societies')),
+    );
   });
 
   testWidgets(
@@ -605,5 +609,38 @@ void main() {
       find.text('No paused listings are eligible to renew.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('compact listing card keeps Add horizontal when sold count shows', (
+    tester,
+  ) async {
+    _ignoreOverflow();
+    SharedPreferences.setMockInitialValues({'society_id': 'mine'});
+    await tester.binding.setSurfaceSize(const Size(400, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          fetchListings: () async => [
+            _listingJson(name: 'veg Sushi', quantity: 38)
+              ..['societyId'] = 'mine'
+              ..['price'] = 90
+              ..['quantitySold'] = 2,
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('2 sold'), findsWidgets);
+    expect(find.text('REGULAR'), findsWidgets);
+    final price = tester.getRect(find.text('₹90').first);
+    final sold = tester.getRect(find.text('2 sold').first);
+    expect(sold.top, greaterThan(price.bottom - 1));
+
+    final addSize = tester.getSize(find.text('Add').first);
+    expect(addSize.width, greaterThan(addSize.height));
   });
 }

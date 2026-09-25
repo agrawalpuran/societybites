@@ -27,7 +27,7 @@ function sellerIdFromOrder(order) {
  * @param {string} userId
  * @param {{ title: string, body: string, notificationType: string, orderId: string }} opts
  */
-async function sendToUser(userId, { title, body, notificationType, orderId }) {
+async function sendToUser(userId, { title, body, notificationType, orderId, extra }) {
   if (!userId || !notificationType || !orderId) return;
 
   const tokens = await prisma.deviceToken.findMany({
@@ -42,7 +42,11 @@ async function sendToUser(userId, { title, body, notificationType, orderId }) {
     type: "order_update",
     orderId: String(orderId),
     notificationType: String(notificationType),
+    ...(extra && typeof extra === "object" ? extra : {}),
   };
+  for (const key of Object.keys(data)) {
+    data[key] = String(data[key] ?? "");
+  }
 
   const staleIds = [];
 
@@ -191,6 +195,22 @@ function notifyPaymentConfirmed(order) {
   );
 }
 
+function notifyOrderMessage(order, senderId) {
+  const sellerId = sellerIdFromOrder(order);
+  const recipientId = senderId === order.buyerId ? sellerId : order.buyerId;
+  if (!recipientId || recipientId === senderId) return;
+  const fromSeller = senderId === sellerId;
+  notifyAsync(() =>
+    sendToUser(recipientId, {
+      title: fromSeller ? "New message from seller" : "New message from buyer",
+      body: `Order ${order.orderNumber} has a new message`,
+      notificationType: "order_message",
+      orderId: order.id,
+      extra: { recipientRole: fromSeller ? "buyer" : "seller" },
+    })
+  );
+}
+
 module.exports = {
   notifyAsync,
   sendToUser,
@@ -200,4 +220,5 @@ module.exports = {
   notifyReadyBy,
   notifyBuyerMarkedPaid,
   notifyPaymentConfirmed,
+  notifyOrderMessage,
 };

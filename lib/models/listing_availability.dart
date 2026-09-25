@@ -38,6 +38,9 @@ int? parsePreparationTimeMinutes(dynamic value) {
   return int.tryParse(value?.toString() ?? '');
 }
 
+const singleMadeToOrderListingMessage =
+    'Only one Made to order listing can be live at a time. Buyers need a single prep time. Pause or edit your current Made to order item instead.';
+
 String formatPreparationEstimate(int? minutes) {
   if (minutes == null || minutes <= 0) return '';
   final days = preparationDaysFromMinutes(minutes);

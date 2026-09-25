@@ -96,7 +96,10 @@ class PushNotificationService {
 
   static void _handleOpen(RemoteMessage message) {
     final type = message.data['notificationType'] ?? '';
-    final tabIndex = _sellerTypes.contains(type) ? 2 : 1;
+    final recipientRole = message.data['recipientRole'] ?? '';
+    final tabIndex = type == 'order_message'
+        ? (recipientRole == 'seller' ? 2 : 1)
+        : (_sellerTypes.contains(type) ? 2 : 1);
     final nav = navigatorKey.currentState;
     if (nav == null) return;
 

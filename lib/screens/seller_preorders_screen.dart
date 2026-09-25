@@ -14,11 +14,15 @@ class SellerPreOrdersScreen extends StatefulWidget {
   const SellerPreOrdersScreen({
     super.key,
     this.fetchCampaigns,
+    this.fetchCatalog,
     this.ensureCanCreateListing,
   });
 
   /// Test seam. Production uses [ApiService.getPreOrderCampaigns].
   final Future<List<Map<String, dynamic>>> Function()? fetchCampaigns;
+
+  /// Test seam. Production loads the seller's PREORDER catalog.
+  final Future<List<Map<String, dynamic>>> Function()? fetchCatalog;
 
   /// Test seam. Production uses [SellerOnboarding.ensureCanCreateListing].
   final Future<bool> Function(BuildContext context)? ensureCanCreateListing;
@@ -32,14 +36,40 @@ class SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
   bool _loading = true;
   bool _hasSuccessfullyLoaded = false;
   String? _error;
+  bool? _catalogEmpty;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadCatalog();
   }
 
   Future<void> reload() => _load();
+
+  Future<void> _loadCatalog() async {
+    try {
+      late final List<Map<String, dynamic>> raw;
+      final fetchCatalog = widget.fetchCatalog;
+      if (fetchCatalog != null) {
+        raw = await fetchCatalog();
+      } else if (widget.fetchCampaigns != null) {
+        return;
+      } else {
+        final societyId = await SessionService.getSocietyId();
+        final sellerId = await SessionService.getUserId();
+        if (sellerId == null || societyId == null || societyId.isEmpty) return;
+        raw = await ApiService.getListings(
+          societyId: societyId,
+          sellerId: sellerId,
+          status: 'all',
+          catalogType: listingCatalogPreorder,
+        );
+      }
+      if (!mounted) return;
+      setState(() => _catalogEmpty = raw.isEmpty);
+    } catch (_) {}
+  }
 
   Future<void> _load() async {
     if (!_hasSuccessfullyLoaded) {
@@ -121,6 +151,16 @@ class SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
   }
 
   Future<void> _create() async {
+    if (_catalogEmpty == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'There is nothing in the pre-order catalog. Create the catalog first.',
+          ),
+        ),
+      );
+      return;
+    }
     final result = await Navigator.push<Object?>(
       context,
       MaterialPageRoute(builder: (_) => const CreatePreOrderScreen()),
@@ -154,6 +194,7 @@ class SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
         ),
       ),
     );
+    if (mounted) await _loadCatalog();
   }
 
   Future<void> _open(PreOrderCampaign campaign) async {
@@ -240,6 +281,15 @@ class SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
                                 style: TextStyle(fontWeight: FontWeight.w800),
                               ),
                             ),
+                            if (_catalogEmpty == true) ...[
+                              const SizedBox(height: 14),
+                              CreatePreorderCatalogNudge(
+                                onCreateCatalog: _createCatalog,
+                              ),
+                            ] else if (_catalogEmpty == false) ...[
+                              const SizedBox(height: 14),
+                              const ExistingPreorderCatalogNote(),
+                            ],
                             const SizedBox(height: 22),
                             if (_loading && !_hasSuccessfullyLoaded)
                               const Padding(
@@ -259,11 +309,11 @@ class SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
                                   child: const Text('Try again'),
                                 ),
                               )
-                            else if (_campaigns.isEmpty)
+                            else if (_campaigns.isEmpty && _catalogEmpty != true)
                               PreOrderEmptyState(
                                 title: 'No pre-orders yet',
                                 message:
-                                    'Create a campaign, add products, and collect demand before you cook.',
+                                    'Create a campaign from items already in your pre-order catalog.',
                                 action: ElevatedButton.icon(
                                   onPressed: _create,
                                   icon: const Icon(Icons.add_rounded),

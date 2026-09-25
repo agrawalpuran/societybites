@@ -7,9 +7,12 @@ import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/preorder_widgets.dart';
+import '../widgets/simple_time_picker.dart';
 import '../widgets/food_type_selector.dart';
 import '../widgets/required_field_label.dart';
 import '../models/food_type.dart';
+import '../widgets/photo_source_sheet.dart';
+import 'add_listing_screen.dart';
 
 class PreOrderCampaignCreated {
   const PreOrderCampaignCreated(this.campaignId);
@@ -85,35 +88,51 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
   Future<DateTime?> _pickDateTime(DateTime? current) async {
     final now = DateTime.now();
     final initial = current ?? now.add(const Duration(hours: 1));
-    final date = await showDatePicker(
-      context: context,
-      initialDate: initial.isBefore(now) ? now : initial,
+    return pickDateAndSimpleTime(
+      context,
+      initial: initial.isBefore(now) ? now : initial,
       firstDate: DateTime(now.year, now.month, now.day),
       lastDate: now.add(const Duration(days: 180)),
     );
-    if (date == null || !mounted) return null;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
-    );
-    if (time == null) return null;
-    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
   }
 
   Future<void> _pickCoverImage() async {
-    final file = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1600,
-      imageQuality: 85,
+    final source = await showPhotoSourceSheet(
+      context,
+      title: 'Add Campaign Photo',
     );
-    if (file == null || !mounted) return;
-    final bytes = await file.readAsBytes();
-    if (!mounted) return;
-    setState(() {
-      _coverImageBytes = bytes;
-      _coverImageMime = file.mimeType ?? 'image/jpeg';
-      _coverImageRemoved = false;
-    });
+    if (source == null || !mounted) return;
+    await _pickCoverImageFrom(source);
+  }
+
+  Future<void> _pickCoverImageFrom(ImageSource source) async {
+    try {
+      final file = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        imageQuality: 85,
+      );
+      if (file == null || !mounted) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _coverImageBytes = bytes;
+        _coverImageMime = file.mimeType ?? 'image/jpeg';
+        _coverImageRemoved = false;
+      });
+    } on PlatformException catch (error) {
+      if (!mounted) return;
+      final denied = error.code.toLowerCase().contains('denied') ||
+          (error.message?.toLowerCase().contains('denied') ?? false) ||
+          (error.message?.toLowerCase().contains('permission') ?? false);
+      _show(
+        denied
+            ? (source == ImageSource.camera
+                ? 'Camera access is needed to take a photo. You can enable it in Settings.'
+                : 'Photo access is needed to choose from your gallery. You can enable it in Settings.')
+            : 'Could not open ${source == ImageSource.camera ? 'the camera' : 'the gallery'}. Please try again.',
+      );
+    }
   }
 
   void _removeCoverImage() {
@@ -252,6 +271,10 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
+                          if (!_isEditing) ...[
+                            const SizedBox(height: 14),
+                            const ExistingPreorderCatalogNote(),
+                          ],
                           if (_settingsLocked) ...[
                             const SizedBox(height: 16),
                             Container(
@@ -525,6 +548,7 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
           ),
           child: _coverImageBytes == null && _existingCoverImageUrl == null
               ? InkWell(
+                  key: const Key('preorder-cover-photo'),
                   onTap: _pickCoverImage,
                   borderRadius: BorderRadius.circular(20),
                   child: const Column(
@@ -537,7 +561,7 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
                       ),
                       SizedBox(height: 10),
                       Text(
-                        'Upload image',
+                        'Add photo',
                         style: TextStyle(
                           color: preorderText,
                           fontWeight: FontWeight.w800,
@@ -545,7 +569,7 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
                       ),
                       SizedBox(height: 3),
                       Text(
-                        'Choose from gallery',
+                        'Take a photo or choose from gallery',
                         style: TextStyle(color: preorderMuted, fontSize: 12),
                       ),
                     ],
@@ -897,6 +921,18 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
     }
   }
 
+  Future<void> _createCatalog() async {
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AddListingScreen(
+          catalogType: listingCatalogPreorder,
+        ),
+      ),
+    );
+    if (created == true && mounted) await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -962,10 +998,8 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
                           ),
                           const SizedBox(height: 16),
                           if (_listings.isEmpty)
-                            const PreOrderEmptyState(
-                              title: 'No pre-order items yet',
-                              message:
-                                  'Add food items under My Listings → Pre-orders, then come back to add them to this campaign.',
+                            CreatePreorderCatalogNudge(
+                              onCreateCatalog: _createCatalog,
                             )
                           else ...[
                             const RequiredFieldLabel(
@@ -1003,6 +1037,7 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
                             ),
                           ],
                         ],
+                        if (_isEditing || _listings.isNotEmpty) ...[
                         const SizedBox(height: 18),
                         const RequiredFieldLabel(
                           'FOOD TYPE',
@@ -1145,6 +1180,7 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
                               ),
                             ),
                           ),
+                        ],
                         ],
                       ],
                     ),

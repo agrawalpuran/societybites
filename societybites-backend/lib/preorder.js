@@ -129,10 +129,18 @@ function serializeCampaign(campaign) {
     campaign.seller ||
     (campaign.products && campaign.products[0] && campaign.products[0].seller) ||
     null;
+  const eligibility = campaign.discoveryEligibility;
   return {
     id: campaign.id,
     sellerId: campaign.sellerId,
     societyId: campaign.societyId,
+    sellingReachLevel:
+      (campaign.seller && campaign.seller.sellingReachLevel) || undefined,
+    distanceKm:
+      eligibility && eligibility.distanceKm != null
+        ? eligibility.distanceKm
+        : undefined,
+    discoveryReach: campaign.discoveryReach || undefined,
     title: campaign.title,
     description: campaign.description || null,
     coverImageUrl: campaign.coverImageUrl || null,

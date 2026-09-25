@@ -25,6 +25,10 @@ model User {
   deliveryCharge    Float    @default(0)
   /// UPI_ONLY | UPI_AND_COD. Controls NEW checkout options only; orders snapshot paymentMethod.
   paymentPreference String   @default("UPI_AND_COD")
+  /// Capture-only FSSAI licence. No approval or enforcement.
+  fssaiNumber         String?
+  fssaiExpiry         DateTime?
+  fssaiRegisteredName String?
   suspended       Boolean    @default(false)
   createdAt       DateTime   @default(now())
   societyId       String?

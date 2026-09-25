@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../models/data.dart';
 import '../models/listing_availability.dart';
+import '../services/api_service.dart';
+import '../services/session_service.dart';
 import '../widgets/app_header.dart';
+import '../widgets/preorder_widgets.dart';
 import 'add_listing_screen.dart';
 import 'create_preorder_screen.dart';
 import 'preorder_detail_screen.dart';
@@ -10,7 +14,17 @@ enum AddListingOrderType { availableNow, madeToOrder, preOrder }
 
 /// Seller entry for + Add Listing. Routes to existing listing or campaign flows.
 class AddListingTypeScreen extends StatefulWidget {
-  const AddListingTypeScreen({super.key});
+  const AddListingTypeScreen({
+    super.key,
+    this.fetchPreorderCatalog,
+    this.fetchMadeToOrderListings,
+  });
+
+  /// Test seam. Production loads the seller's PREORDER catalog.
+  final Future<List<Map<String, dynamic>>> Function()? fetchPreorderCatalog;
+
+  /// Test seam. Production loads the seller's regular listings.
+  final Future<List<Map<String, dynamic>>> Function()? fetchMadeToOrderListings;
 
   @override
   State<AddListingTypeScreen> createState() => _AddListingTypeScreenState();
@@ -18,8 +32,105 @@ class AddListingTypeScreen extends StatefulWidget {
 
 class _AddListingTypeScreenState extends State<AddListingTypeScreen> {
   AddListingOrderType _selected = AddListingOrderType.availableNow;
+  bool? _preorderCatalogEmpty;
+  var _hasLiveMadeToOrder = false;
+  late final Future<void> _catalogLoad;
+  late final Future<void> _madeToOrderLoad;
+
+  @override
+  void initState() {
+    super.initState();
+    _catalogLoad = _loadPreorderCatalog();
+    _madeToOrderLoad = _loadMadeToOrderListings();
+  }
+
+  Future<void> _loadPreorderCatalog() async {
+    try {
+      late final List<Map<String, dynamic>> raw;
+      final fetch = widget.fetchPreorderCatalog;
+      if (fetch != null) {
+        raw = await fetch();
+      } else {
+        final societyId = await SessionService.getSocietyId();
+        final sellerId = await SessionService.getUserId();
+        if (sellerId == null || societyId == null || societyId.isEmpty) {
+          return;
+        }
+        raw = await ApiService.getListings(
+          societyId: societyId,
+          sellerId: sellerId,
+          status: 'all',
+          catalogType: listingCatalogPreorder,
+        );
+      }
+      if (!mounted) return;
+      setState(() => _preorderCatalogEmpty = raw.isEmpty);
+    } catch (_) {
+      // Don't block campaign creation if catalog lookup fails.
+    }
+  }
+
+  Future<void> _loadMadeToOrderListings() async {
+    try {
+      late final List<Map<String, dynamic>> raw;
+      final fetch = widget.fetchMadeToOrderListings;
+      if (fetch != null) {
+        raw = await fetch();
+      } else {
+        final societyId = await SessionService.getSocietyId();
+        final sellerId = await SessionService.getUserId();
+        if (sellerId == null || societyId == null || societyId.isEmpty) {
+          return;
+        }
+        raw = await ApiService.getListings(
+          societyId: societyId,
+          sellerId: sellerId,
+          status: 'all',
+          catalogType: listingCatalogRegular,
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        _hasLiveMadeToOrder = raw.any((row) {
+          final mode = parseListingAvailabilityMode(row['availabilityMode']);
+          final status = row['status']?.toString() ?? 'active';
+          return mode == listingAvailabilityMadeToOrder &&
+              (status == 'active' || status == 'sold_out');
+        });
+      });
+    } catch (_) {}
+  }
+
+  Future<bool> _openCreateCatalog() async {
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AddListingScreen(
+          catalogType: listingCatalogPreorder,
+        ),
+      ),
+    );
+    if (created == true && mounted) {
+      setState(() => _preorderCatalogEmpty = false);
+    }
+    return created == true;
+  }
 
   Future<void> _continue() async {
+    if (_selected == AddListingOrderType.madeToOrder) {
+      await _madeToOrderLoad;
+      if (!mounted) return;
+      if (_hasLiveMadeToOrder) return;
+    }
+
+    if (_selected == AddListingOrderType.preOrder) {
+      await _catalogLoad;
+      if (!mounted) return;
+      if (_preorderCatalogEmpty == true) {
+        return;
+      }
+    }
+
     final created = await Navigator.push<Object?>(
       context,
       MaterialPageRoute(
@@ -101,6 +212,23 @@ class _AddListingTypeScreenState extends State<AddListingTypeScreen> {
                       color: Color(0xFF6A7774),
                     ),
                   ),
+                  if (_selected == AddListingOrderType.preOrder &&
+                      _preorderCatalogEmpty == true) ...[
+                    const SizedBox(height: 14),
+                    CreatePreorderCatalogNudge(onCreateCatalog: () {
+                      _openCreateCatalog();
+                    }),
+                  ],
+                  if (_selected == AddListingOrderType.preOrder &&
+                      _preorderCatalogEmpty == false) ...[
+                    const SizedBox(height: 14),
+                    const ExistingPreorderCatalogNote(),
+                  ],
+                  if (_selected == AddListingOrderType.madeToOrder &&
+                      _hasLiveMadeToOrder) ...[
+                    const SizedBox(height: 14),
+                    const _SingleMadeToOrderNote(),
+                  ],
                   const SizedBox(height: 18),
                   _TypeCard(
                     key: const Key('listing-type-available-now'),
@@ -379,6 +507,33 @@ class _HelpLine extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SingleMadeToOrderNote extends StatelessWidget {
+  const _SingleMadeToOrderNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('single-made-to-order-note'),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF2F1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF5C6C2)),
+      ),
+      child: const Text(
+        singleMadeToOrderListingMessage,
+        style: TextStyle(
+          color: Color(0xFFC4231A),
+          height: 1.35,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

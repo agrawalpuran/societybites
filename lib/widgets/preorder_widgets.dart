@@ -386,6 +386,110 @@ class PreOrderCampaignCard extends StatelessWidget {
   }
 }
 
+class CreatePreorderCatalogNudge extends StatelessWidget {
+  const CreatePreorderCatalogNudge({
+    super.key,
+    required this.onCreateCatalog,
+  });
+
+  final VoidCallback onCreateCatalog;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('preorder-empty-catalog-nudge'),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF2F1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF5C6C2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'There is nothing in the pre-order catalog',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFC4231A),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Create the catalog first. Then you can add those items to a pre-order campaign.',
+            style: TextStyle(
+              color: Color(0xFFC4231A),
+              height: 1.35,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 42,
+            child: ElevatedButton.icon(
+              key: const Key('create-preorder-catalog-from-nudge'),
+              onPressed: onCreateCatalog,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: preorderGreen,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.menu_book_outlined, size: 18),
+              label: const Text(
+                'Create catalog',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ExistingPreorderCatalogNote extends StatelessWidget {
+  const ExistingPreorderCatalogNote({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('existing-preorder-catalog-note'),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F7F4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD4E8DF)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, color: preorderGreen, size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'You can create a pre-order from items already in your pre-order catalog.',
+              style: TextStyle(
+                color: preorderText,
+                height: 1.35,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class PreOrderEmptyState extends StatelessWidget {
   const PreOrderEmptyState({
     super.key,

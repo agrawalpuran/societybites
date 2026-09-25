@@ -197,6 +197,23 @@ async function main() {
     assert(made.json.maxDailyOrders === 1, "maxDailyOrders stored");
     listingIds.push(made.json.id);
 
+    const secondLive = await jsonRequest(server, {
+      method: "POST",
+      path: "/listings",
+      token: sellerToken,
+      body: {
+        name: `Second cake ${stamp}`,
+        price: 500,
+        foodType: "VEG",
+        category: "Desserts",
+        quantity: 10,
+        availabilityMode: "MADE_TO_ORDER",
+        preparationTimeMinutes: 60,
+      },
+    });
+    assert(secondLive.status === 400, "second live MADE_TO_ORDER must be 400");
+    assert(secondLive.json.code === "SINGLE_MADE_TO_ORDER", "single MTO code");
+
     const edited = await jsonRequest(server, {
       method: "PATCH",
       path: `/listings/${made.json.id}`,
@@ -237,6 +254,25 @@ async function main() {
       token: sellerToken,
     });
     assert(resumed.status === 200, "resume MADE_TO_ORDER");
+
+    const mixedCart = await jsonRequest(server, {
+      method: "POST",
+      path: "/orders",
+      token: buyerToken,
+      body: {
+        societyId: seller.societyId,
+        paymentMethod: "cash",
+        items: [
+          { listingId: readyNow.json.id, quantity: 1 },
+          { listingId: made.json.id, quantity: 1 },
+        ],
+      },
+    });
+    assert(mixedCart.status === 400, "mixed READY_NOW + MADE_TO_ORDER must be rejected");
+    assert(
+      String(mixedCart.json && mixedCart.json.error).includes("mix"),
+      "mixed cart error should mention mix"
+    );
 
     const cashOrder = await jsonRequest(server, {
       method: "POST",
@@ -311,22 +347,18 @@ async function main() {
     });
     assert(blockedByCap.status === 400, "maxDailyOrders must block further accepted-day orders");
 
-    const upiListing = await jsonRequest(server, {
-      method: "POST",
-      path: "/listings",
+    const raiseCap = await jsonRequest(server, {
+      method: "PATCH",
+      path: `/listings/${made.json.id}`,
       token: sellerToken,
       body: {
-        name: `UPI cake ${stamp}`,
-        price: 80,
         foodType: "VEG",
-        category: "Desserts",
-        quantity: 10,
         availabilityMode: "MADE_TO_ORDER",
-        preparationTimeMinutes: 60,
+        preparationTimeMinutes: 180,
+        maxDailyOrders: 20,
       },
     });
-    assert(upiListing.status === 201, "UPI MADE_TO_ORDER listing");
-    listingIds.push(upiListing.json.id);
+    assert(raiseCap.status === 200, "raise maxDailyOrders for UPI order");
 
     const upiOrder = await jsonRequest(server, {
       method: "POST",
@@ -335,7 +367,7 @@ async function main() {
       body: {
         societyId: seller.societyId,
         paymentMethod: "upi",
-        items: [{ listingId: upiListing.json.id, quantity: 1 }],
+        items: [{ listingId: made.json.id, quantity: 1 }],
       },
     });
     assert(upiOrder.status === 201, `UPI MTO order failed ${JSON.stringify(upiOrder.json)}`);

@@ -8,12 +8,18 @@ const { serializeOrder } = require("../utils/listingSerializer");
 const { loadSellerInsights } = require("../lib/sellerInsights");
 const { getPlatformFee } = require("../lib/platformFee");
 const { expireListingIfDue } = require("../utils/listingExpiry");
-const { assertMadeToOrderCapacity, isMadeToOrderListing } = require("../lib/listingAvailability");
+  const {
+    assertMadeToOrderCapacity,
+    isMadeToOrderListing,
+    assertRegularOrderAvailabilityMix,
+    assertSingleMadeToOrderListingInOrder,
+  } = require("../lib/listingAvailability");
 const {
   notifyOrderCreated,
   notifyStatusChange,
   notifyOrderRejected,
   notifyReadyBy,
+  notifyOrderMessage,
 } = require("../utils/notifications");
 const {
   lazyCloseCampaign,
@@ -376,6 +382,8 @@ router.post(
       },
     });
 
+    notifyOrderMessage(order, req.user.id);
+
     res.status(201).json(serializeMessage(created, order));
   })
 );
@@ -570,6 +578,19 @@ router.post(
       });
     }
 
+    if (orderType === "regular") {
+      try {
+        const regularListings = preparedItems.map(({ listing }) => listing);
+        assertRegularOrderAvailabilityMix(regularListings);
+        assertSingleMadeToOrderListingInOrder(regularListings);
+      } catch (err) {
+        return res.status(err.statusCode || 400).json({
+          error: err.message,
+          code: err.code,
+        });
+      }
+    }
+
     const sellerForPayment =
       preparedItems.find((item) => item.seller)?.seller ||
       (await prisma.user.findUnique({
@@ -648,10 +669,6 @@ router.post(
         assertCampaignAcceptsOrders(campaign);
       } catch (err) {
         return res.status(err.statusCode || 400).json({ error: err.message });
-      }
-
-      if (campaign.societyId !== societyId) {
-        return res.status(400).json({ error: "Campaign does not belong to this society" });
       }
 
       const campaignListingIds = new Set(

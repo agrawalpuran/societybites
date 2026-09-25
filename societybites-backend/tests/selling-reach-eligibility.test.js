@@ -3,7 +3,7 @@ const http = require("http");
 const express = require("express");
 const prisma = require("../lib/prisma");
 const { signToken } = require("../lib/jwt");
-const { evaluateSellerDiscoveryEligibility } = require("../lib/sellingReachEligibility");
+const { evaluateSellerDiscoveryEligibility, discoveryDisplayReach } = require("../lib/sellingReachEligibility");
 const listingRoutes = require("../routes/listings");
 const orderRoutes = require("../routes/orders");
 
@@ -119,6 +119,18 @@ function mainUnit() {
   });
   assert(extendedYes.eligible === true, "EXTENDED inside extended radius eligible");
   assert(extendedYes.appliedRadiusKm === 10, "extended uses city extendedRadiusKm");
+  assert(
+    discoveryDisplayReach(sameMine, 5) === "inSociety",
+    "same society campaigns group in society"
+  );
+  assert(
+    discoveryDisplayReach(nearbyYes, 5) === "nearby",
+    "within nearby radius groups as nearby"
+  );
+  assert(
+    discoveryDisplayReach(extendedYes, 5) === "extended",
+    "outside nearby and inside extended groups as extended"
+  );
 
   const extendedNo = evaluateSellerDiscoveryEligibility({
     buyerSociety: extendedOutside,

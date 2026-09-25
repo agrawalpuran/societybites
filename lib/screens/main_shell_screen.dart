@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/cart_controller.dart';
@@ -31,6 +33,7 @@ class _MainShellScreenState extends State<MainShellScreen>
   var _dashboardMounted = false;
   var _profileMounted = false;
   var _kitchenAttentionCount = 0;
+  Timer? _unreadPoll;
 
   @override
   void initState() {
@@ -49,11 +52,15 @@ class _MainShellScreenState extends State<MainShellScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.registerIfPossible();
     });
+    _unreadPoll = Timer.periodic(const Duration(seconds: 12), (_) {
+      _pollUnread();
+    });
   }
 
   @override
   void dispose() {
     _preload.dispose();
+    _unreadPoll?.cancel();
     if (PushNotificationService.onForegroundOrderUpdate == _refreshVisibleTab) {
       PushNotificationService.onForegroundOrderUpdate = null;
     }
@@ -84,7 +91,7 @@ class _MainShellScreenState extends State<MainShellScreen>
     setState(() => _dashboardMounted = true);
   }
 
-  /// After Home checkout, land on Orders. Refresh only if that tab already loaded.
+  /// After checkout from Home or a listing/storefront, land on Orders.
   void _showOrdersAfterCheckout() {
     if (!mounted) return;
     final wasMounted = _ordersMounted;
@@ -92,11 +99,34 @@ class _MainShellScreenState extends State<MainShellScreen>
       _navIndex = 1;
       _ordersMounted = true;
     });
-    if (!wasMounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _ordersKey.currentState?.refresh();
+      if (wasMounted) _ordersKey.currentState?.refresh();
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Order placed',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            width: 140,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            backgroundColor: const Color(0xFF0E5A47),
+          ),
+        );
     });
+  }
+
+  void _pollUnread() {
+    _ordersKey.currentState?.refreshUnread();
+    _dashboardKey.currentState?.refreshUnread();
   }
 
   void _refreshVisibleTab() {

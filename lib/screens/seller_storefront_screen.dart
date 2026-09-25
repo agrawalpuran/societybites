@@ -290,6 +290,13 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       if (!replace || !mounted) return;
       setState(_cart.clear);
     }
+    if (delta > 0) {
+      final mixConflict = cartAvailabilityConflict(_cart, food);
+      if (mixConflict != null) {
+        _show(mixConflict);
+        return;
+      }
+    }
     final current = _cartQuantity(food);
     if (delta > 0 && current >= food.quantity) {
       _show('Only ${food.quantity} available for ${food.name}.');
@@ -701,6 +708,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                   width: double.infinity,
                   height: double.infinity,
                   borderRadius: 14,
+                  showTypeBadge: true,
                 ),
               ),
               const SizedBox(height: 10),

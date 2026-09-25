@@ -75,6 +75,9 @@ class OrdersScreenState extends State<OrdersScreen>
   /// Called by MainShell on failed first-load retry, app resume, and FCM.
   void refresh() => _loadOrders();
 
+  /// Lightweight poll: refresh unread badges without spinner or campaign fetches.
+  Future<void> refreshUnread() => _applyUnreadCounts();
+
   Future<void> _loadOrders({bool isInitial = false}) async {
     final selling = _isSellingView;
     final bucket = selling ? _seller : _buyer;
@@ -144,6 +147,42 @@ class OrdersScreenState extends State<OrdersScreen>
       }
     }
     if (isInitial) _notifyInitialLoadSettled();
+  }
+
+  Future<void> _applyUnreadCounts() async {
+    if (!_buyer.hasSuccessfullyLoaded && !_seller.hasSuccessfullyLoaded) return;
+    try {
+      final fetch = widget.fetchOrders ??
+          ({required String role}) => ApiService.getOrders(role: role);
+      final roles = <bool>[];
+      if (_buyer.hasSuccessfullyLoaded) roles.add(false);
+      if (_seller.hasSuccessfullyLoaded) roles.add(true);
+      for (final selling in roles) {
+        final bucket = selling ? _seller : _buyer;
+        final orders = await fetch(role: selling ? 'seller' : 'buyer');
+        final counts = <String, int>{};
+        for (final json in orders) {
+          final parsed = Order.fromJson(json);
+          counts[parsed.id] = parsed.unreadMessageCount;
+        }
+        if (!mounted) return;
+        var changed = false;
+        List<Order> mapped(List<Order> list) => list.map((order) {
+          final next = counts[order.id] ?? 0;
+          if (next == order.unreadMessageCount) return order;
+          changed = true;
+          return order.withUnreadCount(next);
+        }).toList();
+        final nextActive = mapped(bucket.active);
+        final nextPast = mapped(bucket.past);
+        if (changed) {
+          setState(() {
+            bucket.active = nextActive;
+            bucket.past = nextPast;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   void _notifyInitialLoadSettled() {
@@ -706,12 +745,9 @@ class _ActiveOrderCard extends StatelessWidget {
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
+                        scrollable: true,
                         title: const Text('Cancel order?'),
-                        content: Text(
-                          order.isPreOrder
-                              ? 'Cancel ${order.orderId}? Pre-orders can only be cancelled before the campaign cutoff.'
-                              : 'Cancel ${order.orderId}? The seller will be notified and inventory will be restored.',
-                        ),
+                        content: Text(order.buyerCancelConfirmMessage),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
@@ -789,72 +825,77 @@ class _PickupInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final food = order.food;
     final location = food.locationLabel;
-    final when = food.pickupTime;
-    final note =
-        (food.pickupLocation != null && food.pickupLocation!.isNotEmpty)
-        ? food.pickupLocation!
-        : 'My Home (Verified)';
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFF5F7F6),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFEAEFED)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.place_outlined, size: 18, color: Color(0xFF0E5A47)),
-              SizedBox(width: 6),
-              Text(
+              const Icon(
+                Icons.place_outlined,
+                size: 16,
+                color: Color(0xFF0E5A47),
+              ),
+              const SizedBox(width: 5),
+              const Text(
                 'Pickup details',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF101617),
                 ),
               ),
+              const Spacer(),
+              Flexible(
+                child: Text(
+                  order.sellerLabel,
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF3A4644),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Seller: ${order.sellerLabel}',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF3A4644),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Where: $location',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF3A4644),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'When: $when',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF3A4644),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Note: $note',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6A7774),
-              fontWeight: FontWeight.w500,
-            ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Where',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF6A7774),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  location,
+                  textAlign: TextAlign.right,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    height: 1.25,
+                    color: Color(0xFF3A4644),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

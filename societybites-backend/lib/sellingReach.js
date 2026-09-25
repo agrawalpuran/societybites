@@ -1,6 +1,7 @@
 const { canonicalCityKey } = require("./launchCity");
 const { serializeFulfilment, DEFAULT_FULFILMENT_MODE } = require("./sellerFulfilment");
 const { serializePaymentPreference } = require("./sellerPaymentPreference");
+const { serializeFssai } = require("./fssai");
 
 const SELLING_REACH_LEVELS = Object.freeze({
   MY_SOCIETY: "MY_SOCIETY",
@@ -123,6 +124,7 @@ async function attachSellingReach(user, prismaClient) {
     fulfilmentMode: (user && user.fulfilmentMode) || DEFAULT_FULFILMENT_MODE,
     fulfilment: serializeFulfilment(user),
     paymentPreference: serializePaymentPreference(user),
+    fssai: serializeFssai(user),
   };
 }
 

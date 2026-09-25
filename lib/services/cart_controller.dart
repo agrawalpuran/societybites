@@ -39,6 +39,16 @@ class CartController extends ChangeNotifier {
     onShowOrdersAfterPlace?.call();
   }
 
+  /// After checkout from a listing, storefront, or pre-order, drop those
+  /// screens so the buyer is back on the shell Orders tab.
+  void finishPlacedOrder(BuildContext context) {
+    handlePlacedOrder();
+    if (!context.mounted) return;
+    final navigator = Navigator.of(context);
+    if (!navigator.canPop()) return;
+    navigator.popUntil((route) => route.isFirst);
+  }
+
   Future<bool> openCheckout(BuildContext context) async {
     final signedIn = await SessionService.isSignedIn();
     if (!context.mounted) return false;

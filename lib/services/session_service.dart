@@ -83,8 +83,14 @@ class SessionService {
   static Future<void> cacheProfileFromApi(Map<String, dynamic> profile) async {
     final prefs = await SharedPreferences.getInstance();
     final name = profile['name'] as String?;
-    final society = profile['society'] as Map<String, dynamic>?;
-    final flat = profile['flat'] as Map<String, dynamic>?;
+    Map<String, dynamic>? asMap(dynamic value) {
+      if (value is Map<String, dynamic>) return value;
+      if (value is Map) return Map<String, dynamic>.from(value);
+      return null;
+    }
+
+    final society = asMap(profile['society']);
+    final flat = asMap(profile['flat']);
 
     if (name != null && name.isNotEmpty) {
       await prefs.setString(_userNameKey, name);

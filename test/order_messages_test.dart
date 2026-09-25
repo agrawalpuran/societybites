@@ -73,6 +73,7 @@ void main() {
 
     expect(find.text('Message Seller'), findsOneWidget);
     expect(find.byKey(const Key('order-messages-button')), findsOneWidget);
+    expect(find.byKey(const Key('order-unread-dot')), findsNothing);
   });
 
   testWidgets('Message Buyer appears on seller order', (tester) async {
@@ -122,6 +123,32 @@ void main() {
     expect(button.width, lessThan(280));
   });
 
+  testWidgets('unread poll lights up the message button', (tester) async {
+    await setTallSurface(tester);
+    var unread = 0;
+    final key = GlobalKey<OrdersScreenState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OrdersScreen(
+          key: key,
+          fetchOrders: ({required String role}) async =>
+              [_orderJson(unread: unread)],
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('order-unread-dot')), findsNothing);
+
+    unread = 2;
+    await key.currentState!.refreshUnread();
+    await tester.pump();
+
+    expect(find.byKey(const Key('order-unread-dot')), findsOneWidget);
+    expect(find.text('New · 2'), findsOneWidget);
+  });
+
   testWidgets('unread indicator shows on message button', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -135,7 +162,8 @@ void main() {
     );
 
     expect(find.byKey(const Key('order-unread-dot')), findsOneWidget);
-    expect(find.text('2'), findsOneWidget);
+    expect(find.text('New · 2'), findsOneWidget);
+    expect(find.byIcon(Icons.mark_chat_unread_rounded), findsOneWidget);
   });
 
   testWidgets('conversation screen opens', (tester) async {

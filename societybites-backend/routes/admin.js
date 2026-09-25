@@ -5,6 +5,7 @@ const { requireUser } = require("../middleware/requireUser");
 const { requireAdmin } = require("../middleware/requireAdmin");
 const { canonicalCityKey } = require("../lib/launchCity");
 const { validateCityReachRadii } = require("../lib/sellingReach");
+const { serializeFssai } = require("../lib/fssai");
 
 const router = express.Router();
 
@@ -62,6 +63,70 @@ router.get(
       totalReviews,
       avgPlatformRating: ratingAgg._avg.rating || 0,
     });
+  })
+);
+
+function serializeAdminFssaiRow(user) {
+  const fssai = serializeFssai(user);
+  return {
+    sellerId: user.id,
+    name: user.name || "Seller",
+    societyName: (user.society && user.society.name) || null,
+    fssai,
+    updatedAt: user.updatedAt || user.createdAt,
+  };
+}
+
+// GET /admin/fssai — submitted FSSAI records. Capture view only.
+router.get(
+  "/fssai",
+  asyncHandler(async (req, res) => {
+    const sellerWhere = { role: { in: ["seller", "super_admin"] } };
+    const [sellerCount, submitted] = await Promise.all([
+      prisma.user.count({ where: sellerWhere }),
+      prisma.user.findMany({
+        where: { ...sellerWhere, fssaiNumber: { not: null } },
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
+          fssaiNumber: true,
+          fssaiExpiry: true,
+          fssaiRegisteredName: true,
+          society: { select: { name: true } },
+        },
+        orderBy: { name: "asc" },
+      }),
+    ]);
+    res.json({
+      sellerCount,
+      submittedCount: submitted.length,
+      records: submitted.map(serializeAdminFssaiRow),
+    });
+  })
+);
+
+// GET /admin/fssai/:sellerId
+router.get(
+  "/fssai/:sellerId",
+  asyncHandler(async (req, res) => {
+    const user = await prisma.user.findUnique({
+      where: { id: String(req.params.sellerId) },
+      select: {
+        id: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        fssaiNumber: true,
+        fssaiExpiry: true,
+        fssaiRegisteredName: true,
+        society: { select: { name: true } },
+      },
+    });
+    if (!user || !["seller", "super_admin"].includes(user.role || "")) {
+      return res.status(404).json({ error: "Seller not found" });
+    }
+    res.json(serializeAdminFssaiRow(user));
   })
 );
 

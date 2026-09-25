@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'admin_dashboard_screen.dart';
-import 'admin_users_screen.dart';
 import 'admin_societies_screen.dart';
+import 'admin_fssai_screen.dart';
 import 'admin_listings_screen.dart';
 import 'admin_orders_screen.dart';
 import 'admin_reviews_screen.dart';
@@ -20,8 +20,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
 
   static const _navItems = <_NavItem>[
     _NavItem(icon: Icons.dashboard_rounded, label: 'Dashboard'),
-    _NavItem(icon: Icons.people_rounded, label: 'Users'),
     _NavItem(icon: Icons.apartment_rounded, label: 'Societies'),
+    _NavItem(icon: Icons.badge_outlined, label: 'FSSAI'),
     _NavItem(icon: Icons.fastfood_rounded, label: 'Listings'),
     _NavItem(icon: Icons.shopping_bag_rounded, label: 'Orders'),
     _NavItem(icon: Icons.star_rounded, label: 'Reviews'),
@@ -33,9 +33,9 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       case 0:
         return const AdminDashboardScreen();
       case 1:
-        return const AdminUsersScreen();
-      case 2:
         return const AdminSocietiesScreen();
+      case 2:
+        return const AdminFssaiScreen();
       case 3:
         return const AdminListingsScreen();
       case 4:

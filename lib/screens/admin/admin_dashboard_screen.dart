@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
 import 'admin_city_reach_screen.dart';
+import 'admin_fssai_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -157,6 +158,76 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
                 color: Color(0xFF101617),
+              ),
+            ),
+            const SizedBox(height: 20),
+            _SectionTitle(title: 'FSSAI'),
+            const SizedBox(height: 10),
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => Scaffold(
+                        backgroundColor: const Color(0xFFF8FAF9),
+                        appBar: AppBar(
+                          backgroundColor: const Color(0xFF0E5A47),
+                          foregroundColor: Colors.white,
+                          title: const Text('FSSAI'),
+                        ),
+                        body: const AdminFssaiScreen(),
+                      ),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFEAEFED)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.badge_outlined,
+                        size: 22,
+                        color: Color(0xFF0E5A47),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'FSSAI records',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: Color(0xFF101617),
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'View submitted licence details',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6A7774),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: Color(0xFF8A9491),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 20),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:societybites/models/data.dart';
+import 'package:societybites/screens/create_preorder_screen.dart';
 import 'package:societybites/widgets/preorder_widgets.dart';
 
 PreOrderCampaign _campaign({
@@ -210,5 +211,28 @@ void main() {
 
     expect(find.text('ORDERS CLOSED'), findsOneWidget);
     expect(find.textContaining('Ready'), findsOneWidget);
+  });
+
+  testWidgets('pre-order cover picker offers camera and gallery', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const MaterialApp(home: CreatePreOrderScreen()),
+    );
+    await tester.pump();
+
+    await tester.ensureVisible(find.byKey(const Key('preorder-cover-photo')));
+    await tester.tap(find.byKey(const Key('preorder-cover-photo')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add Campaign Photo'), findsOneWidget);
+    expect(find.text('Take Photo'), findsOneWidget);
+    expect(find.text('Choose from Gallery'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add Campaign Photo'), findsNothing);
   });
 }

@@ -48,13 +48,24 @@ class SellerListScreen extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 27,
-                      backgroundColor: seller.avatarColor,
-                      child: Icon(
-                        seller.avatarIcon,
-                        color: preorderGreen,
-                        size: 27,
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: sellerPresenceRingColor(
+                            seller.hasOrderableItems,
+                          ),
+                          width: 2.4,
+                        ),
+                      ),
+                      child: CircleAvatar(
+                        radius: 27,
+                        backgroundColor: seller.avatarColor,
+                        child: Icon(
+                          seller.avatarIcon,
+                          color: preorderGreen,
+                          size: 27,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 13),

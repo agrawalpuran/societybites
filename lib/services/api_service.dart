@@ -399,6 +399,9 @@ class ApiService {
     String? fulfilmentMode,
     double? deliveryCharge,
     String? paymentPreference,
+    String? fssaiNumber,
+    String? fssaiExpiry,
+    String? fssaiRegisteredName,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/auth/me/profile'),
@@ -415,6 +418,14 @@ class ApiService {
         if (fulfilmentMode != null) 'fulfilmentMode': fulfilmentMode,
         if (deliveryCharge != null) 'deliveryCharge': deliveryCharge,
         if (paymentPreference != null) 'paymentPreference': paymentPreference,
+        if (fssaiNumber != null ||
+            fssaiExpiry != null ||
+            fssaiRegisteredName != null)
+          'fssai': {
+            if (fssaiNumber != null) 'number': fssaiNumber,
+            if (fssaiExpiry != null) 'expiry': fssaiExpiry,
+            if (fssaiRegisteredName != null) 'registeredName': fssaiRegisteredName,
+          },
       }),
     );
 
@@ -1418,6 +1429,17 @@ class ApiService {
     if (response.statusCode == 200) {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
       return (data['platformFee'] as num?)?.toDouble() ?? 0;
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getAdminFssai() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/fssai'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
     }
     _throwFromResponse(response);
   }

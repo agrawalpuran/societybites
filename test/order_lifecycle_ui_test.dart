@@ -163,6 +163,28 @@ void main() {
     expect(find.text('Cancel Order'), findsOneWidget);
   });
 
+  testWidgets('Cancel order dialog shows item name and message', (tester) async {
+    await pumpOrders(tester, [
+      _orderJson(
+        id: '717489',
+        status: 'pending',
+        paymentMethod: 'upi',
+        itemName: 'Fresh Kachori Chat',
+      ),
+    ]);
+    await tester.tap(find.text('Cancel Order'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cancel order?'), findsOneWidget);
+    expect(find.textContaining('SB-717489 · Fresh Kachori Chat'), findsOneWidget);
+    expect(
+      find.textContaining(
+        'The seller will be notified and inventory will be restored.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Keep order'), findsOneWidget);
+  });
+
   testWidgets('UPI accepted unpaid shows Cancel Order', (tester) async {
     await pumpOrders(tester, [
       _orderJson(id: 'ua', status: 'accepted', paymentMethod: 'upi'),

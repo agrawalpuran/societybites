@@ -324,6 +324,22 @@ void main() {
       containsAll(['me', 'seller-1']),
     );
     expect(visible.first.sellerId, 'me');
+    expect(
+      filterBuyerDiscoverableCampaigns(
+        [
+          campaign(
+            status: 'open',
+            open: openAt,
+            cutoff: cutoff,
+            fulfilment: fulfilment,
+            sellerId: 'other-society-seller',
+          ),
+        ],
+        viewerUserId: 'me',
+        now: now,
+      ),
+      hasLength(1),
+    );
   });
 
   test('draft campaigns stay off My Kitchen', () {

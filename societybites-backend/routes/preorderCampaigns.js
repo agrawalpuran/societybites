@@ -25,10 +25,15 @@ const {
   requireCampaignOwner,
   buildCampaignSummary,
 } = require("../lib/preorder");
+const {
+  listDiscoverableCampaigns,
+  assertBuyerCanViewCampaign,
+} = require("../lib/nearbyDiscovery");
 
 const router = express.Router();
 
 const campaignInclude = {
+  seller: { include: { society: true, flat: true } },
   products: {
     include: {
       seller: { include: { flat: true } },
@@ -128,31 +133,10 @@ router.get(
     if (!societyId) return;
 
     const { sellerId, status } = req.query;
-
-    const now = new Date();
-    const openDue = await prisma.preOrderCampaign.findMany({
-      where: {
-        societyId,
-        status: "open",
-        orderCutoffAt: { lte: now },
-      },
-      select: { id: true },
-    });
-    if (openDue.length > 0) {
-      await prisma.preOrderCampaign.updateMany({
-        where: { id: { in: openDue.map((c) => c.id) } },
-        data: { status: "closed" },
-      });
-    }
-
-    const campaigns = await prisma.preOrderCampaign.findMany({
-      where: {
-        societyId,
-        ...(sellerId && { sellerId: String(sellerId) }),
-        ...(status && { status: String(status) }),
-      },
-      include: campaignInclude,
-      orderBy: { fulfilmentAt: "asc" },
+    const campaigns = await listDiscoverableCampaigns({
+      buyer: req.user,
+      sellerId,
+      status,
     });
 
     res.json(campaigns.map(serializeCampaignWithProducts));
@@ -170,7 +154,12 @@ router.get(
       where: { id: req.params.id },
       include: campaignInclude,
     });
-    if (!campaign || campaign.societyId !== societyId) {
+    try {
+      await assertBuyerCanViewCampaign({ buyer: req.user, campaign });
+    } catch (err) {
+      return res.status(err.statusCode || 404).json({ error: err.message });
+    }
+    if (!campaign) {
       return res.status(404).json({ error: "Pre-order campaign not found" });
     }
     const previousStatus = campaign.status;

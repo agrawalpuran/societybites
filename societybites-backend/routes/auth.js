@@ -19,6 +19,7 @@ const { assertSellerFulfilmentUpdate } = require("../lib/sellerFulfilment");
 const {
   assertSellerPaymentPreferenceUpdate,
 } = require("../lib/sellerPaymentPreference");
+const { assertSellerFssaiUpdate } = require("../lib/fssai");
 const { deleteAuthenticatedAccount } = require("../lib/accountDeletion");
 
 const router = express.Router();
@@ -282,6 +283,7 @@ router.patch(
       deliveryCharge,
       paymentPreference,
     } = req.body;
+    const fssaiBody = req.body && req.body.fssai;
 
     const data = {};
     if (name !== undefined) data.name = name;
@@ -345,6 +347,32 @@ router.patch(
         requested: paymentPreference,
         role: nextRole,
       });
+    }
+    if (
+      fssaiBody !== undefined ||
+      req.body.fssaiNumber !== undefined ||
+      req.body.fssaiExpiry !== undefined ||
+      req.body.fssaiRegisteredName !== undefined
+    ) {
+      const nextRole = data.role || req.user.role;
+      Object.assign(
+        data,
+        assertSellerFssaiUpdate({
+          role: nextRole,
+          number:
+            fssaiBody && fssaiBody.number !== undefined
+              ? fssaiBody.number
+              : req.body.fssaiNumber,
+          expiry:
+            fssaiBody && fssaiBody.expiry !== undefined
+              ? fssaiBody.expiry
+              : req.body.fssaiExpiry,
+          registeredName:
+            fssaiBody && fssaiBody.registeredName !== undefined
+              ? fssaiBody.registeredName
+              : req.body.fssaiRegisteredName,
+        })
+      );
     }
 
     const user = await prisma.user.update({

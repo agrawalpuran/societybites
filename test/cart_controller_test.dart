@@ -40,4 +40,52 @@ void main() {
     expect(homeReloaded, isTrue);
     expect(showOrders, isTrue);
   });
+
+  testWidgets(
+    'finishPlacedOrder pops listing checkout back to the first route',
+    (tester) async {
+      var showOrders = false;
+      CartController.instance.onShowOrdersAfterPlace = () => showOrders = true;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => Scaffold(
+                        body: Builder(
+                          builder: (inner) => TextButton(
+                            onPressed: () {
+                              CartController.instance.finishPlacedOrder(inner);
+                            },
+                            child: const Text('Confirm listing order'),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Open listing'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open listing'));
+      await tester.pumpAndSettle();
+      expect(find.text('Confirm listing order'), findsOneWidget);
+
+      await tester.tap(find.text('Confirm listing order'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Open listing'), findsOneWidget);
+      expect(find.text('Confirm listing order'), findsNothing);
+      expect(showOrders, isTrue);
+    },
+  );
 }

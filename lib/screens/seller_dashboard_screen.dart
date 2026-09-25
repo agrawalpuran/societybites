@@ -13,6 +13,7 @@ import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/order_messages_button.dart';
+import '../widgets/simple_time_picker.dart';
 import '../widgets/requested_ready_summary.dart';
 import '../widgets/seller_insights_panel.dart';
 import 'add_listing_screen.dart';
@@ -74,6 +75,34 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     _loadOrders();
     _loadStats();
     _loadPreOrders();
+  }
+
+  /// Lightweight poll: refresh unread badges without a full kitchen reload.
+  Future<void> refreshUnread() async {
+    if (!_hasSuccessfullyLoaded) return;
+    try {
+      final orders = await ApiService.getOrders(role: 'seller');
+      final counts = <String, int>{};
+      for (final json in orders) {
+        final parsed = Order.fromJson(json);
+        counts[parsed.id] = parsed.unreadMessageCount;
+      }
+      if (!mounted) return;
+      var changed = false;
+      List<Order> mapped(List<Order> list) => list.map((order) {
+        final next = counts[order.id] ?? 0;
+        if (next == order.unreadMessageCount) return order;
+        changed = true;
+        return order.withUnreadCount(next);
+      }).toList();
+      final nextActive = mapped(_activeOrders);
+      final nextPast = mapped(_pastOrders);
+      if (!changed) return;
+      setState(() {
+        _activeOrders = nextActive;
+        _pastOrders = nextPast;
+      });
+    } catch (_) {}
   }
 
   /// Bottom-nav entry into My Kitchen always lands on seller orders.
@@ -1080,6 +1109,26 @@ class _SatisfactionCard extends StatelessWidget {
   }
 }
 
+void _showCompactPaymentNotice(BuildContext context, String message) {
+  ScaffoldMessenger.of(context)
+    ..clearSnackBars()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        width: 168,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: const Color(0xFF0E5A47),
+      ),
+    );
+}
+
 class SellerActiveOrderCard extends StatefulWidget {
   const SellerActiveOrderCard({
     super.key,
@@ -1165,12 +1214,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
       widget.onOrderUpdated(Order.fromJson(json));
       await widget.onPaymentConfirmed();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Payment confirmed'),
-          backgroundColor: Color(0xFF0E5A47),
-        ),
-      );
+      _showCompactPaymentNotice(context, 'Payment confirmed');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -1213,12 +1257,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
       widget.onOrderUpdated(Order.fromJson(json));
       await widget.onPaymentConfirmed();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Payment received'),
-          backgroundColor: Color(0xFF0E5A47),
-        ),
-      );
+      _showCompactPaymentNotice(context, 'Payment received');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1583,20 +1622,24 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
           ],
           if (isCash && cashPaid && canComplete) ...[
             const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5EE),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFD4E8DF)),
-              ),
-              child: const Text(
-                'Payment Received',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0E5A47),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                key: const Key('payment-received-banner'),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5EE),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFD4E8DF)),
+                ),
+                child: const Text(
+                  'Payment received',
+                  style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 0.4,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0E5A47),
+                  ),
                 ),
               ),
             ),
@@ -2042,27 +2085,13 @@ class _ReadyBySheetState extends State<_ReadyBySheet> {
     final initial = currentEstimate?.isAfter(now) == true
         ? currentEstimate!
         : now.add(const Duration(minutes: 30));
-    final date = await showDatePicker(
-      context: context,
-      initialDate: initial,
+    final picked = await pickDateAndSimpleTime(
+      context,
+      initial: initial,
       firstDate: DateTime(now.year, now.month, now.day),
       lastDate: now.add(const Duration(days: 2)),
     );
-    if (date == null || !mounted) return;
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
-    );
-    if (time == null || !mounted) return;
-
-    final picked = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.hour,
-      time.minute,
-    );
+    if (picked == null || !mounted) return;
     if (!picked.isAfter(DateTime.now())) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ready by must be in the future')),

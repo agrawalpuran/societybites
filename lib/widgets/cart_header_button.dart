@@ -3,14 +3,25 @@ import 'package:flutter/material.dart';
 import '../services/cart_controller.dart';
 
 class CartHeaderButton extends StatelessWidget {
-  const CartHeaderButton({super.key});
+  const CartHeaderButton({
+    super.key,
+    this.itemCountOverride,
+    this.onPressed,
+  });
+
+  /// When set (e.g. checkout's local cart), badge uses this instead of
+  /// [CartController.itemCount].
+  final int? itemCountOverride;
+
+  /// When set, tap uses this instead of opening checkout again.
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: CartController.instance,
       builder: (context, _) {
-        final itemCount = CartController.instance.itemCount;
+        final itemCount = itemCountOverride ?? CartController.instance.itemCount;
         final badge = itemCount > 9 ? '9+' : '$itemCount';
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -18,7 +29,8 @@ class CartHeaderButton extends StatelessWidget {
             IconButton(
               key: const Key('home-cart-button'),
               tooltip: 'Cart',
-              onPressed: () => CartController.instance.openCheckout(context),
+              onPressed: onPressed ??
+                  () => CartController.instance.openCheckout(context),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 36, minHeight: 32),
               visualDensity: VisualDensity.compact,

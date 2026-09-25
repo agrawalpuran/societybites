@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/listing_image.dart';
+import '../widgets/listing_type_badge.dart';
 import '../widgets/app_header.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/temporarily_unavailable_label.dart';
@@ -88,28 +89,28 @@ class _HeroSection extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
+                  ListingTypeBadge(food: food),
                   if (food.reviewCount >= 5 && food.rating >= 4.5)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0E5A47),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'BESTSELLER',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
-                          ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0E5A47),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'BESTSELLER',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
                         ),
                       ),
                     ),

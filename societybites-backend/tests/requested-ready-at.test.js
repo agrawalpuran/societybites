@@ -252,23 +252,6 @@ async function main() {
     assert(existingGet.status === 200, "existing order without requestedReadyAt still loads");
     assert(existingGet.json.requestedReadyAt == null, "legacy orders keep null requestedReadyAt");
 
-    const upiListing = await jsonRequest(server, {
-      method: "POST",
-      path: "/listings",
-      token: sellerToken,
-      body: {
-        name: `UPI need-by ${stamp}`,
-        price: 80,
-        foodType: "VEG",
-        category: "Desserts",
-        quantity: 10,
-        availabilityMode: "MADE_TO_ORDER",
-        preparationTimeMinutes: 60,
-      },
-    });
-    assert(upiListing.status === 201, "UPI MTO listing");
-    listingIds.push(upiListing.json.id);
-
     const upiOrder = await jsonRequest(server, {
       method: "POST",
       path: "/orders",
@@ -276,7 +259,7 @@ async function main() {
       body: {
         societyId: seller.societyId,
         paymentMethod: "upi",
-        items: [{ listingId: upiListing.json.id, quantity: 1 }],
+        items: [{ listingId: made.json.id, quantity: 1 }],
         requestedReadyAt: futureIso(6),
       },
     });

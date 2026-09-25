@@ -22,6 +22,7 @@ import '../widgets/food_type_selector.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/floating_cart_bar.dart';
+import '../widgets/listing_type_badge.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -112,14 +113,21 @@ class HomeScreenState extends State<HomeScreen> {
       final raw = await ApiService.getPreOrderCampaigns(
         societyId: societyId,
       );
+      final parsed = <PreOrderCampaign>[];
+      for (final item in raw) {
+        try {
+          parsed.add(PreOrderCampaign.fromJson(item));
+        } catch (_) {}
+      }
       final campaigns = filterBuyerDiscoverableCampaigns(
-        raw.map(PreOrderCampaign.fromJson),
+        parsed,
         viewerUserId: userId,
       );
       if (!mounted) return;
       setState(() {
         _viewerUserId = userId;
-        _preOrderCampaigns = campaigns.take(3).toList();
+        _buyerSocietyId = societyId;
+        _preOrderCampaigns = campaigns;
         _preOrdersLoading = false;
       });
     } catch (_) {
@@ -143,7 +151,9 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _onCartOrderPlaced() {
-    if (mounted) _loadListings();
+    if (!mounted) return;
+    _loadListings();
+    _loadPreOrders();
   }
 
   void _onSearchChanged() {
@@ -302,6 +312,23 @@ class HomeScreenState extends State<HomeScreen> {
         setState(_cart.clear);
         CartController.instance.notify();
       }
+    }
+
+    final mixConflict = cartAvailabilityConflict(_cart, food);
+    if (mixConflict != null) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(mixConflict),
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          backgroundColor: const Color(0xFFD94F4F),
+        ),
+      );
+      return;
     }
 
     final currentInCart = _cart
@@ -472,7 +499,6 @@ class HomeScreenState extends State<HomeScreen> {
                     SliverToBoxAdapter(child: _buildSearchBar()),
                     if (_searchQuery.isEmpty) ...[
                       SliverToBoxAdapter(child: _buildCategoryChips()),
-                      SliverToBoxAdapter(child: _buildPreOrdersSection()),
                       SliverToBoxAdapter(child: _buildHomeDiscoverySections()),
                     ],
                     SliverToBoxAdapter(child: _buildAvailableHeader()),
@@ -508,7 +534,28 @@ class HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    if (_preOrderCampaigns.isEmpty) return const SizedBox.shrink();
+    return _buildPreOrderReachCarousel(
+      title: 'Pre-orders Campaign in Your Society',
+      campaigns: _campaignsForReach(HomeListingReach.inSociety),
+    );
+  }
+
+  List<PreOrderCampaign> _campaignsForReach(HomeListingReach reach) {
+    return campaignsForHomeReach(
+      _preOrderCampaigns,
+      reach: reach,
+      buyerSocietyId: _buyerSocietyId,
+      viewerUserId: _viewerUserId,
+      nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+    );
+  }
+
+  Widget _buildPreOrderReachCarousel({
+    required String title,
+    required List<PreOrderCampaign> campaigns,
+  }) {
+    if (campaigns.isEmpty) return const SizedBox.shrink();
+    final preview = campaigns.take(3).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -517,10 +564,10 @@ class HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.fromLTRB(20, 18, 8, 10),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Pre-orders Campaign in Your Society',
-                  style: TextStyle(
+                  title,
+                  style: const TextStyle(
                     fontSize: 19,
                     fontWeight: FontWeight.w800,
                     color: preorderText,
@@ -546,10 +593,10 @@ class HomeScreenState extends State<HomeScreen> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: _preOrderCampaigns.length,
+            itemCount: preview.length,
             separatorBuilder: (context, index) => const SizedBox(width: 10),
             itemBuilder: (context, index) {
-              final campaign = _preOrderCampaigns[index];
+              final campaign = preview[index];
               return HomePreOrderCampaignCard(
                 campaign: campaign,
                 isOwn: campaign.sellerId == _viewerUserId,
@@ -885,6 +932,7 @@ class HomeScreenState extends State<HomeScreen> {
           sellers: _societySellers,
         ),
         _buildSpecialsSection(),
+        _buildPreOrdersSection(),
         _buildSellerReachCarousel(
           key: const Key('home-sellers-nearby'),
           title: 'Nearby Societies',
@@ -897,6 +945,10 @@ class HomeScreenState extends State<HomeScreen> {
           reach: HomeListingReach.nearby,
           listings: _listingsForReach(HomeListingReach.nearby),
         ),
+        _buildPreOrderReachCarousel(
+          title: 'Pre-orders Nearby',
+          campaigns: _campaignsForReach(HomeListingReach.nearby),
+        ),
         _buildSellerReachCarousel(
           key: const Key('home-sellers-extended'),
           title: 'More Around You',
@@ -908,6 +960,10 @@ class HomeScreenState extends State<HomeScreen> {
         _buildReachSection(
           reach: HomeListingReach.extended,
           listings: _listingsForReach(HomeListingReach.extended),
+        ),
+        _buildPreOrderReachCarousel(
+          title: 'Pre-orders Around You',
+          campaigns: _campaignsForReach(HomeListingReach.extended),
         ),
       ],
     );
@@ -1249,7 +1305,10 @@ class _SellerChip extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: seller.avatarColor,
-              border: Border.all(color: const Color(0xFF0E5A47), width: 2.4),
+              border: Border.all(
+                color: sellerPresenceRingColor(seller.hasOrderableItems),
+                width: 2.4,
+              ),
             ),
             child: Icon(
               seller.avatarIcon,
@@ -1502,31 +1561,38 @@ class _SpecialCard extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(isDark ? 50 : 220),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.star_rounded,
-                      size: 14,
-                      color: isDark ? Colors.amber : Colors.amber.shade700,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(isDark ? 50 : 220),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const SizedBox(width: 3),
-                    Text(
-                      food.rating > 0 ? food.rating.toString() : 'New',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : const Color(0xFF3A4644),
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.star_rounded,
+                          size: 14,
+                          color: isDark ? Colors.amber : Colors.amber.shade700,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          food.rating > 0 ? food.rating.toString() : 'New',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : const Color(0xFF3A4644),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  ListingTypeBadge(food: food, compact: true),
+                ],
               ),
             ),
             Expanded(
@@ -1598,46 +1664,58 @@ class _SpecialCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 10, 14),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    '₹${food.price.toStringAsFixed(0)}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : const Color(0xFF101617),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 10,
+                          children: [
+                            Text(
+                              '₹${food.price.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF101617),
+                              ),
+                            ),
+                            if (food.quantity > 0 && !food.isExpired)
+                              Text(
+                                '${food.quantity} left',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? Colors.white70
+                                      : const Color(0xFF6A7774),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (listingSoldCaption(food.quantitySold).isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              listingSoldCaption(food.quantitySold),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? Colors.white70
+                                    : const Color(0xFF6A7774),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  if (food.quantity > 0 && !food.isExpired) ...[
-                    const SizedBox(width: 10),
-                    Text(
-                      '${food.quantity} left',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? Colors.white70
-                            : const Color(0xFF6A7774),
-                      ),
-                    ),
-                  ],
-                  if (listingSoldCaption(food.quantitySold).isNotEmpty) ...[
-                    const SizedBox(width: 10),
-                    Text(
-                      listingSoldCaption(food.quantitySold),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? Colors.white70
-                            : const Color(0xFF6A7774),
-                      ),
-                    ),
-                  ],
                   const SizedBox(width: 8),
-                  Flexible(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: MarketplacePurchaseSlot(
+                  MarketplacePurchaseSlot(
                     food: food,
                     cartQty: cartQty,
                     soldOut: Container(
@@ -1672,6 +1750,7 @@ class _SpecialCard extends StatelessWidget {
                             ),
                             child: const Text(
                               'Add',
+                              softWrap: false,
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 13,
@@ -1725,8 +1804,6 @@ class _SpecialCard extends StatelessWidget {
                           ),
                         ),
                   ),
-                  ),
-                  ),
                 ],
               ),
             ),
@@ -1769,7 +1846,13 @@ class _AvailableItemTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            ListingImage(food: food, width: 72, height: 72, iconSize: 36),
+            ListingImage(
+              food: food,
+              width: 72,
+              height: 72,
+              iconSize: 36,
+              showTypeBadge: true,
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

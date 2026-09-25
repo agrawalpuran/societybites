@@ -38,6 +38,9 @@ const {
   availabilityWriteFields,
   availabilityUpdateFields,
   attachMadeToOrderCapacity,
+  assertSingleBuyerVisibleMadeToOrder,
+  isBuyerVisibleMadeToOrder,
+  isMadeToOrderListing,
 } = require("../lib/listingAvailability");
 
 const router = express.Router();
@@ -286,6 +289,19 @@ router.post(
       return res.status(err.statusCode || 400).json({ error: err.message });
     }
 
+    try {
+      if (isBuyerVisibleMadeToOrder({ ...availabilityFields, status: "active" })) {
+        await assertSingleBuyerVisibleMadeToOrder(prisma, {
+          sellerId: req.user.id,
+        });
+      }
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({
+        error: err.message,
+        code: err.code,
+      });
+    }
+
     const listing = await prisma.listing.create({
       data: {
         sellerId: req.user.id,
@@ -461,6 +477,20 @@ router.patch(
       data.status = "active";
     }
 
+    try {
+      if (isBuyerVisibleMadeToOrder({ ...listing, ...data })) {
+        await assertSingleBuyerVisibleMadeToOrder(prisma, {
+          sellerId: listing.sellerId,
+          excludeListingId: listing.id,
+        });
+      }
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({
+        error: err.message,
+        code: err.code,
+      });
+    }
+
     const updated = await prisma.listing.update({
       where: { id: req.params.id },
       data,
@@ -538,12 +568,34 @@ router.patch(
         campaignId: null,
         status: "paused",
       },
+      select: {
+        id: true,
+        availabilityMode: true,
+        catalogType: true,
+        campaignId: true,
+        status: true,
+      },
+    });
+
+    const liveMadeToOrder = await prisma.listing.findFirst({
+      where: {
+        sellerId,
+        campaignId: null,
+        catalogType: { not: "PREORDER" },
+        availabilityMode: "MADE_TO_ORDER",
+        status: { in: ["active", "sold_out"] },
+      },
       select: { id: true },
     });
+    let reservedMadeToOrder = Boolean(liveMadeToOrder);
 
     const eligibleIds = [];
     for (const listing of candidates) {
       if (await listingInActiveCampaign(prisma, listing)) continue;
+      if (isMadeToOrderListing(listing)) {
+        if (reservedMadeToOrder) continue;
+        reservedMadeToOrder = true;
+      }
       eligibleIds.push(listing.id);
     }
 
@@ -646,6 +698,20 @@ router.patch(
     if (listing.status !== "paused") {
       return res.status(400).json({
         error: `Cannot resume a listing with status "${listing.status}"`,
+      });
+    }
+
+    try {
+      if (isBuyerVisibleMadeToOrder({ ...listing, status: "active" })) {
+        await assertSingleBuyerVisibleMadeToOrder(prisma, {
+          sellerId: listing.sellerId,
+          excludeListingId: listing.id,
+        });
+      }
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({
+        error: err.message,
+        code: err.code,
       });
     }
 

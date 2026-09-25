@@ -4,12 +4,15 @@ import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/made_to_order_hint.dart';
+import '../widgets/one_seller_cart.dart';
 import '../widgets/order_timing_notice.dart';
 import '../widgets/requested_ready_summary.dart';
+import '../widgets/simple_time_picker.dart';
 import '../models/data.dart';
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
 import '../services/api_service.dart';
+import '../services/cart_controller.dart';
 import '../services/session_service.dart';
 import 'login_screen.dart';
 
@@ -133,6 +136,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   bool get _canConfirm {
     if (_isSubmitting || _items.isEmpty || _totalQuantity <= 0) return false;
+    if (cartHasMixedAvailability(_items)) return false;
     if (_showNeedBy && _needBySpecified && _needBy == null) return false;
     if (_isCrossSociety &&
         _sellerFulfilment?.mode == FulfilmentMode.both &&
@@ -203,25 +207,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _pickNeedBy() async {
     final now = DateTime.now();
     final initial = _needBy ?? now.add(const Duration(hours: 2));
-    final date = await showDatePicker(
-      context: context,
-      initialDate: initial.isAfter(now) ? initial : now,
+    final selected = await pickDateAndSimpleTime(
+      context,
+      initial: initial.isAfter(now) ? initial : now.add(const Duration(hours: 2)),
       firstDate: DateTime(now.year, now.month, now.day),
       lastDate: now.add(const Duration(days: 180)),
     );
-    if (!mounted || date == null) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
-    );
-    if (!mounted || time == null) return;
-    final selected = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.hour,
-      time.minute,
-    );
+    if (!mounted || selected == null) return;
     if (selected.isBefore(DateTime.now())) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Need by time must be in the future')),
@@ -235,6 +227,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _confirmOrder() async {
+    if (cartHasMixedAvailability(_items)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(mixedAvailabilityCartMessage),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Color(0xFFD94F4F),
+        ),
+      );
+      return;
+    }
     if (!_canConfirm) return;
 
     setState(() => _isSubmitting = true);
@@ -294,17 +296,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
 
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Order placed! track your order in the orders page.'),
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          backgroundColor: const Color(0xFF0E5A47),
-        ),
-      );
-      Navigator.pop(context, true);
+      CartController.instance.finishPlacedOrder(context);
     } catch (e) {
       if (!mounted) return;
 
@@ -419,7 +411,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildHeader() {
-    return const AppHeader(showCart: false);
+    return AppHeader(
+      cartItemCount: _totalQuantity,
+      onCartPressed: () {},
+    );
   }
 
   String _friendlyOrderError(String raw) {

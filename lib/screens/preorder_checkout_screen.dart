@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/data.dart';
 import '../models/seller_payment_preference.dart';
 import '../services/api_service.dart';
+import '../services/cart_controller.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/order_timing_notice.dart';
@@ -96,7 +97,9 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
           ),
         ),
       );
-      if (confirmed == true && mounted) Navigator.pop(context, true);
+      if (confirmed == true && mounted) {
+        CartController.instance.finishPlacedOrder(context);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

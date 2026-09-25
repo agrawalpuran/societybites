@@ -30,6 +30,7 @@ class Seller {
   final int reviewCount;
   final IconData avatarIcon;
   final Color avatarColor;
+  final bool hasOrderableItems;
 
   const Seller({
     required this.id,
@@ -39,6 +40,7 @@ class Seller {
     this.reviewCount = 0,
     required this.avatarIcon,
     required this.avatarColor,
+    this.hasOrderableItems = true,
   });
 }
 
@@ -538,6 +540,25 @@ class Order {
     return '${items.length} items ($quantity portions)';
   }
 
+  String get cancelItemsLabel {
+    if (items.isEmpty) return '';
+    return items.map((item) {
+      final name = item.food.name.trim().isEmpty ? 'Item' : item.food.name.trim();
+      return item.quantity > 1 ? '$name ×${item.quantity}' : name;
+    }).join(', ');
+  }
+
+  String get buyerCancelConfirmMessage {
+    final itemsLabel = cancelItemsLabel;
+    final heading = itemsLabel.isEmpty
+        ? orderId
+        : '$orderId · $itemsLabel';
+    final reason = isPreOrder
+        ? 'Pre-orders can only be cancelled before the campaign cutoff. The seller will be notified.'
+        : 'The seller will be notified and inventory will be restored.';
+    return '$heading\n\n$reason';
+  }
+
   String get sellerLabel {
     if (items.isEmpty) return 'Neighbor';
     final sellers = items.map((item) => item.food.sellerName).toSet().toList();
@@ -580,6 +601,46 @@ class Order {
       buyerSocietyName: buyerSocietyName,
       sellerSocietyName: sellerSocietyName,
       unreadMessageCount: unreadMessageCount,
+    );
+  }
+
+  Order withUnreadCount(int count) {
+    if (count == unreadMessageCount) return this;
+    return Order(
+      id: id,
+      orderId: orderId,
+      items: items,
+      date: date,
+      status: status,
+      statusStep: statusStep,
+      orderTotal: orderTotal,
+      subtotal: subtotal,
+      communityFee: communityFee,
+      deliveryCharge: deliveryCharge,
+      type: type,
+      campaignId: campaignId,
+      fulfilmentMethod: fulfilmentMethod,
+      fulfilmentNotes: fulfilmentNotes,
+      fulfilmentAt: fulfilmentAt,
+      campaignTitle: campaignTitle,
+      campaignOrderCutoffAt: campaignOrderCutoffAt,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+      hasReview: hasReview,
+      rejectReason: rejectReason,
+      rejectedAt: rejectedAt,
+      completedAt: completedAt,
+      cancelledAt: cancelledAt,
+      expectedReadyAt: expectedReadyAt,
+      requestedReadyAt: requestedReadyAt,
+      createdAt: createdAt,
+      buyerName: buyerName,
+      buyerPhone: buyerPhone,
+      buyerFlatNumber: buyerFlatNumber,
+      buyerBlock: buyerBlock,
+      buyerSocietyName: buyerSocietyName,
+      sellerSocietyName: sellerSocietyName,
+      unreadMessageCount: count,
     );
   }
 
@@ -817,6 +878,11 @@ class PreOrderCampaign {
   final int totalItems;
   final double foodSubtotal;
   final String sellerPaymentPreference;
+  final String? societyId;
+  final SellingReachLevel? sellingReachLevel;
+  final double? distanceKm;
+  /// `inSociety` | `nearby` | `extended` from seller reach + distance.
+  final String? discoveryReach;
 
   const PreOrderCampaign({
     required this.id,
@@ -836,6 +902,10 @@ class PreOrderCampaign {
     this.totalItems = 0,
     this.foodSubtotal = 0,
     this.sellerPaymentPreference = 'UPI_AND_COD',
+    this.societyId,
+    this.sellingReachLevel,
+    this.distanceKm,
+    this.discoveryReach,
   });
 
   bool get isOpen => acceptsNewOrders();
@@ -908,6 +978,12 @@ class PreOrderCampaign {
                     ?.toString()
               : null) ??
           'UPI_AND_COD',
+      societyId: json['societyId']?.toString(),
+      sellingReachLevel: json['sellingReachLevel'] == null
+          ? null
+          : parseSellingReachLevel(json['sellingReachLevel']),
+      distanceKm: (json['distanceKm'] as num?)?.toDouble(),
+      discoveryReach: json['discoveryReach']?.toString(),
     );
   }
 }
@@ -1015,7 +1091,12 @@ class PreOrderSummary {
   }
 }
 
-Seller sellerFromListing(FoodItem food, {double? rating, int? reviewCount}) {
+Seller sellerFromListing(
+  FoodItem food, {
+  double? rating,
+  int? reviewCount,
+  bool? hasOrderableItems,
+}) {
   final hash = food.sellerId.hashCode.abs();
   const avatarIcons = [
     Icons.person,
@@ -1040,7 +1121,15 @@ Seller sellerFromListing(FoodItem food, {double? rating, int? reviewCount}) {
     reviewCount: reviewCount ?? food.reviewCount,
     avatarIcon: avatarIcons[hash % avatarIcons.length],
     avatarColor: avatarColors[hash % avatarColors.length],
+    hasOrderableItems: hasOrderableItems ?? food.canAddToCart,
   );
+}
+
+const sellerSellingRingColor = Color(0xFF0E5A47);
+const sellerOutOfStockRingColor = Color(0xFFD94F4F);
+
+Color sellerPresenceRingColor(bool hasOrderableItems) {
+  return hasOrderableItems ? sellerSellingRingColor : sellerOutOfStockRingColor;
 }
 
 List<Seller> sellersFromListings(List<FoodItem> listings) {
@@ -1061,13 +1150,20 @@ List<Seller> sellersFromListings(List<FoodItem> listings) {
                 (sum, item) => sum + item.rating * item.reviewCount,
               ) /
               reviews;
+    final hasOrderableItems = sellerListings.any((item) => item.canAddToCart);
     return sellerFromListing(
       first,
       rating: weightedRating,
       reviewCount: reviews,
+      hasOrderableItems: hasOrderableItems,
     );
   }).toList();
-  sellers.sort((a, b) => b.rating.compareTo(a.rating));
+  sellers.sort((a, b) {
+    if (a.hasOrderableItems != b.hasOrderableItems) {
+      return a.hasOrderableItems ? -1 : 1;
+    }
+    return b.rating.compareTo(a.rating);
+  });
   return sellers;
 }
 

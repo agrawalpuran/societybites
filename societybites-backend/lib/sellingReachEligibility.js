@@ -150,10 +150,22 @@ function isSellerDiscoverableByBuyer(input) {
   return evaluateSellerDiscoveryEligibility(input).eligible;
 }
 
+/** Home grouping uses distance vs nearby radius, not the seller's opted-in level. */
+function discoveryDisplayReach(eligibility, nearbyRadiusKm) {
+  if (!eligibility || !eligibility.eligible) return null;
+  if (eligibility.reason === "SAME_SOCIETY") return "inSociety";
+  if (eligibility.distanceKm != null && nearbyRadiusKm != null) {
+    return eligibility.distanceKm <= nearbyRadiusKm ? "nearby" : "extended";
+  }
+  if (eligibility.reason === "WITHIN_NEARBY") return "nearby";
+  return "extended";
+}
+
 module.exports = {
   sameSociety,
   sameCanonicalCity,
   evaluateSellerDiscoveryEligibility,
   isSellerDiscoverableByBuyer,
+  discoveryDisplayReach,
   DEFAULT_SELLING_REACH_LEVEL,
 };

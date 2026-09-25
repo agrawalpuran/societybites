@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
 import 'buyer_preorder_detail_screen.dart';
+import 'home_listing_filter.dart';
 import 'seller_storefront_screen.dart';
 
 class BuyerPreOrdersScreen extends StatefulWidget {
@@ -30,6 +31,8 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
   late bool _loading;
   late bool _hasSuccessfullyLoaded;
   String? _error;
+  String? _buyerSocietyId;
+  String? _viewerUserId;
 
   @override
   void initState() {
@@ -71,6 +74,8 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
       if (!mounted) return;
       setState(() {
         _campaigns = campaigns;
+        _buyerSocietyId = societyId;
+        _viewerUserId = userId;
         _loading = false;
         _hasSuccessfullyLoaded = true;
         _error = null;
@@ -117,13 +122,75 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
+  List<PreOrderCampaign> _forReach(HomeListingReach reach) {
+    return campaignsForHomeReach(
+      _campaigns,
+      reach: reach,
+      buyerSocietyId: _buyerSocietyId,
+      viewerUserId: _viewerUserId,
+    );
+  }
+
+  List<Widget> _reachBlocks() {
+    return [
+      ..._reachBlock('In your society', _forReach(HomeListingReach.inSociety)),
+      ..._reachBlock('Nearby', _forReach(HomeListingReach.nearby)),
+      ..._reachBlock('Around you', _forReach(HomeListingReach.extended)),
+    ];
+  }
+
+  List<Widget> _reachBlock(String title, List<PreOrderCampaign> campaigns) {
+    if (campaigns.isEmpty) return const [];
     final grouped = <String, List<PreOrderCampaign>>{};
-    for (final campaign in _campaigns) {
+    for (final campaign in campaigns) {
       grouped.putIfAbsent(campaign.sellerName, () => []).add(campaign);
     }
+    return [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(2, 4, 2, 6),
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: preorderText,
+          ),
+        ),
+      ),
+      ...grouped.entries.expand(
+        (entry) => [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 8, 2, 10),
+            child: InkWell(
+              onTap: () => _openSeller(entry.value.first),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Text(
+                  entry.key,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: preorderGreen,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          ...entry.value.map(
+            (campaign) => BuyerPreOrderCampaignCard(
+              campaign: campaign,
+              onTap: () => _open(campaign),
+              onSellerTap: () => _openSeller(campaign),
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: preorderBackground,
       appBar: AppBar(
@@ -184,37 +251,7 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
                             'New pre-order menus from your neighbors will appear here.',
                       )
                     else
-                      ...grouped.entries.expand(
-                        (entry) => [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(2, 8, 2, 10),
-                            child: InkWell(
-                              onTap: () => _openSeller(entry.value.first),
-                              borderRadius: BorderRadius.circular(6),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 3,
-                                ),
-                                child: Text(
-                                  entry.key,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    color: preorderGreen,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          ...entry.value.map(
-                            (campaign) => BuyerPreOrderCampaignCard(
-                              campaign: campaign,
-                              onTap: () => _open(campaign),
-                              onSellerTap: () => _openSeller(campaign),
-                            ),
-                          ),
-                        ],
-                      ),
+                      ..._reachBlocks(),
                   ],
                 ),
               ),

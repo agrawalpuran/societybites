@@ -10,12 +10,16 @@ class AppHeader extends StatefulWidget {
     this.leading,
     this.actions,
     this.showCart = true,
+    this.cartItemCount,
+    this.onCartPressed,
     this.padding = const EdgeInsets.fromLTRB(20, 14, 20, 0),
   });
 
   final Widget? leading;
   final Widget? actions;
   final bool showCart;
+  final int? cartItemCount;
+  final VoidCallback? onCartPressed;
   final EdgeInsets padding;
 
   @override
@@ -88,7 +92,10 @@ class _AppHeaderState extends State<AppHeader> {
             const SizedBox(width: 10),
           ],
           if (widget.showCart) ...[
-            const CartHeaderButton(),
+            CartHeaderButton(
+              itemCountOverride: widget.cartItemCount,
+              onPressed: widget.onCartPressed,
+            ),
             const SizedBox(width: 10),
           ],
           _UserInfoColumn(

@@ -8,6 +8,8 @@ import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
+import '../widgets/preorder_widgets.dart';
+import '../widgets/simple_time_picker.dart';
 import '../widgets/made_to_order_hint.dart';
 import 'add_listing_screen.dart';
 import 'add_listing_type_screen.dart';
@@ -737,38 +739,44 @@ class MyListingsScreenState extends State<MyListingsScreen>
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      emptyTitle,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
+                child: createPreorderItem
+                    ? CreatePreorderCatalogNudge(
+                        onCreateCatalog: () =>
+                            _openCreateListing(preorderItem: true),
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            emptyTitle,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            emptyBody,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Color(0xFF6A7774),
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => _openCreateListing(
+                              preorderItem: createPreorderItem,
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0E5A47),
+                              foregroundColor: Colors.white,
+                            ),
+                            child: Text(addLabel),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      emptyBody,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Color(0xFF6A7774),
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () =>
-                          _openCreateListing(preorderItem: createPreorderItem),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0E5A47),
-                        foregroundColor: Colors.white,
-                      ),
-                      child: Text(addLabel),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),
@@ -779,6 +787,11 @@ class MyListingsScreenState extends State<MyListingsScreen>
     return Column(
       children: [
         addCatalogButton,
+        if (showAddCatalog)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: ExistingPreorderCatalogNote(),
+          ),
         Expanded(
           child: RefreshIndicator(
             color: const Color(0xFF0E5A47),
@@ -854,6 +867,7 @@ class _SellerListingCard extends StatelessWidget {
                 food: listing,
                 width: 72,
                 height: 72,
+                showTypeBadge: true,
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -1260,24 +1274,17 @@ class _RenewListingDialogState extends State<_RenewListingDialog> {
     var initialDate =
         _dateTime.isBefore(firstDate) ? firstDate : _dateTime;
     if (initialDate.isAfter(lastDate)) initialDate = lastDate;
-    final date = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
+    final picked = await pickDateAndSimpleTime(
+      context,
+      initial: initialDate,
       firstDate: firstDate,
       lastDate: lastDate,
-      helpText: 'Available until (up to $listingAvailableUntilMaxDays days)',
+      dateHelpText: 'Available until (up to $listingAvailableUntilMaxDays days)',
     );
-    if (date == null || !mounted) return;
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_dateTime),
-    );
-    if (time == null || !mounted) return;
+    if (picked == null || !mounted) return;
 
     setState(() {
-      _dateTime =
-          DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      _dateTime = picked;
     });
   }
 

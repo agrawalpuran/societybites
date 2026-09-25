@@ -12,6 +12,7 @@ import 'package:societybites/screens/my_listings_screen.dart';
 import 'package:societybites/screens/seller_storefront_screen.dart';
 import 'package:societybites/services/my_listings_cache.dart';
 import 'package:societybites/widgets/made_to_order_hint.dart';
+import 'package:societybites/widgets/one_seller_cart.dart';
 
 Map<String, dynamic> _listingJson(
   String name, {
@@ -255,6 +256,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Chocolate Cake'), findsOneWidget);
+    expect(find.text('MADE TO ORDER'), findsWidgets);
     expect(find.byType(MadeToOrderHint), findsWidgets);
     expect(find.textContaining('Made to Order'), findsWidgets);
   });
@@ -275,6 +277,7 @@ void main() {
       ),
     );
     await tester.pump();
+    expect(find.text('MADE TO ORDER'), findsWidgets);
     expect(find.textContaining('Made to Order'), findsWidgets);
     expect(find.textContaining('Seller confirms availability'), findsWidgets);
   });
@@ -314,6 +317,78 @@ void main() {
     expect(food.isMadeToOrder, isFalse);
     expect(food.availabilityMode, listingAvailabilityReadyNow);
     expect(food.isPreOrderCatalog, isFalse);
+  });
+
+  test('cart rejects mixing Available now and Made to order', () {
+    final ready = FoodItem.fromJson(_listingJson('Samosa'));
+    final made = FoodItem.fromJson(
+      _listingJson(
+        'Cake',
+        availabilityMode: listingAvailabilityMadeToOrder,
+        preparationTimeMinutes: 120,
+      ),
+    );
+    final otherReady = FoodItem.fromJson(_listingJson('Pakora'));
+    final otherMade = FoodItem.fromJson(
+      _listingJson(
+        'Cookies',
+        availabilityMode: listingAvailabilityMadeToOrder,
+        preparationTimeMinutes: 60,
+      ),
+    );
+
+    expect(
+      cartAvailabilityConflict([CartItem(food: ready)], made),
+      mixedAvailabilityCartMessage,
+    );
+    expect(
+      cartAvailabilityConflict([CartItem(food: made)], ready),
+      mixedAvailabilityCartMessage,
+    );
+    expect(cartAvailabilityConflict([CartItem(food: ready)], otherReady), isNull);
+    expect(
+      cartAvailabilityConflict([CartItem(food: made)], otherMade),
+      multipleMadeToOrderCartMessage,
+    );
+    expect(cartAvailabilityConflict([CartItem(food: ready)], ready), isNull);
+    expect(cartHasMixedAvailability([CartItem(food: ready), CartItem(food: made)]), isTrue);
+  });
+
+  testWidgets('storefront shows mix message instead of adding', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    SellerStorefrontMemoryCache.clear();
+    final ready = FoodItem.fromJson(_listingJson('Samosa', id: 'ready-1'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SellerStorefrontScreen(
+          seller: const Seller(
+            id: 'seller-1',
+            name: 'Anita',
+            block: 'A',
+            rating: 0,
+            avatarIcon: Icons.restaurant,
+            avatarColor: Color(0xFFE8F5EE),
+          ),
+          cartItems: [CartItem(food: ready)],
+          fetchListings: () async => [
+            _listingJson(
+              'Cake',
+              id: 'mto-1',
+              availabilityMode: listingAvailabilityMadeToOrder,
+              preparationTimeMinutes: 120,
+            ),
+          ],
+          fetchCampaigns: () async => const [],
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(find.text('Add'));
+    await tester.pump();
+    expect(find.text(mixedAvailabilityCartMessage), findsOneWidget);
+    expect(find.text('Cake'), findsOneWidget);
   });
 
   testWidgets('checkout explains Made to Order timeline', (tester) async {

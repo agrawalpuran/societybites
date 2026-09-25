@@ -1,7 +1,7 @@
 const prisma = require("./prisma");
 const { canonicalCityKey } = require("./launchCity");
 const { isValidSocietyLocation } = require("./geoDistance");
-const { evaluateSellerDiscoveryEligibility } = require("./sellingReachEligibility");
+const { evaluateSellerDiscoveryEligibility, discoveryDisplayReach } = require("./sellingReachEligibility");
 const { serializeSellingReach } = require("./sellingReach");
 const { serializeFulfilment } = require("./sellerFulfilment");
 const { serializePaymentPreference } = require("./sellerPaymentPreference");
@@ -222,7 +222,132 @@ async function getNearbySellerStorefront({ buyer, sellerId, query } = {}) {
   return serializeNearbySeller(seller, eligibility);
 }
 
+const campaignDiscoveryInclude = {
+  seller: { include: { society: true, flat: true } },
+  products: {
+    include: {
+      seller: { include: { flat: true } },
+      reviews: { select: { rating: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  },
+};
+
+async function listDiscoverableCampaigns({ buyer, sellerId, status } = {}) {
+  const buyerSociety = await loadBuyerSociety(buyer);
+  if (!buyerSociety) {
+    const err = new Error("You must join a society first");
+    err.statusCode = 400;
+    err.code = "SOCIETY_REQUIRED";
+    throw err;
+  }
+
+  const ownerView = Boolean(
+    sellerId && buyer && String(sellerId) === String(buyer.id)
+  );
+
+  const now = new Date();
+  await prisma.preOrderCampaign.updateMany({
+    where: { status: "open", orderCutoffAt: { lte: now } },
+    data: { status: "closed" },
+  });
+
+  const where = {
+    ...(sellerId && { sellerId: String(sellerId) }),
+    ...(status && { status: String(status) }),
+  };
+  if (!ownerView && !status) {
+    where.status = { in: ["open", "closed"] };
+  }
+
+  const campaigns = await prisma.preOrderCampaign.findMany({
+    where,
+    include: campaignDiscoveryInclude,
+    orderBy: { fulfilmentAt: "asc" },
+  });
+
+  if (ownerView) {
+    return campaigns.map((campaign) => {
+      campaign.discoveryReach = "inSociety";
+      campaign.discoveryEligibility = {
+        eligible: true,
+        reason: "SAME_SOCIETY",
+        distanceKm: 0,
+      };
+      return campaign;
+    });
+  }
+
+  const { config } = await loadCityReachConfig(buyerSociety);
+  const nearbyRadiusKm =
+    config && config.nearbyRadiusKm != null ? Number(config.nearbyRadiusKm) : null;
+  return campaigns.filter((campaign) => {
+    if (buyer && String(campaign.sellerId) === String(buyer.id)) {
+      campaign.discoveryEligibility = {
+        eligible: true,
+        reason: "OWNER",
+        distanceKm: 0,
+      };
+      campaign.discoveryReach = "inSociety";
+      return true;
+    }
+    const seller = campaign.seller;
+    if (!seller) return false;
+    const eligibility = evaluateSellerDiscoveryEligibility({
+      buyerSociety,
+      sellerSociety: seller.society,
+      sellingReachLevel: seller.sellingReachLevel,
+      cityReachConfig: config,
+    });
+    if (!eligibility.eligible) return false;
+    campaign.discoveryEligibility = eligibility;
+    campaign.discoveryReach = discoveryDisplayReach(eligibility, nearbyRadiusKm);
+    return true;
+  });
+}
+
+async function assertBuyerCanViewCampaign({ buyer, campaign }) {
+  if (!campaign) {
+    const err = new Error("Pre-order campaign not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  if (buyer && String(buyer.id) === String(campaign.sellerId)) return campaign;
+
+  const buyerSociety = await loadBuyerSociety(buyer);
+  if (!buyerSociety) {
+    const err = new Error("You must join a society first");
+    err.statusCode = 400;
+    err.code = "SOCIETY_REQUIRED";
+    throw err;
+  }
+
+  let seller = campaign.seller;
+  if (!seller || !seller.society) {
+    seller = await prisma.user.findUnique({
+      where: { id: campaign.sellerId },
+      include: { society: true },
+    });
+  }
+  const { config } = await loadCityReachConfig(buyerSociety);
+  const eligibility = evaluateSellerDiscoveryEligibility({
+    buyerSociety,
+    sellerSociety: seller && seller.society,
+    sellingReachLevel: seller && seller.sellingReachLevel,
+    cityReachConfig: config,
+  });
+  if (!eligibility.eligible) {
+    const err = new Error("Pre-order campaign not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  return campaign;
+}
+
 module.exports = {
   discoverNearbySellers,
   getNearbySellerStorefront,
+  listDiscoverableCampaigns,
+  assertBuyerCanViewCampaign,
+  campaignDiscoveryInclude,
 };

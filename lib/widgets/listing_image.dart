@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../services/api_service.dart';
+import 'listing_type_badge.dart';
 
 class ListingImage extends StatelessWidget {
   const ListingImage({
@@ -11,6 +12,7 @@ class ListingImage extends StatelessWidget {
     this.height,
     this.borderRadius = 16,
     this.iconSize = 36,
+    this.showTypeBadge = false,
   });
 
   final FoodItem food;
@@ -18,6 +20,7 @@ class ListingImage extends StatelessWidget {
   final double? height;
   final double borderRadius;
   final double iconSize;
+  final bool showTypeBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +36,7 @@ class ListingImage extends StatelessWidget {
         ? ApiService.imageUrl(imageUrl, cacheKey: food.imageCacheKey)
         : null;
 
-    return ClipRRect(
+    final image = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: Container(
         width: width,
@@ -61,6 +64,27 @@ class ListingImage extends StatelessWidget {
                     errorBuilder: (_, _, _) => _iconFallback(),
                   )
                 : _iconFallback(),
+      ),
+    );
+
+    if (!showTypeBadge) return image;
+
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Stack(
+        children: [
+          Positioned.fill(child: image),
+          Positioned(
+            left: 6,
+            top: 6,
+            right: 6,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: ListingTypeBadge(food: food, compact: true),
+            ),
+          ),
+        ],
       ),
     );
   }

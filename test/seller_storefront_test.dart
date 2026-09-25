@@ -67,6 +67,82 @@ void main() {
     expect(sellers, hasLength(1));
     expect(sellers.single.reviewCount, 3);
     expect(sellers.single.rating, closeTo(4.666, .01));
+    expect(sellers.single.hasOrderableItems, isTrue);
+  });
+
+  test('top sellers put kitchens selling today first and out of stock last', () {
+    FoodItem listing({
+      required String sellerId,
+      required String sellerName,
+      required double rating,
+      required int reviews,
+      int quantity = 1,
+      String status = 'active',
+    }) {
+      return FoodItem(
+        id: '$sellerId-$quantity-$status',
+        name: 'Dish',
+        sellerId: sellerId,
+        sellerName: sellerName,
+        block: 'Block A',
+        price: 80,
+        rating: rating,
+        pickupTime: '5:00 PM',
+        description: '',
+        quantity: quantity,
+        status: status,
+        reviewCount: reviews,
+        icon: Icons.restaurant,
+        bgColor: const Color(0xFFE8F5EE),
+      );
+    }
+
+    final sellers = sellersFromListings([
+      listing(
+        sellerId: 'rated-oos',
+        sellerName: 'Top Rated Empty',
+        rating: 5,
+        reviews: 20,
+        quantity: 0,
+      ),
+      listing(
+        sellerId: 'selling',
+        sellerName: 'Selling Today',
+        rating: 3,
+        reviews: 2,
+      ),
+      listing(
+        sellerId: 'expired',
+        sellerName: 'Expired Kitchen',
+        rating: 4.8,
+        reviews: 10,
+        status: 'expired',
+      ),
+      listing(
+        sellerId: 'mixed',
+        sellerName: 'Mixed Kitchen',
+        rating: 4,
+        reviews: 4,
+        quantity: 0,
+      ),
+      listing(
+        sellerId: 'mixed',
+        sellerName: 'Mixed Kitchen',
+        rating: 4,
+        reviews: 1,
+      ),
+    ]);
+
+    expect(
+      sellers.map((seller) => seller.id).toList(),
+      ['mixed', 'selling', 'rated-oos', 'expired'],
+    );
+    expect(sellers[0].hasOrderableItems, isTrue);
+    expect(sellers[1].hasOrderableItems, isTrue);
+    expect(sellers[2].hasOrderableItems, isFalse);
+    expect(sellers[3].hasOrderableItems, isFalse);
+    expect(sellerPresenceRingColor(true), sellerSellingRingColor);
+    expect(sellerPresenceRingColor(false), sellerOutOfStockRingColor);
   });
 
   test('campaign provides seller metadata for storefront navigation', () {
@@ -98,6 +174,48 @@ void main() {
     await tester.pump();
 
     expect(selected?.id, 'seller-1');
+  });
+
+  testWidgets('seller list avatar ring is green when selling and red when out of stock', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SellerListScreen(
+          title: 'Top Sellers in Your Society',
+          sellers: [
+            sellerFromListing(
+              _food(id: 'live', rating: 4, reviews: 2),
+              hasOrderableItems: true,
+            ),
+            sellerFromListing(
+              FoodItem(
+                id: 'empty',
+                name: 'Empty',
+                sellerId: 'oos',
+                sellerName: 'Out of Stock Kitchen',
+                block: 'Block B',
+                price: 10,
+                rating: 5,
+                pickupTime: '5:00 PM',
+                description: '',
+                quantity: 0,
+                icon: Icons.restaurant,
+                bgColor: const Color(0xFFE8F5EE),
+              ),
+              hasOrderableItems: false,
+            ),
+          ],
+          onSellerTap: (_) {},
+        ),
+      ),
+    );
+
+    expect(find.text('Puran Agrawal'), findsOneWidget);
+    expect(find.text('Out of Stock Kitchen'), findsOneWidget);
+    final puranDy = tester.getTopLeft(find.text('Puran Agrawal')).dy;
+    final oosDy = tester.getTopLeft(find.text('Out of Stock Kitchen')).dy;
+    expect(puranDy, lessThan(oosDy));
   });
 
   testWidgets('campaign seller name has a separate seller action', (

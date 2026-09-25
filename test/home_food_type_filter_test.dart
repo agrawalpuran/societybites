@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/models/food_type.dart';
+import 'package:societybites/models/selling_reach.dart';
 import 'package:societybites/screens/home_listing_filter.dart';
 import 'package:societybites/widgets/food_type_selector.dart';
 
@@ -442,6 +443,118 @@ void main() {
         ],
       }).map((item) => item['id']),
       ['sushi'],
+    );
+  });
+
+  test('home campaign reach keeps other-society campaigns out of Your Society',
+      () {
+    final now = DateTime.now();
+    PreOrderCampaign camp({
+      required String id,
+      required String sellerId,
+      String? societyId,
+      String? discoveryReach,
+      double? distanceKm,
+    }) {
+      return PreOrderCampaign(
+        id: id,
+        sellerId: sellerId,
+        title: id,
+        status: 'open',
+        orderOpenAt: now.subtract(const Duration(hours: 1)),
+        orderCutoffAt: now.add(const Duration(hours: 5)),
+        fulfilmentAt: now.add(const Duration(days: 1)),
+        societyId: societyId,
+        discoveryReach: discoveryReach,
+        distanceKm: distanceKm,
+      );
+    }
+
+    final own = camp(
+      id: 'sat-special',
+      sellerId: 'puran',
+      societyId: 'notting-hill',
+      discoveryReach: 'inSociety',
+    );
+    final fern = camp(
+      id: 'tgif',
+      sellerId: 'aarav',
+      societyId: 'prestige-fern',
+      discoveryReach: 'extended',
+      distanceKm: 8.3,
+    );
+
+    expect(
+      homeCampaignReachFor(
+        own,
+        buyerSocietyId: 'notting-hill',
+        viewerUserId: 'puran',
+      ),
+      HomeListingReach.inSociety,
+    );
+    expect(
+      homeCampaignReachFor(
+        fern,
+        buyerSocietyId: 'notting-hill',
+        viewerUserId: 'puran',
+        nearbyRadiusKm: 6,
+      ),
+      HomeListingReach.extended,
+    );
+    expect(
+      campaignsForHomeReach(
+        [own, fern],
+        reach: HomeListingReach.inSociety,
+        buyerSocietyId: 'notting-hill',
+        viewerUserId: 'puran',
+        nearbyRadiusKm: 6,
+      ).map((campaign) => campaign.id),
+      ['sat-special'],
+    );
+    expect(
+      campaignsForHomeReach(
+        [own, fern],
+        reach: HomeListingReach.extended,
+        buyerSocietyId: 'notting-hill',
+        viewerUserId: 'puran',
+        nearbyRadiusKm: 6,
+      ).map((campaign) => campaign.id),
+      ['tgif'],
+    );
+  });
+
+  test('EXTENDED seller still sees own campaign in Your Society, not Around you',
+      () {
+    final now = DateTime.now();
+    final own = PreOrderCampaign(
+      id: 'sat-special',
+      sellerId: 'puran',
+      title: 'Sat Special',
+      status: 'open',
+      orderOpenAt: now.subtract(const Duration(hours: 1)),
+      orderCutoffAt: now.add(const Duration(hours: 5)),
+      fulfilmentAt: now.add(const Duration(days: 1)),
+      societyId: 'notting-hill',
+      sellingReachLevel: SellingReachLevel.extended,
+      distanceKm: 0,
+    );
+
+    expect(
+      homeCampaignReachFor(
+        own,
+        buyerSocietyId: 'notting-hill',
+        viewerUserId: 'puran',
+        nearbyRadiusKm: 8,
+      ),
+      HomeListingReach.inSociety,
+    );
+    expect(
+      homeCampaignReachFor(
+        own,
+        buyerSocietyId: 'notting-hill',
+        nearbyRadiusKm: 8,
+      ),
+      HomeListingReach.inSociety,
     );
   });
 }
