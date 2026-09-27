@@ -223,16 +223,16 @@ class ApiService {
   static bool _isUnauthorizedResponse(http_client.Response response) =>
       response.statusCode == 401;
 
-  static Future<bool> _refreshAccessToken() {
+  static Future<bool> _refreshAccessToken({bool notifyOnFailure = true}) {
     final active = _refreshInFlight;
     if (active != null) return active;
 
-    final future = _performRefresh();
+    final future = _performRefresh(notifyOnFailure: notifyOnFailure);
     _refreshInFlight = future;
     return future.whenComplete(() => _refreshInFlight = null);
   }
 
-  static Future<bool> _performRefresh() async {
+  static Future<bool> _performRefresh({bool notifyOnFailure = true}) async {
     if (!AuthConfig.usesTwoFactor ||
         await SessionService.getAuthProvider() != '2factor') {
       return false;
@@ -240,7 +240,7 @@ class ApiService {
 
     final refreshToken = await SessionService.getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) {
-      await _invalidateSession();
+      await _invalidateSession(notify: notifyOnFailure);
       return false;
     }
 
@@ -251,7 +251,7 @@ class ApiService {
         body: jsonEncode({'refreshToken': refreshToken}),
       );
       if (response.statusCode != 200) {
-        await _invalidateSession();
+        await _invalidateSession(notify: notifyOnFailure);
         return false;
       }
 
@@ -259,7 +259,7 @@ class ApiService {
       final access = data['token'] as String?;
       final refresh = data['refreshToken'] as String?;
       if (access == null || refresh == null) {
-        await _invalidateSession();
+        await _invalidateSession(notify: notifyOnFailure);
         return false;
       }
 
@@ -280,14 +280,14 @@ class ApiService {
       }
       return true;
     } catch (_) {
-      await _invalidateSession();
+      await _invalidateSession(notify: notifyOnFailure);
       return false;
     }
   }
 
-  static Future<void> _invalidateSession() async {
+  static Future<void> _invalidateSession({bool notify = true}) async {
     await SessionService.clear();
-    onSessionInvalidated?.call();
+    if (notify) onSessionInvalidated?.call();
   }
 
   static Future<Map<String, dynamic>> firebaseLogin(
@@ -335,13 +335,13 @@ class ApiService {
     if (await SessionService.getAuthProvider() != '2factor') return false;
     final refreshToken = await SessionService.getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) {
-      await _invalidateSession();
+      await _invalidateSession(notify: false);
       return false;
     }
 
     // Startup performs exactly one rotation. Successful refresh responses
     // already include and cache the authoritative backend user.
-    return _refreshAccessToken();
+    return _refreshAccessToken(notifyOnFailure: false);
   }
 
   static Future<void> logoutTwoFactor() async {

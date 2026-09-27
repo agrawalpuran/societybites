@@ -46,15 +46,14 @@ void main() {
     expect(find.textContaining('Explore All Kitchens'), findsOneWidget);
   });
 
-  testWidgets('Browse as Guest scrolls marketing content without fake marketplace', (
-    tester,
-  ) async {
+  testWidgets('Browse as Guest opens kitchens list', (tester) async {
     _ignoreKnownLayoutNoise();
     await tester.pumpWidget(const MaterialApp(home: GuestLandingScreen()));
     await tester.pump();
     await tester.tap(find.text('Browse as Guest'));
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byType(GuestLandingScreen), findsOneWidget);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(GuestKitchensScreen), findsOneWidget);
   });
 
   testWidgets('Explore Menus opens kitchens in Bengaluru', (tester) async {

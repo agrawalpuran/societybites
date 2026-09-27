@@ -104,15 +104,16 @@ void main() {
     expect(find.byType(HomeScreen), findsNothing);
   });
 
-  testWidgets('Browse as Guest stays on landing (marketing explore)', (
+  testWidgets('Browse as Guest opens kitchens list, not a sign-in wall', (
     tester,
   ) async {
     _ignoreKnownLayoutNoise();
     await tester.pumpWidget(const MaterialApp(home: GuestLandingScreen()));
     await tester.pump();
     await tester.tap(find.text('Browse as Guest'));
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.byType(GuestLandingScreen), findsOneWidget);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(GuestKitchensScreen), findsOneWidget);
     expect(find.byType(HomeScreen), findsNothing);
   });
 

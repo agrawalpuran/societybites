@@ -17,7 +17,6 @@ class GuestLandingScreen extends StatefulWidget {
 class _GuestLandingScreenState extends State<GuestLandingScreen> {
   final _pageController = PageController();
   final _scrollController = ScrollController();
-  final _categoriesKey = GlobalKey();
   Timer? _timer;
   var _page = 0;
 
@@ -46,24 +45,6 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
     _pageController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _scrollToMarketingExplore() {
-    final context = _categoriesKey.currentContext;
-    if (context != null) {
-      Scrollable.ensureVisible(
-        context,
-        duration: const Duration(milliseconds: 450),
-        curve: Curves.easeInOutCubic,
-        alignment: 0.05,
-      );
-      return;
-    }
-    _scrollController.animateTo(
-      520,
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeInOutCubic,
-    );
   }
 
   void _startAutoRotate() {
@@ -111,7 +92,7 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
             SliverToBoxAdapter(
               child: _HeroSection(
                 onExplore: () => _openRealMarketplace(),
-                onBrowseGuest: _scrollToMarketingExplore,
+                onBrowseGuest: () => _openRealMarketplace(),
               ),
             ),
             SliverToBoxAdapter(
@@ -122,9 +103,8 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
                 onPageChanged: (index) => setState(() => _page = index),
               ),
             ),
-            SliverToBoxAdapter(
-              key: _categoriesKey,
-              child: const _CuratedCategoriesHeading(),
+            const SliverToBoxAdapter(
+              child: _CuratedCategoriesHeading(),
             ),
             SliverToBoxAdapter(
               child: _CuratedCategories(),
