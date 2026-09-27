@@ -42,7 +42,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SocietyBites',
+      title: kAppDisplayName,
       debugShowCheckedModeBanner: false,
       theme: societyBitesTheme(),
       navigatorKey: PushNotificationService.navigatorKey,
