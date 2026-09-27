@@ -101,6 +101,17 @@ void main() {
     expect(find.text('QUANTITY AVAILABLE'), findsOneWidget);
     expect(find.text('DATE/TIME AVAILABLE UNTIL'), findsNothing);
     expect(find.text('AVAILABLE UNTIL (OPTIONAL)'), findsOneWidget);
+    expect(find.text('Full day'), findsOneWidget);
+    expect(find.text('Specific hours'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Full day')).dy,
+      lessThan(tester.getTopLeft(find.text('Same days every week')).dy),
+    );
+
+    await tester.tap(find.byKey(const Key('listing-today-hours')));
+    await tester.pump();
+    expect(find.byKey(const Key('listing-today-start')), findsOneWidget);
+    expect(find.text('AVAILABLE UNTIL (OPTIONAL)'), findsNothing);
 
     await tester.tap(find.byKey(const Key('listing-availability-repeat')));
     await tester.pump();

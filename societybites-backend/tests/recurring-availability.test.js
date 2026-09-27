@@ -8,6 +8,7 @@ const orderRoutes = require("../routes/orders");
 const {
   evaluateRecurringAvailability,
   recurringWriteFields,
+  istClock,
 } = require("../lib/recurringAvailability");
 
 const SEED_BUYER_PHONE = "+919845154070";
@@ -76,6 +77,23 @@ async function main() {
   assert(open.recurringUnavailable === false, "Mon 7:30 IST should be available");
   assert(open.recurringBuyerLabel.includes("Until 11:00 AM"), open.recurringBuyerLabel);
 
+  const stringDays = evaluateRecurringAvailability(
+    { ...listing, recurringWeekdays: ["1", "2", "3", "4", "5", "6"] },
+    { now: mondayMorning }
+  );
+  assert(stringDays.recurringUnavailable === false, "weekday values may be strings");
+
+  const sundayListing = {
+    ...listing,
+    recurringWeekdays: [7],
+    recurringStartMinute: 0,
+    recurringEndMinute: 1439,
+  };
+  const sunday = evaluateRecurringAvailability(sundayListing, {
+    now: new Date("2026-09-27T05:00:00.000Z"),
+  });
+  assert(sunday.recurringUnavailable === false, "Sunday full-day listing is orderable");
+
   const closed = evaluateRecurringAvailability(listing, { now: mondayNoon });
   assert(closed.recurringUnavailable === true, "Mon noon IST should be unavailable");
   assert(closed.recurringNextLabel.includes("tomorrow"), closed.recurringNextLabel);
@@ -101,6 +119,35 @@ async function main() {
     { now: mondayMorning }
   );
   assert(normal.recurringEnabled === false, "unscheduled listing is unchanged");
+
+  const sameDaySaved = recurringWriteFields(
+    {
+      sameDayHours: true,
+      recurringStartMinute: 420,
+      recurringEndMinute: 660,
+    },
+    { catalogType: "REGULAR", availabilityMode: "READY_NOW" }
+  );
+  assert(sameDaySaved.recurringEnabled === false, "today hours are not weekly");
+  assert(sameDaySaved.recurringStartMinute === 420, "today start saved");
+  assert(sameDaySaved.recurringEndMinute === 660, "today end saved");
+
+  const morningWait = evaluateRecurringAvailability(
+    {
+      catalogType: "REGULAR",
+      availabilityMode: "READY_NOW",
+      status: "active",
+      recurringEnabled: false,
+      recurringStartMinute: 420,
+      recurringEndMinute: 660,
+    },
+    { now: new Date("2026-09-28T00:30:00.000Z") }
+  );
+  assert(morningWait.recurringUnavailable === true, "before today window is unavailable");
+  assert(
+    morningWait.recurringNextLabel.includes("7:00 AM"),
+    morningWait.recurringNextLabel
+  );
 
   try {
     recurringWriteFields(
@@ -186,7 +233,7 @@ async function main() {
         category: "Breakfast",
         quantity: 99,
         recurringEnabled: true,
-        recurringWeekdays: [1, 2, 3, 4, 5, 6],
+        recurringWeekdays: [1, 2, 3, 4, 5, 6, 7],
         recurringStartMinute: 0,
         recurringEndMinute: 1439,
         recurringDailyLimit: 2,
@@ -194,10 +241,18 @@ async function main() {
     });
     assert(saved.status === 201, `recurring create failed ${JSON.stringify(saved.json)}`);
     assert(saved.json.recurringEnabled === true, "schedule saved");
-    assert(saved.json.recurringWeekdays.length === 6, "multiple days saved");
+    assert(saved.json.recurringWeekdays.length === 7, "multiple days saved");
     assert(saved.json.recurringStartMinute === 0, "start saved");
     assert(saved.json.recurringEndMinute === 1439, "end saved");
     assert(saved.json.recurringDailyLimit === 2, "daily limit saved");
+    assert(
+      saved.json.recurringUnavailable === false,
+      `full-day listing should be orderable now ${JSON.stringify({
+        clock: istClock(),
+        label: saved.json.recurringBuyerLabel,
+        next: saved.json.recurringNextLabel,
+      })}`
+    );
     listingIds.push(saved.json.id);
 
     const badTime = await jsonRequest(server, {
@@ -324,7 +379,7 @@ async function main() {
     });
     assert(resumed.status === 200, "resume recurring listing");
     assert(resumed.json.recurringEnabled === true, "resume keeps schedule");
-    assert(JSON.stringify(resumed.json.recurringWeekdays) === JSON.stringify([1, 2, 3, 4, 5, 6]), "days intact");
+    assert(JSON.stringify(resumed.json.recurringWeekdays) === JSON.stringify([1, 2, 3, 4, 5, 6, 7]), "days intact");
 
     const sundayOnly = await jsonRequest(server, {
       method: "PATCH",
@@ -333,7 +388,7 @@ async function main() {
       body: {
         foodType: "VEG",
         recurringEnabled: true,
-        recurringWeekdays: [7],
+        recurringWeekdays: [istClock().weekday === 7 ? 1 : 7],
         recurringStartMinute: 0,
         recurringEndMinute: 1439,
         recurringDailyLimit: 20,
@@ -341,24 +396,17 @@ async function main() {
     });
     assert(sundayOnly.status === 200, "update schedule");
 
-    const clock = new Date();
-    const istWeekday = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Kolkata",
-      weekday: "short",
-    }).format(clock);
-    if (istWeekday !== "Sun") {
-      const outside = await jsonRequest(server, {
-        method: "POST",
-        path: "/orders",
-        token: buyerToken,
-        body: {
-          societyId: seller.societyId,
-          paymentMethod: "cash",
-          items: [{ listingId: saved.json.id, quantity: 1 }],
-        },
-      });
-      assert(outside.status === 400, "order outside configured day rejected");
-    }
+    const outside = await jsonRequest(server, {
+      method: "POST",
+      path: "/orders",
+      token: buyerToken,
+      body: {
+        societyId: seller.societyId,
+        paymentMethod: "cash",
+        items: [{ listingId: saved.json.id, quantity: 1 }],
+      },
+    });
+    assert(outside.status === 400, "order outside configured day rejected");
 
     const regularOrder = await jsonRequest(server, {
       method: "POST",

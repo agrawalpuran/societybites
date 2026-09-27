@@ -1,16 +1,19 @@
 import 'dart:io' show Platform;
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../firebase_options.dart';
 import 'api_service.dart';
 import '../screens/main_shell_screen.dart';
 
 /// Top-level background handler (must be a top-level or static function).
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Data is delivered; UI refresh happens on resume / tap.
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
 /// Optional soft FCM registration + foreground/tap handling.
@@ -31,16 +34,23 @@ class PushNotificationService {
     'order_completed',
   };
 
+  static const _androidChannel = MethodChannel('societybites/notifications');
+
+  static bool _initialized = false;
+  static bool _tokenRefreshBound = false;
+
   static bool get _supported =>
       !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
   static Future<void> init() async {
-    if (!_supported) return;
+    if (!_supported || _initialized) return;
+    _initialized = true;
 
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
     FirebaseMessaging.onMessage.listen((message) {
       onForegroundOrderUpdate?.call();
+      _showAndroidForegroundNotification(message);
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen(_handleOpen);
@@ -63,26 +73,53 @@ class PushNotificationService {
         sound: true,
       );
 
+      if (kDebugMode) {
+        debugPrint(
+          '[push] platform=${Platform.isIOS ? 'ios' : 'android'} '
+          'authorizationStatus=${settings.authorizationStatus}',
+        );
+      }
+
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
         return;
       }
 
       final token = await messaging.getToken();
+      if (kDebugMode) {
+        debugPrint(
+          '[push] fcmToken ${token == null || token.isEmpty ? 'missing' : 'obtained'}',
+        );
+      }
       if (token == null || token.isEmpty) return;
 
       final platform = Platform.isIOS ? 'ios' : 'android';
       await ApiService.registerDeviceToken(token, platform: platform);
+      if (kDebugMode) {
+        debugPrint('[push] device token registered');
+      }
 
-      messaging.onTokenRefresh.listen((newToken) async {
-        try {
-          await ApiService.registerDeviceToken(
-            newToken,
-            platform: platform,
-          );
-        } catch (_) {}
-      });
-    } catch (_) {
-      // Never block app flows on push setup failures.
+      if (!_tokenRefreshBound) {
+        _tokenRefreshBound = true;
+        messaging.onTokenRefresh.listen((newToken) async {
+          try {
+            await ApiService.registerDeviceToken(
+              newToken,
+              platform: platform,
+            );
+            if (kDebugMode) {
+              debugPrint('[push] refreshed device token registered');
+            }
+          } catch (err) {
+            if (kDebugMode) {
+              debugPrint('[push] token refresh register failed');
+            }
+          }
+        });
+      }
+    } catch (err) {
+      if (kDebugMode) {
+        debugPrint('[push] registerIfPossible failed: $err');
+      }
     }
   }
 
@@ -92,6 +129,25 @@ class PushNotificationService {
       final token = await FirebaseMessaging.instance.getToken();
       await ApiService.unregisterDeviceToken(token: token);
     } catch (_) {}
+  }
+
+  static Future<void> _showAndroidForegroundNotification(
+    RemoteMessage message,
+  ) async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    final title = message.notification?.title ?? 'SocietyBites';
+    final body = message.notification?.body ?? '';
+    if (body.isEmpty && message.notification?.title == null) return;
+    try {
+      await _androidChannel.invokeMethod('show', {
+        'title': title,
+        'body': body,
+      });
+    } catch (err) {
+      if (kDebugMode) {
+        debugPrint('[push] foreground local notification failed');
+      }
+    }
   }
 
   static void _handleOpen(RemoteMessage message) {

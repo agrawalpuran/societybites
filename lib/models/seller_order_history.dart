@@ -3,11 +3,13 @@ class SellerOrderListPage {
     required this.orders,
     this.hasMore = false,
     this.hasOlder = false,
+    this.pendingCount = 0,
   });
 
   final List<Map<String, dynamic>> orders;
   final bool hasMore;
   final bool hasOlder;
+  final int pendingCount;
 }
 
 const sellerRecentPastDays = 7;
@@ -32,6 +34,16 @@ DateTime? sellerPastEventAt({
   DateTime? createdAt,
 }) {
   return completedAt ?? cancelledAt ?? rejectedAt ?? createdAt;
+}
+
+bool isSellerRecentOpenOrder({
+  required bool isTerminal,
+  DateTime? createdAt,
+  DateTime? now,
+}) {
+  if (isTerminal) return false;
+  if (createdAt == null) return true;
+  return !createdAt.isBefore(sellerRecentPastCutoff(now));
 }
 
 bool isSellerRecentPastOrder({

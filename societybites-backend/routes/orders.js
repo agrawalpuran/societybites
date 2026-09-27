@@ -17,6 +17,7 @@ const {
 const {
   assertRecurringOrderable,
   isRecurringReadyNowListing,
+  isSameDayHoursListing,
 } = require("../lib/recurringAvailability");
 const {
   notifyOrderCreated,
@@ -189,6 +190,7 @@ router.get(
           ),
           hasMore: page.hasMore,
           hasOlder: page.hasOlder,
+          pendingCount: page.pendingCount || 0,
           scope: page.scope,
         });
       }
@@ -553,12 +555,18 @@ router.post(
       }
 
       if (orderType === "regular" && !isMadeToOrderListing(current)) {
+        const usesSchedule =
+          isRecurringReadyNowListing(current) || isSameDayHoursListing(current);
         if (current.status === "expired") {
           return res.status(400).json({
             error: `"${current.name}" has expired and cannot be ordered`,
           });
         }
-        if (current.availableAt && new Date(current.availableAt) < new Date()) {
+        if (
+          !usesSchedule &&
+          current.availableAt &&
+          new Date(current.availableAt) < new Date()
+        ) {
           return res.status(400).json({
             error: `"${current.name}" has expired and cannot be ordered`,
           });

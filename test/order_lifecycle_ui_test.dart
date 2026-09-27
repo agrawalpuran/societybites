@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:societybites/models/data.dart';
 import 'package:societybites/models/order_lifecycle.dart';
 import 'package:societybites/screens/orders_screen.dart';
 
@@ -51,6 +52,14 @@ Map<String, dynamic> _orderJson({
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('formatPlacedAt includes date and time', () {
+    final today = DateTime(2026, 9, 27, 10, 37);
+    expect(Order.formatPlacedAt(today, today), 'Today, 10:37 AM');
+
+    final earlier = DateTime(2026, 9, 12, 15, 5);
+    expect(Order.formatPlacedAt(earlier, today), '12 Sep, 3:05 PM');
+  });
 
   setUp(() {
     SharedPreferences.setMockInitialValues({
@@ -161,6 +170,10 @@ void main() {
       _orderJson(id: 'up', status: 'pending', paymentMethod: 'upi'),
     ]);
     expect(find.text('Cancel Order'), findsOneWidget);
+    final placed = Order.formatPlacedAt(
+      DateTime.parse('2026-09-12T10:00:00.000Z'),
+    );
+    expect(find.textContaining('SB-up · $placed'), findsOneWidget);
   });
 
   testWidgets('Cancel order dialog shows item name and message', (tester) async {

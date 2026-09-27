@@ -664,6 +664,7 @@ class ApiService {
     int? preparationTimeMinutes,
     int? maxDailyOrders,
     bool recurringEnabled = false,
+    bool sameDayHours = false,
     List<int>? recurringWeekdays,
     int? recurringStartMinute,
     int? recurringEndMinute,
@@ -696,6 +697,7 @@ class ApiService {
           'preparationTimeMinutes': preparationTimeMinutes,
         if (maxDailyOrders != null) 'maxDailyOrders': maxDailyOrders,
         'recurringEnabled': recurringEnabled,
+        'sameDayHours': sameDayHours,
         if (recurringWeekdays != null) 'recurringWeekdays': recurringWeekdays,
         if (recurringStartMinute != null)
           'recurringStartMinute': recurringStartMinute,
@@ -811,6 +813,7 @@ class ApiService {
     bool clearMaxDailyOrders = false,
     bool clearAvailableAt = false,
     bool? recurringEnabled,
+    bool? sameDayHours,
     List<int>? recurringWeekdays,
     int? recurringStartMinute,
     int? recurringEndMinute,
@@ -844,6 +847,7 @@ class ApiService {
         if (!clearMaxDailyOrders && maxDailyOrders != null)
           'maxDailyOrders': maxDailyOrders,
         if (recurringEnabled != null) 'recurringEnabled': recurringEnabled,
+        if (sameDayHours != null) 'sameDayHours': sameDayHours,
         if (recurringWeekdays != null) 'recurringWeekdays': recurringWeekdays,
         if (recurringStartMinute != null)
           'recurringStartMinute': recurringStartMinute,
@@ -996,6 +1000,7 @@ class ApiService {
         orders: raw.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
         hasMore: map['hasMore'] == true,
         hasOlder: map['hasOlder'] == true,
+        pendingCount: (map['pendingCount'] as num?)?.toInt() ?? 0,
       );
     }
     _throwFromResponse(response);

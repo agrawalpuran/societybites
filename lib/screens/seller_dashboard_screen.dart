@@ -56,6 +56,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   List<Order> _activeOrders = [];
   List<Order> _pastOrders = [];
   bool _hasOlderPast = false;
+  bool _hasOlderActive = false;
+  int _pendingAttentionCount = 0;
   bool _isLoading = true;
   bool _hasSuccessfullyLoaded = false;
   String? _error;
@@ -296,11 +298,20 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     try {
       late final List<Order> active;
       late final List<Order> past;
-      var hasOlder = false;
+      var hasOlderPast = false;
+      var hasOlderActive = false;
+      var pendingAttention = 0;
       final injected = widget.fetchOrders;
       if (injected != null) {
         final parsed = (await injected()).map(Order.fromJson).toList();
-        active = parsed.where((order) => !order.isTerminal).toList();
+        active = parsed
+            .where(
+              (order) => isSellerRecentOpenOrder(
+                isTerminal: order.isTerminal,
+                createdAt: order.createdAt,
+              ),
+            )
+            .toList();
         past = parsed
             .where(
               (order) => isSellerRecentPastOrder(
@@ -312,7 +323,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               ),
             )
             .toList();
-        hasOlder = parsed.any(
+        hasOlderPast = parsed.any(
           (order) =>
               order.isTerminal &&
               !isSellerRecentPastOrder(
@@ -323,6 +334,16 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 createdAt: order.createdAt,
               ),
         );
+        hasOlderActive = parsed.any(
+          (order) =>
+              !order.isTerminal &&
+              !isSellerRecentOpenOrder(
+                isTerminal: order.isTerminal,
+                createdAt: order.createdAt,
+              ),
+        );
+        pendingAttention =
+            parsed.where((order) => order.status == 'pending').length;
       } else {
         final pages = await Future.wait([
           ApiService.getSellerOrderBucket(scope: 'active'),
@@ -330,7 +351,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         ]);
         active = pages[0].orders.map(Order.fromJson).toList();
         past = pages[1].orders.map(Order.fromJson).toList();
-        hasOlder = pages[1].hasOlder;
+        hasOlderActive = pages[0].hasOlder;
+        hasOlderPast = pages[1].hasOlder;
+        pendingAttention = pages[0].pendingCount;
       }
 
       if (!mounted || gen != _ordersLoadGen) return;
@@ -338,7 +361,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       setState(() {
         _activeOrders = active;
         _pastOrders = past;
-        _hasOlderPast = hasOlder;
+        _hasOlderPast = hasOlderPast;
+        _hasOlderActive = hasOlderActive;
+        _pendingAttentionCount = pendingAttention;
         _isLoading = false;
         _hasSuccessfullyLoaded = true;
         _ordersRefreshInFlight = false;
@@ -386,9 +411,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   void _publishKitchenAttention() {
-    final count =
-        _activeOrders.where((order) => order.status == 'pending').length;
-    widget.onKitchenAttentionCount?.call(count);
+    widget.onKitchenAttentionCount?.call(_pendingAttentionCount);
   }
 
   void _notifyInitialLoadSettled() {
@@ -1015,7 +1038,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          if (showingPast && past.isNotEmpty)
+          if ((showingPast && past.isNotEmpty) ||
+              (!showingPast && active.isNotEmpty && _hasOlderActive))
             const Padding(
               padding: EdgeInsets.only(bottom: 10),
               child: Text(
@@ -1050,6 +1074,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                     : (typedEmpty
                           ? 'No orders yet.\n\n'
                                 'Orders for this type will appear here when buyers place them.'
+                          : _hasOlderActive
+                          ? 'No recent orders'
                           : 'No active orders yet.\n\n'
                                 'When neighbors order your food, they show up here.'),
                 style: const TextStyle(
@@ -1087,7 +1113,19 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 icon: Icons.history_rounded,
                 title: 'Older Orders',
                 subtitle: 'Orders older than 7 days',
-                onTap: _openOlderOrders,
+                onTap: () => _openOlderOrders(openOrders: false),
+              ),
+            ),
+          ],
+          if (!showingPast && _hasOlderActive) ...[
+            const SizedBox(height: 8),
+            KeyedSubtree(
+              key: const Key('older-open-orders-row'),
+              child: ProfileMenuTile(
+                icon: Icons.history_rounded,
+                title: 'Older Orders',
+                subtitle: 'Still in progress, older than 7 days',
+                onTap: () => _openOlderOrders(openOrders: true),
               ),
             ),
           ],
@@ -1096,16 +1134,23 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     );
   }
 
-  Future<void> _openOlderOrders() async {
+  Future<void> _openOlderOrders({required bool openOrders}) async {
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
         builder: (_) => SellerOlderOrdersScreen(
+          openOrders: openOrders,
           fetchOrders: widget.fetchOrders,
           onOrderRefresh: _loadOrders,
+          onAction: openOrders ? _updateStatus : null,
+          onOrderUpdated: openOrders ? _upsertOrder : null,
+          onPaymentConfirmed: openOrders ? _loadOrders : null,
+          onReject: openOrders ? _rejectOrder : null,
+          onReadyBy: openOrders ? _editReadyBy : null,
         ),
       ),
     );
+    if (mounted) await _loadOrders();
   }
 
   Widget _buildExpandCard() {
@@ -1563,7 +1608,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                     ],
                     const SizedBox(height: 3),
                     Text(
-                      '${order.orderId} • ${order.date}',
+                      '${order.orderId} • ${order.placedAtLabel}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF8A9491),
@@ -2151,7 +2196,7 @@ class SellerPastOrderCard extends StatelessWidget {
                     ],
                     const SizedBox(height: 3),
                     Text(
-                      '${order.orderId} • ${order.date}',
+                      '${order.orderId} • ${order.placedAtLabel}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF8A9491),

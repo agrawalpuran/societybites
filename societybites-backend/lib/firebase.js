@@ -13,7 +13,9 @@ if (getApps().length === 0) {
       credential: cert({ projectId, clientEmail, privateKey }),
     });
   } else {
-    initializeApp({ projectId: projectId || "societybites-app" });
+    initializeApp({
+      projectId: projectId || "society-bites",
+    });
     console.warn(
       "Firebase Admin initialized without service account credentials. " +
         "Token verification will fail in production. Set FIREBASE_PROJECT_ID, " +

@@ -532,12 +532,16 @@ class _ActiveOrderCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Text(
-                order.orderId,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFFADB5B2),
-                  fontWeight: FontWeight.w600,
+              Flexible(
+                child: Text(
+                  '${order.orderId} · ${order.placedAtLabel}',
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFADB5B2),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -1202,8 +1206,8 @@ class _PastOrderTile extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       isSellerView
-                          ? '${order.orderId} • ${order.date}'
-                          : '${order.sellerLabel} • ${order.date}',
+                          ? '${order.orderId} • ${order.placedAtLabel}'
+                          : '${order.sellerLabel} • ${order.placedAtLabel}',
                       style: const TextStyle(
                         fontSize: 13,
                         color: Color(0xFF8A9491),

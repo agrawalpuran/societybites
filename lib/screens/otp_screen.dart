@@ -13,6 +13,17 @@ import '../widgets/otp_verify_heading.dart';
 
 export '../widgets/otp_verify_heading.dart';
 
+/// Splits an SMS/autofill/paste value into OTP boxes. Kept as digits, never an int.
+const int kOtpLength = 6;
+
+List<String> splitOtpDigits(String value, {int length = kOtpLength}) {
+  final digits = value.replaceAll(RegExp(r'\D'), '');
+  return List<String>.generate(
+    length,
+    (i) => i < digits.length ? digits[i] : '',
+  );
+}
+
 class OtpScreen extends StatefulWidget {
   const OtpScreen({
     super.key,
@@ -33,7 +44,7 @@ class OtpScreen extends StatefulWidget {
 
 class _OtpScreenState extends State<OtpScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  static const int _otpLength = 6;
+  static const int _otpLength = kOtpLength;
   final List<TextEditingController> _controllers = List.generate(
     _otpLength,
     (_) => TextEditingController(),
@@ -48,6 +59,7 @@ class _OtpScreenState extends State<OtpScreen> {
   ConfirmationResult? _confirmationResult;
   bool _isVerifying = false;
   bool _isResending = false;
+  bool _applyingOtp = false;
   Timer? _resendTimer;
   int _resendSecondsRemaining = 60;
 
@@ -298,20 +310,34 @@ class _OtpScreenState extends State<OtpScreen> {
     }
   }
 
-  void _onOtpChanged(int index, String value) {
-    if (value.length > 1) {
-      final digits = value.replaceAll(RegExp(r'\D'), '');
-      for (var i = 0; i < _otpLength && i < digits.length; i++) {
-        _controllers[i].text = digits[i];
+  void _applyOtpBoxes(List<String> boxes) {
+    _applyingOtp = true;
+    for (var i = 0; i < _otpLength; i++) {
+      if (_controllers[i].text != boxes[i]) {
+        _controllers[i].value = TextEditingValue(
+          text: boxes[i],
+          selection: TextSelection.collapsed(offset: boxes[i].length),
+        );
       }
-      if (digits.length >= _otpLength) {
-        _focusNodes[_otpLength - 1].requestFocus();
+    }
+    _applyingOtp = false;
+  }
+
+  void _onOtpChanged(int index, String value) {
+    if (_applyingOtp) return;
+
+    if (value.length > 1) {
+      final boxes = splitOtpDigits(value, length: _otpLength);
+      _applyOtpBoxes(boxes);
+      final filled = boxes.where((d) => d.isNotEmpty).length;
+      if (filled >= _otpLength) {
+        _focusNodes[_otpLength - 1].unfocus();
         FocusScope.of(context).unfocus();
         if (!_isVerifying) {
           _verifyOtp();
         }
-      } else if (digits.isNotEmpty) {
-        _focusNodes[digits.length.clamp(0, _otpLength - 1)].requestFocus();
+      } else if (filled > 0) {
+        _focusNodes[filled.clamp(0, _otpLength - 1)].requestFocus();
       }
       return;
     }
@@ -385,22 +411,25 @@ class _OtpScreenState extends State<OtpScreen> {
                     ),
                   ),
                   const SizedBox(height: 42),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: List.generate(
-                      _OtpScreenState._otpLength,
-                      (index) => SizedBox(
-                        width:
-                            (size.width -
-                                (horizontalPadding * 2) -
-                                (_OtpScreenState._otpLength - 1) * 8) /
-                            _OtpScreenState._otpLength,
-                        child: _OtpInputBox(
-                          controller: _controllers[index],
-                          focusNode: _focusNodes[index],
-                          autoFocus: index == 0,
-                          onChanged: (value) => _onOtpChanged(index, value),
-                          isPrimary: index == 0,
+                  AutofillGroup(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(
+                        _OtpScreenState._otpLength,
+                        (index) => SizedBox(
+                          width:
+                              (size.width -
+                                  (horizontalPadding * 2) -
+                                  (_OtpScreenState._otpLength - 1) * 8) /
+                              _OtpScreenState._otpLength,
+                          child: _OtpInputBox(
+                            controller: _controllers[index],
+                            focusNode: _focusNodes[index],
+                            autoFocus: index == 0,
+                            enableOtpAutofill: index == 0,
+                            onChanged: (value) => _onOtpChanged(index, value),
+                            isPrimary: index == 0,
+                          ),
                         ),
                       ),
                     ),
@@ -503,11 +532,13 @@ class _OtpInputBox extends StatelessWidget {
     required this.onChanged,
     required this.isPrimary,
     this.autoFocus = false,
+    this.enableOtpAutofill = false,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool autoFocus;
+  final bool enableOtpAutofill;
   final ValueChanged<String> onChanged;
   final bool isPrimary;
 
@@ -518,8 +549,17 @@ class _OtpInputBox extends StatelessWidget {
       focusNode: focusNode,
       autofocus: autoFocus,
       keyboardType: TextInputType.number,
+      textInputAction: enableOtpAutofill
+          ? TextInputAction.done
+          : TextInputAction.next,
       textAlign: TextAlign.center,
-      maxLength: 1,
+      // Allow the full 6-digit SMS code so OS autofill is not truncated to 1.
+      maxLength: kOtpLength,
+      autofillHints: enableOtpAutofill
+          ? const [AutofillHints.oneTimeCode]
+          : null,
+      autocorrect: false,
+      enableSuggestions: false,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       onChanged: onChanged,
       style: const TextStyle(

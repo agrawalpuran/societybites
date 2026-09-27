@@ -7,6 +7,9 @@ const INVALID_TOKEN_CODES = new Set([
   "messaging/registration-token-not-registered",
 ]);
 
+/** Must match Android MainActivity CHANNEL_ID and AndroidManifest default channel. */
+const ANDROID_CHANNEL_ID = "societybites_orders";
+
 /**
  * Fire-and-forget wrapper — never throws to callers; never used inside Prisma txns.
  */
@@ -22,6 +25,21 @@ function sellerIdFromOrder(order) {
   return order?.items?.[0]?.listing?.sellerId || null;
 }
 
+function buildFcmMessage(token, { title, body, data }) {
+  return {
+    token,
+    notification: { title, body },
+    data,
+    android: {
+      priority: "high",
+      notification: {
+        channelId: ANDROID_CHANNEL_ID,
+        sound: "default",
+      },
+    },
+  };
+}
+
 /**
  * Send a push to all active tokens for a user.
  * @param {string} userId
@@ -35,7 +53,10 @@ async function sendToUser(userId, { title, body, notificationType, orderId, extr
     select: { id: true, token: true },
   });
 
-  if (tokens.length === 0) return;
+  if (tokens.length === 0) {
+    logger.info("notify", `No active device tokens (${notificationType})`);
+    return;
+  }
 
   const messaging = getMessaging();
   const data = {
@@ -49,16 +70,13 @@ async function sendToUser(userId, { title, body, notificationType, orderId, extr
   }
 
   const staleIds = [];
+  let sent = 0;
 
   await Promise.all(
     tokens.map(async ({ id, token }) => {
       try {
-        await messaging.send({
-          token,
-          notification: { title, body },
-          data,
-          android: { priority: "high" },
-        });
+        await messaging.send(buildFcmMessage(token, { title, body, data }));
+        sent += 1;
       } catch (err) {
         const code = err?.code || "";
         if (INVALID_TOKEN_CODES.has(code)) {
@@ -72,6 +90,10 @@ async function sendToUser(userId, { title, body, notificationType, orderId, extr
       }
     })
   );
+
+  if (sent > 0) {
+    logger.info("notify", `FCM sent ${sent} (${notificationType})`);
+  }
 
   if (staleIds.length > 0) {
     await prisma.deviceToken.updateMany({
@@ -212,8 +234,10 @@ function notifyOrderMessage(order, senderId) {
 }
 
 module.exports = {
+  ANDROID_CHANNEL_ID,
   notifyAsync,
   sendToUser,
+  buildFcmMessage,
   notifyOrderCreated,
   notifyStatusChange,
   notifyOrderRejected,

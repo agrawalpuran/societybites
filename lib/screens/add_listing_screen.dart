@@ -8,6 +8,7 @@ import '../services/session_service.dart';
 import '../models/food_type.dart';
 import '../models/listing_availability.dart';
 import '../models/listing_categories.dart';
+import '../models/pickup_location.dart';
 import '../models/recurring_availability.dart';
 import '../widgets/available_in_selector.dart';
 import '../widgets/simple_time_picker.dart';
@@ -38,7 +39,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   final _qtyController = TextEditingController(text: '1');
   final _weightPerUnitController = TextEditingController();
   final _descController = TextEditingController();
-  String _pickup = 'My Home (Verified)';
+  String _pickup = defaultPickupLocation;
   String _weightUnit = 'portions';
   final Set<String> _selectedCategories = {};
   List<String> _legacyCategories = [];
@@ -59,6 +60,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   TimeOfDay _recurringEnd = const TimeOfDay(hour: 11, minute: 0);
   bool _dailyLimitEnabled = false;
   final _dailyLimitController = TextEditingController();
+  bool _todayFullDay = true;
 
   bool get _isEditing => widget.existingListing != null;
   bool get _isPreorderCatalog =>
@@ -73,6 +75,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   bool get _showStockAndExpiryFields =>
       !_isMadeToOrder && !_isPreorderCatalog && !_repeatSchedule;
   bool get _showRecurringSection => !_isMadeToOrder && !_isPreorderCatalog;
+  bool get _showUntilField => _showStockAndExpiryFields && _todayFullDay;
 
   String get _orderTypeTitle {
     if (_isPreorderCatalog) return 'Pre-order';
@@ -104,6 +107,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
             subtitle:
                 'Neighbors can order it today. List it again tomorrow if you cook again.',
             onTap: () => setState(() => _repeatSchedule = false),
+            child: !_repeatSchedule ? _buildJustTodayHours() : null,
           ),
           const SizedBox(height: 8),
           _FulfilmentOption(
@@ -113,157 +117,204 @@ class _AddListingScreenState extends State<AddListingScreen> {
             subtitle:
                 'For regular items like idli or thepla. We will show it on the days you choose.',
             onTap: () => setState(() => _repeatSchedule = true),
+            child: _repeatSchedule ? _buildWeeklySchedule() : null,
           ),
-          if (_repeatSchedule) ...[
-            const SizedBox(height: 16),
-            const Text(
-              'WHICH DAYS?',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.1,
-                color: Color(0xFF8A9491),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: List.generate(7, (index) {
-                final day = index + 1;
-                final selected = _recurringDays.contains(day);
-                return Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(right: index == 6 ? 0 : 4),
-                    child: Material(
-                      color: selected
-                          ? const Color(0xFF0E5A47)
-                          : const Color(0xFFF0F2F1),
-                      borderRadius: BorderRadius.circular(10),
-                      child: InkWell(
-                        key: Key('listing-recurring-day-$day'),
-                        onTap: () {
-                          setState(() {
-                            if (selected) {
-                              _recurringDays.remove(day);
-                            } else {
-                              _recurringDays.add(day);
-                            }
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(10),
-                        child: SizedBox(
-                          height: 40,
-                          child: Center(
-                            child: Text(
-                              recurringWeekdayLabels[index],
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: selected
-                                    ? Colors.white
-                                    : const Color(0xFF3A4644),
-                              ),
-                            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJustTodayHours() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FulfilmentOption(
+          key: const Key('listing-today-full-day'),
+          selected: _todayFullDay,
+          nested: true,
+          title: 'Full day',
+          subtitle: 'Neighbors can order anytime today.',
+          onTap: () => setState(() => _todayFullDay = true),
+        ),
+        const SizedBox(height: 8),
+        _FulfilmentOption(
+          key: const Key('listing-today-hours'),
+          selected: !_todayFullDay,
+          nested: true,
+          title: 'Specific hours',
+          subtitle: 'Only take orders between the times you choose.',
+          onTap: () => setState(() => _todayFullDay = false),
+        ),
+        if (!_todayFullDay) ...[
+          const SizedBox(height: 8),
+          _buildHoursPickers(
+            startKey: 'listing-today-start',
+            endKey: 'listing-today-end',
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildWeeklySchedule() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'WHICH DAYS?',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.1,
+            color: Color(0xFF8A9491),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(7, (index) {
+            final day = index + 1;
+            final selected = _recurringDays.contains(day);
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: index == 6 ? 0 : 4),
+                child: Material(
+                  color: selected
+                      ? const Color(0xFF0E5A47)
+                      : const Color(0xFFF0F2F1),
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    key: Key('listing-recurring-day-$day'),
+                    onTap: () {
+                      setState(() {
+                        if (selected) {
+                          _recurringDays.remove(day);
+                        } else {
+                          _recurringDays.add(day);
+                        }
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: SizedBox(
+                      height: 40,
+                      child: Center(
+                        child: Text(
+                          recurringWeekdayLabels[index],
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFF3A4644),
                           ),
                         ),
                       ),
                     ),
                   ),
-                );
-              }),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'WHAT TIME?',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.1,
-                color: Color(0xFF8A9491),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _timeButton(
-                    key: const Key('listing-recurring-start'),
-                    label: _recurringStart.format(context),
-                    onTap: () async {
-                      final picked = await showSimpleTimePicker(
-                        context,
-                        initialTime: _recurringStart,
-                      );
-                      if (picked != null && mounted) {
-                        setState(() => _recurringStart = picked);
-                      }
-                    },
-                  ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    'to',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF6A7774),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: _timeButton(
-                    key: const Key('listing-recurring-end'),
-                    label: _recurringEnd.format(context),
-                    onTap: () async {
-                      final picked = await showSimpleTimePicker(
-                        context,
-                        initialTime: _recurringEnd,
-                      );
-                      if (picked != null && mounted) {
-                        setState(() => _recurringEnd = picked);
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'HOW MANY PER DAY?',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.1,
-                color: Color(0xFF8A9491),
               ),
-            ),
-            const SizedBox(height: 8),
-            _FulfilmentOption(
-              key: const Key('listing-daily-unlimited'),
-              selected: !_dailyLimitEnabled,
-              title: 'No limit',
-              subtitle: 'Keep taking orders during these hours.',
-              onTap: () => setState(() => _dailyLimitEnabled = false),
-            ),
-            const SizedBox(height: 8),
-            _FulfilmentOption(
-              key: const Key('listing-daily-limit'),
-              selected: _dailyLimitEnabled,
-              title: 'I have a limit',
-              subtitle: 'Stop orders after this many portions.',
-              onTap: () => setState(() => _dailyLimitEnabled = true),
-            ),
-            if (_dailyLimitEnabled) ...[
-              const SizedBox(height: 8),
-              TextFormField(
-                key: const Key('listing-daily-limit-field'),
-                controller: _dailyLimitController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: _inputDeco('e.g. 20'),
-              ),
-            ],
-          ],
+            );
+          }),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'WHAT TIME?',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.1,
+            color: Color(0xFF8A9491),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildHoursPickers(),
+        const SizedBox(height: 16),
+        const Text(
+          'HOW MANY PER DAY?',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.1,
+            color: Color(0xFF8A9491),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _FulfilmentOption(
+          key: const Key('listing-daily-unlimited'),
+          selected: !_dailyLimitEnabled,
+          nested: true,
+          title: 'No limit',
+          subtitle: 'Keep taking orders during these hours.',
+          onTap: () => setState(() => _dailyLimitEnabled = false),
+        ),
+        const SizedBox(height: 8),
+        _FulfilmentOption(
+          key: const Key('listing-daily-limit'),
+          selected: _dailyLimitEnabled,
+          nested: true,
+          title: 'I have a limit',
+          subtitle: 'Stop orders after this many portions.',
+          onTap: () => setState(() => _dailyLimitEnabled = true),
+        ),
+        if (_dailyLimitEnabled) ...[
+          const SizedBox(height: 8),
+          TextFormField(
+            key: const Key('listing-daily-limit-field'),
+            controller: _dailyLimitController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: _inputDeco('e.g. 20'),
+          ),
         ],
-      ),
+      ],
+    );
+  }
+
+  Widget _buildHoursPickers({
+    String startKey = 'listing-recurring-start',
+    String endKey = 'listing-recurring-end',
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: _timeButton(
+            key: Key(startKey),
+            label: _recurringStart.format(context),
+            onTap: () async {
+              final picked = await showSimpleTimePicker(
+                context,
+                initialTime: _recurringStart,
+              );
+              if (picked != null && mounted) {
+                setState(() => _recurringStart = picked);
+              }
+            },
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            'to',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF6A7774),
+            ),
+          ),
+        ),
+        Expanded(
+          child: _timeButton(
+            key: Key(endKey),
+            label: _recurringEnd.format(context),
+            onTap: () async {
+              final picked = await showSimpleTimePicker(
+                context,
+                initialTime: _recurringEnd,
+              );
+              if (picked != null && mounted) {
+                setState(() => _recurringEnd = picked);
+              }
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -467,6 +518,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
           .toList();
       _foodType = parseFoodType(listing.foodType);
       _dateTime = listing.availableAt;
+      if (listing.pickupLocation != null &&
+          listing.pickupLocation!.trim().isNotEmpty) {
+        _pickup = listing.pickupLocation!;
+      }
       _availabilityMode = listing.isMadeToOrder
           ? listingAvailabilityMadeToOrder
           : listingAvailabilityReadyNow;
@@ -496,6 +551,18 @@ class _AddListingScreenState extends State<AddListingScreen> {
           _dailyLimitEnabled = true;
           _dailyLimitController.text = '${listing.recurringDailyLimit}';
         }
+      } else if (!listing.isMadeToOrder &&
+          listing.recurringStartMinute != null &&
+          listing.recurringEndMinute != null) {
+        _todayFullDay = false;
+        _recurringStart = TimeOfDay(
+          hour: listing.recurringStartMinute! ~/ 60,
+          minute: listing.recurringStartMinute! % 60,
+        );
+        _recurringEnd = TimeOfDay(
+          hour: listing.recurringEndMinute! ~/ 60,
+          minute: listing.recurringEndMinute! % 60,
+        );
       }
     } else {
       _availabilityMode = parseListingAvailabilityMode(
@@ -627,8 +694,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
     }
 
     final useRecurring = _showRecurringSection && _repeatSchedule;
-    if (useRecurring) {
-      if (_recurringDays.isEmpty) {
+    final sameDayHours =
+        _showRecurringSection && !_repeatSchedule && !_todayFullDay;
+    if (useRecurring || sameDayHours) {
+      if (useRecurring && _recurringDays.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Select at least one available day.')),
         );
@@ -648,7 +717,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
         );
         return;
       }
-      if (_dailyLimitEnabled) {
+      if (useRecurring && _dailyLimitEnabled) {
         final limit = int.tryParse(_dailyLimitController.text.trim());
         if (limit == null || limit < 1) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -692,6 +761,19 @@ class _AddListingScreenState extends State<AddListingScreen> {
           ? int.parse(_dailyLimitController.text.trim())
           : null;
 
+      final sameDayEnd = sameDayHours
+          ? DateTime(
+              DateTime.now().year,
+              DateTime.now().month,
+              DateTime.now().day,
+              _recurringEnd.hour,
+              _recurringEnd.minute,
+            )
+          : null;
+      final availableAt = sameDayHours
+          ? sameDayEnd
+          : (_showUntilField ? _dateTime : null);
+
       if (_isEditing) {
         await ApiService.updateListing(
           listingId: widget.existingListing!.id,
@@ -699,8 +781,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
           price: double.parse(_priceController.text.trim()),
           quantity: quantity,
           description: _descController.text.trim(),
-          availableAt: _showStockAndExpiryFields ? _dateTime : null,
-          clearAvailableAt: !_showStockAndExpiryFields,
+          availableAt: availableAt,
+          clearAvailableAt: availableAt == null && !_showUntilField,
           pickupLocation: _pickup,
           imageUrl: imageUrl,
           weightUnit: _weightUnit,
@@ -715,9 +797,12 @@ class _AddListingScreenState extends State<AddListingScreen> {
           maxDailyOrders: null,
           clearMaxDailyOrders: true,
           recurringEnabled: _showRecurringSection && useRecurring,
+          sameDayHours: sameDayHours,
           recurringWeekdays: useRecurring ? _recurringDays.toList() : const [],
-          recurringStartMinute: useRecurring ? recurringStartMinute : null,
-          recurringEndMinute: useRecurring ? recurringEndMinute : null,
+          recurringStartMinute:
+              (useRecurring || sameDayHours) ? recurringStartMinute : null,
+          recurringEndMinute:
+              (useRecurring || sameDayHours) ? recurringEndMinute : null,
           recurringDailyLimit: recurringLimit,
         );
       } else {
@@ -727,7 +812,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
           price: double.parse(_priceController.text.trim()),
           quantity: quantity,
           description: _descController.text.trim(),
-          availableAt: _showStockAndExpiryFields ? _dateTime : null,
+          availableAt: availableAt,
           pickupLocation: _pickup,
           imageUrl: imageUrl,
           weightUnit: _weightUnit,
@@ -742,9 +827,12 @@ class _AddListingScreenState extends State<AddListingScreen> {
           preparationTimeMinutes: prepMinutes,
           maxDailyOrders: null,
           recurringEnabled: _showRecurringSection && useRecurring,
+          sameDayHours: sameDayHours,
           recurringWeekdays: useRecurring ? _recurringDays.toList() : const [],
-          recurringStartMinute: useRecurring ? recurringStartMinute : null,
-          recurringEndMinute: useRecurring ? recurringEndMinute : null,
+          recurringStartMinute:
+              (useRecurring || sameDayHours) ? recurringStartMinute : null,
+          recurringEndMinute:
+              (useRecurring || sameDayHours) ? recurringEndMinute : null,
           recurringDailyLimit: recurringLimit,
         );
       }
@@ -984,48 +1072,55 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           ),
                         ),
                       ),
-                      if (_showStockAndExpiryFields) ...[
+                      if (_showUntilField) ...[
                         const SizedBox(height: 18),
                         _buildField(
                           label: 'AVAILABLE UNTIL (OPTIONAL)',
                           child: GestureDetector(
-                          onTap: _pickDateTime,
-                          child: Container(
-                            height: 52,
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                  color: const Color(0xFFE0E5E3)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.calendar_today_rounded,
-                                    size: 18, color: Color(0xFF8A9491)),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    _dateTime == null
-                                        ? 'Tap to choose when to stop taking orders'
-                                        : _formattedDateTime,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      color: _dateTime == null
-                                          ? const Color(0xFFADB5B2)
-                                          : const Color(0xFF3A4644),
-                                      fontWeight: FontWeight.w500,
+                            onTap: _pickDateTime,
+                            child: Container(
+                              height: 52,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(0xFFE0E5E3),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_today_rounded,
+                                    size: 18,
+                                    color: Color(0xFF8A9491),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      _dateTime == null
+                                          ? 'Tap to choose when to stop taking orders'
+                                          : _formattedDateTime,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        color: _dateTime == null
+                                            ? const Color(0xFFADB5B2)
+                                            : const Color(0xFF3A4644),
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const Icon(Icons.calendar_month_rounded,
-                                    size: 20, color: Color(0xFF8A9491)),
-                              ],
+                                  const Icon(
+                                    Icons.calendar_month_rounded,
+                                    size: 20,
+                                    color: Color(0xFF8A9491),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
                       ],
                       const SizedBox(height: 18),
                       _buildField(
@@ -1051,27 +1146,28 @@ class _AddListingScreenState extends State<AddListingScreen> {
                                 color: Color(0xFF3A4644),
                                 fontWeight: FontWeight.w500,
                               ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'My Home (Verified)',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.location_on_rounded,
-                                          size: 18,
-                                          color: Color(0xFF0E5A47)),
-                                      SizedBox(width: 8),
-                                      Text('My Home (Verified)'),
-                                    ],
+                              items: [
+                                for (final location in [
+                                  ...listingPickupLocations,
+                                  if (!listingPickupLocations.contains(_pickup))
+                                    _pickup,
+                                ])
+                                  DropdownMenuItem(
+                                    value: location,
+                                    child: location == defaultPickupLocation
+                                        ? const Row(
+                                            children: [
+                                              Icon(
+                                                Icons.location_on_rounded,
+                                                size: 18,
+                                                color: Color(0xFF0E5A47),
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(defaultPickupLocation),
+                                            ],
+                                          )
+                                        : Text(location),
                                   ),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Lobby Area',
-                                  child: Text('Lobby Area'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Society Gate',
-                                  child: Text('Society Gate'),
-                                ),
                               ],
                               onChanged: (v) {
                                 if (v != null) setState(() => _pickup = v);
@@ -1431,67 +1527,90 @@ class _FulfilmentOption extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.child,
+    this.nested = false,
   });
 
   final bool selected;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final Widget? child;
+  final bool nested;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? const Color(0xFFE8F5EE) : Colors.white,
+      color: selected && !nested
+          ? const Color(0xFFE8F5EE)
+          : Colors.white,
       borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? const Color(0xFF0E5A47) : const Color(0xFFE0E5E3),
-            ),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? const Color(0xFF0E5A47) : const Color(0xFFE0E5E3),
           ),
-          child: Row(
-            children: [
-              Icon(
-                selected
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_off,
-                size: 22,
-                color: selected
-                    ? const Color(0xFF0E5A47)
-                    : const Color(0xFF8A9491),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: onTap,
+              borderRadius: child == null
+                  ? BorderRadius.circular(14)
+                  : const BorderRadius.vertical(top: Radius.circular(14)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: Row(
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF101617),
-                      ),
+                    Icon(
+                      selected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_off,
+                      size: 22,
+                      color: selected
+                          ? const Color(0xFF0E5A47)
+                          : const Color(0xFF8A9491),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF6A7774),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF101617),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6A7774),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            if (child != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                child: child,
+              ),
+          ],
         ),
       ),
     );

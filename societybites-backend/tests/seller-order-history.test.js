@@ -224,8 +224,20 @@ async function main() {
     });
     assertCond(active.status === 200, "active scope ok");
     const activeIds = active.json.orders.map((o) => o.id);
-    assertCond(activeIds.includes(activeOld.id), "10-day pending stays active");
+    assertCond(!activeIds.includes(activeOld.id), "10-day pending is not default Active");
+    assertCond(active.json.hasOlder === true, "hasOlder when older open orders exist");
+    assertCond(active.json.pendingCount >= 1, "pending badge still counts older pending");
     assertCond(!activeIds.includes(tenDay.id), "completed is not active");
+
+    const olderActive = await jsonRequest(server, {
+      method: "GET",
+      path: "/orders?role=seller&scope=older_active",
+      token: sellerToken,
+    });
+    assertCond(olderActive.status === 200, "older_active scope ok");
+    const olderActiveIds = olderActive.json.orders.map((o) => o.id);
+    assertCond(olderActiveIds.includes(activeOld.id), "10-day pending loads in older active");
+    assertCond(!olderActiveIds.includes(tenDay.id), "completed is not older active");
 
     const recent = await jsonRequest(server, {
       method: "GET",

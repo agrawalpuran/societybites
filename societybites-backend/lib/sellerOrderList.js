@@ -10,7 +10,12 @@ const TERMINAL_STATUSES = Object.freeze([
   "rejected",
 ]);
 
-const SCOPES = Object.freeze(["active", "recent_past", "older"]);
+const SCOPES = Object.freeze([
+  "active",
+  "older_active",
+  "recent_past",
+  "older",
+]);
 const DEFAULT_OLDER_LIMIT = 20;
 const MAX_OLDER_LIMIT = 50;
 const RECENT_PAST_DAYS = 7;
@@ -72,7 +77,7 @@ function parseScope(value) {
   const scope = String(value || "").trim();
   if (!SCOPES.includes(scope)) {
     const err = new Error(
-      "scope must be one of: active, recent_past, older"
+      "scope must be one of: active, older_active, recent_past, older"
     );
     err.statusCode = 400;
     throw err;
@@ -96,7 +101,20 @@ function whereForScope({ sellerId, scope, status, cutoff }) {
   const base = sellerOrdersBaseWhere(sellerId, status);
   if (scope === "active") {
     return {
-      AND: [base, { status: { notIn: [...TERMINAL_STATUSES] } }],
+      AND: [
+        base,
+        { status: { notIn: [...TERMINAL_STATUSES] } },
+        { createdAt: { gte: cutoff } },
+      ],
+    };
+  }
+  if (scope === "older_active") {
+    return {
+      AND: [
+        base,
+        { status: { notIn: [...TERMINAL_STATUSES] } },
+        { createdAt: { lt: cutoff } },
+      ],
     };
   }
   if (scope === "recent_past") {
@@ -133,30 +151,58 @@ async function listSellerOrders(
   const cutoff = recentPastCutoff(now);
   const where = whereForScope({ sellerId, scope, status, cutoff });
   const orderBy = { createdAt: "desc" };
+  const paginated = scope === "older" || scope === "older_active";
 
-  if (scope !== "older") {
-    const [orders, olderSample] = await Promise.all([
+  if (!paginated) {
+    const extras = [];
+    if (scope === "recent_past") {
+      extras.push(
+        prisma.order.findFirst({
+          where: whereForScope({
+            sellerId,
+            scope: "older",
+            status,
+            cutoff,
+          }),
+          select: { id: true },
+        })
+      );
+    } else {
+      extras.push(
+        prisma.order.findFirst({
+          where: whereForScope({
+            sellerId,
+            scope: "older_active",
+            status,
+            cutoff,
+          }),
+          select: { id: true },
+        })
+      );
+      extras.push(
+        prisma.order.count({
+          where: {
+            ...sellerOrdersBaseWhere(sellerId, status),
+            status: "pending",
+          },
+        })
+      );
+    }
+
+    const [orders, olderSample, pendingCount] = await Promise.all([
       prisma.order.findMany({
         where,
         include,
         orderBy,
       }),
-      scope === "recent_past"
-        ? prisma.order.findFirst({
-            where: whereForScope({
-              sellerId,
-              scope: "older",
-              status,
-              cutoff,
-            }),
-            select: { id: true },
-          })
-        : Promise.resolve(null),
+      extras[0],
+      extras[1] ?? Promise.resolve(0),
     ]);
     return {
       orders,
       hasMore: false,
       hasOlder: Boolean(olderSample),
+      pendingCount: Number(pendingCount) || 0,
       scope,
     };
   }
@@ -175,6 +221,7 @@ async function listSellerOrders(
     orders: hasMore ? rows.slice(0, limit) : rows,
     hasMore,
     hasOlder: true,
+    pendingCount: 0,
     scope,
     page,
     limit,

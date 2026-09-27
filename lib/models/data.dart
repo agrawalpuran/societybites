@@ -527,6 +527,13 @@ class Order {
   bool get isTerminal =>
       status == 'completed' || status == 'cancelled' || status == 'rejected';
 
+  /// Placed date and time for order cards, e.g. "Today, 10:37 AM".
+  String get placedAtLabel {
+    final at = createdAt;
+    if (at == null) return date;
+    return formatPlacedAt(at);
+  }
+
   bool isInBuyerActiveTab([DateTime? now]) =>
       BuyerOrderVisibility.isInBuyerActiveTab(
         status: status,
@@ -781,6 +788,37 @@ class Order {
       sellerSocietyName: json['sellerSocietyName'] as String?,
       unreadMessageCount: (json['unreadMessageCount'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  /// Order placed stamp, e.g. "Today, 10:37 AM" or "12 Sep, 3:30 PM".
+  static String formatPlacedAt(DateTime dt, [DateTime? now]) {
+    final local = dt.toLocal();
+    final current = (now ?? DateTime.now()).toLocal();
+    final hour = local.hour > 12
+        ? local.hour - 12
+        : (local.hour == 0 ? 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    final time =
+        '$hour:${local.minute.toString().padLeft(2, '0')} $ampm';
+    final sameDay = local.year == current.year &&
+        local.month == current.month &&
+        local.day == current.day;
+    if (sameDay) return 'Today, $time';
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${local.day} ${months[local.month - 1]}, $time';
   }
 
   static String formatReadyBy(DateTime dt) {

@@ -111,16 +111,26 @@ void main() {
       isTrue,
     );
     expect(
-      isSellerRecentPastOrder(
+      isSellerRecentOpenOrder(
         isTerminal: false,
-        createdAt: now.subtract(const Duration(days: 20)),
+        createdAt: now.subtract(const Duration(days: 2)),
+        now: now,
+      ),
+      isTrue,
+    );
+    expect(
+      isSellerRecentOpenOrder(
+        isTerminal: false,
+        createdAt: now.subtract(const Duration(days: 10)),
         now: now,
       ),
       isFalse,
     );
   });
 
-  testWidgets('active order older than 7 days stays in Active', (tester) async {
+  testWidgets('active order older than 7 days is behind Older Orders', (
+    tester,
+  ) async {
     await _pumpKitchen(tester, orders: [
       _orderJson(
         id: 'old-active',
@@ -129,11 +139,16 @@ void main() {
         at: now.subtract(const Duration(days: 10)),
       ),
     ]);
-    expect(find.text('Idli'), findsWidgets);
-    expect(find.textContaining('Active (1)'), findsOneWidget);
-    await tester.tap(find.textContaining('Past'));
-    await tester.pump();
     expect(find.text('Idli'), findsNothing);
+    expect(find.textContaining('Active (0)'), findsOneWidget);
+    expect(find.text('No recent orders'), findsOneWidget);
+    expect(find.text('Older Orders'), findsOneWidget);
+    expect(find.text('Still in progress, older than 7 days'), findsOneWidget);
+    await tester.tap(find.text('Older Orders'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(SellerOlderOrdersScreen), findsOneWidget);
+    expect(find.text('Idli'), findsWidgets);
   });
 
   testWidgets('completed order today and 5 days ago appear in Past', (

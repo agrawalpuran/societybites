@@ -37,6 +37,30 @@ function isRecurringReadyNowListing(listing) {
   return isRegularReadyNowListing(listing) && listing.recurringEnabled === true;
 }
 
+function scheduledWeekdays(weekdays) {
+  return [...new Set((weekdays || []).map(Number))].filter((n) => n >= 1 && n <= 7);
+}
+
+function isOnScheduledDay(weekdays, weekday) {
+  return scheduledWeekdays(weekdays).includes(Number(weekday));
+}
+
+function isoWeekdayFromYmd(ymd) {
+  const [year, month, day] = String(ymd).split("-").map(Number);
+  const jsDay = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return jsDay === 0 ? 7 : jsDay;
+}
+
+/** Inclusive start. Exclusive end, except 11:59 PM (1439) includes the rest of the IST day. */
+function isInSellingWindow(minuteOfDay, startMinute, endMinute) {
+  const start = Number(startMinute);
+  const end = Number(endMinute);
+  const minute = Number(minuteOfDay);
+  if (![start, end, minute].every((n) => Number.isInteger(n))) return false;
+  if (end >= 1439) return minute >= start && minute <= 1439;
+  return minute >= start && minute < end;
+}
+
 function parseWeekdays(value) {
   if (!Array.isArray(value) || value.length === 0) {
     throw httpError("Select at least one available day");
@@ -50,6 +74,15 @@ function parseWeekdays(value) {
     throw httpError("Available days must be Monday (1) through Sunday (7)");
   }
   return days;
+}
+
+function isSameDayHoursListing(listing) {
+  return (
+    isRegularReadyNowListing(listing) &&
+    listing.recurringEnabled !== true &&
+    Number.isInteger(listing.recurringStartMinute) &&
+    Number.isInteger(listing.recurringEndMinute)
+  );
 }
 
 function parseMinuteOfDay(value, label) {
@@ -76,6 +109,7 @@ function isRecurringPayloadEnabled(body = {}) {
 function hasRecurringPayload(body = {}) {
   return (
     body.recurringEnabled !== undefined ||
+    body.sameDayHours !== undefined ||
     body.recurringWeekdays !== undefined ||
     body.recurringStartMinute !== undefined ||
     body.recurringEndMinute !== undefined ||
@@ -83,31 +117,49 @@ function hasRecurringPayload(body = {}) {
   );
 }
 
+function isSameDayHoursPayload(body = {}) {
+  return body.sameDayHours === true || body.sameDayHours === "true";
+}
+
 function recurringWriteFields(body, { catalogType, availabilityMode } = {}) {
   const enabled = isRecurringPayloadEnabled(body);
+  const sameDayHours = isSameDayHoursPayload(body);
   const preorder = (catalogType || "REGULAR") === "PREORDER";
   const madeToOrder = (availabilityMode || "READY_NOW") === "MADE_TO_ORDER";
 
-  if (enabled && preorder) {
+  if ((enabled || sameDayHours) && preorder) {
     throw httpError("Pre-order listings cannot use a repeat schedule");
   }
-  if (enabled && madeToOrder) {
+  if ((enabled || sameDayHours) && madeToOrder) {
     throw httpError("Made to order listings cannot use a repeat schedule");
   }
   if (preorder || madeToOrder) {
     return { ...clearedRecurringFields };
   }
-  if (!enabled) {
+  if (enabled && sameDayHours) {
+    throw httpError("Choose either same days every week or hours for today only");
+  }
+  if (!enabled && !sameDayHours) {
     return { ...clearedRecurringFields };
   }
 
-  const weekdays = parseWeekdays(body.recurringWeekdays);
   const start = parseMinuteOfDay(body.recurringStartMinute, "Start time");
   const end = parseMinuteOfDay(body.recurringEndMinute, "End time");
   if (end <= start) {
     throw httpError("End time must be after the start time");
   }
 
+  if (sameDayHours) {
+    return {
+      recurringEnabled: false,
+      recurringWeekdays: [],
+      recurringStartMinute: start,
+      recurringEndMinute: end,
+      recurringDailyLimit: null,
+    };
+  }
+
+  const weekdays = parseWeekdays(body.recurringWeekdays);
   return {
     recurringEnabled: true,
     recurringWeekdays: weekdays,
@@ -144,22 +196,23 @@ function formatIstYmd(date) {
 }
 
 function istClock(now = new Date()) {
+  const date = now instanceof Date ? now : new Date(now);
+  const ymd = formatIstYmd(date);
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: IST,
-    weekday: "short",
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
-  }).formatToParts(now instanceof Date ? now : new Date(now));
+  }).formatToParts(date);
   const get = (type) => parts.find((part) => part.type === type)?.value;
-  const weekdayMap = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
-  const weekday = weekdayMap[get("weekday")] || 1;
-  const hour = parseInt(get("hour"), 10) || 0;
-  const minute = parseInt(get("minute"), 10) || 0;
+  const hour = parseInt(get("hour"), 10);
+  const minute = parseInt(get("minute"), 10);
   return {
-    weekday,
-    minuteOfDay: hour * 60 + minute,
-    ymd: formatIstYmd(now),
+    weekday: isoWeekdayFromYmd(ymd),
+    minuteOfDay:
+      (Number.isInteger(hour) ? hour : 0) * 60 +
+      (Number.isInteger(minute) ? minute : 0),
+    ymd,
   };
 }
 
@@ -224,7 +277,7 @@ function nextScheduledYmd(weekdays, fromYmd, fromMinute, startMinute, includeTod
 }
 
 function nextAvailableLabel({ weekdays, startMinute, clock }) {
-  const todayIsScheduled = (weekdays || []).includes(clock.weekday);
+  const todayIsScheduled = isOnScheduledDay(weekdays, clock.weekday);
   if (todayIsScheduled && clock.minuteOfDay < startMinute) {
     return `Available today from ${formatClock(startMinute)}`;
   }
@@ -255,6 +308,33 @@ function evaluateRecurringAvailability(listing, { now = new Date(), soldToday = 
     recurringHoursSummary: "",
     recurringDailyLimitLabel: "",
   };
+
+  if (isSameDayHoursListing(listing)) {
+    const start = listing.recurringStartMinute;
+    const end = listing.recurringEndMinute;
+    const clock = istClock(now);
+    const paused = listing.status === "paused";
+    const inHours = isInSellingWindow(clock.minuteOfDay, start, end);
+    const unavailable = paused || !inHours;
+    let buyerLabel = `Available today · Until ${formatClock(end)}`;
+    let nextLabel = "";
+    if (paused) buyerLabel = "Temporarily not available";
+    else if (!inHours) {
+      buyerLabel = "Temporarily not available";
+      nextLabel =
+        clock.minuteOfDay < start
+          ? `Available today from ${formatClock(start)}`
+          : "";
+    }
+    return {
+      ...empty,
+      recurringUnavailable: unavailable,
+      recurringBuyerLabel: inHours && !paused ? buyerLabel : buyerLabel,
+      recurringNextLabel: nextLabel,
+      recurringHoursSummary: `${formatClock(start)} – ${formatClock(end)}`,
+    };
+  }
+
   if (!isRecurringReadyNowListing(listing)) return empty;
 
   const weekdays = listing.recurringWeekdays || [];
@@ -263,12 +343,8 @@ function evaluateRecurringAvailability(listing, { now = new Date(), soldToday = 
   const limit = listing.recurringDailyLimit;
   const clock = istClock(now);
   const paused = listing.status === "paused";
-  const onDay = weekdays.includes(clock.weekday);
-  const inHours =
-    Number.isInteger(start) &&
-    Number.isInteger(end) &&
-    clock.minuteOfDay >= start &&
-    clock.minuteOfDay < end;
+  const onDay = isOnScheduledDay(weekdays, clock.weekday);
+  const inHours = isInSellingWindow(clock.minuteOfDay, start, end);
   const soldOut =
     Number.isInteger(limit) && Number(soldToday) >= limit;
   const unavailable = paused || !onDay || !inHours || soldOut;
@@ -360,16 +436,37 @@ async function attachRecurringAvailability(prisma, listings, now = new Date()) {
 }
 
 async function assertRecurringOrderable(prisma, listing, quantity, now = new Date()) {
+  if (isSameDayHoursListing(listing)) {
+    if (listing.status === "paused") {
+      throw httpError(`"${listing.name}" is paused and cannot be ordered`);
+    }
+    const clock = istClock(now);
+    const inHours = isInSellingWindow(
+      clock.minuteOfDay,
+      listing.recurringStartMinute,
+      listing.recurringEndMinute
+    );
+    if (!inHours) {
+      throw httpError(
+        `"${listing.name}" is temporarily not available`,
+        400,
+        "RECURRING_UNAVAILABLE"
+      );
+    }
+    return;
+  }
   if (!isRecurringReadyNowListing(listing)) return;
   if (listing.status === "paused") {
     throw httpError(`"${listing.name}" is paused and cannot be ordered`);
   }
 
   const clock = istClock(now);
-  const onDay = (listing.recurringWeekdays || []).includes(clock.weekday);
-  const inHours =
-    clock.minuteOfDay >= listing.recurringStartMinute &&
-    clock.minuteOfDay < listing.recurringEndMinute;
+  const onDay = isOnScheduledDay(listing.recurringWeekdays, clock.weekday);
+  const inHours = isInSellingWindow(
+    clock.minuteOfDay,
+    listing.recurringStartMinute,
+    listing.recurringEndMinute
+  );
   if (!onDay || !inHours) {
     throw httpError(
       `"${listing.name}" is temporarily not available`,
@@ -398,6 +495,9 @@ module.exports = {
   clearedRecurringFields,
   isRegularReadyNowListing,
   isRecurringReadyNowListing,
+  isSameDayHoursListing,
+  isInSellingWindow,
+  isOnScheduledDay,
   recurringWriteFields,
   recurringUpdateFields,
   evaluateRecurringAvailability,
