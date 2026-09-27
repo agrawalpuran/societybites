@@ -5,6 +5,7 @@ import 'screens/main_shell_screen.dart';
 import 'screens/guest_landing_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/society_selection_screen.dart';
+import 'theme/app_theme.dart';
 import 'widgets/app_header.dart';
 import 'widgets/screen_loading_note.dart';
 import 'services/api_service.dart';
@@ -41,6 +42,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'SocietyBites',
       debugShowCheckedModeBanner: false,
+      theme: societyBitesTheme(),
       navigatorKey: PushNotificationService.navigatorKey,
       home: const AuthGate(),
     );

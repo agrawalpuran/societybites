@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'otp_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_config.dart';
+import '../widgets/app_header.dart';
 
 bool get _isIosLayout => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
@@ -163,35 +164,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final sectionGap = isIos ? 12.0 : size.height * 0.035;
     final topGap = isIos ? 8.0 : size.height * 0.03;
 
-    final form = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(height: topGap),
-        if (Navigator.canPop(context))
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-              color: const Color(0xFF3A4644),
-            ),
-          ),
-        _HeaderSection(theme: theme),
-        SizedBox(height: sectionGap),
-        _InputSection(controller: _phoneController, focusNode: _phoneFocusNode),
-        SizedBox(height: sectionGap),
-        _SendOtpButton(
-          isLoading: _isSendingOtp,
-          onTap: _isSendingOtp ? null : _sendOtp,
-        ),
-        SizedBox(height: sectionGap),
-        const _TrustIndicatorsRow(),
-        if (isIos) ...[const SizedBox(height: 20), const _FooterLinks()],
-      ],
-    );
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Stack(
           children: [
@@ -216,33 +191,63 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-            Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    keyboardDismissBehavior: isIos
-                        ? ScrollViewKeyboardDismissBehavior.onDrag
-                        : ScrollViewKeyboardDismissBehavior.manual,
-                    padding: isIos
-                        ? EdgeInsets.fromLTRB(
-                            horizontalPadding,
-                            12,
-                            horizontalPadding,
-                            12,
-                          )
-                        : EdgeInsets.symmetric(
-                            horizontal: horizontalPadding,
-                            vertical: 24,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  keyboardDismissBehavior: isIos
+                      ? ScrollViewKeyboardDismissBehavior.onDrag
+                      : ScrollViewKeyboardDismissBehavior.manual,
+                  padding: isIos
+                      ? EdgeInsets.fromLTRB(
+                          horizontalPadding,
+                          12,
+                          horizontalPadding,
+                          12,
+                        )
+                      : EdgeInsets.symmetric(
+                          horizontal: horizontalPadding,
+                          vertical: 24,
+                        ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(height: topGap),
+                        if (Navigator.canPop(context))
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: IconButton(
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                size: 20,
+                              ),
+                              color: const Color(0xFF3A4644),
+                            ),
                           ),
-                    child: form,
+                        _HeaderSection(theme: theme),
+                        SizedBox(height: sectionGap),
+                        _InputSection(
+                          controller: _phoneController,
+                          focusNode: _phoneFocusNode,
+                        ),
+                        SizedBox(height: sectionGap),
+                        _SendOtpButton(
+                          isLoading: _isSendingOtp,
+                          onTap: _isSendingOtp ? null : _sendOtp,
+                        ),
+                        SizedBox(height: sectionGap),
+                        const _TrustIndicatorsRow(),
+                        const SizedBox(height: 20),
+                        const _FooterLinks(),
+                        if (!isIos) const SizedBox(height: 14),
+                      ],
+                    ),
                   ),
-                ),
-                if (!isIos) ...[
-                  const _FooterLinks(),
-                  const SizedBox(height: 14),
-                ],
-              ],
+                );
+              },
             ),
           ],
         ),
@@ -285,13 +290,21 @@ class _HeaderSection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Text(
-              'SocietyBites',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontSize: isIos ? 22 : null,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0A4638),
-                letterSpacing: -0.5,
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  kAppDisplayName,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.visible,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontSize: isIos ? 22 : null,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0A4638),
+                    letterSpacing: -0.5,
+                  ),
+                ),
               ),
             ),
           ],
@@ -507,12 +520,17 @@ class _TrustItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final isIos = _isIosLayout;
     return Container(
-      height: isIos ? 72 : 96,
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: 4,
+        vertical: isIos ? 10 : 14,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFFF1F4F3),
         borderRadius: BorderRadius.circular(22),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           _IconBadge(icon: icon),
@@ -520,8 +538,10 @@ class _TrustItem extends StatelessWidget {
           Text(
             label,
             textAlign: TextAlign.center,
+            softWrap: true,
             style: const TextStyle(
               fontSize: 11.5,
+              height: 1.2,
               letterSpacing: 1.1,
               color: Color(0xFF243532),
               fontWeight: FontWeight.w800,
@@ -586,28 +606,16 @@ class _FooterLinks extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: isIos ? 16 : 26),
       child: Column(
         children: [
-          if (isIos)
-            const Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 16,
-              runSpacing: 6,
-              children: [
-                _FooterLinkText(text: 'Terms of Service'),
-                _FooterLinkText(text: 'Privacy Policy'),
-                _FooterLinkText(text: 'Help Center'),
-              ],
-            )
-          else
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _FooterLinkText(text: 'Terms of Service'),
-                SizedBox(width: 22),
-                _FooterLinkText(text: 'Privacy Policy'),
-                SizedBox(width: 22),
-                _FooterLinkText(text: 'Help Center'),
-              ],
-            ),
+          const Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 16,
+            runSpacing: 6,
+            children: [
+              _FooterLinkText(text: 'Terms of Service'),
+              _FooterLinkText(text: 'Privacy Policy'),
+              _FooterLinkText(text: 'Help Center'),
+            ],
+          ),
           const SizedBox(height: 12),
           const Text(
             '© 2024 SOCIETYBITES. ALL RIGHTS RESERVED.',

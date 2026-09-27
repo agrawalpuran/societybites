@@ -1625,29 +1625,34 @@ class _SpecialCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  GestureDetector(
-                    onTap: onSellerTap,
-                    child: Text(
-                      'By ${food.sellerName}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.white : const Color(0xFF0E5A47),
-                        decoration: TextDecoration.underline,
-                        decorationColor: isDark
-                            ? Colors.white
-                            : const Color(0xFF0E5A47),
-                        fontWeight: FontWeight.w700,
+                  Flexible(
+                    child: GestureDetector(
+                      onTap: onSellerTap,
+                      child: Text(
+                        'By ${food.sellerName}',
+                        softWrap: true,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.25,
+                          color: isDark ? Colors.white : const Color(0xFF0E5A47),
+                          decoration: TextDecoration.underline,
+                          decorationColor: isDark
+                              ? Colors.white
+                              : const Color(0xFF0E5A47),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
-                  Expanded(
+                  Flexible(
                     child: Text(
                       ' • ${food.locationLabel}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      softWrap: true,
                       style: TextStyle(
                         fontSize: 12,
+                        height: 1.25,
                         color: isDark
                             ? Colors.white70
                             : const Color(0xFF6A7774),
@@ -1974,7 +1979,8 @@ class _AvailableItemTile extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Container(
+                      Flexible(
+                        child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 4,
@@ -1984,7 +1990,6 @@ class _AvailableItemTile extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(
                               Icons.schedule_rounded,
@@ -1992,16 +1997,21 @@ class _AvailableItemTile extends StatelessWidget {
                               color: Color(0xFF0E5A47),
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              '${food.pickupTime} pickup',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF0E5A47),
-                                fontWeight: FontWeight.w600,
+                            Flexible(
+                              child: Text(
+                                '${food.pickupTime} pickup',
+                                softWrap: true,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.25,
+                                  color: Color(0xFF0E5A47),
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
                         ),
+                      ),
                       ),
                       const SizedBox(width: 8),
                       Flexible(

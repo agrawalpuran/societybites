@@ -5,6 +5,7 @@ import 'package:societybites/config/launch_config.dart';
 import 'package:societybites/models/guest_discovery.dart';
 import 'package:societybites/screens/guest_kitchens_screen.dart';
 import 'package:societybites/screens/guest_landing_screen.dart';
+import 'package:societybites/widgets/app_header.dart';
 
 void _ignoreKnownLayoutNoise() {
   final previous = FlutterError.onError;
@@ -29,7 +30,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: GuestLandingScreen()));
     await tester.pump();
 
-    expect(find.text('SocietyBites'), findsOneWidget);
+    expect(find.text(kAppDisplayName), findsOneWidget);
     expect(find.textContaining('Now serving $currentServingCity'), findsOneWidget);
     expect(find.text('Sign In'), findsOneWidget);
     expect(

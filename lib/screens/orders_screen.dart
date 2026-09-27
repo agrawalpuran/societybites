@@ -994,42 +994,47 @@ class _StatusTracker extends StatelessWidget {
         final isActive = stepIndex <= currentStep;
         final isCurrent = stepIndex == currentStep;
 
-        return Column(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isActive
-                    ? const Color(0xFF0E5A47)
-                    : const Color(0xFFF0F2F1),
-                border: isCurrent
-                    ? Border.all(color: const Color(0xFF0E5A47), width: 2)
+        return Expanded(
+          child: Column(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isActive
+                      ? const Color(0xFF0E5A47)
+                      : const Color(0xFFF0F2F1),
+                  border: isCurrent
+                      ? Border.all(color: const Color(0xFF0E5A47), width: 2)
+                      : null,
+                ),
+                child: isActive
+                    ? Icon(
+                        isCurrent
+                            ? Icons.restaurant_rounded
+                            : Icons.check_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      )
                     : null,
               ),
-              child: isActive
-                  ? Icon(
-                      isCurrent
-                          ? Icons.restaurant_rounded
-                          : Icons.check_rounded,
-                      size: 14,
-                      color: Colors.white,
-                    )
-                  : null,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              steps[stepIndex],
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: isActive
-                    ? const Color(0xFF0E5A47)
-                    : const Color(0xFF8A9491),
+              const SizedBox(height: 4),
+              Text(
+                steps[stepIndex],
+                textAlign: TextAlign.center,
+                softWrap: true,
+                style: TextStyle(
+                  fontSize: 10,
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                  color: isActive
+                      ? const Color(0xFF0E5A47)
+                      : const Color(0xFF8A9491),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       }),
     );
