@@ -1,0 +1,385 @@
+[35mREADME.md[m[36m:[m[32m1[m[36m:[m# [1;31msocietybites[m
+[35mandroid/app/build.gradle.kts[m[36m:[m[32m21[m[36m:[m    namespace = "com.puran.[1;31msocietybites[m"
+[35mandroid/app/build.gradle.kts[m[36m:[m[32m36[m[36m:[m        applicationId = "com.puran.[1;31msocietybites[m"
+[35mandroid/app/google-services.json[m[36m:[m[32m12[m[36m:[m          "package_name": "com.example.[1;31msocietybites[m"
+[35mandroid/app/google-services.json[m[36m:[m[32m31[m[36m:[m          "package_name": "com.puran.[1;31msocietybites[m"
+[35mandroid/app/src/main/AndroidManifest.xml[m[36m:[m[32m7[m[36m:[m        android:label="[1;31msocietybites[m"
+[35mandroid/app/src/main/AndroidManifest.xml[m[36m:[m[32m40[m[36m:[m            android:value="[1;31msocietybites[m_orders" />
+[35mandroid/app/src/main/kotlin/com/puran/societybites/MainActivity.kt[m[36m:[m[32m1[m[36m:[mpackage com.puran.[1;31msocietybites[m
+[35mandroid/app/src/main/kotlin/com/puran/societybites/MainActivity.kt[m[36m:[m[32m16[m[36m:[m        const val CHANNEL_ID = "[1;31msocietybites[m_orders"
+[35mandroid/app/src/main/kotlin/com/puran/societybites/MainActivity.kt[m[36m:[m[32m17[m[36m:[m        private const val METHOD_CHANNEL = "[1;31msocietybites[m/notifications"
+[35mandroid/app/src/main/kotlin/com/puran/societybites/MainActivity.kt[m[36m:[m[32m26[m[36m:[m                    val title = call.argument<String>("title") ?: "[1;31mSocietyBites[m"
+[35mandroid/app/src/main/kotlin/com/puran/societybites/MainActivity.kt[m[36m:[m[32m43[m[36m:[m            description = "[1;31mSocietyBites[m order and message alerts"
+[35mdocs/01_PROJECT_OVERVIEW.md[m[36m:[m[32m1[m[36m:[m# [1;31mSocietyBites[m
+[35mdocs/01_PROJECT_OVERVIEW.md[m[36m:[m[32m5[m[36m:[m[1;31mSocietyBites[m is a hyperlocal food marketplace that enables residents of a gated community to buy homemade food from other residents within the same society.
+[35mdocs/06_PAYMENT_FLOW.md[m[36m:[m[32m3[m[36m:[m[1;31mSocietyBites[m does not act as a payment gateway.
+[35mdocs/2FACTOR_AUTH_CHECKPOINT.md[m[36m:[m[32m148[m[36m:[m- Existing [1;31mSocietyBites[m user reused (same `User.id`, name, society/flat)
+[35mdocs/2FACTOR_AUTH_CHECKPOINT.md[m[36m:[m[32m172[m[36m:[m- `[1;31msocietybites[m-backend/lib/twoFactor.js`
+[35mdocs/2FACTOR_AUTH_CHECKPOINT.md[m[36m:[m[32m173[m[36m:[m- `[1;31msocietybites[m-backend/lib/otpStore.js`
+[35mdocs/2FACTOR_AUTH_CHECKPOINT.md[m[36m:[m[32m174[m[36m:[m- `[1;31msocietybites[m-backend/lib/refreshTokens.js`
+[35mdocs/2FACTOR_AUTH_CHECKPOINT.md[m[36m:[m[32m175[m[36m:[m- `[1;31msocietybites[m-backend/utils/phone.js`
+[35mdocs/2FACTOR_AUTH_CHECKPOINT.md[m[36m:[m[32m179[m[36m:[m- `[1;31msocietybites[m-backend/routes/auth.js`
+[35mdocs/2FACTOR_AUTH_CHECKPOINT.md[m[36m:[m[32m180[m[36m:[m- `[1;31msocietybites[m-backend/lib/jwt.js`
+[35mdocs/2FACTOR_AUTH_CHECKPOINT.md[m[36m:[m[32m181[m[36m:[m- `[1;31msocietybites[m-backend/prisma/schema.prisma`
+[35mdocs/2FACTOR_AUTH_CHECKPOINT.md[m[36m:[m[32m182[m[36m:[m- `[1;31msocietybites[m-backend/.env.example`
+[35mdocs/privacy-policy.md[m[36m:[m[32m1[m[36m:[m# Privacy Policy for [1;31mSocietyBites[m
+[35mdocs/privacy-policy.md[m[36m:[m[32m7[m[36m:[mThank you for using **[1;31mSocietyBites[m** ("the App"). [1;31mSocietyBites[m is a hyperlocal community marketplace that enables residents within a residential society to buy and sell homemade food and other community offerings.
+[35mdocs/privacy-policy.md[m[36m:[m[32m76[m[36m:[m[1;31mSocietyBites[m does not process or store payments.
+[35mdocs/privacy-policy.md[m[36m:[m[32m110[m[36m:[m[1;31mSocietyBites[m is not intended for children under the age of 13.
+[35mios/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m485[m[36m:[m				"PRODUCT_BUNDLE_IDENTIFIER[sdk=*]" = com.[1;31msocietybites[m.app;
+[35mios/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m502[m[36m:[m				PRODUCT_BUNDLE_IDENTIFIER = com.example.[1;31msocietybites[m.RunnerTests;
+[35mios/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m520[m[36m:[m				PRODUCT_BUNDLE_IDENTIFIER = com.example.[1;31msocietybites[m.RunnerTests;
+[35mios/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m536[m[36m:[m				PRODUCT_BUNDLE_IDENTIFIER = com.example.[1;31msocietybites[m.RunnerTests;
+[35mios/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m669[m[36m:[m				PRODUCT_BUNDLE_IDENTIFIER = com.[1;31msocietybites[m.app;
+[35mios/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m695[m[36m:[m				PRODUCT_BUNDLE_IDENTIFIER = com.[1;31msocietybites[m.app;
+[35mios/Runner/GoogleService-Info.plist[m[36m:[m[32m12[m[36m:[m	<string>com.[1;31msocietybites[m.app</string>
+[35mios/Runner/Info.plist[m[36m:[m[32m10[m[36m:[m	<string>[1;31mSocietybites[m</string>
+[35mios/Runner/Info.plist[m[36m:[m[32m18[m[36m:[m	<string>[1;31msocietybites[m</string>
+[35mios/Runner/Info.plist[m[36m:[m[32m40[m[36m:[m	<string>[1;31mSocietyBites[m uses your camera so you can take a photo of the food you are listing.</string>
+[35mios/Runner/Info.plist[m[36m:[m[32m42[m[36m:[m	<string>[1;31mSocietyBites[m uses your photo library so you can choose a photo of the food you are listing.</string>
+[35mlib/firebase_options.dart[m[36m:[m[32m66[m[36m:[m    iosBundleId: 'com.example.[1;31msocietybites[m',
+[35mlib/firebase_options.dart[m[36m:[m[32m75[m[36m:[m    iosBundleId: 'com.example.[1;31msocietybites[m',
+[35mlib/main.dart[m[36m:[m[32m42[m[36m:[m      title: '[1;31mSocietyBites[m',
+[35mlib/models/help_center.dart[m[36m:[m[32m46[m[36m:[m        question: 'What is [1;31mSocietyBites[m?',
+[35mlib/models/help_center.dart[m[36m:[m[32m48[m[36m:[m            '[1;31mSocietyBites[m is a homegrown food marketplace for your apartment community. Neighbours cook, neighbours buy, and you pick up from each other.',
+[35mlib/models/help_center.dart[m[36m:[m[32m188[m[36m:[m            'Some sellers can bring the order to you themselves. This is arranged by the seller, not by a [1;31mSocietyBites[m driver.',
+[35mlib/models/help_center.dart[m[36m:[m[32m202[m[36m:[m            'No. [1;31mSocietyBites[m does not show live tracking or a delivery ETA. Follow the order status and message the seller if you need an update.',
+[35mlib/models/help_center.dart[m[36m:[m[32m244[m[36m:[m            'There is no in-app cancel button for buyers. Ask the seller if they can reject it, or write to support@[1;31msocietybites[m.in if you need help.',
+[35mlib/models/help_center.dart[m[36m:[m[32m349[m[36m:[m            '[1;31mSocietyBites[m does not take the payment. You pay the seller directly with UPI or cash. There is no in-app payment gateway.',
+[35mlib/models/help_center.dart[m[36m:[m[32m356[m[36m:[m            'Your society cannot be changed after you join. Email support@[1;31msocietybites[m.in if you have moved and need help.',
+[35mlib/models/help_center.dart[m[36m:[m[32m363[m[36m:[m            'Checkout may add a small platform fee set by [1;31mSocietyBites[m. You will see it on the bill before you place the order.',
+[35mlib/models/help_center.dart[m[36m:[m[32m412[m[36m:[m            'Email support@[1;31msocietybites[m.in. We typically reply within 24 hours.',
+[35mlib/screens/add_listing_screen.dart[m[36m:[m[32m1470[m[36m:[m                  'regulations and [1;31mSocietyBites[m food safety guidelines. Ensure all '
+[35mlib/screens/admin/admin_shell_screen.dart[m[36m:[m[32m219[m[36m:[m              '[1;31mSocietyBites[m Admin',
+[35mlib/screens/buyer_preorder_detail_screen.dart[m[36m:[m[32m561[m[36m:[m          '[1;31mSocietyBites[m does not currently provide delivery services.',
+[35mlib/screens/create_preorder_screen.dart[m[36m:[m[32m471[m[36m:[m                              '[1;31mSocietyBites[m does not currently provide delivery services. '
+[35mlib/screens/explore_nearby_screen.dart[m[36m:[m[32m201[m[36m:[m          : 'We\'re growing [1;31mSocietyBites[m in your area. Neighboring cooks appear here only if they choose Nearby selling.',
+[35mlib/screens/guest_landing_screen.dart[m[36m:[m[32m91[m[36m:[m            SliverToBoxAdapter(child: _[1;31mSocietyBites[mHeader(onSignIn: _openSignIn)),
+[35mlib/screens/guest_landing_screen.dart[m[36m:[m[32m138[m[36m:[mclass _[1;31mSocietyBites[mHeader extends StatelessWidget {
+[35mlib/screens/guest_landing_screen.dart[m[36m:[m[32m139[m[36m:[m  const _[1;31mSocietyBites[mHeader({required this.onSignIn});
+[35mlib/screens/guest_landing_screen.dart[m[36m:[m[32m165[m[36m:[m              '[1;31mSocietyBites[m',
+[35mlib/screens/login_screen.dart[m[36m:[m[32m289[m[36m:[m              '[1;31mSocietyBites[m',
+[35mlib/screens/login_screen.dart[m[36m:[m[32m613[m[36m:[m            '© 2024 [1;31mSOCIETYBITES[m. ALL RIGHTS RESERVED.',
+[35mlib/screens/orders_screen.dart[m[36m:[m[32m960[m[36m:[m              '[1;31mSocietyBites[m does not provide delivery. Coordinate directly with the seller.',
+[35mlib/screens/otp_screen.dart[m[36m:[m[32m732[m[36m:[m                  'We take community safety seriously at [1;31mSocietyBites[m.',
+[35mlib/screens/payment_screen.dart[m[36m:[m[32m86[m[36m:[m    payeeName: _sellerName.trim().isEmpty ? '[1;31mSocietyBites[m seller' : _sellerName,
+[35mlib/screens/payment_screen.dart[m[36m:[m[32m88[m[36m:[m    transactionNote: '[1;31mSocietyBites[m Order ${_order.orderId}',
+[35mlib/screens/preorder_checkout_screen.dart[m[36m:[m[32m471[m[36m:[m      '[1;31mSocietyBites[m does not currently provide delivery services. Delivery '
+[35mlib/screens/preorder_checkout_screen.dart[m[36m:[m[32m610[m[36m:[m                      '[1;31mSocietyBites[m does not currently provide delivery services. '
+[35mlib/screens/preorder_detail_screen.dart[m[36m:[m[32m949[m[36m:[m      '[1;31mSocietyBites[m does not currently provide delivery services. Pickup or '
+[35mlib/screens/profile_screen.dart[m[36m:[m[32m172[m[36m:[m    return '[1;31mSocietyBites[m Member';
+[35mlib/screens/profile_screen.dart[m[36m:[m[32m1255[m[36m:[m          '[1;31mSocietyBites[m',
+[35mlib/screens/profile_screen.dart[m[36m:[m[32m1418[m[36m:[m                              '[1;31mSocietyBites[m Privacy Policy\n\n'
+[35mlib/screens/profile_screen.dart[m[36m:[m[32m1420[m[36m:[m                                  '[1;31mSocietyBites[m collects and processes the following information:\n'
+[35mlib/screens/profile_screen.dart[m[36m:[m[32m1431[m[36m:[m                                  'For questions: support@[1;31msocietybites[m.in',
+[35mlib/screens/profile_screen.dart[m[36m:[m[32m1439[m[36m:[m                              '[1;31mSocietyBites[m Terms of Service\n\n'
+[35mlib/screens/profile_screen.dart[m[36m:[m[32m1441[m[36m:[m                                  'By using [1;31mSocietyBites[m, you agree to:\n'
+[35mlib/screens/profile_screen.dart[m[36m:[m[32m1447[m[36m:[m                                  '[1;31mSocietyBites[m is a community platform. We reserve the right to suspend accounts that violate community guidelines.\n\n'
+[35mlib/screens/profile_screen.dart[m[36m:[m[32m1448[m[36m:[m                                  'For disputes: support@[1;31msocietybites[m.in',
+[35mlib/screens/profile_screen.dart[m[36m:[m[32m1472[m[36m:[m                                'Permanently delete your [1;31mSocietyBites[m account and associated personal data.',
+[35mlib/services/api_service.dart[m[36m:[m[32m145[m[36m:[m      defaultValue: 'https://[1;31msocietybites[m.onrender.com',
+[35mlib/services/api_service.dart[m[36m:[m[32m148[m[36m:[m    if (normalized.isEmpty) return 'https://[1;31msocietybites[m.onrender.com';
+[35mlib/services/push_notification_service.dart[m[36m:[m[32m37[m[36m:[m  static const _androidChannel = MethodChannel('[1;31msocietybites[m/notifications');
+[35mlib/services/push_notification_service.dart[m[36m:[m[32m138[m[36m:[m    final title = message.notification?.title ?? '[1;31mSocietyBites[m';
+[35mlib/services/upi_payment_service.dart[m[36m:[m[32m101[m[36m:[m/// GPay iOS shows literally (`[1;31mSocietyBites[m+Order+SB-993150`) and can fail.
+[35mlib/widgets/app_header.dart[m[36m:[m[32m70[m[36m:[m              '[1;31mSocietyBites[m',
+[35mlib/widgets/guest_order_auth.dart[m[36m:[m[32m11[m[36m:[m        'Sign in or join [1;31mSocietyBites[m to add items to your cart and place an order.',
+[35mlib/widgets/preorder_widgets.dart[m[36m:[m[32m83[m[36m:[m    return 'Could not reach [1;31mSocietyBites[m. Check your connection and try again.';
+[35mlinux/CMakeLists.txt[m[36m:[m[32m7[m[36m:[mset(BINARY_NAME "[1;31msocietybites[m")
+[35mlinux/CMakeLists.txt[m[36m:[m[32m10[m[36m:[mset(APPLICATION_ID "com.example.[1;31msocietybites[m")
+[35mlinux/runner/my_application.cc[m[36m:[m[32m48[m[36m:[m    gtk_header_bar_set_title(header_bar, "[1;31msocietybites[m");
+[35mlinux/runner/my_application.cc[m[36m:[m[32m52[m[36m:[m    gtk_window_set_title(window, "[1;31msocietybites[m");
+[35mmacos/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m67[m[36m:[m		33CC10ED2044A3C60003C045 /* [1;31msocietybites[m.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "[1;31msocietybites[m.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+[35mmacos/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m134[m[36m:[m				33CC10ED2044A3C60003C045 /* [1;31msocietybites[m.app */,
+[35mmacos/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m220[m[36m:[m			productReference = 33CC10ED2044A3C60003C045 /* [1;31msocietybites[m.app */;
+[35mmacos/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m388[m[36m:[m				PRODUCT_BUNDLE_IDENTIFIER = com.example.[1;31msocietybites[m.RunnerTests;
+[35mmacos/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m391[m[36m:[m				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/[1;31msocietybites[m.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/[1;31msocietybites[m";
+[35mmacos/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m402[m[36m:[m				PRODUCT_BUNDLE_IDENTIFIER = com.example.[1;31msocietybites[m.RunnerTests;
+[35mmacos/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m405[m[36m:[m				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/[1;31msocietybites[m.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/[1;31msocietybites[m";
+[35mmacos/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m416[m[36m:[m				PRODUCT_BUNDLE_IDENTIFIER = com.example.[1;31msocietybites[m.RunnerTests;
+[35mmacos/Runner.xcodeproj/project.pbxproj[m[36m:[m[32m419[m[36m:[m				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/[1;31msocietybites[m.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/[1;31msocietybites[m";
+[35mmacos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme[m[36m:[m[32m18[m[36m:[m               BuildableName = "[1;31msocietybites[m.app"
+[35mmacos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme[m[36m:[m[32m34[m[36m:[m            BuildableName = "[1;31msocietybites[m.app"
+[35mmacos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme[m[36m:[m[32m69[m[36m:[m            BuildableName = "[1;31msocietybites[m.app"
+[35mmacos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme[m[36m:[m[32m86[m[36m:[m            BuildableName = "[1;31msocietybites[m.app"
+[35mmacos/Runner/Configs/AppInfo.xcconfig[m[36m:[m[32m8[m[36m:[mPRODUCT_NAME = [1;31msocietybites[m
+[35mmacos/Runner/Configs/AppInfo.xcconfig[m[36m:[m[32m11[m[36m:[mPRODUCT_BUNDLE_IDENTIFIER = com.example.[1;31msocietybites[m
+[35mmarketing/index.html[m[36m:[m[32m7[m[36m:[m    <title>[1;31mSocietyBites[m</title>
+[35mmarketing/index.html[m[36m:[m[32m108[m[36m:[m    <h1>[1;31mSocietyBites[m</h1>
+[35mmarketing/index.html[m[36m:[m[32m115[m[36m:[m        [1;31mSocietyBites[m is a community-based homemade food marketplace
+[35mmarketing/index.html[m[36m:[m[32m123[m[36m:[m        [1;31mSocietyBites[m brings your community kitchen closer to home.
+[35mmarketing/index.html[m[36m:[m[32m140[m[36m:[m        [1;31mSocietyBites[m helps connect neighbours through the food
+[35mmarketing/index.html[m[36m:[m[32m174[m[36m:[m        [1;31mSocietyBites[m is designed around a simple idea:
+[35mmarketing/index.html[m[36m:[m[32m193[m[36m:[m                [1;31mSocietyBites[m — Bringing communities together,
+[35mmarketing/index.html[m[36m:[m[32m203[m[36m:[m        <strong>[1;31mSocietyBites[m</strong><br>
+[35mmarketing/index.html[m[36m:[m[32m208[m[36m:[m        <a href="https://agrawalpuran.github.io/[1;31msocietybites[m/support/">
+[35mmarketing/index.html[m[36m:[m[32m209[m[36m:[m            [1;31mSocietyBites[m Support
+[35mmarketing/index.html[m[36m:[m[32m214[m[36m:[m        © 2026 [1;31mSocietyBites[m. All rights reserved.
+[35mprivacy/index.html[m[36m:[m[32m6[m[36m:[m    <title>[1;31mSocietyBites[m - Privacy Policy</title>
+[35mprivacy/index.html[m[36m:[m[32m45[m[36m:[m<h1>[1;31mSocietyBites[m Privacy Policy</h1>
+[35mprivacy/index.html[m[36m:[m[32m50[m[36m:[m[1;31mSocietyBites[m ("[1;31mSocietyBites[m", "we", "our", or "us") is a community-based
+[35mprivacy/index.html[m[36m:[m[32m57[m[36m:[minformation when you use the [1;31mSocietyBites[m mobile application.
+[35mprivacy/index.html[m[36m:[m[32m63[m[36m:[mDepending on how you use [1;31mSocietyBites[m, we may collect the following types
+[35mprivacy/index.html[m[36m:[m[32m79[m[36m:[m<strong>Food Listings:</strong> If you use [1;31mSocietyBites[m as a seller, we
+[35mprivacy/index.html[m[36m:[m[32m122[m[36m:[m• Maintain and improve [1;31mSocietyBites[m and its features.
+[35mprivacy/index.html[m[36m:[m[32m128[m[36m:[m[1;31mSocietyBites[m is designed as a community marketplace. Some information
+[35mprivacy/index.html[m[36m:[m[32m147[m[36m:[m[1;31mSocietyBites[m, including services for authentication, cloud hosting,
+[35mprivacy/index.html[m[36m:[m[32m172[m[36m:[m[1;31mSocietyBites[m services, maintain accounts and transaction records,
+[35mprivacy/index.html[m[36m:[m[32m186[m[36m:[mpersonal information associated with your [1;31mSocietyBites[m account, subject
+[35mprivacy/index.html[m[36m:[m[32m197[m[36m:[m[1;31mSocietyBites[m is intended for general audiences and is not specifically
+[35mprivacy/index.html[m[36m:[m[32m210[m[36m:[m[1;31mSocietyBites[m may use or interact with third-party services. Those
+[35mprivacy/index.html[m[36m:[m[32m220[m[36m:[mto [1;31mSocietyBites[m, our practices, or applicable requirements.
+[35mprivacy/index.html[m[36m:[m[32m232[m[36m:[minformation, please contact us through the [1;31mSocietyBites[m support page.
+[35mprivacy/index.html[m[36m:[m[32m236[m[36m:[m<strong>[1;31mSocietyBites[m Support:</strong><br>
+[35mprivacy/index.html[m[36m:[m[32m237[m[36m:[m<a href="https://agrawalpuran.github.io/[1;31msocietybites[m/support/">
+[35mprivacy/index.html[m[36m:[m[32m238[m[36m:[mhttps://agrawalpuran.github.io/[1;31msocietybites[m/support/
+[35mpubspec.yaml[m[36m:[m[32m1[m[36m:[mname: [1;31msocietybites[m
+[35mpubspec.yaml[m[36m:[m[32m63[m[36m:[m  image_path: assets/branding/[1;31msocietybites[m_launcher_icon.png
+[35mpubspec.yaml[m[36m:[m[32m65[m[36m:[m  adaptive_icon_foreground: assets/branding/[1;31msocietybites[m_launcher_icon.png
+[35mpubspec.yaml[m[36m:[m[32m83[m[36m:[m    - assets/branding/[1;31msocietybites[m_launcher_icon.png
+[35msocietybites-backend/.env.example[m[36m:[m[32m47[m[36m:[m# Required for "Find Your Society" discovery. [1;31mSocietyBites[m remains source of truth.
+[35msocietybites-backend/lib/accountDeletion.js[m[36m:[m[32m4[m[36m:[m * Privacy-preserving account deletion for [1;31mSocietyBites[m.
+[35msocietybites-backend/lib/jwt.js[m[36m:[m[32m3[m[36m:[mconst JWT_SECRET = process.env.JWT_SECRET || "[1;31msocietybites[m-dev-secret-change-in-production";
+[35msocietybites-backend/lib/launchCity.js[m[36m:[m[32m158[m[36m:[m    `This society is not currently available in [1;31mSocietyBites[m. We are currently available in ${config.city}.`,
+[35msocietybites-backend/package-lock.json[m[36m:[m[32m2[m[36m:[m  "name": "[1;31msocietybites[m-backend",
+[35msocietybites-backend/package-lock.json[m[36m:[m[32m8[m[36m:[m      "name": "[1;31msocietybites[m-backend",
+[35msocietybites-backend/package.json[m[36m:[m[32m2[m[36m:[m  "name": "[1;31msocietybites[m-backend",
+[35msocietybites-backend/prisma/schema.prisma[m[36m:[m[32m60[m[36m:[m  /// Google Place ID of the real-world society. Discovery only — [1;31mSocietyBites[m id remains source of truth.
+[35msocietybites-backend/scripts/download-seed-images.js[m[36m:[m[32m32[m[36m:[m            "User-Agent": "[1;31mSocietyBites[m-Seed/1.0",
+[35msocietybites-backend/scripts/migrate-uploads-to-supabase.js[m[36m:[m[32m3[m[36m:[m * Run from [1;31msocietybites[m-backend after setting SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+[35msocietybites-backend/seed-images/ATTRIBUTION.md[m[36m:[m[32m3[m[36m:[mFood photos sourced from [Wikimedia Commons](https://commons.wikimedia.org/) for [1;31mSocietyBites[m demo data.
+[35msocietybites-backend/tests/notifications-payload.test.js[m[36m:[m[32m23[m[36m:[massert(ANDROID_CHANNEL_ID === "[1;31msocietybites[m_orders", "channel constant");
+[35msocietybites-backend/tests/society-places.test.js[m[36m:[m[32m148[m[36m:[m  assert(!suggestions[0].id, "suggestions must not invent a [1;31mSocietyBites[m id");
+[35msocietybites-backend/utils/notifications.js[m[36m:[m[32m11[m[36m:[mconst ANDROID_CHANNEL_ID = "[1;31msocietybites[m_orders";
+[35msocietybites-backend/utils/notifications.js[m[36m:[m[32m112[m[36m:[m      title: "New [1;31mSocietyBites[m order",
+[35msocietybites-backend/utils/phone.js[m[36m:[m[32m2[m[36m:[m * Canonical [1;31mSocietyBites[m phone: +91XXXXXXXXXX (E.164 India).
+[35msupport/index.html[m[36m:[m[32m6[m[36m:[m    <title>[1;31mSocietyBites[m Support</title>
+[35msupport/index.html[m[36m:[m[32m36[m[36m:[m    <h1>[1;31mSocietyBites[m Support</h1>
+[35msupport/index.html[m[36m:[m[32m39[m[36m:[m        Welcome to [1;31mSocietyBites[m support.
+[35msupport/index.html[m[36m:[m[32m43[m[36m:[m        [1;31mSocietyBites[m is a community-based homemade food marketplace
+[35msupport/index.html[m[36m:[m[32m51[m[36m:[m        If you need assistance with the [1;31mSocietyBites[m app, please contact
+[35msupport/index.html[m[36m:[m[32m57[m[36m:[m        support@[1;31msocietybites[m.app
+[35msupport/index.html[m[36m:[m[32m71[m[36m:[m        functionality in the [1;31mSocietyBites[m app.
+[35msupport/index.html[m[36m:[m[32m83[m[36m:[m        [1;31mSocietyBites[m respects your privacy and handles your information
+[35mtest/account_deletion_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/screens/guest_landing_screen.dart';
+[35mtest/account_deletion_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/screens/profile_screen.dart';
+[35mtest/account_deletion_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/services/session_service.dart';
+[35mtest/account_deletion_test.dart[m[36m:[m[32m83[m[36m:[m      find.textContaining('Permanently delete your [1;31mSocietyBites[m account'),
+[35mtest/add_listing_type_screen_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/add_listing_type_screen_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/listing_availability.dart';
+[35mtest/add_listing_type_screen_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/add_listing_screen.dart';
+[35mtest/add_listing_type_screen_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/add_listing_type_screen.dart';
+[35mtest/add_listing_type_screen_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/create_preorder_screen.dart';
+[35mtest/app_bottom_nav_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/app_bottom_nav.dart';
+[35mtest/app_header_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/services/cart_controller.dart';
+[35mtest/app_header_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/app_header.dart';
+[35mtest/buyer_preorder_detail_screen_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/buyer_preorder_detail_screen_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/screens/buyer_preorder_detail_screen.dart';
+[35mtest/buyer_preorders_screen_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/buyer_preorders_screen_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/screens/buyer_preorders_screen.dart';
+[35mtest/buyer_preorders_screen_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/preorder_widgets.dart';
+[35mtest/cart_controller_test.dart[m[36m:[m[32m2[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/cart_controller_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/services/cart_controller.dart';
+[35mtest/confirm_upi_id_dialog_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/screens/profile_screen.dart';
+[35mtest/confirm_upi_id_dialog_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/confirm_upi_id_dialog.dart';
+[35mtest/cross_society_order_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/cross_society_order_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/nearby_seller.dart';
+[35mtest/cross_society_order_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/models/seller_fulfilment.dart';
+[35mtest/cross_society_order_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/checkout_screen.dart';
+[35mtest/cross_society_order_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/home_screen.dart';
+[35mtest/cross_society_order_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/screens/orders_screen.dart';
+[35mtest/cross_society_order_test.dart[m[36m:[m[32m10[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_storefront_screen.dart';
+[35mtest/cross_society_order_test.dart[m[36m:[m[32m11[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/order_fulfilment_banner.dart';
+[35mtest/empty_cart_nav_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/empty_cart_nav_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/checkout_screen.dart';
+[35mtest/empty_cart_nav_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_dashboard_screen.dart';
+[35mtest/empty_cart_nav_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/services/cart_controller.dart';
+[35mtest/explore_nearby_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/explore_nearby_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/nearby_seller.dart';
+[35mtest/explore_nearby_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/explore_nearby_screen.dart';
+[35mtest/explore_nearby_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/home_screen.dart';
+[35mtest/explore_nearby_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/orders_screen.dart';
+[35mtest/explore_nearby_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_storefront_screen.dart';
+[35mtest/explore_nearby_test.dart[m[36m:[m[32m270[m[36m:[m    expect(find.textContaining('growing [1;31mSocietyBites[m'), findsOneWidget);
+[35mtest/floating_cart_bar_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/floating_cart_bar_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/screens/checkout_screen.dart';
+[35mtest/floating_cart_bar_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/services/cart_controller.dart';
+[35mtest/floating_cart_bar_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/floating_cart_bar.dart';
+[35mtest/food_detail_description_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/food_detail_description_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/screens/food_detail_screen.dart';
+[35mtest/guest_landing_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/config/launch_config.dart';
+[35mtest/guest_landing_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/guest_discovery.dart';
+[35mtest/guest_landing_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/guest_kitchens_screen.dart';
+[35mtest/guest_landing_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/guest_landing_screen.dart';
+[35mtest/guest_landing_test.dart[m[36m:[m[32m32[m[36m:[m    expect(find.text('[1;31mSocietyBites[m'), findsOneWidget);
+[35mtest/guest_marketplace_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/guest_marketplace_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/guest_discovery.dart';
+[35mtest/guest_marketplace_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/guest_kitchens_screen.dart';
+[35mtest/guest_marketplace_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/guest_landing_screen.dart';
+[35mtest/guest_marketplace_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/home_screen.dart';
+[35mtest/guest_marketplace_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_storefront_screen.dart';
+[35mtest/help_center_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/help_center.dart';
+[35mtest/help_center_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/screens/help_center_screen.dart';
+[35mtest/help_center_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/profile_screen.dart';
+[35mtest/help_center_test.dart[m[36m:[m[32m97[m[36m:[m    expect(find.text('What is [1;31mSocietyBites[m?'), findsOneWidget);
+[35mtest/help_center_test.dart[m[36m:[m[32m103[m[36m:[m    await tester.tap(find.text('What is [1;31mSocietyBites[m?'));
+[35mtest/home_food_type_filter_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/home_food_type_filter_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/food_type.dart';
+[35mtest/home_food_type_filter_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/selling_reach.dart';
+[35mtest/home_food_type_filter_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/home_listing_filter.dart';
+[35mtest/home_food_type_filter_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/food_type_selector.dart';
+[35mtest/kitchen_order_organization_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/kitchen_order_organization_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/kitchen_order_category.dart';
+[35mtest/kitchen_order_organization_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/models/listing_availability.dart';
+[35mtest/kitchen_order_organization_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_dashboard_screen.dart';
+[35mtest/listing_availability_ux_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/listing_availability_ux_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/food_type.dart';
+[35mtest/listing_availability_ux_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/food_detail_screen.dart';
+[35mtest/listing_availability_ux_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/home_listing_filter.dart';
+[35mtest/listing_availability_ux_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/home_screen.dart';
+[35mtest/listing_availability_ux_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/screens/my_listings_screen.dart';
+[35mtest/listing_availability_ux_test.dart[m[36m:[m[32m10[m[36m:[mimport 'package:[1;31msocietybites[m/services/my_listings_cache.dart';
+[35mtest/listing_availability_ux_test.dart[m[36m:[m[32m11[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/listing_purchase_slot.dart';
+[35mtest/listing_catalog_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/listing_catalog_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/screens/add_listing_screen.dart';
+[35mtest/listing_catalog_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/add_listing_type_screen.dart';
+[35mtest/listing_catalog_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/create_preorder_screen.dart';
+[35mtest/listing_catalog_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/my_listings_screen.dart';
+[35mtest/listing_catalog_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_preorders_screen.dart';
+[35mtest/listing_catalog_test.dart[m[36m:[m[32m10[m[36m:[mimport 'package:[1;31msocietybites[m/services/my_listings_cache.dart';
+[35mtest/listing_categories_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/listing_categories_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/food_type.dart';
+[35mtest/listing_categories_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/listing_categories.dart';
+[35mtest/listing_categories_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/home_listing_filter.dart';
+[35mtest/listing_categories_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/available_in_selector.dart';
+[35mtest/made_to_order_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/made_to_order_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/listing_availability.dart';
+[35mtest/made_to_order_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/add_listing_screen.dart';
+[35mtest/made_to_order_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/checkout_screen.dart';
+[35mtest/made_to_order_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/order_timing_notice.dart';
+[35mtest/made_to_order_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/screens/food_detail_screen.dart';
+[35mtest/made_to_order_test.dart[m[36m:[m[32m10[m[36m:[mimport 'package:[1;31msocietybites[m/screens/home_listing_filter.dart';
+[35mtest/made_to_order_test.dart[m[36m:[m[32m11[m[36m:[mimport 'package:[1;31msocietybites[m/screens/my_listings_screen.dart';
+[35mtest/made_to_order_test.dart[m[36m:[m[32m12[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_storefront_screen.dart';
+[35mtest/made_to_order_test.dart[m[36m:[m[32m13[m[36m:[mimport 'package:[1;31msocietybites[m/services/my_listings_cache.dart';
+[35mtest/made_to_order_test.dart[m[36m:[m[32m14[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/made_to_order_hint.dart';
+[35mtest/made_to_order_test.dart[m[36m:[m[32m15[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/one_seller_cart.dart';
+[35mtest/main_shell_tab_select_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/screens/tab_preload.dart';
+[35mtest/main_shell_tab_select_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/tab_select_load.dart';
+[35mtest/main_shell_tab_select_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/app_bottom_nav.dart';
+[35mtest/need_by_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/need_by_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/listing_availability.dart';
+[35mtest/need_by_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/models/order_lifecycle.dart';
+[35mtest/need_by_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/checkout_screen.dart';
+[35mtest/need_by_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/orders_screen.dart';
+[35mtest/need_by_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/screens/preorder_checkout_screen.dart';
+[35mtest/need_by_test.dart[m[36m:[m[32m10[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_dashboard_screen.dart';
+[35mtest/need_by_test.dart[m[36m:[m[32m11[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/requested_ready_summary.dart';
+[35mtest/order_call_actions_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/order_call_actions_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/order_lifecycle.dart';
+[35mtest/order_call_actions_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/orders_screen.dart';
+[35mtest/order_call_actions_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/payment_screen.dart';
+[35mtest/order_call_actions_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_dashboard_screen.dart';
+[35mtest/order_call_actions_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/listing_image.dart';
+[35mtest/order_lifecycle_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/models/order_lifecycle.dart';
+[35mtest/order_lifecycle_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/order_lifecycle_dialogs.dart';
+[35mtest/order_lifecycle_ui_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/order_lifecycle_ui_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/order_lifecycle.dart';
+[35mtest/order_lifecycle_ui_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/orders_screen.dart';
+[35mtest/order_messages_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/order_messages_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/order_lifecycle.dart';
+[35mtest/order_messages_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/order_conversation_screen.dart';
+[35mtest/order_messages_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/orders_screen.dart';
+[35mtest/order_messages_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_dashboard_screen.dart';
+[35mtest/order_messages_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/order_messages_button.dart';
+[35mtest/order_reconciliation_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/order_reconciliation_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/payment_screen.dart';
+[35mtest/order_reconciliation_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/services/api_service.dart';
+[35mtest/order_reconciliation_test.dart[m[36m:[m[32m303[m[36m:[m      expect(launchedUri?.queryParameters['tn'], '[1;31mSocietyBites[m Order SB-1001');
+[35mtest/order_reconciliation_test.dart[m[36m:[m[32m366[m[36m:[m      expect(launchedUri?.queryParameters['tn'], '[1;31mSocietyBites[m Order SB-1001');
+[35mtest/orders_role_switch_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/orders_screen.dart';
+[35mtest/otp_autofill_test.dart[m[36m:[m[32m2[m[36m:[mimport 'package:[1;31msocietybites[m/screens/otp_screen.dart';
+[35mtest/otp_verify_layout_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/otp_verify_heading.dart';
+[35mtest/preorder_cover_widgets_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/preorder_cover_widgets_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/screens/create_preorder_screen.dart';
+[35mtest/preorder_cover_widgets_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/preorder_widgets.dart';
+[35mtest/preorder_models_test.dart[m[36m:[m[32m2[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/preorder_models_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/preorder_widgets.dart';
+[35mtest/profile_fssai_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/screens/profile_screen.dart';
+[35mtest/profile_fulfilment_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/seller_fulfilment.dart';
+[35mtest/profile_fulfilment_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/screens/profile_screen.dart';
+[35mtest/profile_photo_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/profile_photo_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/screens/profile_photo_crop_screen.dart';
+[35mtest/profile_photo_test.dart[m[36m:[m[32m10[m[36m:[mimport 'package:[1;31msocietybites[m/screens/profile_screen.dart';
+[35mtest/profile_photo_test.dart[m[36m:[m[32m11[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_storefront_screen.dart';
+[35mtest/profile_photo_test.dart[m[36m:[m[32m12[m[36m:[mimport 'package:[1;31msocietybites[m/services/profile_photo_processor.dart';
+[35mtest/profile_photo_test.dart[m[36m:[m[32m13[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/seller_avatar.dart';
+[35mtest/profile_selling_reach_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/selling_reach.dart';
+[35mtest/profile_selling_reach_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/screens/profile_screen.dart';
+[35mtest/recurring_availability_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/recurring_availability_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/listing_availability.dart';
+[35mtest/recurring_availability_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/models/recurring_availability.dart';
+[35mtest/recurring_availability_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/add_listing_screen.dart';
+[35mtest/recurring_availability_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/my_listings_screen.dart';
+[35mtest/recurring_availability_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/listing_purchase_slot.dart';
+[35mtest/recurring_availability_test.dart[m[36m:[m[32m10[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/recurring_availability_hint.dart';
+[35mtest/required_field_label_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/models/listing_availability.dart';
+[35mtest/required_field_label_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/screens/add_listing_screen.dart';
+[35mtest/required_field_label_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/screens/create_preorder_screen.dart';
+[35mtest/required_field_label_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/required_field_label.dart';
+[35mtest/seller_insights_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/seller_insights_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/seller_insights_panel.dart';
+[35mtest/seller_kitchen_past_history_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/seller_order_history.dart';
+[35mtest/seller_kitchen_past_history_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_dashboard_screen.dart';
+[35mtest/seller_kitchen_past_history_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_older_orders_screen.dart';
+[35mtest/seller_payment_preference_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/seller_payment_preference_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/order_lifecycle.dart';
+[35mtest/seller_payment_preference_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/models/seller_payment_preference.dart';
+[35mtest/seller_payment_preference_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/checkout_screen.dart';
+[35mtest/seller_payment_preference_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/orders_screen.dart';
+[35mtest/seller_payment_preference_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/screens/payment_screen.dart';
+[35mtest/seller_payment_preference_test.dart[m[36m:[m[32m10[m[36m:[mimport 'package:[1;31msocietybites[m/screens/profile_screen.dart';
+[35mtest/seller_payment_preference_test.dart[m[36m:[m[32m11[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/order_fulfilment_banner.dart';
+[35mtest/seller_storefront_test.dart[m[36m:[m[32m5[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/seller_storefront_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_list_screen.dart';
+[35mtest/seller_storefront_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_storefront_screen.dart';
+[35mtest/seller_storefront_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/preorder_widgets.dart';
+[35mtest/selling_reach_test.dart[m[36m:[m[32m2[m[36m:[mimport 'package:[1;31msocietybites[m/models/selling_reach.dart';
+[35mtest/session_restore_guest_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/services/api_service.dart';
+[35mtest/simple_time_picker_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/simple_time_picker.dart';
+[35mtest/society_search_test.dart[m[36m:[m[32m2[m[36m:[mimport 'package:[1;31msocietybites[m/services/society_search.dart';
+[35mtest/society_selection_screen_test.dart[m[36m:[m[32m4[m[36m:[mimport 'package:[1;31msocietybites[m/screens/society_selection_screen.dart';
+[35mtest/stale_refresh_ux_test.dart[m[36m:[m[32m6[m[36m:[mimport 'package:[1;31msocietybites[m/models/data.dart';
+[35mtest/stale_refresh_ux_test.dart[m[36m:[m[32m7[m[36m:[mimport 'package:[1;31msocietybites[m/screens/home_screen.dart';
+[35mtest/stale_refresh_ux_test.dart[m[36m:[m[32m8[m[36m:[mimport 'package:[1;31msocietybites[m/screens/my_listings_screen.dart';
+[35mtest/stale_refresh_ux_test.dart[m[36m:[m[32m9[m[36m:[mimport 'package:[1;31msocietybites[m/screens/preorder_detail_screen.dart';
+[35mtest/stale_refresh_ux_test.dart[m[36m:[m[32m10[m[36m:[mimport 'package:[1;31msocietybites[m/screens/profile_screen.dart';
+[35mtest/stale_refresh_ux_test.dart[m[36m:[m[32m11[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_feedback_screen.dart';
+[35mtest/stale_refresh_ux_test.dart[m[36m:[m[32m12[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_preorders_screen.dart';
+[35mtest/stale_refresh_ux_test.dart[m[36m:[m[32m13[m[36m:[mimport 'package:[1;31msocietybites[m/screens/seller_storefront_screen.dart';
+[35mtest/stale_refresh_ux_test.dart[m[36m:[m[32m14[m[36m:[mimport 'package:[1;31msocietybites[m/services/my_listings_cache.dart';
+[35mtest/tab_preload_test.dart[m[36m:[m[32m2[m[36m:[mimport 'package:[1;31msocietybites[m/screens/tab_preload.dart';
+[35mtest/tab_select_load_test.dart[m[36m:[m[32m2[m[36m:[mimport 'package:[1;31msocietybites[m/screens/tab_select_load.dart';
+[35mtest/upi_app_brand_icon_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/widgets/upi_app_brand_icon.dart';
+[35mtest/upi_payment_service_test.dart[m[36m:[m[32m3[m[36m:[mimport 'package:[1;31msocietybites[m/services/upi_payment_service.dart';
+[35mtest/upi_payment_service_test.dart[m[36m:[m[32m11[m[36m:[m      transactionNote: '[1;31mSocietyBites[m Order SB-1023',
+[35mtest/upi_payment_service_test.dart[m[36m:[m[32m23[m[36m:[m      'tn': '[1;31mSocietyBites[m Order SB-1023',
+[35mtest/upi_payment_service_test.dart[m[36m:[m[32m28[m[36m:[m    expect(encoded, contains('tn=[1;31mSocietyBites[m%20Order%20SB-1023'));
+[35mtest/upi_payment_service_test.dart[m[36m:[m[32m41[m[36m:[m        transactionNote: '[1;31mSocietyBites[m Order SB1023',
+[35mtest/upi_payment_service_test.dart[m[36m:[m[32m50[m[36m:[m        transactionNote: '[1;31mSocietyBites[m Order SB1023',
+[35mtest/upi_payment_service_test.dart[m[36m:[m[32m95[m[36m:[m      transactionNote: '[1;31mSocietyBites[m Order SB-1023',
+[35mtest/upi_payment_service_test.dart[m[36m:[m[32m112[m[36m:[m    expect(upiLaunchString(gpay), contains('[1;31mSocietyBites[m%20Order%20SB-1023'));
+[35mtest/upi_payment_service_test.dart[m[36m:[m[32m143[m[36m:[m      transactionNote: '[1;31mSocietyBites[m Order SB1',
+[35mtest/widget_test.dart[m[36m:[m[32m8[m[36m:[m        home: Scaffold(body: Text('[1;31mSocietyBites[m')),
+[35mtest/widget_test.dart[m[36m:[m[32m12[m[36m:[m    expect(find.text('[1;31mSocietyBites[m'), findsOneWidget);
+[35mweb/index.html[m[36m:[m[32m26[m[36m:[m  <meta name="apple-mobile-web-app-title" content="[1;31msocietybites[m">
+[35mweb/index.html[m[36m:[m[32m32[m[36m:[m  <title>[1;31msocietybites[m</title>
+[35mweb/manifest.json[m[36m:[m[32m2[m[36m:[m    "name": "[1;31msocietybites[m",
+[35mweb/manifest.json[m[36m:[m[32m3[m[36m:[m    "short_name": "[1;31msocietybites[m",
+[35mwindows/CMakeLists.txt[m[36m:[m[32m3[m[36m:[mproject([1;31msocietybites[m LANGUAGES CXX)
+[35mwindows/CMakeLists.txt[m[36m:[m[32m7[m[36m:[mset(BINARY_NAME "[1;31msocietybites[m")
+[35mwindows/runner/Runner.rc[m[36m:[m[32m93[m[36m:[m            VALUE "FileDescription", "[1;31msocietybites[m" "\0"
+[35mwindows/runner/Runner.rc[m[36m:[m[32m95[m[36m:[m            VALUE "InternalName", "[1;31msocietybites[m" "\0"
+[35mwindows/runner/Runner.rc[m[36m:[m[32m97[m[36m:[m            VALUE "OriginalFilename", "[1;31msocietybites[m.exe" "\0"
+[35mwindows/runner/Runner.rc[m[36m:[m[32m98[m[36m:[m            VALUE "ProductName", "[1;31msocietybites[m" "\0"
+[35mwindows/runner/main.cpp[m[36m:[m[32m30[m[36m:[m  if (!window.Create(L"[1;31msocietybites[m", origin, size)) {

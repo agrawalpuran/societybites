@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../config/launch_config.dart';
 import '../models/guest_discovery.dart';
+import '../widgets/app_header.dart';
 import 'guest_kitchens_screen.dart';
 import 'login_screen.dart';
 
@@ -160,13 +161,20 @@ class _SocietyBitesHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
-            child: Text(
-              'SocietyBites',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF141A18),
+          const Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                kAppDisplayName,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.visible,
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF141A18),
+                ),
               ),
             ),
           ),

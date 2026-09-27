@@ -780,7 +780,11 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                         label: 'Add',
                         onTap: () => _changeCart(food, 1),
                       ),
-                      qtyStepper: Row(
+                      qtyStepper: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           _quantityButton(
                             Icons.remove,
@@ -800,6 +804,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                             filled: true,
                           ),
                         ],
+                      ),
                       ),
                     ),
                       ),
@@ -918,6 +923,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       style: FilledButton.styleFrom(
         backgroundColor: preorderGreen,
         visualDensity: VisualDensity.compact,
+        minimumSize: const Size(0, 36),
         padding: const EdgeInsets.symmetric(horizontal: 12),
       ),
       child: Text(label),

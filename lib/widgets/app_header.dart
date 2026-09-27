@@ -5,6 +5,9 @@ import '../services/cart_controller.dart';
 import '../services/session_service.dart';
 import 'cart_header_button.dart';
 
+/// On-screen product name. Internal identifiers may still say SocietyBites.
+const kAppDisplayName = 'SocietyEats';
+
 class AppHeader extends StatefulWidget {
   const AppHeader({
     super.key,
@@ -65,22 +68,36 @@ class _AppHeaderState extends State<AppHeader> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (widget.leading != null) widget.leading!,
-          if (widget.leading == null) ...const [
-            Text(
-              'SocietyBites',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 20,
-                color: Color(0xFF0A4638),
+          if (widget.leading == null)
+            const Flexible(
+              fit: FlexFit.loose,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      kAppDisplayName,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.visible,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                        color: Color(0xFF0A4638),
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Icon(
+                      Icons.restaurant_menu_rounded,
+                      color: Color(0xFF0E5A47),
+                      size: 18,
+                    ),
+                  ],
+                ),
               ),
             ),
-            SizedBox(width: 4),
-            Icon(
-              Icons.restaurant_menu_rounded,
-              color: Color(0xFF0E5A47),
-              size: 18,
-            ),
-          ],
           const Spacer(),
           if (widget.actions != null) ...[
             widget.actions!,
