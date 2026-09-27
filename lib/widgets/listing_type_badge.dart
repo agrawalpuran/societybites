@@ -8,10 +8,12 @@ class ListingTypeBadge extends StatelessWidget {
     super.key,
     required this.food,
     this.compact = true,
+    this.dense = false,
   });
 
   final FoodItem food;
   final bool compact;
+  final bool dense;
 
   static String labelFor(FoodItem food) {
     if (food.isPreOrder || food.isPreOrderCatalog) return 'PRE-ORDER';
@@ -22,7 +24,7 @@ class ListingTypeBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (food.isPreOrder || food.isPreOrderCatalog) {
-      return PreOrderBadge(compact: compact);
+      return PreOrderBadge(compact: true);
     }
 
     final madeToOrder = food.isMadeToOrder;
@@ -32,12 +34,13 @@ class ListingTypeBadge extends StatelessWidget {
     final foreground = madeToOrder
         ? const Color(0xFF5A3E8A)
         : const Color(0xFF0E5A47);
+    final fontSize = dense ? 8.0 : (compact ? 9.0 : 10.0);
 
     return Container(
       key: const Key('listing-type-badge'),
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 7 : 9,
-        vertical: compact ? 3 : 4,
+        horizontal: dense ? 5 : (compact ? 7 : 9),
+        vertical: dense ? 1 : (compact ? 3 : 4),
       ),
       decoration: BoxDecoration(
         color: background,
@@ -49,9 +52,10 @@ class ListingTypeBadge extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: foreground,
-          fontSize: compact ? 9 : 10,
-          letterSpacing: compact ? .4 : .6,
-          fontWeight: FontWeight.w800,
+          fontSize: fontSize,
+          letterSpacing: dense ? .2 : (compact ? .4 : .6),
+          fontWeight: FontWeight.w700,
+          height: 1.15,
         ),
       ),
     );

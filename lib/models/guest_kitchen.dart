@@ -5,6 +5,7 @@ class GuestKitchen {
     required this.societyName,
     this.categories = const [],
     this.listings = const [],
+    this.profilePhotoUrl,
   });
 
   final String sellerId;
@@ -12,6 +13,7 @@ class GuestKitchen {
   final String societyName;
   final List<String> categories;
   final List<Map<String, dynamic>> listings;
+  final String? profilePhotoUrl;
 
   String? get categoryLabel {
     if (categories.isEmpty) return null;
@@ -37,6 +39,13 @@ class GuestKitchen {
                 .map((item) => Map<String, dynamic>.from(item))
                 .toList()
           : const [],
+      profilePhotoUrl: () {
+        final raw = (seller['profilePhotoUrl'] ?? json['profilePhotoUrl'])
+            ?.toString()
+            .trim();
+        if (raw == null || raw.isEmpty || raw == 'null') return null;
+        return raw;
+      }(),
     );
   }
 }

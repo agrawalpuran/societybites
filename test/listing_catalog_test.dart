@@ -416,6 +416,7 @@ void main() {
     expect(find.text('Pre-order'), findsWidgets);
     expect(find.text('QUANTITY AVAILABLE'), findsNothing);
     expect(find.text('DATE/TIME AVAILABLE UNTIL'), findsNothing);
+    expect(find.text('AVAILABLE UNTIL (OPTIONAL)'), findsNothing);
     expect(find.byType(AddListingTypeScreen), findsNothing);
   });
 

@@ -1,6 +1,7 @@
 const { listingCategoriesFromRecord } = require("./listingCategories");
 const { serializePaymentPreference } = require("../lib/sellerPaymentPreference");
 const { serializeFulfilment } = require("../lib/sellerFulfilment");
+const { evaluateRecurringAvailability } = require("../lib/recurringAvailability");
 
 const ORDER_STATUS_TO_STEP = {
   pending: 0,
@@ -18,10 +19,13 @@ function serializeListing(listing) {
   const flat = seller.flat;
   const reviews = listing.reviews || [];
   const reviewCount = reviews.length;
-    const fulfilment = serializeFulfilment(seller);
-    const avgRating = reviewCount > 0
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
-      : 0;
+  const fulfilment = serializeFulfilment(seller);
+  const avgRating = reviewCount > 0
+    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+    : 0;
+  const recurring = evaluateRecurringAvailability(listing, {
+    soldToday: listing.recurringSoldToday || 0,
+  });
 
   return {
     id: listing.id,
@@ -49,9 +53,28 @@ function serializeListing(listing) {
         : listing.preparationTimeMinutes,
     maxDailyOrders: listing.maxDailyOrders == null ? null : listing.maxDailyOrders,
     madeToOrderUnavailableToday: Boolean(listing.madeToOrderUnavailableToday),
+    recurringEnabled: recurring.recurringEnabled,
+    recurringWeekdays: Array.isArray(listing.recurringWeekdays)
+      ? listing.recurringWeekdays
+      : [],
+    recurringStartMinute:
+      listing.recurringStartMinute == null ? null : listing.recurringStartMinute,
+    recurringEndMinute:
+      listing.recurringEndMinute == null ? null : listing.recurringEndMinute,
+    recurringDailyLimit:
+      listing.recurringDailyLimit == null ? null : listing.recurringDailyLimit,
+    recurringUnavailable: recurring.recurringUnavailable,
+    recurringSoldOutToday: recurring.recurringSoldOutToday,
+    recurringBuyerLabel: recurring.recurringBuyerLabel,
+    recurringNextLabel: recurring.recurringNextLabel,
+    recurringScheduleSummary: recurring.recurringScheduleSummary,
+    recurringHoursSummary: recurring.recurringHoursSummary,
+    recurringDailyLimitLabel: recurring.recurringDailyLimitLabel,
     societyId: listing.societyId,
     sellerId: listing.sellerId,
     sellerName: seller.name || "Neighbor",
+    sellerProfilePhotoUrl:
+      listing.sellerProfilePhotoUrl || seller.profilePhotoUrl || null,
     sellerUpiId: seller.upiId || null,
     sellerUpiDisplayName: seller.upiDisplayName || null,
     sellerPaymentPreference: serializePaymentPreference(seller),

@@ -5,6 +5,7 @@ function isSellerRole(role) {
 const PAYMENT_PREFERENCES = Object.freeze({
   UPI_ONLY: "UPI_ONLY",
   UPI_AND_COD: "UPI_AND_COD",
+  COD_IN_SOCIETY_UPI_OUTSIDE: "COD_IN_SOCIETY_UPI_OUTSIDE",
 });
 
 const DEFAULT_PAYMENT_PREFERENCE = PAYMENT_PREFERENCES.UPI_AND_COD;
@@ -23,6 +24,14 @@ function normalizePaymentPreference(value) {
     return PAYMENT_PREFERENCES.UPI_ONLY;
   }
   if (
+    raw === "COD_IN_SOCIETY_UPI_OUTSIDE" ||
+    raw === "COD_IN_SOCIETY" ||
+    raw === "COD_SOCIETY" ||
+    raw === "IN_SOCIETY_COD"
+  ) {
+    return PAYMENT_PREFERENCES.COD_IN_SOCIETY_UPI_OUTSIDE;
+  }
+  if (
     raw === "UPI_AND_COD" ||
     raw === "UPI+COD" ||
     raw === "BOTH" ||
@@ -36,17 +45,28 @@ function normalizePaymentPreference(value) {
 
 function parsePaymentPreference(value) {
   if (typeof value !== "string") {
-    throw httpError(400, "paymentPreference must be UPI_ONLY or UPI_AND_COD");
+    throw httpError(
+      400,
+      "paymentPreference must be UPI_ONLY, UPI_AND_COD, or COD_IN_SOCIETY_UPI_OUTSIDE"
+    );
   }
   const raw = String(value).trim().toUpperCase();
   if (!ALLOWED_PAYMENT_PREFERENCES.includes(raw)) {
-    throw httpError(400, "paymentPreference must be UPI_ONLY or UPI_AND_COD");
+    throw httpError(
+      400,
+      "paymentPreference must be UPI_ONLY, UPI_AND_COD, or COD_IN_SOCIETY_UPI_OUTSIDE"
+    );
   }
   return raw;
 }
 
-function allowsCod(preference) {
-  return normalizePaymentPreference(preference) === PAYMENT_PREFERENCES.UPI_AND_COD;
+function allowsCod(preference, { sameSociety = true } = {}) {
+  const normalized = normalizePaymentPreference(preference);
+  if (normalized === PAYMENT_PREFERENCES.UPI_ONLY) return false;
+  if (normalized === PAYMENT_PREFERENCES.COD_IN_SOCIETY_UPI_OUTSIDE) {
+    return sameSociety !== false;
+  }
+  return normalized === PAYMENT_PREFERENCES.UPI_AND_COD;
 }
 
 function assertSellerPaymentPreferenceUpdate({ requested, role }) {
@@ -56,13 +76,25 @@ function assertSellerPaymentPreferenceUpdate({ requested, role }) {
   return parsePaymentPreference(requested);
 }
 
-function assertPaymentMethodAllowed({ preference, paymentMethod }) {
+function assertPaymentMethodAllowed({
+  preference,
+  paymentMethod,
+  sameSociety = true,
+}) {
   const method = String(paymentMethod || "upi").trim().toLowerCase();
   if (method !== "upi" && method !== "cash") {
     throw httpError(400, "paymentMethod must be 'upi' or 'cash'");
   }
-  if (method === "cash" && !allowsCod(preference)) {
-    throw httpError(400, "This seller accepts UPI only");
+  if (method === "cash" && !allowsCod(preference, { sameSociety })) {
+    const inSocietyOnly =
+      normalizePaymentPreference(preference) ===
+      PAYMENT_PREFERENCES.COD_IN_SOCIETY_UPI_OUTSIDE;
+    throw httpError(
+      400,
+      inSocietyOnly
+        ? "This seller accepts cash only from buyers in the same society"
+        : "This seller accepts UPI only"
+    );
   }
   return method;
 }

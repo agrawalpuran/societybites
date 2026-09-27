@@ -133,6 +133,10 @@ function serializeCampaign(campaign) {
   return {
     id: campaign.id,
     sellerId: campaign.sellerId,
+    sellerProfilePhotoUrl:
+      (campaign.seller && campaign.seller.profilePhotoUrl) ||
+      (sellerPrefSource && sellerPrefSource.profilePhotoUrl) ||
+      null,
     societyId: campaign.societyId,
     sellingReachLevel:
       (campaign.seller && campaign.seller.sellingReachLevel) || undefined,

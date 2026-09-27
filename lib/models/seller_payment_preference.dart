@@ -1,6 +1,7 @@
 enum SellerPaymentPreference {
   upiOnly,
   upiAndCod,
+  codInSocietyUpiOutside,
 }
 
 const defaultSellerPaymentPreference = SellerPaymentPreference.upiAndCod;
@@ -11,6 +12,11 @@ SellerPaymentPreference parseSellerPaymentPreference(Object? value) {
     case 'UPI-ONLY':
     case 'UPI':
       return SellerPaymentPreference.upiOnly;
+    case 'COD_IN_SOCIETY_UPI_OUTSIDE':
+    case 'COD_IN_SOCIETY':
+    case 'COD_SOCIETY':
+    case 'IN_SOCIETY_COD':
+      return SellerPaymentPreference.codInSocietyUpiOutside;
     case 'UPI_AND_COD':
     case 'UPI+COD':
     case 'BOTH':
@@ -26,10 +32,23 @@ extension SellerPaymentPreferenceApi on SellerPaymentPreference {
         return 'UPI_ONLY';
       case SellerPaymentPreference.upiAndCod:
         return 'UPI_AND_COD';
+      case SellerPaymentPreference.codInSocietyUpiOutside:
+        return 'COD_IN_SOCIETY_UPI_OUTSIDE';
     }
   }
 
-  bool get allowsCod => this == SellerPaymentPreference.upiAndCod;
+  bool get allowsCod => this != SellerPaymentPreference.upiOnly;
+
+  bool allowsCodFor({required bool sameSociety}) {
+    switch (this) {
+      case SellerPaymentPreference.upiOnly:
+        return false;
+      case SellerPaymentPreference.upiAndCod:
+        return true;
+      case SellerPaymentPreference.codInSocietyUpiOutside:
+        return sameSociety;
+    }
+  }
 
   String get title {
     switch (this) {
@@ -37,6 +56,8 @@ extension SellerPaymentPreferenceApi on SellerPaymentPreference {
         return 'UPI Only';
       case SellerPaymentPreference.upiAndCod:
         return 'UPI + Cash on Delivery';
+      case SellerPaymentPreference.codInSocietyUpiOutside:
+        return 'Cash in society, UPI outside';
     }
   }
 
@@ -48,6 +69,8 @@ extension SellerPaymentPreferenceApi on SellerPaymentPreference {
         return 'Buyers must pay through UPI.';
       case SellerPaymentPreference.upiAndCod:
         return 'Buyers can choose either UPI or COD.';
+      case SellerPaymentPreference.codInSocietyUpiOutside:
+        return 'Neighbours in your society can pay cash. Buyers from other societies pay by UPI.';
     }
   }
 
@@ -57,6 +80,8 @@ extension SellerPaymentPreferenceApi on SellerPaymentPreference {
         return 'Buyers must pay through UPI.';
       case SellerPaymentPreference.upiAndCod:
         return 'Buyers can choose UPI or cash on delivery.';
+      case SellerPaymentPreference.codInSocietyUpiOutside:
+        return 'COD for your society. UPI for nearby / outside buyers.';
     }
   }
 }

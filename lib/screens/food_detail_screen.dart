@@ -3,11 +3,13 @@ import '../widgets/listing_image.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/app_header.dart';
 import '../widgets/made_to_order_hint.dart';
+import '../widgets/recurring_availability_hint.dart';
 import '../widgets/temporarily_unavailable_label.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
 import 'checkout_screen.dart';
 import '../widgets/guest_order_auth.dart';
+import '../widgets/seller_avatar.dart';
 
 class FoodDetailScreen extends StatelessWidget {
   const FoodDetailScreen({
@@ -75,6 +77,8 @@ class _HeroSection extends StatelessWidget {
         ),
         SafeArea(
           child: AppHeader(
+            showCart: false,
+            showUser: false,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             leading: _CircleButton(
               icon: Icons.arrow_back_ios_new_rounded,
@@ -158,6 +162,7 @@ class _HeroSection extends StatelessWidget {
                 ),
               ),
               MadeToOrderHint(food: food),
+              RecurringAvailabilityHint(food: food),
               if (food.isExpired) ...[
                 const SizedBox(height: 8),
                 const TemporarilyUnavailableLabel(),
@@ -305,12 +310,13 @@ class _SellerCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
             children: [
-              CircleAvatar(
+              SellerAvatar(
                 radius: 24,
                 backgroundColor: const Color(0xFFE8F5EE),
-                child: Icon(
+                photoUrl: food.sellerProfilePhotoUrl,
+                fallback: const Icon(
                   Icons.person_rounded,
-                  color: const Color(0xFF0E5A47),
+                  color: Color(0xFF0E5A47),
                   size: 26,
                 ),
               ),

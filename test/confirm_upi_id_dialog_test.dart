@@ -76,6 +76,9 @@ Future<void> _pumpProfile(
 }
 
 Future<void> _openUpiSheet(WidgetTester tester) async {
+  await tester.ensureVisible(find.text('Seller Settings'));
+  await tester.tap(find.text('Seller Settings'));
+  await tester.pumpAndSettle();
   await tester.ensureVisible(find.text('UPI for Payments'));
   await tester.tap(find.text('UPI for Payments'));
   await tester.pumpAndSettle();
@@ -286,8 +289,11 @@ void main() {
       tester,
       profile: _sellerProfile(paymentPreference: 'UPI_AND_COD'),
     );
+    await tester.ensureVisible(find.text('Seller Settings'));
+    await tester.tap(find.text('Seller Settings'));
+    await tester.pumpAndSettle();
     expect(find.text('UPI + Cash on Delivery'), findsOneWidget);
-    expect(find.text('PAYMENT METHODS'), findsOneWidget);
+    expect(find.text('PAYMENTS'), findsOneWidget);
   });
 
   testWidgets('payment preference UPI Only is unchanged by UPI confirm', (
@@ -297,6 +303,9 @@ void main() {
       tester,
       profile: _sellerProfile(paymentPreference: 'UPI_ONLY'),
     );
+    await tester.ensureVisible(find.text('Seller Settings'));
+    await tester.tap(find.text('Seller Settings'));
+    await tester.pumpAndSettle();
     expect(find.text('UPI Only'), findsOneWidget);
   });
 }

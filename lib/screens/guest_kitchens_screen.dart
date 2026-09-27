@@ -84,6 +84,7 @@ class GuestKitchensScreenState extends State<GuestKitchensScreen> {
       rating: 0,
       avatarIcon: Icons.restaurant,
       avatarColor: const Color(0xFFD5E8D4),
+      profilePhotoUrl: kitchen.profilePhotoUrl,
     );
     Navigator.push(
       context,

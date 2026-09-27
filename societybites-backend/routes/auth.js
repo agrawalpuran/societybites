@@ -21,6 +21,11 @@ const {
 } = require("../lib/sellerPaymentPreference");
 const { assertSellerFssaiUpdate } = require("../lib/fssai");
 const { deleteAuthenticatedAccount } = require("../lib/accountDeletion");
+const { uploadPublicImage } = require("../lib/objectStorage");
+const {
+  parseImageUpload,
+  normalizeStoredProfilePhotoUrl,
+} = require("../lib/profileImage");
 
 const router = express.Router();
 
@@ -267,6 +272,31 @@ router.get(
   })
 );
 
+router.post(
+  "/me/profile-photo",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const parsed = parseImageUpload(req.body);
+    const imageUrl = await uploadPublicImage({
+      buffer: parsed.buffer,
+      mimeType: parsed.mimeType,
+      userId: req.user.id,
+      prefix: "profiles",
+    });
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { profilePhotoUrl: imageUrl },
+      include: { society: true, flat: true },
+    });
+    const token = signToken(user);
+    res.status(201).json({
+      imageUrl,
+      user: await attachSellingReach(user, prisma),
+      token,
+    });
+  })
+);
+
 router.patch(
   "/me/profile",
   requireUser,
@@ -318,7 +348,10 @@ router.patch(
       if (parsed.deliveryCharge !== undefined) data.deliveryCharge = parsed.deliveryCharge;
     }
     // societyId / flatId are assigned only via POST /societies/join.
-    if (profilePhotoUrl !== undefined) data.profilePhotoUrl = profilePhotoUrl;
+    // Photo bytes are accepted only via POST /auth/me/profile-photo.
+    if (profilePhotoUrl !== undefined) {
+      data.profilePhotoUrl = normalizeStoredProfilePhotoUrl(profilePhotoUrl);
+    }
     if (upiId !== undefined) {
       const trimmed = typeof upiId === "string" ? upiId.trim() : upiId;
       if (trimmed === "" || trimmed === null) {

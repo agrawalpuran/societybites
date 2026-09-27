@@ -83,6 +83,16 @@ void main() {
     expect(parseSellerPaymentPreference('UPI_ONLY').allowsCod, isFalse);
     expect(parseSellerPaymentPreference(null).allowsCod, isTrue);
     expect(parseSellerPaymentPreference('UPI_AND_COD').allowsCod, isTrue);
+    expect(
+      parseSellerPaymentPreference('COD_IN_SOCIETY_UPI_OUTSIDE')
+          .allowsCodFor(sameSociety: true),
+      isTrue,
+    );
+    expect(
+      parseSellerPaymentPreference('COD_IN_SOCIETY_UPI_OUTSIDE')
+          .allowsCodFor(sameSociety: false),
+      isFalse,
+    );
   });
 
   test('UPI pending blocks mark ready and time; COD does not', () {
@@ -179,14 +189,20 @@ void main() {
     await tester.pump();
     while (tester.takeException() != null) {}
 
-    expect(find.text('PAYMENT METHODS'), findsOneWidget);
+    await tester.ensureVisible(find.text('Seller Settings'));
+    await tester.tap(find.text('Seller Settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PAYMENTS'), findsOneWidget);
+    expect(find.text('Payment Methods'), findsOneWidget);
     expect(find.text('UPI + Cash on Delivery'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Change').at(1));
-    await tester.tap(find.text('Change').at(1));
+    await tester.ensureVisible(find.text('Payment Methods'));
+    await tester.tap(find.text('Payment Methods'));
     await tester.pumpAndSettle();
     expect(find.text('UPI Only'), findsWidgets);
     expect(find.text('Buyers must pay through UPI.'), findsWidgets);
+    expect(find.text('Cash in society, UPI outside'), findsOneWidget);
     await tester.tap(find.text('UPI Only').last);
     await tester.pump();
     await tester.tap(find.text('Save'));
@@ -253,6 +269,66 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(sent, 'cash');
+  });
+
+  testWidgets('in-society COD is hidden for outside buyers', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'user_id': 'user-1',
+      'society_id': 'society-b',
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CheckoutScreen(
+          isCrossSociety: true,
+          cartItems: [
+            CartItem(
+              food: _food(preference: 'COD_IN_SOCIETY_UPI_OUTSIDE'),
+              quantity: 1,
+            ),
+          ],
+          placeOrder: ({
+            required societyId,
+            required items,
+            required paymentMethod,
+            fulfilmentMethod,
+            requestedReadyAt,
+          }) async =>
+              {'id': 'o1'},
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('UPI'), findsOneWidget);
+    expect(find.text('Cash on Delivery'), findsNothing);
+  });
+
+  testWidgets('in-society COD is offered to neighbours', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'user_id': 'user-1',
+      'society_id': 'society-a',
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CheckoutScreen(
+          cartItems: [
+            CartItem(
+              food: _food(preference: 'COD_IN_SOCIETY_UPI_OUTSIDE'),
+              quantity: 1,
+            ),
+          ],
+          placeOrder: ({
+            required societyId,
+            required items,
+            required paymentMethod,
+            fulfilmentMethod,
+            requestedReadyAt,
+          }) async =>
+              {'id': 'o1'},
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Cash on Delivery'), findsOneWidget);
   });
 
   testWidgets('existing I Have Paid remains on UPI payment screen', (tester) async {

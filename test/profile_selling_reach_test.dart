@@ -69,15 +69,13 @@ Future<void> _pumpProfile(
   await tester.pump();
   await tester.pump();
   while (tester.takeException() != null) {}
-  if (find.text('Change').evaluate().isNotEmpty) {
-    await tester.scrollUntilVisible(
-      find.text('Change').first,
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pump();
-    while (tester.takeException() != null) {}
-  }
+}
+
+Future<void> _openSellerSettings(WidgetTester tester) async {
+  await tester.ensureVisible(find.text('Seller Settings'));
+  await tester.tap(find.text('Seller Settings'));
+  await tester.pumpAndSettle();
+  while (tester.takeException() != null) {}
 }
 
 void main() {
@@ -105,19 +103,23 @@ void main() {
       },
     );
 
-    expect(find.text('SELLER SETTINGS'), findsOneWidget);
-    expect(find.text('My Society'), findsOneWidget);
+    expect(find.text('Seller Settings'), findsOneWidget);
+    expect(find.text('Edit Profile'), findsOneWidget);
+    expect(find.text('SELLER FULFILMENT'), findsNothing);
+    expect(find.text('PAYMENT METHODS'), findsNothing);
+
+    await _openSellerSettings(tester);
+    expect(find.text('PAYMENTS'), findsOneWidget);
+    expect(find.text('Selling Reach'), findsOneWidget);
     expect(find.text('Visible to buyers in your society'), findsOneWidget);
     expect(find.text('Change'), findsWidgets);
-    expect(find.text('Edit Profile'), findsOneWidget);
-    expect(find.text('SELLER FULFILMENT'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Change').first);
-    await tester.tap(find.text('Change').first);
+    await tester.ensureVisible(find.text('Selling Reach'));
+    await tester.tap(find.text('Selling Reach'));
     await tester.pumpAndSettle();
     while (tester.takeException() != null) {}
 
-    expect(find.text('Selling Reach'), findsOneWidget);
+    expect(find.text('Selling Reach'), findsWidgets);
     expect(find.text('Who can see your food?'), findsOneWidget);
     expect(find.text('Buyers in your society'), findsOneWidget);
     expect(find.text('Buyers within 5 km'), findsOneWidget);
@@ -127,7 +129,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(savedLevel, 'NEARBY');
-    expect(find.text('Nearby'), findsOneWidget);
+    expect(find.text('Selling Reach'), findsWidgets);
     expect(find.text('Buyers within 5 km'), findsOneWidget);
     expect(find.text('Selling reach updated'), findsOneWidget);
   });
@@ -146,16 +148,17 @@ void main() {
       },
     );
 
-    await tester.ensureVisible(find.text('Change').first);
-    await tester.tap(find.text('Change').first);
+    await _openSellerSettings(tester);
+    await tester.ensureVisible(find.text('Selling Reach'));
+    await tester.tap(find.text('Selling Reach'));
     await tester.pumpAndSettle();
     while (tester.takeException() != null) {}
     await tester.tap(find.text('Extended'));
     await tester.pumpAndSettle();
     while (tester.takeException() != null) {}
 
-    expect(find.text('My Society'), findsOneWidget);
-    expect(find.text('Extended'), findsNothing);
+    expect(find.text('Visible to buyers in your society'), findsOneWidget);
+    expect(find.text('Buyers within 10 km'), findsNothing);
     expect(find.textContaining('Could not update selling reach'), findsOneWidget);
   });
 
@@ -175,8 +178,9 @@ void main() {
       },
     );
 
-    await tester.ensureVisible(find.text('Change').first);
-    await tester.tap(find.text('Change').first);
+    await _openSellerSettings(tester);
+    await tester.ensureVisible(find.text('Selling Reach'));
+    await tester.tap(find.text('Selling Reach'));
     await tester.pumpAndSettle();
     while (tester.takeException() != null) {}
 
@@ -219,9 +223,8 @@ void main() {
     while (tester.takeException() != null) {}
 
     expect(find.text('Start Selling'), findsOneWidget);
-    expect(find.text('SELLER SETTINGS'), findsNothing);
+    expect(find.text('Seller Settings'), findsNothing);
     expect(find.text('PAYMENT METHODS'), findsNothing);
     expect(find.text('Edit Profile'), findsOneWidget);
-    expect(find.text('My Orders'), findsOneWidget);
   });
 }

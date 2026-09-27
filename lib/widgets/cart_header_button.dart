@@ -22,6 +22,7 @@ class CartHeaderButton extends StatelessWidget {
       listenable: CartController.instance,
       builder: (context, _) {
         final itemCount = itemCountOverride ?? CartController.instance.itemCount;
+        if (itemCount <= 0) return const SizedBox.shrink();
         final badge = itemCount > 9 ? '9+' : '$itemCount';
         return Column(
           mainAxisSize: MainAxisSize.min,

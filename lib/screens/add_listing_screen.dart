@@ -8,6 +8,7 @@ import '../services/session_service.dart';
 import '../models/food_type.dart';
 import '../models/listing_availability.dart';
 import '../models/listing_categories.dart';
+import '../models/recurring_availability.dart';
 import '../widgets/available_in_selector.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/food_type_selector.dart';
@@ -52,6 +53,12 @@ class _AddListingScreenState extends State<AddListingScreen> {
   late String _availabilityMode;
   int _prepPresetMinutes = 60;
   final _customPrepDaysController = TextEditingController();
+  bool _repeatSchedule = false;
+  final Set<int> _recurringDays = {};
+  TimeOfDay _recurringStart = const TimeOfDay(hour: 7, minute: 0);
+  TimeOfDay _recurringEnd = const TimeOfDay(hour: 11, minute: 0);
+  bool _dailyLimitEnabled = false;
+  final _dailyLimitController = TextEditingController();
 
   bool get _isEditing => widget.existingListing != null;
   bool get _isPreorderCatalog =>
@@ -64,7 +71,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
   bool get _showFulfilmentSection =>
       !_isPreorderCatalog && (_showFulfilmentChoice || _isMadeToOrder);
   bool get _showStockAndExpiryFields =>
-      !_isMadeToOrder && !_isPreorderCatalog;
+      !_isMadeToOrder && !_isPreorderCatalog && !_repeatSchedule;
+  bool get _showRecurringSection => !_isMadeToOrder && !_isPreorderCatalog;
 
   String get _orderTypeTitle {
     if (_isPreorderCatalog) return 'Pre-order';
@@ -81,6 +89,214 @@ class _AddListingScreenState extends State<AddListingScreen> {
       return preparationMinutesFromDays(days);
     }
     return _prepPresetMinutes;
+  }
+
+  Widget _buildRecurringSection() {
+    return _buildField(
+      label: 'WHEN IS THIS AVAILABLE?',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _FulfilmentOption(
+            key: const Key('listing-availability-today'),
+            selected: !_repeatSchedule,
+            title: 'Just today',
+            subtitle:
+                'Neighbors can order it today. List it again tomorrow if you cook again.',
+            onTap: () => setState(() => _repeatSchedule = false),
+          ),
+          const SizedBox(height: 8),
+          _FulfilmentOption(
+            key: const Key('listing-availability-repeat'),
+            selected: _repeatSchedule,
+            title: 'Same days every week',
+            subtitle:
+                'For regular items like idli or thepla. We will show it on the days you choose.',
+            onTap: () => setState(() => _repeatSchedule = true),
+          ),
+          if (_repeatSchedule) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'WHICH DAYS?',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.1,
+                color: Color(0xFF8A9491),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: List.generate(7, (index) {
+                final day = index + 1;
+                final selected = _recurringDays.contains(day);
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: index == 6 ? 0 : 4),
+                    child: Material(
+                      color: selected
+                          ? const Color(0xFF0E5A47)
+                          : const Color(0xFFF0F2F1),
+                      borderRadius: BorderRadius.circular(10),
+                      child: InkWell(
+                        key: Key('listing-recurring-day-$day'),
+                        onTap: () {
+                          setState(() {
+                            if (selected) {
+                              _recurringDays.remove(day);
+                            } else {
+                              _recurringDays.add(day);
+                            }
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: SizedBox(
+                          height: 40,
+                          child: Center(
+                            child: Text(
+                              recurringWeekdayLabels[index],
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: selected
+                                    ? Colors.white
+                                    : const Color(0xFF3A4644),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'WHAT TIME?',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.1,
+                color: Color(0xFF8A9491),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _timeButton(
+                    key: const Key('listing-recurring-start'),
+                    label: _recurringStart.format(context),
+                    onTap: () async {
+                      final picked = await showSimpleTimePicker(
+                        context,
+                        initialTime: _recurringStart,
+                      );
+                      if (picked != null && mounted) {
+                        setState(() => _recurringStart = picked);
+                      }
+                    },
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    'to',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF6A7774),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _timeButton(
+                    key: const Key('listing-recurring-end'),
+                    label: _recurringEnd.format(context),
+                    onTap: () async {
+                      final picked = await showSimpleTimePicker(
+                        context,
+                        initialTime: _recurringEnd,
+                      );
+                      if (picked != null && mounted) {
+                        setState(() => _recurringEnd = picked);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'HOW MANY PER DAY?',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.1,
+                color: Color(0xFF8A9491),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _FulfilmentOption(
+              key: const Key('listing-daily-unlimited'),
+              selected: !_dailyLimitEnabled,
+              title: 'No limit',
+              subtitle: 'Keep taking orders during these hours.',
+              onTap: () => setState(() => _dailyLimitEnabled = false),
+            ),
+            const SizedBox(height: 8),
+            _FulfilmentOption(
+              key: const Key('listing-daily-limit'),
+              selected: _dailyLimitEnabled,
+              title: 'I have a limit',
+              subtitle: 'Stop orders after this many portions.',
+              onTap: () => setState(() => _dailyLimitEnabled = true),
+            ),
+            if (_dailyLimitEnabled) ...[
+              const SizedBox(height: 8),
+              TextFormField(
+                key: const Key('listing-daily-limit-field'),
+                controller: _dailyLimitController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: _inputDeco('e.g. 20'),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _timeButton({
+    required Key key,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      key: key,
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          height: 52,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE0E5E3)),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF101617),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildFulfilmentSection() {
@@ -261,6 +477,26 @@ class _AddListingScreenState extends State<AddListingScreen> {
           _customPrepDaysController.text = days.toString();
         }
       }
+      if (listing.recurringEnabled && !listing.isMadeToOrder) {
+        _repeatSchedule = true;
+        _recurringDays.addAll(listing.recurringWeekdays);
+        if (listing.recurringStartMinute != null) {
+          _recurringStart = TimeOfDay(
+            hour: listing.recurringStartMinute! ~/ 60,
+            minute: listing.recurringStartMinute! % 60,
+          );
+        }
+        if (listing.recurringEndMinute != null) {
+          _recurringEnd = TimeOfDay(
+            hour: listing.recurringEndMinute! ~/ 60,
+            minute: listing.recurringEndMinute! % 60,
+          );
+        }
+        if (listing.recurringDailyLimit != null) {
+          _dailyLimitEnabled = true;
+          _dailyLimitController.text = '${listing.recurringDailyLimit}';
+        }
+      }
     } else {
       _availabilityMode = parseListingAvailabilityMode(
         widget.initialAvailabilityMode,
@@ -276,6 +512,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
     _weightPerUnitController.dispose();
     _descController.dispose();
     _customPrepDaysController.dispose();
+    _dailyLimitController.dispose();
     super.dispose();
   }
 
@@ -389,6 +626,39 @@ class _AddListingScreenState extends State<AddListingScreen> {
       }
     }
 
+    final useRecurring = _showRecurringSection && _repeatSchedule;
+    if (useRecurring) {
+      if (_recurringDays.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Select at least one available day.')),
+        );
+        return;
+      }
+      final startMinute = timeOfDayToMinute(
+        _recurringStart.hour,
+        _recurringStart.minute,
+      );
+      final endMinute = timeOfDayToMinute(
+        _recurringEnd.hour,
+        _recurringEnd.minute,
+      );
+      if (endMinute <= startMinute) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('End time must be after the start time.')),
+        );
+        return;
+      }
+      if (_dailyLimitEnabled) {
+        final limit = int.tryParse(_dailyLimitController.text.trim());
+        if (limit == null || limit < 1) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Enter a daily quantity of 1 or more.')),
+          );
+          return;
+        }
+      }
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -405,11 +675,22 @@ class _AddListingScreenState extends State<AddListingScreen> {
         );
       }
 
-      final quantity = (_isMadeToOrder || _isPreorderCatalog)
+      final quantity = (_isMadeToOrder || _isPreorderCatalog || useRecurring)
           ? (_isEditing && widget.existingListing!.quantity > 0
               ? widget.existingListing!.quantity
               : 99)
           : int.parse(_qtyController.text.trim());
+      final recurringStartMinute = timeOfDayToMinute(
+        _recurringStart.hour,
+        _recurringStart.minute,
+      );
+      final recurringEndMinute = timeOfDayToMinute(
+        _recurringEnd.hour,
+        _recurringEnd.minute,
+      );
+      final recurringLimit = useRecurring && _dailyLimitEnabled
+          ? int.parse(_dailyLimitController.text.trim())
+          : null;
 
       if (_isEditing) {
         await ApiService.updateListing(
@@ -433,6 +714,11 @@ class _AddListingScreenState extends State<AddListingScreen> {
           preparationTimeMinutes: prepMinutes,
           maxDailyOrders: null,
           clearMaxDailyOrders: true,
+          recurringEnabled: _showRecurringSection && useRecurring,
+          recurringWeekdays: useRecurring ? _recurringDays.toList() : const [],
+          recurringStartMinute: useRecurring ? recurringStartMinute : null,
+          recurringEndMinute: useRecurring ? recurringEndMinute : null,
+          recurringDailyLimit: recurringLimit,
         );
       } else {
         await ApiService.createListing(
@@ -455,6 +741,11 @@ class _AddListingScreenState extends State<AddListingScreen> {
               : _availabilityMode,
           preparationTimeMinutes: prepMinutes,
           maxDailyOrders: null,
+          recurringEnabled: _showRecurringSection && useRecurring,
+          recurringWeekdays: useRecurring ? _recurringDays.toList() : const [],
+          recurringStartMinute: useRecurring ? recurringStartMinute : null,
+          recurringEndMinute: useRecurring ? recurringEndMinute : null,
+          recurringDailyLimit: recurringLimit,
         );
       }
 
@@ -588,6 +879,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           decoration: _inputDeco('₹ 0.00'),
                         ),
                       ),
+                      if (_showRecurringSection) ...[
+                        const SizedBox(height: 18),
+                        _buildRecurringSection(),
+                      ],
                       if (_showStockAndExpiryFields) ...[
                         const SizedBox(height: 18),
                         _buildField(
@@ -692,7 +987,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       if (_showStockAndExpiryFields) ...[
                         const SizedBox(height: 18),
                         _buildField(
-                          label: 'DATE/TIME AVAILABLE UNTIL',
+                          label: 'AVAILABLE UNTIL (OPTIONAL)',
                           child: GestureDetector(
                           onTap: _pickDateTime,
                           child: Container(
@@ -713,7 +1008,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                                 Expanded(
                                   child: Text(
                                     _dateTime == null
-                                        ? 'mm/dd/yyyy, --:-- --'
+                                        ? 'Tap to choose when to stop taking orders'
                                         : _formattedDateTime,
                                     style: TextStyle(
                                       fontSize: 15,
@@ -1131,6 +1426,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
 class _FulfilmentOption extends StatelessWidget {
   const _FulfilmentOption({
+    super.key,
     required this.selected,
     required this.title,
     required this.subtitle,

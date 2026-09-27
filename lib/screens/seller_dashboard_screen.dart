@@ -6,13 +6,16 @@ import '../widgets/listing_image.dart';
 import '../widgets/order_items_list.dart';
 import '../widgets/order_fulfilment_banner.dart';
 import '../models/data.dart';
+import '../models/kitchen_order_category.dart';
 import '../models/order_lifecycle.dart';
+import '../models/seller_order_history.dart';
 import '../services/api_service.dart';
 import '../widgets/order_lifecycle_dialogs.dart';
 import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/order_messages_button.dart';
+import '../widgets/profile_menu_tile.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/requested_ready_summary.dart';
 import '../widgets/seller_insights_panel.dart';
@@ -22,12 +25,15 @@ import 'my_listings_screen.dart';
 import 'preorder_detail_screen.dart';
 import 'seller_preorders_screen.dart';
 import 'seller_feedback_screen.dart';
+import 'seller_older_orders_screen.dart';
 
 class SellerDashboardScreen extends StatefulWidget {
   const SellerDashboardScreen({
     super.key,
     this.onInitialLoadSettled,
     this.onKitchenAttentionCount,
+    this.fetchOrders,
+    this.fetchCampaigns,
   });
 
   /// Fired once when the first orders load finishes (success or failure).
@@ -36,6 +42,12 @@ class SellerDashboardScreen extends StatefulWidget {
   /// Pending seller orders that still need accept/reject.
   final ValueChanged<int>? onKitchenAttentionCount;
 
+  /// Test seam. Production uses [ApiService.getOrders].
+  final Future<List<Map<String, dynamic>>> Function()? fetchOrders;
+
+  /// Test seam. Production uses [ApiService.getPreOrderCampaigns].
+  final Future<List<Map<String, dynamic>>> Function()? fetchCampaigns;
+
   @override
   SellerDashboardScreenState createState() => SellerDashboardScreenState();
 }
@@ -43,6 +55,7 @@ class SellerDashboardScreen extends StatefulWidget {
 class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   List<Order> _activeOrders = [];
   List<Order> _pastOrders = [];
+  bool _hasOlderPast = false;
   bool _isLoading = true;
   bool _hasSuccessfullyLoaded = false;
   String? _error;
@@ -58,6 +71,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   /// 0 = Active, 1 = Past
   int _ordersTab = 0;
+
+  KitchenOrderCategory? _kitchenFilter;
 
   @override
   void initState() {
@@ -81,16 +96,26 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   Future<void> refreshUnread() async {
     if (!_hasSuccessfullyLoaded) return;
     try {
-      final orders = await ApiService.getOrders(role: 'seller');
+      final List<Map<String, dynamic>> raw;
+      final injected = widget.fetchOrders;
+      if (injected != null) {
+        raw = await injected();
+      } else {
+        final pages = await Future.wait([
+          ApiService.getSellerOrderBucket(scope: 'active'),
+          ApiService.getSellerOrderBucket(scope: 'recent_past'),
+        ]);
+        raw = [...pages[0].orders, ...pages[1].orders];
+      }
       final counts = <String, int>{};
-      for (final json in orders) {
+      for (final json in raw) {
         final parsed = Order.fromJson(json);
         counts[parsed.id] = parsed.unreadMessageCount;
       }
       if (!mounted) return;
       var changed = false;
       List<Order> mapped(List<Order> list) => list.map((order) {
-        final next = counts[order.id] ?? 0;
+        final next = counts[order.id] ?? order.unreadMessageCount;
         if (next == order.unreadMessageCount) return order;
         changed = true;
         return order.withUnreadCount(next);
@@ -111,27 +136,71 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     setState(() => _areaTab = 0);
   }
 
+  List<KitchenOrderCategory> get _visibleKitchenCategories =>
+      visibleKitchenCategories(
+        orders: [..._activeOrders, ..._pastOrders],
+        campaigns: _preOrderCampaigns,
+      );
+
+  KitchenOrderCategory? get _resolvedKitchenCategory => resolveKitchenCategory(
+        visible: _visibleKitchenCategories,
+        selected: _kitchenFilter,
+      );
+
+  List<Order> _ordersForCategory(List<Order> source) {
+    final selected = _resolvedKitchenCategory;
+    if (selected == null) return source;
+    return source
+        .where((order) => kitchenCategoryForOrder(order) == selected)
+        .toList();
+  }
+
+  bool get _showPreOrdersSection {
+    final visible = _visibleKitchenCategories;
+    if (!visible.contains(KitchenOrderCategory.preorders)) return false;
+    if (visible.length <= 1) return true;
+    return _resolvedKitchenCategory == KitchenOrderCategory.preorders;
+  }
+
+  bool get _showKitchenOrderList {
+    if (_resolvedKitchenCategory != KitchenOrderCategory.preorders) {
+      return true;
+    }
+    if (_ordersForCategory(_activeOrders).isNotEmpty ||
+        _ordersForCategory(_pastOrders).isNotEmpty) {
+      return true;
+    }
+    return _preOrderCampaigns.isEmpty;
+  }
+
   Future<void> _loadPreOrders() async {
     try {
-      final societyId = await SessionService.getSocietyId();
-      if (societyId == null || societyId.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _preOrderCampaigns = [];
-            _preOrdersLoading = false;
-          });
+      List<Map<String, dynamic>> raw;
+      final injected = widget.fetchCampaigns;
+      if (injected != null) {
+        raw = await injected();
+      } else {
+        final societyId = await SessionService.getSocietyId();
+        if (societyId == null || societyId.isEmpty) {
+          if (mounted) {
+            setState(() {
+              _preOrderCampaigns = [];
+              _preOrdersLoading = false;
+            });
+          }
+          return;
         }
-        return;
+        final sellerId = await SessionService.getUserId();
+        if (sellerId == null) return;
+        raw = await ApiService.getPreOrderCampaigns(
+          societyId: societyId,
+          sellerId: sellerId,
+        );
       }
-      final sellerId = await SessionService.getUserId();
-      if (sellerId == null) return;
-      final raw = await ApiService.getPreOrderCampaigns(
-        societyId: societyId,
-        sellerId: sellerId,
-      );
       final campaigns = await Future.wait(
         raw.map((json) async {
           final campaign = PreOrderCampaign.fromJson(json);
+          if (injected != null) return campaign;
           try {
             final summary = PreOrderSummary.fromJson(
               await ApiService.getPreOrderSummary(campaign.id),
@@ -225,14 +294,51 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     }
 
     try {
-      final orders = await ApiService.getOrders(role: 'seller');
-      final parsed = orders.map(Order.fromJson).toList();
+      late final List<Order> active;
+      late final List<Order> past;
+      var hasOlder = false;
+      final injected = widget.fetchOrders;
+      if (injected != null) {
+        final parsed = (await injected()).map(Order.fromJson).toList();
+        active = parsed.where((order) => !order.isTerminal).toList();
+        past = parsed
+            .where(
+              (order) => isSellerRecentPastOrder(
+                isTerminal: order.isTerminal,
+                completedAt: order.completedAt,
+                cancelledAt: order.cancelledAt,
+                rejectedAt: order.rejectedAt,
+                createdAt: order.createdAt,
+              ),
+            )
+            .toList();
+        hasOlder = parsed.any(
+          (order) =>
+              order.isTerminal &&
+              !isSellerRecentPastOrder(
+                isTerminal: order.isTerminal,
+                completedAt: order.completedAt,
+                cancelledAt: order.cancelledAt,
+                rejectedAt: order.rejectedAt,
+                createdAt: order.createdAt,
+              ),
+        );
+      } else {
+        final pages = await Future.wait([
+          ApiService.getSellerOrderBucket(scope: 'active'),
+          ApiService.getSellerOrderBucket(scope: 'recent_past'),
+        ]);
+        active = pages[0].orders.map(Order.fromJson).toList();
+        past = pages[1].orders.map(Order.fromJson).toList();
+        hasOlder = pages[1].hasOlder;
+      }
 
       if (!mounted || gen != _ordersLoadGen) return;
 
       setState(() {
-        _activeOrders = parsed.where((o) => !o.isTerminal).toList();
-        _pastOrders = parsed.where((o) => o.isTerminal).toList();
+        _activeOrders = active;
+        _pastOrders = past;
+        _hasOlderPast = hasOlder;
         _isLoading = false;
         _hasSuccessfullyLoaded = true;
         _ordersRefreshInFlight = false;
@@ -499,7 +605,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                       ),
                       slivers: [
                         SliverToBoxAdapter(child: _buildOrdersHeader()),
-                        SliverToBoxAdapter(child: _buildPreOrdersSection()),
+                        SliverToBoxAdapter(child: _buildKitchenTypeSelector()),
+                        if (_showPreOrdersSection)
+                          SliverToBoxAdapter(child: _buildPreOrdersSection()),
                         if (_error != null)
                           SliverToBoxAdapter(
                             child: Padding(
@@ -512,16 +620,11 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                           ),
                         if (_isLoading)
                           const SliverToBoxAdapter(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 48),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  color: Color(0xFF0E5A47),
-                                ),
-                              ),
+                            child: _KitchenLoadingNote(
+                              message: 'Loading orders…',
                             ),
                           )
-                        else
+                        else if (_showKitchenOrderList)
                           SliverToBoxAdapter(child: _buildOrdersSection(context)),
                         SliverToBoxAdapter(child: _buildExpandCard()),
                         SliverToBoxAdapter(child: _buildAddListingCta(context)),
@@ -649,15 +752,76 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               ],
             ),
           ),
-          TextButton(
-            key: const Key('my-kitchen-listings'),
-            onPressed: _openMyListings,
-            child: const Text(
-              'My Listings',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
+          Wrap(
+            alignment: WrapAlignment.end,
+            children: [
+              TextButton(
+                key: const Key('my-kitchen-add-listing'),
+                onPressed: _openAddListing,
+                child: const Text(
+                  'Add listing',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              TextButton(
+                key: const Key('my-kitchen-listings'),
+                onPressed: _openMyListings,
+                child: const Text(
+                  'My Listings',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildKitchenTypeSelector() {
+    final cats = _visibleKitchenCategories;
+    if (cats.length <= 1) return const SizedBox.shrink();
+    final selected = _resolvedKitchenCategory;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: SizedBox(
+        height: 44,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F2F1),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final scroll = cats.length > 2 && constraints.maxWidth < 360;
+              final itemWidth = scroll
+                  ? 128.0
+                  : constraints.maxWidth / cats.length;
+              final row = Row(
+                children: [
+                  for (final category in cats)
+                    SizedBox(
+                      width: itemWidth,
+                      child: _OrdersSegment(
+                        key: ValueKey('kitchen-type-${category.name}'),
+                        label: kitchenCategoryLabel(category),
+                        selected: selected == category,
+                        onTap: () => setState(() => _kitchenFilter = category),
+                      ),
+                    ),
+                ],
+              );
+              if (!scroll) return row;
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: row,
+                ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -750,13 +914,10 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           ),
           const SizedBox(height: 12),
           if (_preOrdersLoading)
-            const SizedBox(
-              height: 76,
-              child: Center(
-                child: CircularProgressIndicator(
-                  color: preorderGreen,
-                  strokeWidth: 2,
-                ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: _KitchenLoadingNote(
+                message: 'Loading pre-orders…',
               ),
             )
           else if (_preOrderCampaigns.isEmpty)
@@ -818,7 +979,10 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   Widget _buildOrdersSection(BuildContext context) {
     final showingPast = _ordersTab == 1;
-    final orders = showingPast ? _pastOrders : _activeOrders;
+    final active = _ordersForCategory(_activeOrders);
+    final past = _ordersForCategory(_pastOrders);
+    final orders = showingPast ? past : active;
+    final typedEmpty = _visibleKitchenCategories.length > 1;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -835,14 +999,14 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               children: [
                 Expanded(
                   child: _OrdersSegment(
-                    label: 'Active (${_activeOrders.length})',
+                    label: 'Active (${active.length})',
                     selected: !showingPast,
                     onTap: () => setState(() => _ordersTab = 0),
                   ),
                 ),
                 Expanded(
                   child: _OrdersSegment(
-                    label: 'Past (${_pastOrders.length})',
+                    label: 'Past (${past.length})',
                     selected: showingPast,
                     onTap: () => setState(() => _ordersTab = 1),
                   ),
@@ -851,6 +1015,20 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             ),
           ),
           const SizedBox(height: 14),
+          if (showingPast && past.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: Text(
+                'RECENT ORDERS',
+                key: Key('recent-orders-heading'),
+                style: TextStyle(
+                  fontSize: 12,
+                  letterSpacing: 0.7,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF6A7774),
+                ),
+              ),
+            ),
           if (orders.isEmpty)
             Container(
               width: double.infinity,
@@ -862,10 +1040,18 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               ),
               child: Text(
                 showingPast
-                    ? 'No past orders yet.\n\n'
-                          'Completed and cancelled sales will appear here.'
-                    : 'No active orders yet.\n\n'
-                          'When neighbors order your food, they show up here.',
+                    ? (typedEmpty
+                          ? 'No orders yet.\n\n'
+                                'Orders for this type will appear here when buyers place them.'
+                          : _hasOlderPast
+                          ? 'No recent orders'
+                          : 'No past orders yet.\n\n'
+                                'Completed and cancelled sales will appear here.')
+                    : (typedEmpty
+                          ? 'No orders yet.\n\n'
+                                'Orders for this type will appear here when buyers place them.'
+                          : 'No active orders yet.\n\n'
+                                'When neighbors order your food, they show up here.'),
                 style: const TextStyle(
                   color: Color(0xFF3A4644),
                   height: 1.45,
@@ -875,7 +1061,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             )
           else if (showingPast)
             ...orders.map(
-              (order) => _SellerPastOrderCard(
+              (order) => SellerPastOrderCard(
                 order: order,
                 onRefresh: _loadOrders,
               ),
@@ -893,7 +1079,31 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 rejectBusy: _rejectingOrderId == order.id,
               ),
             ),
+          if (showingPast && _hasOlderPast) ...[
+            const SizedBox(height: 8),
+            KeyedSubtree(
+              key: const Key('older-orders-row'),
+              child: ProfileMenuTile(
+                icon: Icons.history_rounded,
+                title: 'Older Orders',
+                subtitle: 'Orders older than 7 days',
+                onTap: _openOlderOrders,
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Future<void> _openOlderOrders() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SellerOlderOrdersScreen(
+          fetchOrders: widget.fetchOrders,
+          onOrderRefresh: _loadOrders,
+        ),
       ),
     );
   }
@@ -976,6 +1186,19 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     if (mounted) _loadOrders();
   }
 
+  Future<void> _openAddListing() async {
+    final canList = await SellerOnboarding.ensureCanCreateListing(context);
+    if (!canList || !mounted) return;
+
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const AddListingTypeScreen()),
+    );
+    if (created == true && mounted) {
+      _loadOrders();
+    }
+  }
+
   Widget _buildAddListingCta(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -1005,22 +1228,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             width: double.infinity,
             height: 58,
             child: ElevatedButton.icon(
-              onPressed: () async {
-                final canList = await SellerOnboarding.ensureCanCreateListing(
-                  context,
-                );
-                if (!canList || !context.mounted) return;
-
-                final created = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AddListingTypeScreen(),
-                  ),
-                );
-                if (created == true) {
-                  _loadOrders();
-                }
-              },
+              onPressed: _openAddListing,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0E5A47),
                 foregroundColor: Colors.white,
@@ -1854,6 +2062,9 @@ class _OrdersSegment extends StatelessWidget {
           child: Center(
             child: Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
@@ -1867,8 +2078,8 @@ class _OrdersSegment extends StatelessWidget {
   }
 }
 
-class _SellerPastOrderCard extends StatelessWidget {
-  const _SellerPastOrderCard({required this.order, this.onRefresh});
+class SellerPastOrderCard extends StatelessWidget {
+  const SellerPastOrderCard({super.key, required this.order, this.onRefresh});
 
   final Order order;
   final Future<void> Function()? onRefresh;
@@ -2178,6 +2389,26 @@ class _ReadyBySheetState extends State<_ReadyBySheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _KitchenLoadingNote extends StatelessWidget {
+  const _KitchenLoadingNote({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      child: Text(
+        message,
+        style: const TextStyle(
+          color: Color(0xFF8A9491),
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

@@ -8,12 +8,16 @@ const { serializeOrder } = require("../utils/listingSerializer");
 const { loadSellerInsights } = require("../lib/sellerInsights");
 const { getPlatformFee } = require("../lib/platformFee");
 const { expireListingIfDue } = require("../utils/listingExpiry");
-  const {
-    assertMadeToOrderCapacity,
-    isMadeToOrderListing,
-    assertRegularOrderAvailabilityMix,
-    assertSingleMadeToOrderListingInOrder,
-  } = require("../lib/listingAvailability");
+const {
+  assertMadeToOrderCapacity,
+  isMadeToOrderListing,
+  assertRegularOrderAvailabilityMix,
+  assertSingleMadeToOrderListingInOrder,
+} = require("../lib/listingAvailability");
+const {
+  assertRecurringOrderable,
+  isRecurringReadyNowListing,
+} = require("../lib/recurringAvailability");
 const {
   notifyOrderCreated,
   notifyStatusChange,
@@ -42,6 +46,7 @@ const {
 } = require("../lib/orderMessages");
 const { buyerCancelDeniedReason } = require("../lib/buyerCancel");
 const { parseRequestedReadyAt } = require("../lib/orderReadyTime");
+const { listSellerOrders } = require("../lib/sellerOrderList");
 
 const router = express.Router();
 
@@ -129,6 +134,7 @@ function isOrderSeller(order, userId) {
 async function restoreReservedInventory(tx, items) {
   for (const item of items) {
     if (!shouldRestoreListingInventory(item.listing)) continue;
+    if (isRecurringReadyNowListing(item.listing)) continue;
     await tx.listing.update({
       where: { id: item.listingId },
       data: {
@@ -163,9 +169,30 @@ router.get(
   "/",
   requireUser,
   asyncHandler(async (req, res) => {
-    const { role = "buyer", status } = req.query;
+    const { role = "buyer", status, scope } = req.query;
 
     if (role === "seller") {
+      if (scope) {
+        const page = await listSellerOrders(prisma, {
+          sellerId: req.user.id,
+          scope,
+          status,
+          page: req.query.page,
+          limit: req.query.limit,
+          include: orderInclude,
+        });
+        return res.json({
+          orders: await attachUnreadCounts(
+            prisma,
+            page.orders.map(serializeOrder),
+            req.user.id
+          ),
+          hasMore: page.hasMore,
+          hasOlder: page.hasOlder,
+          scope: page.scope,
+        });
+      }
+
       const orders = await prisma.order.findMany({
         where: {
           items: {
@@ -550,9 +577,21 @@ router.post(
         return res.status(400).json({ error: "Each item needs quantity >= 1" });
       }
 
+      if (orderType === "regular") {
+        try {
+          await assertRecurringOrderable(prisma, current, quantity);
+        } catch (err) {
+          return res.status(err.statusCode || 400).json({
+            error: err.message,
+            code: err.code,
+          });
+        }
+      }
+
       const enforceStock =
         (orderType === "regular" || current.inventoryMode === "limited") &&
-        !isMadeToOrderListing(current);
+        !isMadeToOrderListing(current) &&
+        !isRecurringReadyNowListing(current);
       if (enforceStock && quantity > current.quantity) {
         return res.status(409).json({
           error:
@@ -597,10 +636,12 @@ router.post(
         where: { id: preparedItems[0].listing.sellerId },
         select: { paymentPreference: true },
       }));
+    const isCrossSocietyOrder = preparedItems.some((item) => item.crossSociety);
     try {
       assertPaymentMethodAllowed({
         preference: sellerForPayment && sellerForPayment.paymentPreference,
         paymentMethod,
+        sameSociety: !isCrossSocietyOrder,
       });
     } catch (err) {
       return res.status(err.statusCode || 400).json({ error: err.message });
@@ -721,7 +762,8 @@ router.post(
         for (const { listing, quantity } of preparedItems) {
           const reserveStock =
             (orderType === "regular" || listing.inventoryMode === "limited") &&
-            !isMadeToOrderListing(listing);
+            !isMadeToOrderListing(listing) &&
+            !isRecurringReadyNowListing(listing);
           if (!reserveStock) continue;
 
           const updated = await tx.listing.updateMany({

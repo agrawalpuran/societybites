@@ -131,6 +131,88 @@ void main() {
     expect(find.byKey(const Key('home-see-all-items')), findsNothing);
   });
 
+  testWidgets('More Around You SEE ALL expands and SHOW LESS collapses', (
+    tester,
+  ) async {
+    _ignoreOverflow();
+    SharedPreferences.setMockInitialValues({'society_id': 'mine'});
+    await tester.binding.setSurfaceSize(const Size(400, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final extended = List.generate(8, (i) {
+      return _listingJson(name: 'Around Dish $i')
+        ..['id'] = 'ext-$i'
+        ..['societyId'] = 'ext-soc'
+        ..['sellerId'] = 'ext-cook'
+        ..['sellerName'] = 'Extended Cook'
+        ..['sellingReachLevel'] = 'EXTENDED'
+        ..['distanceKm'] = 12;
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          fetchListings: () async => [
+            _listingJson(name: 'Society Dal')..['societyId'] = 'mine',
+          ],
+          fetchNearbySellers: () async => {
+            'available': true,
+            'nearbyRadiusKm': 8,
+            'extendedRadiusKm': 15,
+            'sellers': [
+              {
+                'seller': {
+                  'id': 'ext-cook',
+                  'name': 'Extended Cook',
+                  'sellingReachLevel': 'EXTENDED',
+                  'distanceKm': 12,
+                },
+                'listings': extended,
+              },
+            ],
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('More Around You'), findsOneWidget);
+    expect(find.byKey(const Key('home-see-all-extended')), findsOneWidget);
+    expect(find.text('SHOW LESS'), findsNothing);
+    expect(find.byKey(const ValueKey('home-reach-card-ext-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-reach-card-ext-7')), findsNothing);
+    expect(find.byKey(const ValueKey('home-reach-tile-ext-7')), findsNothing);
+
+    await tester.ensureVisible(find.byKey(const Key('home-see-all-extended')));
+    await tester.tap(find.byKey(const Key('home-see-all-extended')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('home-see-all-extended')), findsNothing);
+    expect(find.byKey(const Key('home-show-less-extended')), findsOneWidget);
+    expect(find.text('SHOW LESS'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-reach-tile-ext-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-reach-tile-ext-7')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-reach-card-ext-0')), findsNothing);
+    expect(find.text("Today's Specials in Your Society"), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('home-show-less-extended')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.byKey(const Key('home-see-all-extended')), findsOneWidget);
+    expect(find.text('SHOW LESS'), findsNothing);
+    expect(find.byKey(const ValueKey('home-reach-card-ext-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-reach-tile-ext-7')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('home-see-all-extended')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('home-show-less-extended')));
+    await tester.pump();
+    expect(find.byKey(const Key('home-see-all-extended')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-reach-tile-ext-7')), findsNothing);
+  });
+
   testWidgets('Home search shows matching listings as the user types', (
     tester,
   ) async {
@@ -408,6 +490,53 @@ void main() {
     expect(find.text('Extended Reach'), findsNothing);
     expect(find.byKey(const Key('home-see-all-nearby')), findsNothing);
     expect(find.byKey(const Key('home-see-all-extended')), findsNothing);
+  });
+
+  testWidgets('More Around You seller chips fit without a bottom overflow', (
+    tester,
+  ) async {
+    _ignoreOverflow();
+    SharedPreferences.setMockInitialValues({'society_id': 'mine'});
+    await tester.binding.setSurfaceSize(const Size(400, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          fetchListings: () async => [
+            _listingJson(name: 'Society Dal')..['societyId'] = 'mine',
+          ],
+          fetchNearbySellers: () async => {
+            'available': true,
+            'nearbyRadiusKm': 8,
+            'extendedRadiusKm': 15,
+            'sellers': [
+              {
+                'seller': {
+                  'id': 'ext-cook',
+                  'name': 'Rupal Amin',
+                  'sellingReachLevel': 'EXTENDED',
+                  'distanceKm': 12,
+                },
+                'listings': [
+                  _listingJson(name: 'Extended Dosa')
+                    ..['id'] = 'ext-dosa'
+                    ..['societyId'] = 'ext-soc'
+                    ..['sellerId'] = 'ext-cook'
+                    ..['sellerName'] = 'Rupal Amin'
+                    ..['distanceKm'] = 12,
+                ],
+              },
+            ],
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('More Around You'), findsOneWidget);
+    expect(find.text('Rupal Amin'), findsWidgets);
   });
 
   testWidgets('Non-Veg filter hides veg specials and does not rename remaining cards', (

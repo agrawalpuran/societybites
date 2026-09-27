@@ -74,6 +74,13 @@ Future<void> _pumpSeller(
   while (tester.takeException() != null) {}
 }
 
+Future<void> _openSellerSettings(WidgetTester tester) async {
+  await tester.ensureVisible(find.text('Seller Settings'));
+  await tester.tap(find.text('Seller Settings'));
+  await tester.pumpAndSettle();
+  while (tester.takeException() != null) {}
+}
+
 Finder _fulfilmentChange() => find.text('Change').last;
 
 void main() {
@@ -117,12 +124,12 @@ void main() {
       },
     );
 
-    expect(find.text('SELLER FULFILMENT'), findsOneWidget);
-    expect(find.text('PAYMENT METHODS'), findsOneWidget);
+    await _openSellerSettings(tester);
+    expect(find.text('PAYMENTS'), findsOneWidget);
+    expect(find.text('Payment Methods'), findsOneWidget);
     expect(find.text('UPI + Cash on Delivery'), findsOneWidget);
     expect(find.text('Buyer Pickup'), findsOneWidget);
-    expect(find.text('SELLER SETTINGS'), findsOneWidget);
-    expect(find.text('My Society'), findsOneWidget);
+    expect(find.text('Selling Reach'), findsOneWidget);
 
     await tester.ensureVisible(_fulfilmentChange());
     await tester.tap(_fulfilmentChange());
@@ -163,6 +170,7 @@ void main() {
       },
     );
 
+    await _openSellerSettings(tester);
     await tester.ensureVisible(_fulfilmentChange());
     await tester.tap(_fulfilmentChange());
     await tester.pumpAndSettle();
@@ -205,6 +213,6 @@ void main() {
     expect(find.text('Start Selling'), findsOneWidget);
     expect(find.text('SELLER FULFILMENT'), findsNothing);
     expect(find.text('PAYMENT METHODS'), findsNothing);
-    expect(find.text('SELLER SETTINGS'), findsNothing);
+    expect(find.text('Seller Settings'), findsNothing);
   });
 }

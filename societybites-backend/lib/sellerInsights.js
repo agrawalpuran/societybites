@@ -264,6 +264,8 @@ module.exports = {
   DEFAULT_PRESET,
   formatIstYmd,
   addDaysYmd,
+  startOfIstDay,
+  endOfIstDay,
   resolveDateRange,
   computeInsights,
   loadSellerInsights,

@@ -927,6 +927,22 @@ class _SellerListingCard extends StatelessWidget {
                       ),
                     if (listing.isMadeToOrder)
                       MadeToOrderHint(food: listing, compact: true),
+                    if (listing.isRecurringReadyNow) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        [
+                          listing.recurringScheduleSummary,
+                          listing.recurringHoursSummary,
+                          listing.recurringDailyLimitLabel,
+                        ].where((part) => part.isNotEmpty).join('\n'),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF6A7774),
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -7,9 +7,11 @@ import '../services/session_service.dart';
 import '../widgets/guest_order_auth.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/made_to_order_hint.dart';
+import '../widgets/recurring_availability_hint.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/preorder_widgets.dart';
+import '../widgets/seller_avatar.dart';
 import 'buyer_preorder_detail_screen.dart';
 import 'checkout_screen.dart';
 import 'food_detail_screen.dart';
@@ -276,6 +278,8 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       _show(
         food.isExpired
             ? '${food.name} is out of stock.'
+            : food.recurringUnavailable
+            ? '${food.name} is temporarily not available.'
             : food.madeToOrderUnavailableToday
             ? '${food.name} is currently unavailable.'
             : '${food.name} is sold out.',
@@ -498,6 +502,13 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
   Widget _header() {
     final location = _location;
     final reviews = _reviewCount > 0 ? _reviewCount : widget.seller.reviewCount;
+    final photoUrl = widget.seller.profilePhotoUrl ??
+        _products
+            .map((item) => item.sellerProfilePhotoUrl)
+            .firstWhere(
+              (url) => url != null && url.isNotEmpty,
+              orElse: () => null,
+            );
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
@@ -509,10 +520,11 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
+          SellerAvatar(
             radius: 36,
             backgroundColor: widget.seller.avatarColor,
-            child: Icon(
+            photoUrl: photoUrl,
+            fallback: Icon(
               widget.seller.avatarIcon,
               color: preorderGreen,
               size: 34,
@@ -731,6 +743,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                   ),
                 ),
               MadeToOrderHint(food: food, compact: true),
+              RecurringAvailabilityHint(food: food, compact: true),
               const SizedBox(height: 4),
               Row(
                 children: [

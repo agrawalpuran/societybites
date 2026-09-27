@@ -4,12 +4,15 @@ import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:http/http.dart' as http_client;
 
 import '../models/order_lifecycle.dart';
+import '../models/seller_order_history.dart';
 import '../models/selling_reach.dart';
 import 'auth_config.dart';
 import 'session_service.dart';
 import 'society_search.dart';
 
 final http = _RefreshAwareHttp();
+
+const Object _omitProfilePhoto = Object();
 
 Map<String, dynamic> buildOrderReadyTimePayload({
   DateTime? expectedReadyAt,
@@ -402,6 +405,7 @@ class ApiService {
     String? fssaiNumber,
     String? fssaiExpiry,
     String? fssaiRegisteredName,
+    Object? profilePhotoUrl = _omitProfilePhoto,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/auth/me/profile'),
@@ -418,6 +422,8 @@ class ApiService {
         if (fulfilmentMode != null) 'fulfilmentMode': fulfilmentMode,
         if (deliveryCharge != null) 'deliveryCharge': deliveryCharge,
         if (paymentPreference != null) 'paymentPreference': paymentPreference,
+        if (!identical(profilePhotoUrl, _omitProfilePhoto))
+          'profilePhotoUrl': profilePhotoUrl,
         if (fssaiNumber != null ||
             fssaiExpiry != null ||
             fssaiRegisteredName != null)
@@ -657,6 +663,11 @@ class ApiService {
     String availabilityMode = 'READY_NOW',
     int? preparationTimeMinutes,
     int? maxDailyOrders,
+    bool recurringEnabled = false,
+    List<int>? recurringWeekdays,
+    int? recurringStartMinute,
+    int? recurringEndMinute,
+    int? recurringDailyLimit,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/listings'),
@@ -684,6 +695,13 @@ class ApiService {
         if (preparationTimeMinutes != null)
           'preparationTimeMinutes': preparationTimeMinutes,
         if (maxDailyOrders != null) 'maxDailyOrders': maxDailyOrders,
+        'recurringEnabled': recurringEnabled,
+        if (recurringWeekdays != null) 'recurringWeekdays': recurringWeekdays,
+        if (recurringStartMinute != null)
+          'recurringStartMinute': recurringStartMinute,
+        if (recurringEndMinute != null)
+          'recurringEndMinute': recurringEndMinute,
+        if (recurringEnabled) 'recurringDailyLimit': recurringDailyLimit,
       }),
     );
 
@@ -696,6 +714,7 @@ class ApiService {
   static Future<String> uploadListingImage({
     required List<int> bytes,
     String mimeType = 'image/jpeg',
+    String purpose = 'listing',
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/media/upload'),
@@ -703,12 +722,36 @@ class ApiService {
       body: jsonEncode({
         'imageBase64': base64Encode(bytes),
         'mimeType': mimeType,
+        'purpose': purpose,
       }),
     );
 
     if (response.statusCode == 201) {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
       return data['imageUrl'] as String;
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> uploadMyProfilePhoto({
+    required List<int> bytes,
+    String mimeType = 'image/jpeg',
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/me/profile-photo'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'imageBase64': base64Encode(bytes),
+        'mimeType': mimeType,
+      }),
+    );
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      if (data['token'] != null &&
+          await SessionService.getAuthProvider() == 'firebase') {
+        await SessionService.saveToken(data['token'] as String);
+      }
+      return Map<String, dynamic>.from(data['user'] as Map);
     }
     _throwFromResponse(response);
   }
@@ -767,6 +810,11 @@ class ApiService {
     int? maxDailyOrders,
     bool clearMaxDailyOrders = false,
     bool clearAvailableAt = false,
+    bool? recurringEnabled,
+    List<int>? recurringWeekdays,
+    int? recurringStartMinute,
+    int? recurringEndMinute,
+    int? recurringDailyLimit,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/listings/$listingId'),
@@ -795,6 +843,15 @@ class ApiService {
         if (clearMaxDailyOrders) 'maxDailyOrders': null,
         if (!clearMaxDailyOrders && maxDailyOrders != null)
           'maxDailyOrders': maxDailyOrders,
+        if (recurringEnabled != null) 'recurringEnabled': recurringEnabled,
+        if (recurringWeekdays != null) 'recurringWeekdays': recurringWeekdays,
+        if (recurringStartMinute != null)
+          'recurringStartMinute': recurringStartMinute,
+        if (recurringEndMinute != null)
+          'recurringEndMinute': recurringEndMinute,
+        if (recurringEnabled == true)
+          'recurringDailyLimit': recurringDailyLimit,
+        if (recurringEnabled == false) 'recurringDailyLimit': null,
       }),
     );
 
@@ -906,6 +963,40 @@ class ApiService {
     if (response.statusCode == 200) {
       final data = _decodeResponse(response) as List;
       return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  /// Seller My Kitchen buckets. Does not change GET /orders without [scope].
+  static Future<SellerOrderListPage> getSellerOrderBucket({
+    required String scope,
+    int? page,
+    int? limit,
+  }) async {
+    final query = <String, String>{
+      'role': 'seller',
+      'scope': scope,
+    };
+    if (page != null) query['page'] = '$page';
+    if (limit != null) query['limit'] = '$limit';
+
+    final uri = Uri.parse('$baseUrl/orders').replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      if (data is List) {
+        return SellerOrderListPage(
+          orders: data.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+        );
+      }
+      final map = Map<String, dynamic>.from(data as Map);
+      final raw = map['orders'] as List? ?? const [];
+      return SellerOrderListPage(
+        orders: raw.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+        hasMore: map['hasMore'] == true,
+        hasOlder: map['hasOlder'] == true,
+      );
     }
     _throwFromResponse(response);
   }

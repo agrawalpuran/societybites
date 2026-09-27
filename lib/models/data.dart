@@ -4,6 +4,7 @@ import 'food_type.dart';
 import 'listing_availability.dart';
 import 'listing_categories.dart';
 import 'order_lifecycle.dart';
+import 'recurring_availability.dart';
 import 'seller_fulfilment.dart';
 import 'selling_reach.dart';
 
@@ -31,6 +32,7 @@ class Seller {
   final IconData avatarIcon;
   final Color avatarColor;
   final bool hasOrderableItems;
+  final String? profilePhotoUrl;
 
   const Seller({
     required this.id,
@@ -41,6 +43,7 @@ class Seller {
     required this.avatarIcon,
     required this.avatarColor,
     this.hasOrderableItems = true,
+    this.profilePhotoUrl,
   });
 }
 
@@ -79,11 +82,23 @@ class FoodItem {
   final int? preparationTimeMinutes;
   final int? maxDailyOrders;
   final bool madeToOrderUnavailableToday;
+  final bool recurringEnabled;
+  final List<int> recurringWeekdays;
+  final int? recurringStartMinute;
+  final int? recurringEndMinute;
+  final int? recurringDailyLimit;
+  final bool recurringUnavailable;
+  final String recurringBuyerLabel;
+  final String recurringNextLabel;
+  final String recurringScheduleSummary;
+  final String recurringHoursSummary;
+  final String recurringDailyLimitLabel;
   final String sellerPaymentPreference;
   final SellerFulfilment sellerFulfilment;
   final SellingReachLevel? sellerSellingReachLevel;
   /// Great-circle km from the buyer's society. Set from nearby-sellers cards.
   final double? distanceKm;
+  final String? sellerProfilePhotoUrl;
 
   const FoodItem({
     required this.id,
@@ -120,10 +135,22 @@ class FoodItem {
     this.preparationTimeMinutes,
     this.maxDailyOrders,
     this.madeToOrderUnavailableToday = false,
+    this.recurringEnabled = false,
+    this.recurringWeekdays = const [],
+    this.recurringStartMinute,
+    this.recurringEndMinute,
+    this.recurringDailyLimit,
+    this.recurringUnavailable = false,
+    this.recurringBuyerLabel = '',
+    this.recurringNextLabel = '',
+    this.recurringScheduleSummary = '',
+    this.recurringHoursSummary = '',
+    this.recurringDailyLimitLabel = '',
     this.sellerPaymentPreference = 'UPI_AND_COD',
     this.sellerFulfilment = const SellerFulfilment(),
     this.sellerSellingReachLevel,
     this.distanceKm,
+    this.sellerProfilePhotoUrl,
   });
 
   List<String> get listingCategories {
@@ -149,8 +176,19 @@ class FoodItem {
   bool get isActive => status == 'active';
   bool get isExpired => status == 'expired';
 
-  bool get canAddToCart =>
-      isActive && quantity > 0 && !madeToOrderUnavailableToday;
+  bool get isRecurringReadyNow =>
+      !isPreOrderCatalog &&
+      !isPreOrder &&
+      !isMadeToOrder &&
+      recurringEnabled;
+
+  bool get canAddToCart {
+    if (!isActive || madeToOrderUnavailableToday || recurringUnavailable) {
+      return false;
+    }
+    if (isRecurringReadyNow) return true;
+    return quantity > 0;
+  }
 
   /// Human-readable pickup / seller location for cards and detail.
   String get locationLabel {
@@ -251,6 +289,19 @@ class FoodItem {
       maxDailyOrders: parsePreparationTimeMinutes(json['maxDailyOrders']),
       madeToOrderUnavailableToday:
           json['madeToOrderUnavailableToday'] == true,
+      recurringEnabled: parseRecurringEnabled(json['recurringEnabled']),
+      recurringWeekdays: parseRecurringWeekdays(json['recurringWeekdays']),
+      recurringStartMinute: parseOptionalInt(json['recurringStartMinute']),
+      recurringEndMinute: parseOptionalInt(json['recurringEndMinute']),
+      recurringDailyLimit: parseOptionalInt(json['recurringDailyLimit']),
+      recurringUnavailable: json['recurringUnavailable'] == true,
+      recurringBuyerLabel: json['recurringBuyerLabel']?.toString() ?? '',
+      recurringNextLabel: json['recurringNextLabel']?.toString() ?? '',
+      recurringScheduleSummary:
+          json['recurringScheduleSummary']?.toString() ?? '',
+      recurringHoursSummary: json['recurringHoursSummary']?.toString() ?? '',
+      recurringDailyLimitLabel:
+          json['recurringDailyLimitLabel']?.toString() ?? '',
       sellerPaymentPreference:
           json['sellerPaymentPreference']?.toString() ?? 'UPI_AND_COD',
       sellerFulfilment: SellerFulfilment.fromAuthMe(json),
@@ -260,7 +311,16 @@ class FoodItem {
       distanceKm: json['distanceKm'] == null
           ? null
           : _asDouble(json['distanceKm']),
+      sellerProfilePhotoUrl: _photoUrl(
+        json['sellerProfilePhotoUrl'] ?? json['profilePhotoUrl'],
+      ),
     );
+  }
+
+  static String? _photoUrl(dynamic value) {
+    final raw = value?.toString().trim();
+    if (raw == null || raw.isEmpty || raw == 'null') return null;
+    return raw;
   }
 
   static double _asDouble(dynamic value, [double fallback = 0]) {
@@ -482,6 +542,11 @@ class Order {
       (status == 'accepted' || status == 'preparing');
 
   bool get hasMadeToOrderItems => items.any((item) => item.food.isMadeToOrder);
+
+  bool get hasReadyNowItems => items.any((item) {
+    final food = item.food;
+    return !food.isPreOrderCatalog && !food.isMadeToOrder;
+  });
 
   int? get usualPreparationMinutes {
     final mins = items
@@ -883,6 +948,7 @@ class PreOrderCampaign {
   final double? distanceKm;
   /// `inSociety` | `nearby` | `extended` from seller reach + distance.
   final String? discoveryReach;
+  final String? sellerProfilePhotoUrl;
 
   const PreOrderCampaign({
     required this.id,
@@ -906,6 +972,7 @@ class PreOrderCampaign {
     this.sellingReachLevel,
     this.distanceKm,
     this.discoveryReach,
+    this.sellerProfilePhotoUrl,
   });
 
   bool get isOpen => acceptsNewOrders();
@@ -984,6 +1051,11 @@ class PreOrderCampaign {
           : parseSellingReachLevel(json['sellingReachLevel']),
       distanceKm: (json['distanceKm'] as num?)?.toDouble(),
       discoveryReach: json['discoveryReach']?.toString(),
+      sellerProfilePhotoUrl: () {
+        final raw = json['sellerProfilePhotoUrl']?.toString().trim();
+        if (raw == null || raw.isEmpty || raw == 'null') return null;
+        return raw;
+      }(),
     );
   }
 }
@@ -1122,6 +1194,7 @@ Seller sellerFromListing(
     avatarIcon: avatarIcons[hash % avatarIcons.length],
     avatarColor: avatarColors[hash % avatarColors.length],
     hasOrderableItems: hasOrderableItems ?? food.canAddToCart,
+    profilePhotoUrl: food.sellerProfilePhotoUrl,
   );
 }
 
@@ -1205,5 +1278,6 @@ Seller sellerFromPreOrderCampaign(PreOrderCampaign campaign) {
     reviewCount: reviewCount,
     avatarIcon: avatarIcons[hash % avatarIcons.length],
     avatarColor: avatarColors[hash % avatarColors.length],
+    profilePhotoUrl: campaign.sellerProfilePhotoUrl,
   );
 }

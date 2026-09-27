@@ -29,6 +29,7 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
   PreOrderPaymentMethod _payment = PreOrderPaymentMethod.upi;
   double _platformFee = 0;
   bool _submitting = false;
+  bool _sameSociety = true;
 
   @override
   void initState() {
@@ -38,11 +39,25 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
         ? 'pickup'
         : 'seller_delivery';
     _loadPlatformFee();
+    _resolveSameSociety();
+  }
+
+  Future<void> _resolveSameSociety() async {
+    final buyerSociety = await SessionService.getSocietyId();
+    final sellerSociety = widget.campaign.societyId;
+    final same = sellerSociety == null ||
+        sellerSociety.isEmpty ||
+        buyerSociety == sellerSociety;
+    if (!mounted) return;
+    setState(() {
+      _sameSociety = same;
+      if (!_allowsCash) _payment = PreOrderPaymentMethod.upi;
+    });
   }
 
   bool get _allowsCash =>
       parseSellerPaymentPreference(widget.campaign.sellerPaymentPreference)
-          .allowsCod;
+          .allowsCodFor(sameSociety: _sameSociety);
 
   Future<void> _loadPlatformFee() async {
     try {

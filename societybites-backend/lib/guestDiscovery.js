@@ -2,6 +2,7 @@ const prisma = require("./prisma");
 const { listingCategoriesFromRecord } = require("../utils/listingCategories");
 const { canonicalCityKey } = require("./launchCity");
 const { expireDueListings, DISCOVERABLE_STATUSES } = require("../utils/listingExpiry");
+const { evaluateRecurringAvailability, attachRecurringAvailability } = require("./recurringAvailability");
 
 const GUEST_REACH_LEVELS = ["NEARBY", "EXTENDED"];
 
@@ -60,17 +61,29 @@ function serializeGuestListing(listing, seller) {
         : listing.preparationTimeMinutes,
     maxDailyOrders: listing.maxDailyOrders == null ? null : listing.maxDailyOrders,
     madeToOrderUnavailableToday: Boolean(listing.madeToOrderUnavailableToday),
+    ...(() => {
+      const recurring = evaluateRecurringAvailability(listing, {
+        soldToday: listing.recurringSoldToday || 0,
+      });
+      return {
+        recurringEnabled: recurring.recurringEnabled,
+        recurringUnavailable: recurring.recurringUnavailable,
+        recurringBuyerLabel: recurring.recurringBuyerLabel,
+        recurringNextLabel: recurring.recurringNextLabel,
+      };
+    })(),
     sellerId: listing.sellerId,
     sellerName: (seller && seller.name) || "Neighbor",
+    sellerProfilePhotoUrl: (seller && seller.profilePhotoUrl) || null,
     avgRating: Math.round(avgRating * 10) / 10,
     reviewCount,
   };
 }
 
-function serializeGuestKitchen(seller) {
-  const listings = (seller.listings || []).map((listing) =>
-    serializeGuestListing(listing, seller)
-  );
+async function serializeGuestKitchen(seller) {
+  const listings = (
+    await attachRecurringAvailability(prisma, seller.listings || [])
+  ).map((listing) => serializeGuestListing(listing, seller));
   const categories = [
     ...new Set(listings.flatMap((item) => item.categories || []).filter(Boolean)),
   ];
@@ -79,6 +92,7 @@ function serializeGuestKitchen(seller) {
       id: seller.id,
       name: seller.name || "Neighbor",
       societyName: (seller.society && seller.society.name) || null,
+      profilePhotoUrl: seller.profilePhotoUrl || null,
       categories,
     },
     listings,
@@ -135,9 +149,12 @@ async function discoverGuestKitchens({ query } = {}) {
     orderBy: { name: "asc" },
   });
 
-  const kitchens = sellers
-    .filter((seller) => matchesGuestEligibility(seller, cityKey))
-    .map(serializeGuestKitchen);
+  const kitchens = [];
+  for (const seller of sellers.filter((row) =>
+    matchesGuestEligibility(row, cityKey)
+  )) {
+    kitchens.push(await serializeGuestKitchen(seller));
+  }
 
   return {
     cityKey,
@@ -171,7 +188,7 @@ async function getGuestKitchenStorefront({ sellerId, query } = {}) {
   return {
     cityKey,
     cityName: displayCityName(cityKey),
-    ...serializeGuestKitchen(seller),
+    ...(await serializeGuestKitchen(seller)),
   };
 }
 

@@ -49,6 +49,7 @@ class _MainShellScreenState extends State<MainShellScreen>
     );
     PushNotificationService.onForegroundOrderUpdate = _refreshVisibleTab;
     CartController.instance.onShowOrdersAfterPlace = _showOrdersAfterCheckout;
+    CartController.instance.onSelectShellTab = _selectTab;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.registerIfPossible();
     });
@@ -69,6 +70,9 @@ class _MainShellScreenState extends State<MainShellScreen>
       _showOrdersAfterCheckout,
     )) {
       CartController.instance.onShowOrdersAfterPlace = null;
+    }
+    if (identical(CartController.instance.onSelectShellTab, _selectTab)) {
+      CartController.instance.onSelectShellTab = null;
     }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();

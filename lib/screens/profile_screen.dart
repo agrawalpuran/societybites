@@ -1,23 +1,28 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
 import '../models/selling_reach.dart';
 import '../services/api_service.dart';
+import '../services/profile_photo_processor.dart';
 import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../services/push_notification_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/confirm_upi_id_dialog.dart';
+import '../widgets/photo_source_sheet.dart';
+import '../widgets/profile_menu_tile.dart';
+import '../widgets/seller_avatar.dart';
 import 'admin/admin_shell_screen.dart';
 import 'guest_landing_screen.dart';
 import 'help_center_screen.dart';
 import 'legal_screen.dart';
 import 'login_screen.dart';
-import 'orders_screen.dart';
-import 'seller_dashboard_screen.dart';
-import 'my_listings_screen.dart';
+import 'profile_photo_crop_screen.dart';
+import 'seller_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
@@ -28,6 +33,10 @@ class ProfileScreen extends StatefulWidget {
     this.saveUpiDetails,
     this.saveFssaiDetails,
     this.deleteAccount,
+    this.pickProfilePhotoBytes,
+    this.cropProfilePhoto,
+    this.uploadProfilePhoto,
+    this.saveProfilePhoto,
   });
 
   /// Switches the main shell tab instead of pushing a new route.
@@ -60,6 +69,14 @@ class ProfileScreen extends StatefulWidget {
   /// Test seam. Production uses [ApiService.deleteMyAccount].
   final Future<void> Function()? deleteAccount;
 
+  /// Test seams for profile photo. Production uses camera/gallery + crop + upload.
+  final Future<Uint8List?> Function(ImageSource source)? pickProfilePhotoBytes;
+  final Future<Uint8List?> Function(Uint8List bytes)? cropProfilePhoto;
+  final Future<Map<String, dynamic>> Function(List<int> bytes)?
+      uploadProfilePhoto;
+  final Future<Map<String, dynamic>> Function({String? profilePhotoUrl})?
+      saveProfilePhoto;
+
   @override
   ProfileScreenState createState() => ProfileScreenState();
 }
@@ -78,13 +95,26 @@ class ProfileScreenState extends State<ProfileScreen> {
   SellerFulfilment _fulfilment = const SellerFulfilment();
   SellerPaymentPreference _paymentPreference = defaultSellerPaymentPreference;
   String? _fssaiNumber;
+  String? _profilePhotoUrl;
+  bool _savingProfilePhoto = false;
   String? _fssaiRegisteredName;
   DateTime? _fssaiExpiry;
+  final _sellerSettingsTick = ValueNotifier(0);
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _sellerSettingsTick.dispose();
+    super.dispose();
+  }
+
+  void _refreshSellerSettings() {
+    _sellerSettingsTick.value++;
   }
 
   Future<void> reload() => _loadProfile();
@@ -125,11 +155,13 @@ class ProfileScreenState extends State<ProfileScreen> {
         _fulfilment = SellerFulfilment.fromAuthMe(profile);
         _paymentPreference = paymentPreferenceFromAuthMe(profile);
         _applyFssaiFromProfile(profile);
+        _profilePhotoUrl = profile['profilePhotoUrl'] as String? ?? _profilePhotoUrl;
       } catch (_) {}
     }
 
     if (!mounted) return;
     setState(() {});
+    _refreshSellerSettings();
   }
 
   String get _displayName {
@@ -282,25 +314,38 @@ class ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _openOrders() {
-    if (widget.onSelectTab != null) {
-      widget.onSelectTab!(1);
-      return;
-    }
+  void _openSellerSettings() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const OrdersScreen()),
-    );
-  }
-
-  void _openSellerDashboard() {
-    if (widget.onSelectTab != null) {
-      widget.onSelectTab!(2);
-      return;
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const SellerDashboardScreen()),
+      MaterialPageRoute(
+        builder: (_) => ValueListenableBuilder<int>(
+          valueListenable: _sellerSettingsTick,
+          builder: (context, _, child) {
+            return SellerSettingsScreen(
+              photoUrl: _profilePhotoUrl,
+              displayName: _displayName,
+              savingPhoto: _savingProfilePhoto,
+              upiSubtitle: (_upiId != null && _upiId!.isNotEmpty)
+                  ? _upiId!
+                  : 'Add UPI ID so buyers can pay you',
+              paymentTitle: _paymentPreference.title,
+              sellingReachSubtitle:
+                  _sellingReach.subtitleFor(_sellingReachLevel),
+              fulfilmentTitle: _fulfilment.mode.title,
+              fulfilmentSubtitle: _fulfilment.subtitle,
+              fssaiSubtitle: _fssaiSubtitle,
+              onChangePhoto: _changeProfilePhoto,
+              onRemovePhoto:
+                  _profilePhotoUrl == null ? null : _removeProfilePhoto,
+              onEditUpi: () => _editUpi(),
+              onChangePaymentPreference: _changePaymentPreference,
+              onChangeSellingReach: _changeSellingReach,
+              onChangeFulfilment: _changeFulfilment,
+              onEditFssai: _editFssai,
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -869,6 +914,120 @@ class ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _changeProfilePhoto() async {
+    if (_savingProfilePhoto) return;
+    final source = await showPhotoSourceSheet(
+      context,
+      title: 'Change Profile Photo',
+    );
+    if (source == null || !mounted) return;
+
+    try {
+      Uint8List? picked;
+      if (widget.pickProfilePhotoBytes != null) {
+        picked = await widget.pickProfilePhotoBytes!(source);
+      } else {
+        final picker = ImagePicker();
+        final file = await picker.pickImage(
+          source: source,
+          maxWidth: 2000,
+          imageQuality: 90,
+        );
+        if (file != null) {
+          picked = await file.readAsBytes();
+        }
+      }
+      if (picked == null || !mounted) return;
+
+      Uint8List? cropped;
+      if (widget.cropProfilePhoto != null) {
+        cropped = await widget.cropProfilePhoto!(picked);
+      } else {
+        cropped = await Navigator.push<Uint8List>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProfilePhotoCropScreen(imageBytes: picked!),
+          ),
+        );
+      }
+      if (cropped == null || !mounted) return;
+
+      setState(() => _savingProfilePhoto = true);
+      _refreshSellerSettings();
+      final encoded = encodeProfilePhoto(cropped);
+      final profile = widget.uploadProfilePhoto != null
+          ? await widget.uploadProfilePhoto!(encoded)
+          : await ApiService.uploadMyProfilePhoto(bytes: encoded);
+      if (!mounted) return;
+      setState(() {
+        _profilePhotoUrl = profile['profilePhotoUrl'] as String?;
+        _savingProfilePhoto = false;
+      });
+      _refreshSellerSettings();
+    } on ProfilePhotoRejected catch (error) {
+      if (!mounted) return;
+      setState(() => _savingProfilePhoto = false);
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } on PlatformException catch (error) {
+      if (!mounted) return;
+      setState(() => _savingProfilePhoto = false);
+      _refreshSellerSettings();
+      final denied = error.code.toLowerCase().contains('denied') ||
+          (error.message?.toLowerCase().contains('denied') ?? false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            denied
+                ? (source == ImageSource.camera
+                    ? 'Camera access is needed to take a photo. You can enable it in Settings.'
+                    : 'Photo access is needed to choose from your gallery. You can enable it in Settings.')
+                : 'Could not open ${source == ImageSource.camera ? 'the camera' : 'the gallery'}. Please try again.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _savingProfilePhoto = false);
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ApiService.userFacingError(error).contains('too large')
+                ? profilePhotoTooLargeMessage
+                : 'Could not save your photo. Please try again.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _removeProfilePhoto() async {
+    if (_savingProfilePhoto) return;
+    setState(() => _savingProfilePhoto = true);
+    _refreshSellerSettings();
+    try {
+      final profile = widget.saveProfilePhoto != null
+          ? await widget.saveProfilePhoto!(profilePhotoUrl: null)
+          : await ApiService.updateMyProfile(profilePhotoUrl: null);
+      if (!mounted) return;
+      setState(() {
+        _profilePhotoUrl = profile['profilePhotoUrl'] as String?;
+        _savingProfilePhoto = false;
+      });
+      _refreshSellerSettings();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _savingProfilePhoto = false);
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not remove your photo. Please try again.')),
+      );
+    }
+  }
+
   bool get _isSeller => _role == 'seller' || _role == 'super_admin';
 
   Future<void> _changeSellingReach() async {
@@ -978,12 +1137,14 @@ class ProfileScreenState extends State<ProfileScreen> {
           _sellingReach = SellingReach.fromAuthMe(updated);
         }
       });
+      _refreshSellerSettings();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Selling reach updated')),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _sellingReachLevel = previous);
+      _refreshSellerSettings();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update selling reach: $e')),
       );
@@ -1027,12 +1188,14 @@ class ProfileScreenState extends State<ProfileScreen> {
             );
       if (!mounted) return;
       setState(() => _fulfilment = SellerFulfilment.fromAuthMe(updated));
+      _refreshSellerSettings();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Fulfilment updated')),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _fulfilment = previous);
+      _refreshSellerSettings();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update fulfilment: $e')),
       );
@@ -1060,12 +1223,14 @@ class ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _paymentPreference = paymentPreferenceFromAuthMe(updated);
       });
+      _refreshSellerSettings();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Payment methods updated')),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _paymentPreference = previous);
+      _refreshSellerSettings();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update payment methods: $e')),
       );
@@ -1160,6 +1325,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                             role: _roleLabel,
                             societyName: _societyName,
                             flatNumber: _flatNumber,
+                            photoUrl: _profilePhotoUrl,
                           ),
                           const SizedBox(height: 24),
                           const Text(
@@ -1172,119 +1338,22 @@ class ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          _MenuTile(
+                          ProfileMenuTile(
                             icon: Icons.edit_rounded,
                             title: 'Edit Profile',
                             subtitle: 'Update your display name',
                             onTap: _editProfile,
                           ),
-                          _MenuTile(
-                            icon: Icons.account_balance_wallet_rounded,
-                            title: 'UPI for Payments',
-                            subtitle: (_upiId != null && _upiId!.isNotEmpty)
-                                ? _upiId!
-                                : 'Add UPI ID so buyers can pay you',
-                            onTap: () => _editUpi(),
-                          ),
                           if (_role == 'buyer' || _role == null)
-                            _MenuTile(
+                            ProfileMenuTile(
                               icon: Icons.storefront_rounded,
                               title: 'Start Selling',
                               subtitle:
                                   'List food for neighbors in your society',
                               onTap: _enableSelling,
                             ),
-                          _MenuTile(
-                            icon: Icons.receipt_long_rounded,
-                            title: 'My Orders',
-                            subtitle: 'Track active and past orders',
-                            onTap: _openOrders,
-                          ),
-                          _MenuTile(
-                            icon: Icons.inventory_2_outlined,
-                            title: 'My Listings',
-                            subtitle: 'Edit or remove your food items',
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const MyListingsScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                          _MenuTile(
-                            icon: Icons.grid_view_rounded,
-                            title: 'Seller Dashboard',
-                            subtitle: 'List food and manage orders',
-                            onTap: _openSellerDashboard,
-                          ),
-                          if (_isSeller) ...[
-                            const SizedBox(height: 10),
-                            const Text(
-                              'SELLER SETTINGS',
-                              style: TextStyle(
-                                fontSize: 12,
-                                letterSpacing: 1.4,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF8A9491),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            _MenuTile(
-                              icon: Icons.badge_outlined,
-                              title: 'FSSAI details',
-                              subtitle: _fssaiSubtitle,
-                              trailingLabel: 'Update',
-                              onTap: _editFssai,
-                            ),
-                            const SizedBox(height: 10),
-                            _MenuTile(
-                              icon: Icons.social_distance_rounded,
-                              title: _sellingReachLevel.title,
-                              subtitle: _sellingReach.subtitleFor(_sellingReachLevel),
-                              trailingLabel: 'Change',
-                              onTap: _changeSellingReach,
-                            ),
-                            const SizedBox(height: 10),
-                            const Text(
-                              'PAYMENT METHODS',
-                              style: TextStyle(
-                                fontSize: 12,
-                                letterSpacing: 1.4,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF8A9491),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            _MenuTile(
-                              icon: Icons.payments_outlined,
-                              title: _paymentPreference.title,
-                              subtitle: _paymentPreference.profileSubtitle,
-                              trailingLabel: 'Change',
-                              onTap: _changePaymentPreference,
-                            ),
-                            const SizedBox(height: 10),
-                            const Text(
-                              'SELLER FULFILMENT',
-                              style: TextStyle(
-                                fontSize: 12,
-                                letterSpacing: 1.4,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF8A9491),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            _MenuTile(
-                              icon: Icons.local_shipping_outlined,
-                              title: _fulfilment.mode.title,
-                              subtitle: _fulfilment.subtitle,
-                              trailingLabel: 'Change',
-                              onTap: _changeFulfilment,
-                            ),
-                          ],
                           if (_role == 'super_admin')
-                            _MenuTile(
+                            ProfileMenuTile(
                               icon: Icons.admin_panel_settings_rounded,
                               title: 'Admin Portal',
                               subtitle: 'Manage platform settings',
@@ -1297,6 +1366,26 @@ class ProfileScreenState extends State<ProfileScreen> {
                                 );
                               },
                             ),
+                          if (_isSeller) ...[
+                            const SizedBox(height: 20),
+                            const Text(
+                              'SELLER',
+                              style: TextStyle(
+                                fontSize: 12,
+                                letterSpacing: 1.4,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF8A9491),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            ProfileMenuTile(
+                              icon: Icons.settings_outlined,
+                              title: 'Seller Settings',
+                              subtitle:
+                                  'Manage payments, fulfilment, profile & FSSAI',
+                              onTap: _openSellerSettings,
+                            ),
+                          ],
                           const SizedBox(height: 20),
                           const Text(
                             'SUPPORT',
@@ -1308,7 +1397,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          _MenuTile(
+                          ProfileMenuTile(
                             icon: Icons.help_outline_rounded,
                             title: 'Help Center',
                             subtitle: 'FAQs and community support',
@@ -1321,7 +1410,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                               );
                             },
                           ),
-                          _MenuTile(
+                          ProfileMenuTile(
                             icon: Icons.privacy_tip_outlined,
                             title: 'Privacy Policy',
                             onTap: () => _openLegal(
@@ -1342,7 +1431,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                                   'For questions: support@societybites.in',
                             ),
                           ),
-                          _MenuTile(
+                          ProfileMenuTile(
                             icon: Icons.description_outlined,
                             title: 'Terms of Service',
                             onTap: () => _openLegal(
@@ -1359,7 +1448,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                                   'For disputes: support@societybites.in',
                             ),
                           ),
-                          _MenuTile(
+                          ProfileMenuTile(
                             icon: Icons.info_outline_rounded,
                             title: 'About',
                             subtitle: 'App version and info',
@@ -1376,7 +1465,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          _MenuTile(
+                          ProfileMenuTile(
                             icon: Icons.delete_outline_rounded,
                             title: 'Delete Account',
                             subtitle:
@@ -1753,6 +1842,7 @@ class _ProfileCard extends StatelessWidget {
     required this.role,
     required this.societyName,
     required this.flatNumber,
+    this.photoUrl,
   });
 
   final String name;
@@ -1760,6 +1850,7 @@ class _ProfileCard extends StatelessWidget {
   final String role;
   final String? societyName;
   final String? flatNumber;
+  final String? photoUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -1773,10 +1864,11 @@ class _ProfileCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
+          SellerAvatar(
             radius: 32,
             backgroundColor: const Color(0xFFE8F5EE),
-            child: Text(
+            photoUrl: photoUrl,
+            fallback: Text(
               name.isNotEmpty ? name[0].toUpperCase() : '?',
               style: const TextStyle(
                 fontSize: 26,
@@ -1858,104 +1950,6 @@ class _Chip extends StatelessWidget {
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: Color(0xFF0E5A47),
-        ),
-      ),
-    );
-  }
-}
-
-class _MenuTile extends StatelessWidget {
-  const _MenuTile({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-    this.trailingLabel,
-    this.destructive = false,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final String? trailingLabel;
-  final bool destructive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent =
-        destructive ? const Color(0xFFD94F4F) : const Color(0xFF0E5A47);
-    final iconBg =
-        destructive ? const Color(0xFFFBEAEA) : const Color(0xFFF0F2F1);
-    final border =
-        destructive ? const Color(0xFFE8B4B4) : const Color(0xFFEAEFED);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: ListTile(
-          onTap: onTap,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          leading: Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: iconBg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: accent, size: 22),
-          ),
-          title: Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              color: destructive
-                  ? const Color(0xFFD94F4F)
-                  : const Color(0xFF101617),
-            ),
-          ),
-          subtitle: subtitle != null
-              ? Text(
-                  subtitle!,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6A7774),
-                  ),
-                )
-              : null,
-          trailing: trailingLabel == null
-              ? Icon(
-                  Icons.chevron_right_rounded,
-                  color: destructive
-                      ? const Color(0xFFE8B4B4)
-                      : const Color(0xFFADB5B2),
-                )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      trailingLabel!,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: accent,
-                      ),
-                    ),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: Color(0xFFADB5B2),
-                    ),
-                  ],
-                ),
         ),
       ),
     );

@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
 class TemporarilyUnavailableLabel extends StatelessWidget {
-  const TemporarilyUnavailableLabel({super.key, this.compact = false});
+  const TemporarilyUnavailableLabel({
+    super.key,
+    this.compact = false,
+    this.text = 'Out of stock',
+  });
 
   final bool compact;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
@@ -11,7 +16,7 @@ class TemporarilyUnavailableLabel extends StatelessWidget {
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerRight,
       child: Text(
-        'Out of stock',
+        text,
         maxLines: 1,
         softWrap: false,
         overflow: TextOverflow.fade,

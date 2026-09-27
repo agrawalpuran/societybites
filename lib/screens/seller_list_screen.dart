@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../widgets/preorder_widgets.dart';
+import '../widgets/seller_avatar.dart';
 
 class SellerListScreen extends StatelessWidget {
   const SellerListScreen({
@@ -48,24 +49,18 @@ class SellerListScreen extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: sellerPresenceRingColor(
-                            seller.hasOrderableItems,
-                          ),
-                          width: 2.4,
-                        ),
+                    SellerAvatar(
+                      radius: 27,
+                      backgroundColor: seller.avatarColor,
+                      photoUrl: seller.profilePhotoUrl,
+                      ringColor: sellerPresenceRingColor(
+                        seller.hasOrderableItems,
                       ),
-                      child: CircleAvatar(
-                        radius: 27,
-                        backgroundColor: seller.avatarColor,
-                        child: Icon(
-                          seller.avatarIcon,
-                          color: preorderGreen,
-                          size: 27,
-                        ),
+                      ringWidth: 2.4,
+                      fallback: Icon(
+                        seller.avatarIcon,
+                        color: preorderGreen,
+                        size: 27,
                       ),
                     ),
                     const SizedBox(width: 13),

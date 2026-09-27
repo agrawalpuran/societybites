@@ -362,7 +362,7 @@ void main() {
       expect(launchedUri?.queryParameters['pn'], 'Test Seller');
       expect(launchedUri?.queryParameters['am'], '245.00');
       expect(launchedUri?.queryParameters['cu'], 'INR');
-      expect(launchedUri?.queryParameters['tr'], 'SB1001');
+      expect(launchedUri?.queryParameters.containsKey('tr'), isFalse);
       expect(launchedUri?.queryParameters['tn'], 'SocietyBites Order SB-1001');
       expect(find.text("I've Paid via UPI"), findsOneWidget);
     } finally {

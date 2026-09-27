@@ -22,8 +22,11 @@ void main() {
       'tr': 'SB1023',
       'tn': 'SocietyBites Order SB-1023',
     });
-    expect(uri.toString(), contains('Sharma+Snacks+%26+More'));
-    expect(uri.toString(), contains('SB-1023'));
+    final encoded = upiLaunchString(uri);
+    expect(encoded, contains('Sharma%20Snacks%20%26%20More'));
+    expect(encoded, isNot(contains('Sharma+')));
+    expect(encoded, contains('tn=SocietyBites%20Order%20SB-1023'));
+    expect(encoded, contains('tr=SB1023'));
     expect(uri.queryParameters.keys, hasLength(6));
   });
 
@@ -102,31 +105,34 @@ void main() {
     expect(gpay.scheme, 'gpay');
     expect(gpay.host, 'upi');
     expect(gpay.path, '/pay');
-    expect(gpay.queryParameters, upi.queryParameters);
-    expect(gpay.toString(), startsWith('gpay://upi/pay?'));
+    expect(gpay.queryParameters['pa'], upi.queryParameters['pa']);
+    expect(gpay.queryParameters['am'], '245.00');
+    expect(gpay.queryParameters.containsKey('tr'), isFalse);
+    expect(upiLaunchString(gpay), startsWith('gpay://upi/pay?'));
+    expect(upiLaunchString(gpay), contains('SocietyBites%20Order%20SB-1023'));
+    expect(upiLaunchString(gpay), isNot(contains('+')));
 
     final phonepe = buildUpiAppLaunchUri(
       upiPayUri: upi,
-      target: const UpiAppLaunchTarget(scheme: 'phonepe', host: 'pay'),
+      target: const UpiAppLaunchTarget(scheme: 'phonepe', host: 'upi', path: '/pay'),
     );
     expect(phonepe.scheme, 'phonepe');
-    expect(phonepe.host, 'pay');
-    expect(phonepe.queryParameters, upi.queryParameters);
-    expect(phonepe.toString(), startsWith('phonepe://pay?'));
+    expect(phonepe.host, 'upi');
+    expect(phonepe.path, '/pay');
+    expect(upiLaunchString(phonepe), startsWith('phonepe://upi/pay?'));
 
     final paytm = buildUpiAppLaunchUri(
       upiPayUri: upi,
-      target: const UpiAppLaunchTarget(scheme: 'paytmmp', host: 'pay'),
+      target: const UpiAppLaunchTarget(scheme: 'paytm', host: 'upi', path: '/pay'),
     );
-    expect(paytm.toString(), startsWith('paytmmp://pay?'));
-    expect(paytm.queryParameters, upi.queryParameters);
+    expect(upiLaunchString(paytm), startsWith('paytm://upi/pay?'));
+    expect(paytm.queryParameters['pa'], upi.queryParameters['pa']);
 
     final bhim = buildUpiAppLaunchUri(
       upiPayUri: upi,
-      target: const UpiAppLaunchTarget(scheme: 'bhim', host: 'pay'),
+      target: const UpiAppLaunchTarget(scheme: 'bhim', host: 'upi', path: '/pay'),
     );
-    expect(bhim.toString(), startsWith('bhim://pay?'));
-    expect(bhim.queryParameters, upi.queryParameters);
+    expect(upiLaunchString(bhim), startsWith('bhim://upi/pay?'));
   });
 
   test('getAvailableUpiApps hides apps that cannot launch', () async {
@@ -162,6 +168,11 @@ void main() {
     );
     expect(onlyPhonePe.map((app) => app.id), ['phonepe']);
     expect(onlyPhonePe.single.resolvedLaunchUri?.scheme, 'phonepe');
+    expect(onlyPhonePe.single.resolvedLaunchUri?.host, 'upi');
+    expect(
+      upiLaunchString(onlyPhonePe.single.resolvedLaunchUri!),
+      startsWith('phonepe://upi/pay?'),
+    );
   });
 
   test('sanitizes UPI transaction references', () {

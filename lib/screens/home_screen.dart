@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/app_header.dart';
 import '../widgets/made_to_order_hint.dart';
+import '../widgets/recurring_availability_hint.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
 import '../services/cart_controller.dart';
@@ -23,6 +23,7 @@ import '../widgets/one_seller_cart.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/floating_cart_bar.dart';
 import '../widgets/listing_type_badge.dart';
+import '../widgets/seller_avatar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -72,6 +73,11 @@ class HomeScreenState extends State<HomeScreen> {
   String? _buyerSocietyId;
   HomeListingReach? _expandedReach;
   SellingReach _cityReach = const SellingReach();
+  final _reachSectionKeys = <HomeListingReach, GlobalKey>{
+    HomeListingReach.inSociety: GlobalKey(),
+    HomeListingReach.nearby: GlobalKey(),
+    HomeListingReach.extended: GlobalKey(),
+  };
 
   bool get isLoadInProgress => _isLoading;
   bool get hasSuccessfullyLoaded => _hasSuccessfullyLoaded;
@@ -286,6 +292,10 @@ class HomeScreenState extends State<HomeScreen> {
           content: Text(
             food.isExpired
                 ? '${food.name} is out of stock'
+                : food.recurringUnavailable
+                ? (food.recurringNextLabel.isNotEmpty
+                    ? '${food.name} is temporarily not available. ${food.recurringNextLabel}'
+                    : '${food.name} is temporarily not available')
                 : food.madeToOrderUnavailableToday
                 ? '${food.name} is currently unavailable'
                 : '${food.name} is sold out',
@@ -1067,14 +1077,34 @@ class HomeScreenState extends State<HomeScreen> {
     return _TodaysSpecialsSection(
       specials: listings.take(homeReachPreviewCount).toList(),
       showSeeAll: listings.length > homeReachPreviewCount,
-      onSeeAll: () =>
-          setState(() => _expandedReach = HomeListingReach.inSociety),
+      onSeeAll: () => _expandReach(HomeListingReach.inSociety),
       cartQtyFor: _cartQtyFor,
       onAdd: _addToCart,
       onRemove: _removeFromCart,
       onTap: _openDetail,
       onSellerTap: (food) => _openSeller(sellerFromListing(food)),
     );
+  }
+
+  void _expandReach(HomeListingReach reach) {
+    setState(() => _expandedReach = reach);
+  }
+
+  void _collapseReach(HomeListingReach reach) {
+    setState(() {
+      if (_expandedReach == reach) _expandedReach = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final context = _reachSectionKeys[reach]?.currentContext;
+      if (context == null) return;
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        alignment: 0.08,
+      );
+    });
   }
 
   List<FoodItem> _listingsForReach(HomeListingReach reach) {
@@ -1093,7 +1123,7 @@ class HomeScreenState extends State<HomeScreen> {
   }) {
     if (listings.isEmpty) return const SizedBox.shrink();
     final expanded = _expandedReach == reach;
-    final preview = !expanded && listings.length > homeReachPreviewCount;
+    final canToggle = listings.length > homeReachPreviewCount;
     final visible = expanded
         ? listings
         : listings.take(homeReachPreviewCount).toList();
@@ -1102,11 +1132,23 @@ class HomeScreenState extends State<HomeScreen> {
       HomeListingReach.nearby => const Key('home-see-all-nearby'),
       HomeListingReach.extended => const Key('home-see-all-extended'),
     };
+    final showLessKey = switch (reach) {
+      HomeListingReach.inSociety => const Key('home-show-less-in-society'),
+      HomeListingReach.nearby => const Key('home-show-less-nearby'),
+      HomeListingReach.extended => const Key('home-show-less-extended'),
+    };
+    const actionStyle = TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: Color(0xFF0E5A47),
+      letterSpacing: 0.5,
+    );
     final showTitle = title != null && title.isNotEmpty;
     return Column(
+      key: _reachSectionKeys[reach],
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (showTitle || preview)
+        if (showTitle || canToggle)
           Padding(
             padding: EdgeInsets.fromLTRB(20, showTitle ? 22 : 8, 8, 14),
             child: Row(
@@ -1123,19 +1165,25 @@ class HomeScreenState extends State<HomeScreen> {
                         )
                       : const SizedBox.shrink(),
                 ),
-                if (preview)
+                if (canToggle)
                   TextButton(
-                    key: seeAllKey,
-                    onPressed: () => setState(() => _expandedReach = reach),
-                    child: const Text(
-                      'SEE ALL',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0E5A47),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                    key: expanded ? showLessKey : seeAllKey,
+                    onPressed: () => expanded
+                        ? _collapseReach(reach)
+                        : _expandReach(reach),
+                    child: expanded
+                        ? const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('SHOW LESS', style: actionStyle),
+                              Icon(
+                                Icons.keyboard_arrow_up,
+                                size: 16,
+                                color: Color(0xFF0E5A47),
+                              ),
+                            ],
+                          )
+                        : const Text('SEE ALL', style: actionStyle),
                   ),
               ],
             ),
@@ -1292,48 +1340,45 @@ class _SellerChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isIos = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: seller.avatarColor,
-              border: Border.all(
-                color: sellerPresenceRingColor(seller.hasOrderableItems),
-                width: 2.4,
-              ),
-            ),
-            child: Icon(
-              seller.avatarIcon,
-              color: const Color(0xFF3A4644),
-              size: 28,
-            ),
-          ),
-          SizedBox(height: isIos ? 4 : 8),
-          SizedBox(
-            width: 72,
-            height: isIos ? 32 : null,
-            child: Text(
-              seller.name,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+      child: SizedBox(
+        width: 72,
+        height: 100,
+        child: Column(
+          children: [
+            SellerAvatar(
+              radius: 32,
+              backgroundColor: seller.avatarColor,
+              photoUrl: seller.profilePhotoUrl,
+              ringColor: sellerPresenceRingColor(seller.hasOrderableItems),
+              ringWidth: 2.4,
+              fallback: Icon(
+                seller.avatarIcon,
                 color: const Color(0xFF3A4644),
-                height: isIos ? 1.1 : 1.2,
+                size: 28,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            SizedBox(
+              width: 72,
+              height: 32,
+              child: Text(
+                seller.name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3A4644),
+                  height: 1.1,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1625,6 +1670,11 @@ class _SpecialCard extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
                 child: MadeToOrderHint(food: food, compact: true),
               ),
+            if (food.isRecurringReadyNow)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
+                child: RecurringAvailabilityHint(food: food, compact: true),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
               child: Row(
@@ -1851,7 +1901,6 @@ class _AvailableItemTile extends StatelessWidget {
               width: 72,
               height: 72,
               iconSize: 36,
-              showTypeBadge: true,
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -1862,15 +1911,23 @@ class _AvailableItemTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Text(
-                          food.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF101617),
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              food.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF101617),
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            ListingTypeBadge(food: food, dense: true),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1912,6 +1969,7 @@ class _AvailableItemTile extends StatelessWidget {
                     ],
                   ),
                   MadeToOrderHint(food: food, compact: true),
+                  RecurringAvailabilityHint(food: food, compact: true),
                   const SizedBox(height: 4),
                   Row(
                     children: [

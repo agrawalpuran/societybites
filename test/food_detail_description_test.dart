@@ -59,5 +59,7 @@ void main() {
       find.text('The seller has not added a description yet.'),
       findsOneWidget,
     );
+    expect(find.text('Cart'), findsNothing);
+    expect(find.byKey(const Key('home-cart-button')), findsNothing);
   });
 }

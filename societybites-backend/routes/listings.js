@@ -42,8 +42,23 @@ const {
   isBuyerVisibleMadeToOrder,
   isMadeToOrderListing,
 } = require("../lib/listingAvailability");
+const {
+  recurringWriteFields,
+  recurringUpdateFields,
+  attachRecurringAvailability,
+} = require("../lib/recurringAvailability");
 
-const router = express.Router();
+async function jsonListings(listings) {
+  const withCapacity = await attachMadeToOrderCapacity(prisma, listings);
+  const withRecurring = await attachRecurringAvailability(prisma, withCapacity);
+  await attachQuantitySold(prisma, withRecurring);
+  return withRecurring.map((listing) => serializeListing(listing));
+}
+
+async function jsonListing(listing) {
+  const [serialized] = await jsonListings([listing]);
+  return serialized;
+}
 
 const listingInclude = {
   seller: {
@@ -63,6 +78,8 @@ async function rejectCommittedCampaignProductMutation(listing, res) {
   });
   return true;
 }
+
+const router = express.Router();
 
 router.get(
   "/guest-kitchens",
@@ -182,9 +199,8 @@ router.get(
       orderBy: { createdAt: "desc" },
     });
 
-    const withCapacity = await attachMadeToOrderCapacity(prisma, listings);
-    await attachQuantitySold(prisma, withCapacity);
-    res.json(withCapacity.map((listing) => serializeListing(listing)));
+    const payload = await jsonListings(listings);
+    res.json(payload);
   })
 );
 
@@ -210,10 +226,7 @@ router.get(
     }
 
     listing = await expireListingIfDue(prisma, listing, { include: listingInclude });
-    const [withCapacity] = await attachMadeToOrderCapacity(prisma, [listing]);
-    const payload = withCapacity || listing;
-    await attachQuantitySold(prisma, [payload]);
-    res.json(serializeListing(payload));
+    res.json(await jsonListing(listing));
   })
 );
 
@@ -277,6 +290,7 @@ router.post(
     const parsedCatalogType = parseCatalogType(req.body.catalogType);
     let parsedCategories;
     let availabilityFields;
+    let recurringFields;
     try {
       parsedCategories = parseListingCategories(req.body, { required: true });
       availabilityFields = availabilityWriteFields({
@@ -284,6 +298,10 @@ router.post(
         availabilityMode: req.body.availabilityMode,
         preparationTimeMinutes: req.body.preparationTimeMinutes,
         maxDailyOrders: req.body.maxDailyOrders,
+      });
+      recurringFields = recurringWriteFields(req.body, {
+        catalogType: parsedCatalogType,
+        availabilityMode: availabilityFields.availabilityMode,
       });
     } catch (err) {
       return res.status(err.statusCode || 400).json({ error: err.message });
@@ -320,11 +338,13 @@ router.post(
         ...categoryWriteFields(parsedCategories),
         catalogType: parsedCatalogType,
         ...availabilityFields,
+        ...recurringFields,
+        ...(recurringFields.recurringEnabled ? { availableAt: null } : {}),
       },
       include: listingInclude,
     });
 
-    res.status(201).json(serializeListing(listing));
+    res.status(201).json(await jsonListing(listing));
   })
 );
 
@@ -367,7 +387,7 @@ router.patch(
     }
 
     if ((listing.catalogType || "REGULAR") === nextType) {
-      return res.json(serializeListing(listing));
+      return res.json(await jsonListing(listing));
     }
 
     const updated = await prisma.listing.update({
@@ -379,12 +399,17 @@ router.patch(
               availabilityMode: "READY_NOW",
               preparationTimeMinutes: null,
               maxDailyOrders: null,
+              recurringEnabled: false,
+              recurringWeekdays: [],
+              recurringStartMinute: null,
+              recurringEndMinute: null,
+              recurringDailyLimit: null,
             }
           : { catalogType: nextType },
       include: listingInclude,
     });
 
-    res.json(serializeListing(updated));
+    res.json(await jsonListing(updated));
   })
 );
 
@@ -450,6 +475,12 @@ router.patch(
     try {
       const availabilityFields = availabilityUpdateFields(req.body, listing);
       if (availabilityFields) Object.assign(data, availabilityFields);
+      const nextMode = data.availabilityMode || listing.availabilityMode;
+      const recurringFields = recurringUpdateFields(req.body, listing, nextMode);
+      if (recurringFields) Object.assign(data, recurringFields);
+      if (recurringFields && recurringFields.recurringEnabled) {
+        data.availableAt = null;
+      }
     } catch (err) {
       return res.status(err.statusCode || 400).json({ error: err.message });
     }
@@ -497,7 +528,7 @@ router.patch(
       include: listingInclude,
     });
 
-    res.json(serializeListing(updated));
+    res.json(await jsonListing(updated));
   })
 );
 
@@ -661,7 +692,7 @@ router.patch(
       include: listingInclude,
     });
 
-    res.json(serializeListing(updated));
+    res.json(await jsonListing(updated));
   })
 );
 
@@ -721,7 +752,7 @@ router.patch(
       include: listingInclude,
     });
 
-    res.json(serializeListing(updated));
+    res.json(await jsonListing(updated));
   })
 );
 
@@ -775,7 +806,7 @@ router.patch(
       include: listingInclude,
     });
 
-    res.json(serializeListing(updated));
+    res.json(await jsonListing(updated));
   })
 );
 

@@ -61,6 +61,14 @@ function jsonRequest(server, { method, path, token, body }) {
 async function main() {
   assert(allowsCod("UPI_AND_COD"), "default preference allows COD");
   assert(!allowsCod("UPI_ONLY"), "UPI_ONLY hides COD");
+  assert(
+    allowsCod("COD_IN_SOCIETY_UPI_OUTSIDE", { sameSociety: true }),
+    "in-society COD allowed for neighbours"
+  );
+  assert(
+    !allowsCod("COD_IN_SOCIETY_UPI_OUTSIDE", { sameSociety: false }),
+    "in-society COD hidden outside society"
+  );
   assertPaymentMethodAllowed({ preference: "UPI_ONLY", paymentMethod: "upi" });
   try {
     assertPaymentMethodAllowed({ preference: "UPI_ONLY", paymentMethod: "cash" });
@@ -69,6 +77,22 @@ async function main() {
     if (err.message === "expected COD reject") throw err;
     assert(err.statusCode === 400, "COD reject is 400");
   }
+  try {
+    assertPaymentMethodAllowed({
+      preference: "COD_IN_SOCIETY_UPI_OUTSIDE",
+      paymentMethod: "cash",
+      sameSociety: false,
+    });
+    throw new Error("expected outside COD reject");
+  } catch (err) {
+    if (err.message === "expected outside COD reject") throw err;
+    assert(err.statusCode === 400, "outside COD reject is 400");
+  }
+  assertPaymentMethodAllowed({
+    preference: "COD_IN_SOCIETY_UPI_OUTSIDE",
+    paymentMethod: "cash",
+    sameSociety: true,
+  });
   assert(
     upiBlocksPreparation({ paymentMethod: "upi", paymentStatus: "pending" }),
     "UPI pending blocks prep"

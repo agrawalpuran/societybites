@@ -120,6 +120,16 @@ model Listing {
   preparationTimeMinutes Int?
   /// Optional cap on accepted MADE_TO_ORDER orders per UTC day. Null = no cap.
   maxDailyOrders Int?
+  /// REGULAR + READY_NOW only. Existing listings stay false.
+  recurringEnabled Boolean @default(false)
+  /// ISO weekdays 1=Mon … 7=Sun. Empty unless recurringEnabled.
+  recurringWeekdays Int[] @default([])
+  /// Minutes from IST midnight. Inclusive start of selling window.
+  recurringStartMinute Int?
+  /// Minutes from IST midnight. Exclusive end of selling window (start < end).
+  recurringEndMinute Int?
+  /// Optional portions per IST selling day. Null = no daily cap.
+  recurringDailyLimit Int?
   /// When set, this listing is a pre-order campaign product, not a regular listing.
   campaignId     String?
   /// Catalog listing this campaign product was copied from. Null for ad-hoc / historical copies.

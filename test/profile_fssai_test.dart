@@ -64,6 +64,10 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    await tester.ensureVisible(find.text('Seller Settings'));
+    await tester.tap(find.text('Seller Settings'));
+    await tester.pumpAndSettle();
+
     expect(find.text('FSSAI details'), findsOneWidget);
     await tester.ensureVisible(find.text('FSSAI details'));
     await tester.tap(find.text('FSSAI details'));
@@ -117,6 +121,10 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    await tester.ensureVisible(find.text('Seller Settings'));
+    await tester.tap(find.text('Seller Settings'));
+    await tester.pumpAndSettle();
+
     expect(find.textContaining('12345678901234'), findsWidgets);
     expect(find.textContaining('Agrawal Kitchen'), findsWidgets);
 
@@ -154,5 +162,6 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(find.text('FSSAI details'), findsNothing);
+    expect(find.text('Seller Settings'), findsNothing);
   });
 }

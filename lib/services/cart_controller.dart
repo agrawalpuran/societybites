@@ -18,6 +18,9 @@ class CartController extends ChangeNotifier {
   /// Main shell switches to the buyer Orders tab after checkout.
   VoidCallback? onShowOrdersAfterPlace;
 
+  /// Switch a bottom-nav tab on the existing shell without rebuilding it.
+  ValueChanged<int>? onSelectShellTab;
+
   int get itemCount =>
       items.fold<int>(0, (sum, item) => sum + item.quantity);
 
@@ -29,6 +32,13 @@ class CartController extends ChangeNotifier {
   void clear() {
     if (items.isEmpty) return;
     items.clear();
+    notifyListeners();
+  }
+
+  void replaceItems(List<CartItem> next) {
+    items
+      ..clear()
+      ..addAll(next);
     notifyListeners();
   }
 

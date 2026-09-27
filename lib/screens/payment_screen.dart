@@ -10,6 +10,7 @@ import '../models/data.dart';
 import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
 import '../services/upi_payment_service.dart';
+import '../widgets/upi_app_brand_icon.dart';
 
 typedef PaymentApiCall = Future<Map<String, dynamic>> Function(String orderId);
 typedef UpiLauncher = Future<bool> Function(Uri uri);
@@ -220,7 +221,10 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   Future<bool> _launchUpiUri(Uri uri) async {
     try {
-      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return await launchUrl(
+        Uri.parse(upiLaunchString(uri)),
+        mode: LaunchMode.externalApplication,
+      );
     } catch (_) {
       return false;
     }
@@ -254,18 +258,12 @@ class _PaymentScreenState extends State<PaymentScreen>
   Future<void> _launchSelectedUpiApp(UpiAppOption app) async {
     final resolved = app.resolvedLaunchUri;
     if (resolved == null || _order.orderTotal <= 0) return;
-    final uri = Uri(
-      scheme: resolved.scheme,
-      host: resolved.host,
-      path: resolved.path,
-      queryParameters: _upiPaymentUri.queryParameters,
-    );
     try {
       setState(() => _upiLaunchError = null);
       final launch = widget.launchUpi;
       final launched = launch != null
-          ? await launch(uri)
-          : await _launchUpiUri(uri);
+          ? await launch(resolved)
+          : await _launchUpiUri(resolved);
       if (!launched && mounted) {
         setState(() => _upiLaunchError = _noUpiAppMessage);
       }
@@ -529,7 +527,7 @@ class _PaymentScreenState extends State<PaymentScreen>
             onTap: _showUpiIntentButton ? _launchUpiApp : null,
             child: QrImageView(
               key: const ValueKey('upi-qr'),
-              data: _upiPaymentUri.toString(),
+              data: upiLaunchString(_upiPaymentUri),
               version: QrVersions.auto,
               size: 200,
               backgroundColor: Colors.white,
@@ -591,7 +589,7 @@ class _PaymentScreenState extends State<PaymentScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(app.icon, size: 20, color: app.accent),
+                UpiAppBrandIcon(appId: app.id, size: 32),
                 const SizedBox(height: 4),
                 Text(
                   app.displayName,

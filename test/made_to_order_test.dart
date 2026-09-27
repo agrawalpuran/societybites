@@ -90,6 +90,7 @@ void main() {
     expect(find.text('PREPARATION TIME'), findsOneWidget);
     expect(find.text('QUANTITY AVAILABLE'), findsNothing);
     expect(find.text('DATE/TIME AVAILABLE UNTIL'), findsNothing);
+    expect(find.text('AVAILABLE UNTIL (OPTIONAL)'), findsNothing);
     expect(find.text('MAXIMUM ORDERS PER DAY (OPTIONAL)'), findsNothing);
   });
 
@@ -184,6 +185,7 @@ void main() {
     expect(find.text('Available Now'), findsNothing);
     expect(find.text('QUANTITY AVAILABLE'), findsNothing);
     expect(find.text('DATE/TIME AVAILABLE UNTIL'), findsNothing);
+    expect(find.text('AVAILABLE UNTIL (OPTIONAL)'), findsNothing);
   });
 
   testWidgets('My Kitchen filters Made to Order separately', (tester) async {

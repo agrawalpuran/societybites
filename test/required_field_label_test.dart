@@ -45,6 +45,7 @@ void main() {
     expect(requiredLabels, isNot(contains('FOOD TAGS')));
     expect(requiredLabels, isNot(contains('WEIGHT PER PORTION')));
     expect(requiredLabels, isNot(contains('DATE/TIME AVAILABLE UNTIL')));
+    expect(requiredLabels, isNot(contains('AVAILABLE UNTIL (OPTIONAL)')));
   });
 
   testWidgets('Made to Order adds a required preparation-time indicator', (

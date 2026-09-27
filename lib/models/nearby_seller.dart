@@ -45,6 +45,7 @@ class NearbySellerCard {
     this.distanceKm,
     required this.fulfilment,
     this.listings = const [],
+    this.profilePhotoUrl,
   });
 
   final String sellerId;
@@ -53,6 +54,7 @@ class NearbySellerCard {
   final double? distanceKm;
   final SellerFulfilment fulfilment;
   final List<FoodItem> listings;
+  final String? profilePhotoUrl;
 
   String get distanceLabel {
     final km = distanceKm;
@@ -92,6 +94,7 @@ class NearbySellerCard {
               'sellerId': sellerId,
               'sellerName': sellerName,
               'price': 0,
+              'sellerProfilePhotoUrl': profilePhotoUrl,
             }),
     );
   }
@@ -111,6 +114,11 @@ class NearbySellerCard {
         'fulfilmentMode': json['fulfilmentMode'],
         'deliveryCharge': json['deliveryCharge'],
       }),
+      profilePhotoUrl: () {
+        final raw = seller['profilePhotoUrl']?.toString().trim();
+        if (raw == null || raw.isEmpty || raw == 'null') return null;
+        return raw;
+      }(),
       listings: listingsRaw is List
           ? listingsRaw
                 .whereType<Map>()

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/cart_controller.dart';
 import '../services/session_service.dart';
 import 'cart_header_button.dart';
 
@@ -10,6 +11,7 @@ class AppHeader extends StatefulWidget {
     this.leading,
     this.actions,
     this.showCart = true,
+    this.showUser = true,
     this.cartItemCount,
     this.onCartPressed,
     this.padding = const EdgeInsets.fromLTRB(20, 14, 20, 0),
@@ -18,6 +20,7 @@ class AppHeader extends StatefulWidget {
   final Widget? leading;
   final Widget? actions;
   final bool showCart;
+  final bool showUser;
   final int? cartItemCount;
   final VoidCallback? onCartPressed;
   final EdgeInsets padding;
@@ -28,8 +31,6 @@ class AppHeader extends StatefulWidget {
 
 class _AppHeaderState extends State<AppHeader> {
   String? _name;
-  String? _flatNumber;
-  String? _societyName;
 
   @override
   void initState() {
@@ -39,17 +40,13 @@ class _AppHeaderState extends State<AppHeader> {
 
   Future<void> _loadUserInfo() async {
     var name = await SessionService.getUserName();
-    var flatNumber = await SessionService.getFlatNumber();
-    var societyName = await SessionService.getSocietyName();
 
     final userId = await SessionService.getUserId();
-    if (userId != null && (name == null || flatNumber == null)) {
+    if (userId != null && name == null) {
       try {
         final profile = await ApiService.getMe();
         await SessionService.cacheProfileFromApi(profile);
         name = await SessionService.getUserName();
-        flatNumber = await SessionService.getFlatNumber();
-        societyName = await SessionService.getSocietyName();
       } catch (_) {}
     }
 
@@ -57,8 +54,6 @@ class _AppHeaderState extends State<AppHeader> {
 
     setState(() {
       _name = name;
-      _flatNumber = flatNumber;
-      _societyName = societyName;
     });
   }
 
@@ -67,7 +62,7 @@ class _AppHeaderState extends State<AppHeader> {
     return Padding(
       padding: widget.padding,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (widget.leading != null) widget.leading!,
           if (widget.leading == null) ...const [
@@ -91,18 +86,26 @@ class _AppHeaderState extends State<AppHeader> {
             widget.actions!,
             const SizedBox(width: 10),
           ],
-          if (widget.showCart) ...[
-            CartHeaderButton(
-              itemCountOverride: widget.cartItemCount,
-              onPressed: widget.onCartPressed,
+          if (widget.showCart)
+            ListenableBuilder(
+              listenable: CartController.instance,
+              builder: (context, _) {
+                final count =
+                    widget.cartItemCount ?? CartController.instance.itemCount;
+                if (count <= 0) return const SizedBox.shrink();
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CartHeaderButton(
+                      itemCountOverride: widget.cartItemCount,
+                      onPressed: widget.onCartPressed,
+                    ),
+                    if (widget.showUser) const SizedBox(width: 10),
+                  ],
+                );
+              },
             ),
-            const SizedBox(width: 10),
-          ],
-          _UserInfoColumn(
-            name: _name,
-            flatNumber: _flatNumber,
-            societyName: _societyName,
-          ),
+          if (widget.showUser) _UserInfoColumn(name: _name),
         ],
       ),
     );
@@ -110,25 +113,13 @@ class _AppHeaderState extends State<AppHeader> {
 }
 
 class _UserInfoColumn extends StatelessWidget {
-  const _UserInfoColumn({
-    required this.name,
-    required this.flatNumber,
-    required this.societyName,
-  });
+  const _UserInfoColumn({required this.name});
 
   final String? name;
-  final String? flatNumber;
-  final String? societyName;
 
   @override
   Widget build(BuildContext context) {
-    final lines = <String>[
-      if (name != null && name!.isNotEmpty) name!,
-      if (flatNumber != null && flatNumber!.isNotEmpty) 'Flat $flatNumber',
-      if (societyName != null && societyName!.isNotEmpty) societyName!,
-    ];
-
-    if (lines.isEmpty) {
+    if (name == null || name!.isEmpty) {
       return const Icon(
         Icons.person_rounded,
         color: Color(0xFF0E5A47),
@@ -136,22 +127,15 @@ class _UserInfoColumn extends StatelessWidget {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: lines
-          .map(
-            (line) => Text(
-              line,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontSize: 11,
-                height: 1.35,
-                color: Color(0xFF4A5A57),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          )
-          .toList(),
+    return Text(
+      name!,
+      textAlign: TextAlign.right,
+      style: const TextStyle(
+        fontSize: 13,
+        height: 1.2,
+        color: Color(0xFF4A5A57),
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 }

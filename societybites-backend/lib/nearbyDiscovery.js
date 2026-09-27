@@ -7,6 +7,7 @@ const { serializeFulfilment } = require("./sellerFulfilment");
 const { serializePaymentPreference } = require("./sellerPaymentPreference");
 const { serializeListing, attachQuantitySold } = require("../utils/listingSerializer");
 const { expireDueListings, DISCOVERABLE_STATUSES } = require("../utils/listingExpiry");
+const { attachRecurringAvailability } = require("./recurringAvailability");
 
 const ACTIVE_LISTING_WHERE = {
   status: { in: DISCOVERABLE_STATUSES },
@@ -64,14 +65,16 @@ async function loadCityReachConfig(society) {
   };
 }
 
-function serializeNearbySeller(seller, eligibility) {
-  const listings = (seller.listings || []).map((listing) => serializeListing(listing));
+async function serializeNearbySeller(seller, eligibility) {
+  const attached = await attachRecurringAvailability(prisma, seller.listings || []);
+  const listings = attached.map((listing) => serializeListing(listing));
   return {
     seller: {
       id: seller.id,
       name: seller.name || "Neighbor",
       societyId: seller.societyId || null,
       societyName: (seller.society && seller.society.name) || null,
+      profilePhotoUrl: seller.profilePhotoUrl || null,
       distanceKm: roundKm(eligibility.distanceKm),
       sellingReachLevel: seller.sellingReachLevel || "MY_SOCIETY",
       paymentPreference: serializePaymentPreference(seller),
@@ -145,7 +148,7 @@ async function discoverNearbySellers({ buyer, query } = {}) {
     });
     if (!eligibility.eligible) continue;
     sellers.push({
-      card: serializeNearbySeller(candidate, eligibility),
+      card: await serializeNearbySeller(candidate, eligibility),
       distanceKm: eligibility.distanceKm == null ? Number.POSITIVE_INFINITY : eligibility.distanceKm,
     });
   }
@@ -219,7 +222,7 @@ async function getNearbySellerStorefront({ buyer, sellerId, query } = {}) {
   }
 
   await attachQuantitySold(prisma, seller.listings);
-  return serializeNearbySeller(seller, eligibility);
+  return await serializeNearbySeller(seller, eligibility);
 }
 
 const campaignDiscoveryInclude = {
