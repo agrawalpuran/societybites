@@ -43,12 +43,14 @@ Map<String, dynamic> _orderJson({
   String type = 'regular',
   String availabilityMode = listingAvailabilityReadyNow,
   String catalogType = listingCatalogRegular,
+  String paymentStatus = 'pending',
 }) {
   return {
     'id': id,
     'orderNumber': 'SB-$id',
     'status': status,
     'type': type,
+    'paymentStatus': paymentStatus,
     'total': 80,
     'subtotal': 80,
     'communityFee': 0,
@@ -193,11 +195,37 @@ void main() {
     expect(find.text('No active orders yet.'), findsNothing);
   });
 
-  testWidgets('regular + pre-orders shows the selector', (tester) async {
+  testWidgets('regular + closed campaigns shows the Pre-orders tab', (
+    tester,
+  ) async {
     await _pumpKitchen(
       tester,
       orders: [_orderJson(id: '1', name: 'Dhokla')],
-      campaigns: [_campaignJson()],
+      campaigns: [
+        {
+          ..._campaignJson(),
+          'status': 'closed',
+        },
+      ],
+    );
+    expect(find.byKey(const ValueKey('kitchen-type-orders')), findsOneWidget);
+    expect(find.byKey(const ValueKey('kitchen-type-preorders')), findsOneWidget);
+    expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsNothing);
+    expect(find.text('Dhokla'), findsWidgets);
+    expect(find.text('Friday Specials'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('kitchen-type-preorders')));
+    await tester.pump();
+    expect(find.text('Friday Specials'), findsOneWidget);
+    expect(find.text('Dhokla'), findsNothing);
+  });
+
+  testWidgets('regular + pre-order orders shows the selector', (tester) async {
+    await _pumpKitchen(
+      tester,
+      orders: [
+        _orderJson(id: '1', name: 'Dhokla'),
+        _orderJson(id: 'p', name: 'Box', type: 'pre_order'),
+      ],
     );
     expect(find.byKey(const ValueKey('kitchen-type-orders')), findsOneWidget);
     expect(find.byKey(const ValueKey('kitchen-type-preorders')), findsOneWidget);
@@ -205,7 +233,7 @@ void main() {
     expect(find.text('Dhokla'), findsWidgets);
     await tester.tap(find.byKey(const ValueKey('kitchen-type-preorders')));
     await tester.pump();
-    expect(find.text('Friday Specials'), findsOneWidget);
+    expect(find.text('Box'), findsWidgets);
     expect(find.text('Dhokla'), findsNothing);
   });
 
@@ -221,8 +249,8 @@ void main() {
           name: 'Cake',
           availabilityMode: listingAvailabilityMadeToOrder,
         ),
+        _orderJson(id: 'p', name: 'Box', type: 'pre_order'),
       ],
-      campaigns: [_campaignJson()],
     );
     expect(find.byKey(const ValueKey('kitchen-type-orders')), findsOneWidget);
     expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsOneWidget);
@@ -267,5 +295,61 @@ void main() {
     await tester.tap(find.textContaining('Past'));
     await tester.pump();
     expect(find.text('Dhokla'), findsWidgets);
+  });
+
+  testWidgets('past-only made-to-order does not keep the extra tab', (
+    tester,
+  ) async {
+    await _pumpKitchen(
+      tester,
+      orders: [
+        _orderJson(id: '1', name: 'Dhokla'),
+        _orderJson(
+          id: '2',
+          name: 'Cake',
+          status: 'completed',
+          availabilityMode: listingAvailabilityMadeToOrder,
+        ),
+      ],
+    );
+    expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsNothing);
+    expect(find.byKey(const ValueKey('kitchen-type-orders')), findsNothing);
+    await tester.tap(find.textContaining('Past'));
+    await tester.pump();
+    expect(find.text('Cake'), findsWidgets);
+  });
+
+  testWidgets('action badges appear on kitchen type and Active tabs', (
+    tester,
+  ) async {
+    await _pumpKitchen(
+      tester,
+      orders: [
+        _orderJson(id: '1', name: 'Dhokla', status: 'pending'),
+        _orderJson(
+          id: '2',
+          name: 'Cake',
+          status: 'pending',
+          availabilityMode: listingAvailabilityMadeToOrder,
+        ),
+        _orderJson(
+          id: '3',
+          name: 'Samosa',
+          status: 'accepted',
+          paymentStatus: 'pending',
+        ),
+      ],
+    );
+    expect(find.byKey(const ValueKey('kitchen-type-orders')), findsOneWidget);
+    expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('kitchen-type-badge-orders')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('kitchen-type-badge-madeToOrder')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('kitchen-active-badge')), findsOneWidget);
   });
 }

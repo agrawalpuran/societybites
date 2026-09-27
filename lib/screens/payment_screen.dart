@@ -11,6 +11,7 @@ import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
 import '../services/upi_payment_service.dart';
 import '../widgets/upi_app_brand_icon.dart';
+import '../widgets/screen_loading_note.dart';
 
 typedef PaymentApiCall = Future<Map<String, dynamic>> Function(String orderId);
 typedef UpiLauncher = Future<bool> Function(Uri uri);
@@ -337,10 +338,7 @@ class _PaymentScreenState extends State<PaymentScreen>
             if (_isAwaitingSeller)
               _buildAwaitingSeller()
             else if (_isLoadingUpi)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-              )
+              const ScreenLoadingNote(message: 'Loading payment details…')
             else if (_hasUpi) ...[
               _buildQrSection(),
               const SizedBox(height: 16),

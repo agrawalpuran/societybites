@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../widgets/screen_loading_note.dart';
 
 class AdminListingsScreen extends StatefulWidget {
   const AdminListingsScreen({super.key});
@@ -160,9 +161,7 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
   Widget _buildContent() {
     if (_isLoading && _listings.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-      );
+      return const ScreenLoadingNote(message: 'Loading listings…');
     }
     if (_error != null && _listings.isEmpty) {
       return Center(
@@ -193,12 +192,7 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
         itemBuilder: (context, index) {
           if (index == _listings.length) {
             _loadMore();
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(
-                child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-              ),
-            );
+            return const ScreenLoadingNote(message: 'Loading more…');
           }
 
           final listing = _listings[index];

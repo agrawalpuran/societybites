@@ -82,7 +82,7 @@ void main() {
     });
   });
 
-  testWidgets('Home first load can show a spinner then listings', (tester) async {
+  testWidgets('Home first load shows chrome and loading copy, not a spinner', (tester) async {
     _ignoreKnownLayoutNoise();
     final pending = Completer<List<Map<String, dynamic>>>();
     await tester.pumpWidget(
@@ -92,13 +92,15 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.byType(CircularProgressIndicator), findsWidgets);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Loading kitchens…'), findsOneWidget);
 
     pending.complete([_listingJson('Paneer Wrap')]);
     await tester.pump();
     await tester.pump();
 
     expect(find.text('Paneer Wrap'), findsOneWidget);
+    expect(find.text('Loading kitchens…'), findsNothing);
   });
 
   testWidgets('Home refresh keeps listings visible and replaces on success', (
@@ -195,7 +197,7 @@ void main() {
     await tester.pump();
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.text('My Profile'), findsOneWidget);
-    expect(find.text('Cached Neighbor'), findsOneWidget);
+    expect(find.text('Cached Neighbor'), findsWidgets);
 
     first.complete({'name': 'Visible Neighbor'});
     await tester.pump();

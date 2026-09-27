@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../widgets/screen_loading_note.dart';
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -306,9 +307,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Widget _buildContent() {
     if (_isLoading && _users.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-      );
+      return const ScreenLoadingNote(message: 'Loading users…');
     }
     if (_error != null && _users.isEmpty) {
       return Center(
@@ -337,12 +336,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         itemBuilder: (context, index) {
           if (index == _users.length) {
             _loadMore();
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(
-                child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-              ),
-            );
+            return const ScreenLoadingNote(message: 'Loading more…');
           }
 
           final user = _users[index];

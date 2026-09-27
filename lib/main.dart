@@ -5,6 +5,8 @@ import 'screens/main_shell_screen.dart';
 import 'screens/guest_landing_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/society_selection_screen.dart';
+import 'widgets/app_header.dart';
+import 'widgets/screen_loading_note.dart';
 import 'services/api_service.dart';
 import 'services/auth_config.dart';
 import 'services/session_service.dart';
@@ -93,8 +95,14 @@ class AuthGate extends StatelessWidget {
         if (!snapshot.hasData) {
           return const Scaffold(
             backgroundColor: Color(0xFFF8FAF9),
-            body: Center(
-              child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
+            body: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppHeader(),
+                  ScreenLoadingNote(message: 'Loading…'),
+                ],
+              ),
             ),
           );
         }

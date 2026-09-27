@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../widgets/screen_loading_note.dart';
 
 String _humanizeStatus(String status) {
   if (status.isEmpty) return status;
@@ -212,12 +213,7 @@ class _SellerInsightsPanelState extends State<SellerInsightsPanel> {
           ),
           const SizedBox(height: 14),
           if (_loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: CircularProgressIndicator(color: _green),
-              ),
-            )
+            const ScreenLoadingNote(message: 'Loading insights…')
           else if (_error != null)
             _ErrorCard(message: _error!, onRetry: _load)
           else

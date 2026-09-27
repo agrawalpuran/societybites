@@ -4,6 +4,7 @@ import '../models/data.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
+import '../widgets/screen_loading_note.dart';
 import 'buyer_preorder_detail_screen.dart';
 import 'home_listing_filter.dart';
 import 'seller_storefront_screen.dart';
@@ -132,10 +133,19 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
   }
 
   List<Widget> _reachBlocks() {
-    return [
+    final blocks = [
       ..._reachBlock('In your society', _forReach(HomeListingReach.inSociety)),
       ..._reachBlock('Nearby', _forReach(HomeListingReach.nearby)),
       ..._reachBlock('Around you', _forReach(HomeListingReach.extended)),
+    ];
+    if (blocks.isNotEmpty) return blocks;
+    return [
+      for (final campaign in _campaigns)
+        BuyerPreOrderCampaignCard(
+          campaign: campaign,
+          onTap: () => _open(campaign),
+          onSellerTap: () => _openSeller(campaign),
+        ),
     ];
   }
 
@@ -227,14 +237,7 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
                     ),
                     const SizedBox(height: 22),
                     if (_loading && !_hasSuccessfullyLoaded)
-                      const Padding(
-                        padding: EdgeInsets.all(48),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: preorderGreen,
-                          ),
-                        ),
-                      )
+                      const ScreenLoadingNote(message: 'Loading pre-orders…')
                     else if (_error != null && !_hasSuccessfullyLoaded)
                       PreOrderEmptyState(
                         title: 'Could not load pre-orders',

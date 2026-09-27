@@ -24,13 +24,12 @@ class MarketplacePurchaseSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (food.isExpired || food.recurringUnavailable) {
-      return TemporarilyUnavailableLabel(
-        compact: compact,
-        text: food.recurringUnavailable
-            ? 'Temporarily not available'
-            : 'Out of stock',
-      );
+    // Recurring closed copy lives on RecurringAvailabilityHint, not the Add slot.
+    if (food.recurringUnavailable) {
+      return const SizedBox.shrink();
+    }
+    if (food.isExpired) {
+      return TemporarilyUnavailableLabel(compact: compact, text: 'Out of stock');
     }
     if (!food.isRecurringReadyNow && food.quantity <= 0) {
       return soldOut;

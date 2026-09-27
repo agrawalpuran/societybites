@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../services/api_service.dart';
+import 'status_banner.dart';
 
 const preorderGreen = Color(0xFF0E5A47);
 const preorderBackground = Color(0xFFF8FAF9);
@@ -504,40 +505,11 @@ class PreOrderEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F7F4),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFD4E8DF)),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.event_note_rounded, color: preorderGreen, size: 34),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: preorderText,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              height: 1.4,
-              color: preorderMuted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          if (action != null) ...[const SizedBox(height: 16), action!],
-        ],
-      ),
+    return StatusBanner(
+      title: title,
+      message: message,
+      action: action,
+      padding: EdgeInsets.zero,
     );
   }
 }

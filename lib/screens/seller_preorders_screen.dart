@@ -6,6 +6,7 @@ import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/preorder_widgets.dart';
+import '../widgets/screen_loading_note.dart';
 import 'add_listing_screen.dart';
 import 'create_preorder_screen.dart';
 import 'preorder_detail_screen.dart';
@@ -292,13 +293,8 @@ class SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
                             ],
                             const SizedBox(height: 22),
                             if (_loading && !_hasSuccessfullyLoaded)
-                              const Padding(
-                                padding: EdgeInsets.all(48),
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    color: preorderGreen,
-                                  ),
-                                ),
+                              const ScreenLoadingNote(
+                                message: 'Loading pre-orders…',
                               )
                             else if (_error != null && !_hasSuccessfullyLoaded)
                               PreOrderEmptyState(

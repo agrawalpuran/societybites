@@ -1,4 +1,13 @@
 const recurringWeekdayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const recurringWeekdayShortLabels = [
+  'Mon',
+  'Tue',
+  'Wed',
+  'Thu',
+  'Fri',
+  'Sat',
+  'Sun',
+];
 
 bool parseRecurringEnabled(dynamic value) => value == true || value == 'true';
 
@@ -29,3 +38,42 @@ String formatRecurringClock(int minuteOfDay) {
 }
 
 int timeOfDayToMinute(int hour, int minute) => hour * 60 + minute;
+
+String formatRecurringWeekdaysSummary(List<int> weekdays) {
+  final days = [...weekdays]
+      .where((n) => n >= 1 && n <= 7)
+      .toSet()
+      .toList()
+    ..sort();
+  if (days.isEmpty) return '';
+  if (days.length == 7) return 'Every day';
+  final labels = days.map((n) => recurringWeekdayShortLabels[n - 1]).toList();
+  final consecutive =
+      days.length > 1 &&
+      days.asMap().entries.every((e) => e.key == 0 || e.value == days[e.key - 1] + 1);
+  if (consecutive && days.length >= 3) {
+    return '${labels.first}–${labels.last}';
+  }
+  return labels.join(', ');
+}
+
+String formatRecurringHoursSummary(int? startMinute, int? endMinute) {
+  if (startMinute == null || endMinute == null) return '';
+  return '${formatRecurringClock(startMinute)} – ${formatRecurringClock(endMinute)}';
+}
+
+String formatRecurringWindowLabel({
+  required List<int> weekdays,
+  int? startMinute,
+  int? endMinute,
+  String scheduleSummary = '',
+  String hoursSummary = '',
+}) {
+  final schedule = scheduleSummary.trim().isNotEmpty
+      ? scheduleSummary.trim()
+      : formatRecurringWeekdaysSummary(weekdays);
+  final hours = hoursSummary.trim().isNotEmpty
+      ? hoursSummary.trim()
+      : formatRecurringHoursSummary(startMinute, endMinute);
+  return [schedule, hours].where((part) => part.isNotEmpty).join(' · ');
+}

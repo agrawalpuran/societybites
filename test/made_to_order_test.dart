@@ -140,7 +140,39 @@ void main() {
     expect(find.text('1–7'), findsOneWidget);
   });
 
-  testWidgets('editing can switch from Made to Order back to Ready Now', (
+  testWidgets('editing a regular listing does not show Available Now vs Made to Order', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AddListingScreen(
+          existingListing: FoodItem(
+            id: 'l1',
+            name: 'Dosa',
+            sellerId: 's1',
+            sellerName: 'Anita',
+            block: 'A',
+            price: 95,
+            rating: 5,
+            pickupTime: '5 PM',
+            description: '',
+            icon: Icons.restaurant,
+            bgColor: const Color(0xFFE8F5EE),
+            availabilityMode: listingAvailabilityReadyNow,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('HOW WILL YOU FULFIL THIS?'), findsNothing);
+    expect(find.text('Available Now'), findsNothing);
+    expect(find.text('Made to Order'), findsNothing);
+    expect(find.text('PREPARATION TIME'), findsNothing);
+  });
+
+  testWidgets('editing Made to Order keeps prep time and does not switch type', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -168,10 +200,8 @@ void main() {
     );
     await tester.pump();
     expect(find.text('PREPARATION TIME'), findsOneWidget);
-
-    await tester.tap(find.text('Available Now'));
-    await tester.pump();
-    expect(find.text('PREPARATION TIME'), findsNothing);
+    expect(find.text('HOW WILL YOU FULFIL THIS?'), findsNothing);
+    expect(find.text('Available Now'), findsNothing);
   });
 
   testWidgets('Pre-order add listing hides fulfilment controls', (tester) async {

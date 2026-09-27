@@ -19,6 +19,8 @@ import '../widgets/profile_menu_tile.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/requested_ready_summary.dart';
 import '../widgets/seller_insights_panel.dart';
+import '../widgets/screen_loading_note.dart';
+import '../widgets/status_banner.dart';
 import 'add_listing_screen.dart';
 import 'add_listing_type_screen.dart';
 import 'my_listings_screen.dart';
@@ -140,7 +142,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   List<KitchenOrderCategory> get _visibleKitchenCategories =>
       visibleKitchenCategories(
-        orders: [..._activeOrders, ..._pastOrders],
+        orders: _activeOrders,
         campaigns: _preOrderCampaigns,
       );
 
@@ -150,12 +152,35 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       );
 
   List<Order> _ordersForCategory(List<Order> source) {
-    final selected = _resolvedKitchenCategory;
-    if (selected == null) return source;
-    return source
-        .where((order) => kitchenCategoryForOrder(order) == selected)
-        .toList();
+    return ordersForKitchenCategory(
+      source: source,
+      selected: _resolvedKitchenCategory,
+      visible: _visibleKitchenCategories,
+    );
   }
+
+  int _actionCountForCategory(KitchenOrderCategory category) {
+    return kitchenCategoryActionCount(
+      category: category,
+      orders: _activeOrders,
+      visible: _visibleKitchenCategories,
+      needsAction: (order) => orderNeedsSellerAction(
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        paymentMethod: order.paymentMethod,
+      ),
+    );
+  }
+
+  int get _activeActionCount => _ordersForCategory(_activeOrders)
+      .where(
+        (order) => orderNeedsSellerAction(
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+          paymentMethod: order.paymentMethod,
+        ),
+      )
+      .length;
 
   bool get _showPreOrdersSection {
     final visible = _visibleKitchenCategories;
@@ -643,7 +668,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                           ),
                         if (_isLoading)
                           const SliverToBoxAdapter(
-                            child: _KitchenLoadingNote(
+                            child: ScreenLoadingNote(
                               message: 'Loading orders…',
                             ),
                           )
@@ -700,6 +725,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 key: const Key('seller-area-orders-tab'),
                 label: 'Orders',
                 selected: _areaTab == 0,
+                badgeCount: _pendingAttentionCount,
+                badgeKey: const Key('seller-area-orders-badge'),
                 onTap: () => setState(() => _areaTab = 0),
               ),
             ),
@@ -829,6 +856,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                         key: ValueKey('kitchen-type-${category.name}'),
                         label: kitchenCategoryLabel(category),
                         selected: selected == category,
+                        badgeCount: _actionCountForCategory(category),
+                        badgeKey:
+                            ValueKey('kitchen-type-badge-${category.name}'),
                         onTap: () => setState(() => _kitchenFilter = category),
                       ),
                     ),
@@ -937,12 +967,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           ),
           const SizedBox(height: 12),
           if (_preOrdersLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: _KitchenLoadingNote(
-                message: 'Loading pre-orders…',
-              ),
-            )
+            const ScreenLoadingNote(message: 'Loading pre-orders…')
           else if (_preOrderCampaigns.isEmpty)
             Container(
               width: double.infinity,
@@ -1024,6 +1049,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                   child: _OrdersSegment(
                     label: 'Active (${active.length})',
                     selected: !showingPast,
+                    badgeCount: _activeActionCount,
+                    badgeKey: const Key('kitchen-active-badge'),
                     onTap: () => setState(() => _ordersTab = 0),
                   ),
                 ),
@@ -1054,36 +1081,19 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               ),
             ),
           if (orders.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F7F4),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFD4E8DF)),
-              ),
-              child: Text(
-                showingPast
-                    ? (typedEmpty
-                          ? 'No orders yet.\n\n'
-                                'Orders for this type will appear here when buyers place them.'
-                          : _hasOlderPast
-                          ? 'No recent orders'
-                          : 'No past orders yet.\n\n'
-                                'Completed and cancelled sales will appear here.')
-                    : (typedEmpty
-                          ? 'No orders yet.\n\n'
-                                'Orders for this type will appear here when buyers place them.'
-                          : _hasOlderActive
-                          ? 'No recent orders'
-                          : 'No active orders yet.\n\n'
-                                'When neighbors order your food, they show up here.'),
-                style: const TextStyle(
-                  color: Color(0xFF3A4644),
-                  height: 1.45,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+            StatusBanner(
+              padding: EdgeInsets.zero,
+              message: showingPast
+                  ? (typedEmpty
+                      ? 'No orders yet. Orders for this type will appear here when buyers place them.'
+                      : _hasOlderPast
+                      ? 'No recent orders'
+                      : 'No past orders yet. Completed and cancelled sales will appear here.')
+                  : (typedEmpty
+                      ? 'No orders yet. Orders for this type will appear here when buyers place them.'
+                      : _hasOlderActive
+                      ? 'No recent orders'
+                      : 'No active orders yet. When neighbors order your food, they show up here.'),
             )
           else if (showingPast)
             ...orders.map(
@@ -2088,11 +2098,15 @@ class _OrdersSegment extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.badgeCount = 0,
+    this.badgeKey,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final int badgeCount;
+  final Key? badgeKey;
 
   @override
   Widget build(BuildContext context) {
@@ -2105,16 +2119,54 @@ class _OrdersSegment extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Center(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: selected ? Colors.white : const Color(0xFF6A7774),
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: selected
+                          ? Colors.white
+                          : const Color(0xFF6A7774),
+                    ),
+                  ),
+                ),
+                if (badgeCount > 0) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    key: badgeKey,
+                    constraints: const BoxConstraints(minWidth: 18),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? Colors.white
+                          : const Color(0xFFE85D04),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      badgeCount > 9 ? '9+' : '$badgeCount',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
+                        color: selected
+                            ? const Color(0xFFE85D04)
+                            : Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ),
@@ -2434,26 +2486,6 @@ class _ReadyBySheetState extends State<_ReadyBySheet> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _KitchenLoadingNote extends StatelessWidget {
-  const _KitchenLoadingNote({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-      child: Text(
-        message,
-        style: const TextStyle(
-          color: Color(0xFF8A9491),
-          fontWeight: FontWeight.w600,
-        ),
       ),
     );
   }

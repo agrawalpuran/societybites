@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
 import '../widgets/preorder_widgets.dart';
+import '../widgets/screen_loading_note.dart';
 import 'preorder_checkout_screen.dart';
 import 'seller_storefront_screen.dart';
 
@@ -175,9 +176,7 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
       ),
       body: _campaign == null
           ? _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: preorderGreen),
-                  )
+                ? const ScreenLoadingNote(message: 'Loading pre-order…')
                 : _errorState()
           : RefreshIndicator(
               color: preorderGreen,

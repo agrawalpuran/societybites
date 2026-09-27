@@ -233,14 +233,15 @@ void main() {
     expect(find.text('Buyer Biryani'), findsOneWidget);
   });
 
-  testWidgets('first Buying load can show a spinner then orders', (tester) async {
+  testWidgets('first Buying load shows loading copy then orders', (tester) async {
     final pending = Completer<List<Map<String, dynamic>>>();
     await pumpOrders(
       tester,
       fetchOrders: ({required String role}) => pending.future,
     );
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Loading orders…'), findsOneWidget);
 
     pending.complete([_buyerOrder]);
     await tester.pump();

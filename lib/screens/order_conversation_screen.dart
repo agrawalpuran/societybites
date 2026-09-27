@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../models/order_message.dart';
 import '../services/api_service.dart';
+import '../widgets/screen_loading_note.dart';
+import '../widgets/status_banner.dart';
 
 typedef OrderMessagesLoader = Future<List<Map<String, dynamic>>> Function(
   String orderId,
@@ -164,46 +166,19 @@ class _OrderConversationScreenState extends State<OrderConversationScreen>
         children: [
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const ScreenLoadingNote(message: 'Loading messages…')
                 : _error != null && _messages.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        _error!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Color(0xFF6A7774)),
-                      ),
-                    ),
+                ? Align(
+                    alignment: Alignment.topCenter,
+                    child: StatusBanner(message: _error!),
                   )
                 : _messages.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(28),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'No messages yet',
-                            key: Key('empty-messages'),
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF101617),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            emptyHint,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF6A7774),
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
+                ? Align(
+                    alignment: Alignment.topCenter,
+                    child: StatusBanner(
+                      key: const Key('empty-messages'),
+                      title: 'No messages yet',
+                      message: emptyHint,
                     ),
                   )
                 : ListView.builder(

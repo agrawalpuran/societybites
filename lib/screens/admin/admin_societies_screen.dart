@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../widgets/screen_loading_note.dart';
 
 class AdminSocietiesScreen extends StatefulWidget {
   const AdminSocietiesScreen({super.key});
@@ -266,9 +267,7 @@ class _AdminSocietiesScreenState extends State<AdminSocietiesScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-      );
+      return const ScreenLoadingNote(message: 'Loading societies…');
     }
     if (_error != null) {
       return Center(

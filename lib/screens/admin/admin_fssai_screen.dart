@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../widgets/screen_loading_note.dart';
 
 /// Admin view for submitted FSSAI details. Capture only — no approve/reject.
 class AdminFssaiScreen extends StatefulWidget {
@@ -55,9 +56,7 @@ class _AdminFssaiScreenState extends State<AdminFssaiScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-      );
+      return const ScreenLoadingNote(message: 'Loading FSSAI records…');
     }
     if (_error != null) {
       return Center(

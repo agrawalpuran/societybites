@@ -7,6 +7,8 @@ import '../widgets/order_items_list.dart';
 import '../widgets/order_lifecycle_dialogs.dart';
 import '../widgets/order_messages_button.dart';
 import '../widgets/requested_ready_summary.dart';
+import '../widgets/screen_loading_note.dart';
+import '../widgets/status_banner.dart';
 import '../models/data.dart';
 import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
@@ -261,21 +263,13 @@ class OrdersScreenState extends State<OrdersScreen>
             const SizedBox(height: 16),
             if (_currentRole.isLoading)
               const Expanded(
-                child: Center(
-                  child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-                ),
+                child: ScreenLoadingNote(message: 'Loading orders…'),
               )
             else if (_currentRole.error != null)
               Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                      _currentRole.error!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Color(0xFFD94F4F)),
-                    ),
-                  ),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: StatusBanner(message: _currentRole.error!),
                 ),
               )
             else
@@ -422,10 +416,10 @@ class _ActiveTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (orders.isEmpty) {
-      return Center(
-        child: Text(
-          isSellerView ? 'No active sales.' : 'No active orders.',
-          style: const TextStyle(color: Color(0xFF6A7774)),
+      return Align(
+        alignment: Alignment.topCenter,
+        child: StatusBanner(
+          message: isSellerView ? 'No active sales.' : 'No active orders.',
         ),
       );
     }
@@ -1078,19 +1072,11 @@ class _PastTab extends StatelessWidget {
             ),
           ),
         if (orders.isEmpty)
-          Padding(
+          StatusBanner(
             padding: const EdgeInsets.only(bottom: 16),
-            child: Text(
-              isSellerView
-                  ? 'No completed sales yet. When a buyer marks an order complete, it appears here.'
-                  : 'No past orders yet.',
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF6A7774),
-                fontWeight: FontWeight.w500,
-                height: 1.4,
-              ),
-            ),
+            message: isSellerView
+                ? 'No completed sales yet. When a buyer marks an order complete, it appears here.'
+                : 'No past orders yet.',
           )
         else
           ...orders.map(

@@ -11,6 +11,8 @@ import '../widgets/listing_image.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/made_to_order_hint.dart';
+import '../widgets/screen_loading_note.dart';
+import '../widgets/status_banner.dart';
 import 'add_listing_screen.dart';
 import 'add_listing_type_screen.dart';
 
@@ -580,35 +582,20 @@ class MyListingsScreenState extends State<MyListingsScreen>
             ),
             Expanded(
               child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF0E5A47),
-                      ),
-                    )
+                  ? const ScreenLoadingNote(message: 'Loading listings…')
                   : _error != null
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _error!,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Color(0xFFD94F4F),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: _loadListings,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF0E5A47),
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text('Try again'),
-                                ),
-                              ],
+                      ? Align(
+                          alignment: Alignment.topCenter,
+                          child: StatusBanner(
+                            message: _error!,
+                            action: ElevatedButton(
+                              onPressed: _loadListings,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0E5A47),
+                                foregroundColor: Colors.white,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              child: const Text('Try again'),
                             ),
                           ),
                         )
@@ -733,53 +720,32 @@ class MyListingsScreenState extends State<MyListingsScreen>
 
     if (listings.isEmpty) {
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           addCatalogButton,
-          Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: createPreorderItem
-                    ? CreatePreorderCatalogNudge(
-                        onCreateCatalog: () =>
-                            _openCreateListing(preorderItem: true),
-                      )
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            emptyTitle,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            emptyBody,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Color(0xFF6A7774),
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => _openCreateListing(
-                              preorderItem: createPreorderItem,
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0E5A47),
-                              foregroundColor: Colors.white,
-                            ),
-                            child: Text(addLabel),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-          ),
+          createPreorderItem
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                  child: CreatePreorderCatalogNudge(
+                    onCreateCatalog: () =>
+                        _openCreateListing(preorderItem: true),
+                  ),
+                )
+              : StatusBanner(
+                  title: emptyTitle,
+                  message: emptyBody,
+                  action: ElevatedButton(
+                    onPressed: () => _openCreateListing(
+                      preorderItem: createPreorderItem,
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0E5A47),
+                      foregroundColor: Colors.white,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: Text(addLabel),
+                  ),
+                ),
         ],
       );
     }

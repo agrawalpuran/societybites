@@ -5,6 +5,8 @@ import '../models/data.dart';
 import '../models/guest_kitchen.dart';
 import '../services/api_service.dart';
 import '../widgets/app_header.dart';
+import '../widgets/screen_loading_note.dart';
+import '../widgets/status_banner.dart';
 import 'seller_storefront_screen.dart';
 
 class GuestKitchensScreen extends StatefulWidget {
@@ -140,12 +142,6 @@ class GuestKitchensScreenState extends State<GuestKitchensScreen> {
   }
 
   Widget _body(String cityName) {
-    if (_loading && !_hasSuccessfullyLoaded) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-      );
-    }
-
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
@@ -169,7 +165,9 @@ class GuestKitchensScreenState extends State<GuestKitchensScreen> {
             height: 1.4,
           ),
         ),
-        if (_error != null && !_hasSuccessfullyLoaded) ...[
+        if (_loading && !_hasSuccessfullyLoaded)
+          const ScreenLoadingNote(message: 'Loading kitchens…')
+        else if (_error != null && !_hasSuccessfullyLoaded) ...[
           const SizedBox(height: 24),
           Text(
             _error!,
@@ -185,34 +183,11 @@ class GuestKitchensScreenState extends State<GuestKitchensScreen> {
             label: const Text('Retry'),
           ),
         ] else if (_kitchens.isEmpty) ...[
-          const SizedBox(height: 28),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: const Color(0xFFE6EBE9)),
-            ),
-            child: const Column(
-              children: [
-                Text(
-                  'No kitchens available yet',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF101617),
-                  ),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  'Resident cooks in this city will appear here when they share an active regular menu.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFF6A7774), height: 1.4),
-                ),
-              ],
-            ),
+          const StatusBanner(
+            padding: EdgeInsets.zero,
+            title: 'No kitchens available yet',
+            message:
+                'Resident cooks in this city will appear here when they share an active regular menu.',
           ),
         ] else ...[
           const SizedBox(height: 18),

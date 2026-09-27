@@ -98,7 +98,7 @@ class _OrderMessagesButtonState extends State<OrderMessagesButton>
                 : boxed
                 ? green
                 : const Color(0xFFD4E8DF),
-            width: _hasUnread ? 1.6 : 1,
+            width: boxed || _hasUnread ? 1.6 : 1.2,
           ),
           backgroundColor: _hasUnread
               ? accent
@@ -107,11 +107,12 @@ class _OrderMessagesButtonState extends State<OrderMessagesButton>
               : Colors.white,
           padding: EdgeInsets.symmetric(
             horizontal: boxed || _hasUnread ? 14 : 10,
-            vertical: boxed || _hasUnread ? 10 : 6,
+            vertical: boxed || _hasUnread ? 12 : 8,
           ),
-          minimumSize: Size.zero,
+          // Taller tap target on mobile; keep intrinsic width (not full-row).
+          minimumSize: Size(0, boxed || _hasUnread ? 40 : 32),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: VisualDensity.compact,
+          visualDensity: VisualDensity.standard,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

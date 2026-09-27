@@ -318,9 +318,9 @@ function evaluateRecurringAvailability(listing, { now = new Date(), soldToday = 
     const unavailable = paused || !inHours;
     let buyerLabel = `Available today · Until ${formatClock(end)}`;
     let nextLabel = "";
-    if (paused) buyerLabel = "Temporarily not available";
+    if (paused) buyerLabel = "Not available now";
     else if (!inHours) {
-      buyerLabel = "Temporarily not available";
+      buyerLabel = "Not available now";
       nextLabel =
         clock.minuteOfDay < start
           ? `Available today from ${formatClock(start)}`
@@ -350,9 +350,9 @@ function evaluateRecurringAvailability(listing, { now = new Date(), soldToday = 
   const unavailable = paused || !onDay || !inHours || soldOut;
 
   let buyerLabel = `Available today · Until ${formatClock(end)}`;
-  if (paused) buyerLabel = "Temporarily not available";
-  else if (soldOut) buyerLabel = "Temporarily not available";
-  else if (!onDay || !inHours) buyerLabel = "Temporarily not available";
+  if (paused) buyerLabel = "Not available now";
+  else if (soldOut) buyerLabel = "Not available now";
+  else if (!onDay || !inHours) buyerLabel = "Not available now";
 
   let nextLabel = "";
   if (soldOut && onDay) nextLabel = "Sold out for today";

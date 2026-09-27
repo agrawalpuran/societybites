@@ -182,6 +182,23 @@ class FoodItem {
       !isMadeToOrder &&
       recurringEnabled;
 
+  bool get showsBuyerAvailabilityHint {
+    if (isPreOrderCatalog || isPreOrder || isMadeToOrder) return false;
+    return isRecurringReadyNow ||
+        recurringUnavailable ||
+        recurringHoursSummary.isNotEmpty ||
+        recurringScheduleSummary.isNotEmpty ||
+        recurringBuyerLabel.isNotEmpty;
+  }
+
+  String get recurringWindowLabel => formatRecurringWindowLabel(
+        weekdays: recurringWeekdays,
+        startMinute: recurringStartMinute,
+        endMinute: recurringEndMinute,
+        scheduleSummary: recurringScheduleSummary,
+        hoursSummary: recurringHoursSummary,
+      );
+
   bool get canAddToCart {
     if (!isActive || madeToOrderUnavailableToday || recurringUnavailable) {
       return false;

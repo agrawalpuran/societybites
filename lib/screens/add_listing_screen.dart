@@ -69,9 +69,9 @@ class _AddListingScreenState extends State<AddListingScreen> {
   bool get _isMadeToOrder =>
       !_isPreorderCatalog &&
       _availabilityMode == listingAvailabilityMadeToOrder;
-  bool get _showFulfilmentChoice => _isEditing && !_isPreorderCatalog;
-  bool get _showFulfilmentSection =>
-      !_isPreorderCatalog && (_showFulfilmentChoice || _isMadeToOrder);
+  /// Type is chosen on Add listing (Available Now vs Made to Order vs Pre-order),
+  /// not switched again on edit.
+  bool get _showFulfilmentSection => !_isPreorderCatalog && _isMadeToOrder;
   bool get _showStockAndExpiryFields =>
       !_isMadeToOrder && !_isPreorderCatalog && !_repeatSchedule;
   bool get _showRecurringSection => !_isMadeToOrder && !_isPreorderCatalog;
@@ -352,47 +352,12 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   Widget _buildFulfilmentSection() {
     return _buildField(
-      label: _showFulfilmentChoice
-          ? 'HOW WILL YOU FULFIL THIS?'
-          : 'PREPARATION TIME',
+      label: 'PREPARATION TIME',
       isRequired: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_showFulfilmentChoice) ...[
-            _FulfilmentOption(
-              selected: !_isMadeToOrder,
-              title: 'Available Now',
-              subtitle: 'Normally available for regular orders',
-              onTap: () => setState(() {
-                _availabilityMode = listingAvailabilityReadyNow;
-              }),
-            ),
-            const SizedBox(height: 8),
-            _FulfilmentOption(
-              selected: _isMadeToOrder,
-              title: 'Made to Order',
-              subtitle: 'Prepare this after a buyer places an order',
-              onTap: () => setState(() {
-                _availabilityMode = listingAvailabilityMadeToOrder;
-              }),
-            ),
-          ],
           if (_isMadeToOrder) ...[
-            if (_showFulfilmentChoice) ...[
-              const SizedBox(height: 14),
-              RequiredFieldLabel(
-                'PREPARATION TIME',
-                required: true,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.1,
-                  color: Color(0xFF8A9491),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
             Wrap(
               spacing: 8,
               runSpacing: 8,

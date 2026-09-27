@@ -279,7 +279,9 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
         food.isExpired
             ? '${food.name} is out of stock.'
             : food.recurringUnavailable
-            ? '${food.name} is temporarily not available.'
+            ? (food.recurringWindowLabel.isNotEmpty
+                ? '${food.name} is not available now. Available ${food.recurringWindowLabel}.'
+                : '${food.name} is not available now.')
             : food.madeToOrderUnavailableToday
             ? '${food.name} is currently unavailable.'
             : '${food.name} is sold out.',

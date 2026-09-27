@@ -8,6 +8,7 @@ import '../widgets/one_seller_cart.dart';
 import '../widgets/order_timing_notice.dart';
 import '../widgets/requested_ready_summary.dart';
 import '../widgets/simple_time_picker.dart';
+import '../widgets/status_banner.dart';
 import '../models/data.dart';
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
@@ -354,8 +355,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _buildHeader(),
             Expanded(
               child: _items.isEmpty
-                  ? _EmptyCartState(
-                      onBrowse: () => _goToShell(0),
+                  ? Align(
+                      alignment: Alignment.topCenter,
+                      child: StatusBanner(
+                        title: 'Your cart is empty',
+                        message:
+                            'Add something from a neighbour\'s kitchen to continue.',
+                        action: FilledButton(
+                          onPressed: () => _goToShell(0),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF0E5A47),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          child: const Text('Browse food'),
+                        ),
+                      ),
                     )
                   : SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
@@ -1072,60 +1086,6 @@ class _BillRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _EmptyCartState extends StatelessWidget {
-  const _EmptyCartState({required this.onBrowse});
-
-  final VoidCallback onBrowse;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.shopping_bag_outlined,
-              size: 48,
-              color: Color(0xFF8A9491),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Your cart is empty',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF101617),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Add something from a neighbour\'s kitchen to continue.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.4,
-                color: Color(0xFF8A9491),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: onBrowse,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF0E5A47),
-              ),
-              child: const Text('Browse food'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../widgets/screen_loading_note.dart';
 
 class AdminAuditScreen extends StatefulWidget {
   const AdminAuditScreen({super.key});
@@ -60,9 +61,7 @@ class _AdminAuditScreenState extends State<AdminAuditScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading && _logs.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-      );
+      return const ScreenLoadingNote(message: 'Loading audit log…');
     }
     if (_error != null && _logs.isEmpty) {
       return Center(
@@ -92,12 +91,7 @@ class _AdminAuditScreenState extends State<AdminAuditScreen> {
         itemBuilder: (context, index) {
           if (index == _logs.length) {
             _loadMore();
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(
-                child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-              ),
-            );
+            return const ScreenLoadingNote(message: 'Loading more…');
           }
 
           final log = _logs[index];

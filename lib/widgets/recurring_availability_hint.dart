@@ -14,14 +14,26 @@ class RecurringAvailabilityHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!food.isRecurringReadyNow) return const SizedBox.shrink();
-    final primary = food.recurringBuyerLabel.isNotEmpty
-        ? food.recurringBuyerLabel
-        : (food.recurringUnavailable
-            ? 'Temporarily not available'
-            : 'Available today');
-    final secondary = food.recurringNextLabel;
+    if (!food.showsBuyerAvailabilityHint) return const SizedBox.shrink();
     final unavailable = food.recurringUnavailable;
+    final window = food.recurringWindowLabel;
+    final primary = unavailable
+        ? 'Not available now'
+        : (food.recurringBuyerLabel.isNotEmpty
+            ? food.recurringBuyerLabel
+            : 'Available today');
+    final extra = <String>[];
+    if (unavailable) {
+      if (window.isNotEmpty) extra.add(window);
+      if (!compact && food.recurringNextLabel.isNotEmpty) {
+        extra.add(food.recurringNextLabel);
+      } else if (window.isEmpty && food.recurringNextLabel.isNotEmpty) {
+        extra.add(food.recurringNextLabel);
+      }
+    } else if (!compact) {
+      if (window.isNotEmpty && !primary.contains(window)) extra.add(window);
+      if (food.recurringNextLabel.isNotEmpty) extra.add(food.recurringNextLabel);
+    }
 
     return Padding(
       padding: EdgeInsets.only(top: compact ? 4 : 8),
@@ -30,25 +42,27 @@ class RecurringAvailabilityHint extends StatelessWidget {
         children: [
           Text(
             primary,
-            maxLines: compact ? 1 : 2,
+            maxLines: compact ? 2 : 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: compact ? 11 : 12,
               fontWeight: FontWeight.w700,
+              height: 1.2,
               color: unavailable
                   ? const Color(0xFFD94F4F)
                   : const Color(0xFF0E5A47),
             ),
           ),
-          if (!compact && secondary.isNotEmpty)
+          for (final line in extra)
             Text(
-              secondary,
-              maxLines: 1,
+              line,
+              maxLines: compact ? 2 : 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12,
+              style: TextStyle(
+                fontSize: compact ? 11 : 12,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF6A7774),
+                height: 1.25,
+                color: const Color(0xFF6A7774),
               ),
             ),
         ],

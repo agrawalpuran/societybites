@@ -315,3 +315,35 @@ bool isPaymentFinished(String paymentStatus) =>
     paymentStatus == 'seller_confirmed' ||
     paymentStatus == 'paid' ||
     paymentStatus == 'failed';
+
+/// True when the seller still has a primary action (accept, confirm paid,
+/// mark ready, complete, or confirm cash). Waiting on the buyer to pay is not
+/// counted.
+bool orderNeedsSellerAction({
+  required String status,
+  required String paymentStatus,
+  String? paymentMethod,
+}) {
+  if (status == 'completed' ||
+      status == 'rejected' ||
+      status == 'cancelled') {
+    return false;
+  }
+  final lifecycle = SellerOrderLifecycle.forStatus(status);
+  final payment = SellerPaymentActions.fromOrder(
+    status: status,
+    paymentMethod: paymentMethod,
+    paymentStatus: paymentStatus,
+  );
+  final cashPaid = paymentStatus == 'paid';
+  final needsCashConfirm = payment.isCash &&
+      lifecycle.treatAsReady &&
+      !cashPaid &&
+      paymentStatus != 'failed';
+  final canComplete = lifecycle.showComplete && (!payment.isCash || cashPaid);
+  return lifecycle.showAccept ||
+      payment.showMarkReady ||
+      payment.showConfirmOrderAndChooseTime ||
+      canComplete ||
+      needsCashConfirm;
+}

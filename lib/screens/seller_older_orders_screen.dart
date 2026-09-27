@@ -4,6 +4,8 @@ import '../models/data.dart';
 import '../models/seller_order_history.dart';
 import '../services/api_service.dart';
 import '../widgets/app_header.dart';
+import '../widgets/screen_loading_note.dart';
+import '../widgets/status_banner.dart';
 import 'seller_dashboard_screen.dart';
 
 class SellerOlderOrdersScreen extends StatefulWidget {
@@ -190,8 +192,7 @@ class _SellerOlderOrdersScreenState extends State<SellerOlderOrdersScreen> {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: const [
-          SizedBox(height: 80),
-          Center(child: Text('Loading older orders…')),
+          ScreenLoadingNote(message: 'Loading older orders…'),
         ],
       );
     }
@@ -199,10 +200,7 @@ class _SellerOlderOrdersScreenState extends State<SellerOlderOrdersScreen> {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(_error!, textAlign: TextAlign.center),
-          ),
+          StatusBanner(message: _error!),
         ],
       );
     }
@@ -210,19 +208,11 @@ class _SellerOlderOrdersScreenState extends State<SellerOlderOrdersScreen> {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-            child: Text(
-              widget.openOrders
-                  ? 'No older open orders.\n\nOrders still in progress from more than 7 days ago will appear here.'
-                  : 'No older orders.\n\nCompleted and cancelled sales older than 7 days will appear here.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF3A4644),
-                height: 1.45,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+          StatusBanner(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            message: widget.openOrders
+                ? 'No older open orders. Orders still in progress from more than 7 days ago will appear here.'
+                : 'No older orders. Completed and cancelled sales older than 7 days will appear here.',
           ),
         ],
       );
@@ -242,16 +232,7 @@ class _SellerOlderOrdersScreenState extends State<SellerOlderOrdersScreen> {
         itemCount: _orders.length + (_loadingMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= _orders.length) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            );
+            return const ScreenLoadingNote(message: 'Loading more…');
           }
           final order = _orders[index];
           if (widget.openOrders) {

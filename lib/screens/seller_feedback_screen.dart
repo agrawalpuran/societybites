@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
 import '../widgets/app_header.dart';
+import '../widgets/screen_loading_note.dart';
+import '../widgets/status_banner.dart';
 
 class SellerFeedbackScreen extends StatefulWidget {
   const SellerFeedbackScreen({super.key, this.fetchReviews});
@@ -119,43 +121,23 @@ class SellerFeedbackScreenState extends State<SellerFeedbackScreen> {
             ),
             Expanded(
               child: _isLoading && !_hasSuccessfullyLoaded
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF0E5A47),
-                      ),
-                    )
+                  ? const ScreenLoadingNote(message: 'Loading reviews…')
                   : _error != null
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _error!,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Color(0xFFD94F4F),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                TextButton(
-                                  onPressed: _load,
-                                  child: const Text('Retry'),
-                                ),
-                              ],
+                      ? Align(
+                          alignment: Alignment.topCenter,
+                          child: StatusBanner(
+                            message: _error!,
+                            action: TextButton(
+                              onPressed: _load,
+                              child: const Text('Retry'),
                             ),
                           ),
                         )
                       : _reviews.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'No feedback yet',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
-                                  color: Color(0xFF3A4644),
-                                ),
+                          ? const Align(
+                              alignment: Alignment.topCenter,
+                              child: StatusBanner(
+                                message: 'No feedback yet',
                               ),
                             )
                           : RefreshIndicator(

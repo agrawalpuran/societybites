@@ -9,6 +9,7 @@ import '../models/data.dart';
 import '../services/api_service.dart';
 import 'checkout_screen.dart';
 import '../widgets/guest_order_auth.dart';
+import '../widgets/screen_loading_note.dart';
 import '../widgets/seller_avatar.dart';
 
 class FoodDetailScreen extends StatelessWidget {
@@ -529,12 +530,7 @@ class _ReviewsSectionState extends State<_ReviewsSection> {
           ),
           const SizedBox(height: 14),
           if (_isLoading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-              ),
-            )
+            const ScreenLoadingNote(message: 'Loading reviews…')
           else if (_reviews.isEmpty)
             const Text(
               'No reviews yet. Be the first to order and share feedback!',

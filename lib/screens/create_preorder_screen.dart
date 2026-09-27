@@ -9,6 +9,7 @@ import '../widgets/app_header.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/food_type_selector.dart';
+import '../widgets/screen_loading_note.dart';
 import '../widgets/required_field_label.dart';
 import '../models/food_type.dart';
 import '../widgets/photo_source_sheet.dart';
@@ -947,7 +948,7 @@ class _AddPreOrderProductScreenState extends State<AddPreOrderProductScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: preorderGreen))
+          ? const ScreenLoadingNote(message: 'Loading campaign product…')
           : _error != null
           ? Center(child: Text(_error!, textAlign: TextAlign.center))
           : SingleChildScrollView(

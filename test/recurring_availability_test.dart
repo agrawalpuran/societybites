@@ -3,8 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/models/listing_availability.dart';
+import 'package:societybites/models/recurring_availability.dart';
 import 'package:societybites/screens/add_listing_screen.dart';
 import 'package:societybites/screens/my_listings_screen.dart';
+import 'package:societybites/widgets/listing_purchase_slot.dart';
 import 'package:societybites/widgets/recurring_availability_hint.dart';
 
 void _ignoreOverflow() {
@@ -45,7 +47,7 @@ Map<String, dynamic> _listingJson({
     'recurringUnavailable': unavailable,
     'recurringBuyerLabel': recurring
         ? (unavailable
-            ? 'Temporarily not available'
+            ? 'Not available now'
             : 'Available today · Until 11:00 AM')
         : '',
     'recurringNextLabel': unavailable ? 'Available tomorrow from 7:00 AM' : '',
@@ -79,6 +81,14 @@ void main() {
     final food = FoodItem.fromJson(_listingJson(recurring: true, unavailable: true));
     expect(food.isRecurringReadyNow, isTrue);
     expect(food.canAddToCart, isFalse);
+    expect(food.recurringWindowLabel, 'Mon–Sat · 7:00 AM – 11:00 AM');
+  });
+
+  test('weekday range summary uses Mon–Fri when consecutive', () {
+    expect(
+      formatRecurringWeekdaysSummary([1, 2, 3, 4, 5]),
+      'Mon–Fri',
+    );
   });
 
   testWidgets('Available Now form shows today only and repeat schedule', (
@@ -207,8 +217,59 @@ void main() {
       ),
     );
     expect(find.text('Available today · Until 11:00 AM'), findsOneWidget);
-    expect(find.text('Temporarily not available'), findsOneWidget);
+    expect(find.text('Not available now'), findsOneWidget);
+    expect(find.text('Mon–Sat · 7:00 AM – 11:00 AM'), findsWidgets);
     expect(find.text('Available tomorrow from 7:00 AM'), findsOneWidget);
+    expect(find.text('Temporarily not available'), findsNothing);
     expect(find.text('recurringEnabled'), findsNothing);
+  });
+
+  testWidgets('compact buyer card shows schedule without overflowing', (
+    tester,
+  ) async {
+    _ignoreOverflow();
+    final closed = FoodItem.fromJson(
+      _listingJson(recurring: true, unavailable: true),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 160,
+            child: RecurringAvailabilityHint(food: closed, compact: true),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Not available now'), findsOneWidget);
+    expect(find.text('Mon–Sat · 7:00 AM – 11:00 AM'), findsOneWidget);
+    expect(find.text('Available tomorrow from 7:00 AM'), findsNothing);
+  });
+
+  testWidgets('purchase slot does not repeat not available now', (tester) async {
+    final closed = FoodItem.fromJson(
+      _listingJson(recurring: true, unavailable: true),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              RecurringAvailabilityHint(food: closed, compact: true),
+              MarketplacePurchaseSlot(
+                food: closed,
+                cartQty: 0,
+                compact: true,
+                soldOut: const Text('Sold out'),
+                addButton: const Text('Add'),
+                qtyStepper: const Text('qty'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Not available now'), findsOneWidget);
+    expect(find.text('Add'), findsNothing);
   });
 }

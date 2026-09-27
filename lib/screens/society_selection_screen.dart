@@ -6,6 +6,7 @@ import '../widgets/app_header.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../services/society_search.dart';
+import '../widgets/screen_loading_note.dart';
 
 typedef SocietyListLoader = Future<List<Map<String, dynamic>>> Function();
 typedef SocietySearchCall = Future<List<Map<String, dynamic>>> Function(String query);
@@ -433,19 +434,7 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
       ),
       const SizedBox(height: 16),
       if (_isSearching)
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 28),
-          child: Center(
-            child: SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.6,
-                color: Color(0xFF0E5A47),
-              ),
-            ),
-          ),
-        )
+        const ScreenLoadingNote(message: 'Searching societies…')
       else if (_appliedQuery.length < 2)
         const _HintCard(
           icon: Icons.apartment_rounded,

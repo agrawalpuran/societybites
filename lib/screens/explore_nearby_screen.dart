@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/nearby_seller.dart';
 import '../services/api_service.dart';
 import '../services/seller_onboarding.dart';
+import '../widgets/screen_loading_note.dart';
+import '../widgets/status_banner.dart';
 import 'seller_storefront_screen.dart';
 
 class ExploreNearbyScreen extends StatefulWidget {
@@ -140,12 +142,6 @@ class ExploreNearbyScreenState extends State<ExploreNearbyScreen> {
   }
 
   Widget _body() {
-    if (_loading && !_hasSuccessfullyLoaded) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-      );
-    }
-
     final result = _result;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(
@@ -163,29 +159,33 @@ class ExploreNearbyScreenState extends State<ExploreNearbyScreen> {
               fontSize: 15,
             ),
           ),
-        if (result?.available == true && result?.appliedRadiusKm != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            'Looking up to ${_radiusLabel(result!.appliedRadiusKm!)} km for sellers who opted into Nearby or Extended',
-            style: const TextStyle(
-              color: Color(0xFF6A7774),
-              fontWeight: FontWeight.w500,
+        if (_loading && !_hasSuccessfullyLoaded)
+          const ScreenLoadingNote(message: 'Loading nearby kitchens…')
+        else ...[
+          if (result?.available == true && result?.appliedRadiusKm != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Looking up to ${_radiusLabel(result!.appliedRadiusKm!)} km for sellers who opted into Nearby or Extended',
+              style: const TextStyle(
+                color: Color(0xFF6A7774),
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-        ],
-        if (_error != null && !_hasSuccessfullyLoaded) ...[
-          const SizedBox(height: 24),
-          Text(
-            _error!,
-            style: const TextStyle(color: Color(0xFFB42318)),
-          ),
-        ] else if (result != null &&
-            (!result.available || result.sellers.isEmpty)) ...[
-          const SizedBox(height: 28),
-          _emptyState(result),
-        ] else ...[
-          const SizedBox(height: 16),
-          ...?result?.sellers.map(_sellerCard),
+          ],
+          if (_error != null && !_hasSuccessfullyLoaded) ...[
+            const SizedBox(height: 24),
+            Text(
+              _error!,
+              style: const TextStyle(color: Color(0xFFB42318)),
+            ),
+          ] else if (result != null &&
+              (!result.available || result.sellers.isEmpty)) ...[
+            const SizedBox(height: 28),
+            _emptyState(result),
+          ] else ...[
+            const SizedBox(height: 16),
+            ...?result?.sellers.map(_sellerCard),
+          ],
         ],
       ],
     );
@@ -193,53 +193,19 @@ class ExploreNearbyScreenState extends State<ExploreNearbyScreen> {
 
   Widget _emptyState(NearbyDiscoveryResult result) {
     final unavailable = !result.available;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE6EBE9)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            unavailable ? 'Nearby unavailable' : 'No nearby sellers yet',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF101617),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            unavailable
-                ? 'We need your society location to show nearby home cooks.'
-                : 'We\'re growing SocietyBites in your area.\nNeighboring cooks appear here only if they choose Nearby selling.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF6A7774),
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            'Want to sell on SocietyBites?',
-            style: TextStyle(
-              color: Color(0xFF3A4644),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 10),
-          FilledButton(
-            onPressed: _startSelling,
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF0E5A47),
-            ),
-            child: const Text('Start Selling'),
-          ),
-        ],
+    return StatusBanner(
+      padding: EdgeInsets.zero,
+      title: unavailable ? 'Nearby unavailable' : 'No nearby sellers yet',
+      message: unavailable
+          ? 'We need your society location to show nearby home cooks.'
+          : 'We\'re growing SocietyBites in your area. Neighboring cooks appear here only if they choose Nearby selling.',
+      action: FilledButton(
+        onPressed: _startSelling,
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF0E5A47),
+          visualDensity: VisualDensity.compact,
+        ),
+        child: const Text('Start Selling'),
       ),
     );
   }

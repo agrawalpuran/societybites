@@ -4,6 +4,7 @@ import '../models/data.dart';
 import '../services/api_service.dart';
 import '../widgets/order_items_list.dart';
 import '../widgets/preorder_widgets.dart';
+import '../widgets/screen_loading_note.dart';
 import 'create_preorder_screen.dart';
 
 class PreOrderDetailScreen extends StatefulWidget {
@@ -257,7 +258,7 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
         ),
       ),
       body: _loading && _campaign == null
-          ? const Center(child: CircularProgressIndicator(color: preorderGreen))
+          ? const ScreenLoadingNote(message: 'Loading pre-order…')
           : _error != null && _campaign == null
           ? _errorState()
           : RefreshIndicator(

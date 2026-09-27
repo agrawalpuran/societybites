@@ -22,6 +22,8 @@ import '../widgets/food_type_selector.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/floating_cart_bar.dart';
+import '../widgets/screen_loading_note.dart';
+import '../widgets/status_banner.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/seller_avatar.dart';
 
@@ -293,9 +295,11 @@ class HomeScreenState extends State<HomeScreen> {
             food.isExpired
                 ? '${food.name} is out of stock'
                 : food.recurringUnavailable
-                ? (food.recurringNextLabel.isNotEmpty
-                    ? '${food.name} is temporarily not available. ${food.recurringNextLabel}'
-                    : '${food.name} is temporarily not available')
+                ? (food.recurringWindowLabel.isNotEmpty
+                    ? '${food.name} is not available now. Available ${food.recurringWindowLabel}'
+                    : food.recurringNextLabel.isNotEmpty
+                    ? '${food.name} is not available now. ${food.recurringNextLabel}'
+                    : '${food.name} is not available now')
                 : food.madeToOrderUnavailableToday
                 ? '${food.name} is currently unavailable'
                 : '${food.name} is sold out',
@@ -445,11 +449,7 @@ class HomeScreenState extends State<HomeScreen> {
       backgroundColor: const Color(0xFFF8FAF9),
       floatingActionButton: const FloatingCartBar(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-            )
-          : SafeArea(
+      body: SafeArea(
               child: RefreshIndicator(
                 color: const Color(0xFF0E5A47),
                 onRefresh: _refreshHome,
@@ -459,7 +459,11 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                   slivers: [
                     SliverToBoxAdapter(child: _buildHeader()),
-                    if (_showEmptySocietyState) ...[
+                    if (_isLoading) ...[
+                      const SliverToBoxAdapter(
+                        child: ScreenLoadingNote(message: 'Loading kitchens…'),
+                      ),
+                    ] else if (_showEmptySocietyState) ...[
                       SliverToBoxAdapter(child: _buildEmptySocietyState()),
                     ] else ...[
                     if (_error != null)
@@ -530,19 +534,7 @@ class HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPreOrdersSection() {
     if (_preOrdersLoading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 10),
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-              color: preorderGreen,
-              strokeWidth: 2,
-            ),
-          ),
-        ),
-      );
+      return const ScreenLoadingNote(message: 'Loading pre-orders…');
     }
     return _buildPreOrderReachCarousel(
       title: 'Pre-orders Campaign in Your Society',
@@ -701,69 +693,31 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEmptySocietyState() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFE6EBE9)),
-        ),
-        child: Column(
-          children: [
-            const Text(
-              'No sellers available in your society yet',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF101617),
-              ),
+    return StatusBanner(
+      title: 'No sellers available in your society yet',
+      message:
+          'Be the first one to share homemade food in your community. Discover home food from nearby societies.',
+      action: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          FilledButton(
+            onPressed: _startSellingFromHome,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF0E5A47),
+              visualDensity: VisualDensity.compact,
             ),
-            const SizedBox(height: 10),
-            const Text(
-              'Be the first one to share homemade food in your community.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFF3A4644),
-                fontWeight: FontWeight.w600,
-                height: 1.35,
-              ),
+            child: const Text('Start Selling'),
+          ),
+          OutlinedButton(
+            onPressed: _openExploreNearby,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF0E5A47),
+              visualDensity: VisualDensity.compact,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Discover home food from nearby societies',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF6A7774)),
-            ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _startSellingFromHome,
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF0E5A47),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text('Start Selling'),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: _openExploreNearby,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF0E5A47),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text('Explore Nearby'),
-              ),
-            ),
-          ],
-        ),
+            child: const Text('Explore Nearby'),
+          ),
+        ],
       ),
     );
   }
@@ -1299,19 +1253,12 @@ class HomeScreenState extends State<HomeScreen> {
   Widget _buildAvailableList() {
     if (_filteredListings.isEmpty) {
       return SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Text(
-            _searchQuery.isNotEmpty
-                ? 'No listings match "$_searchQuery".'
-                : _selectedCategory != null
-                ? 'No listings in $_selectedCategory yet.'
-                : 'No listings yet. Be the first to add food from the seller dashboard.',
-            style: const TextStyle(
-              color: Color(0xFF6A7774),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+        child: StatusBanner(
+          message: _searchQuery.isNotEmpty
+              ? 'No listings match "$_searchQuery".'
+              : _selectedCategory != null
+              ? 'No listings in $_selectedCategory yet.'
+              : 'No listings yet. Be the first to add food from the seller dashboard.',
         ),
       );
     }
@@ -1765,7 +1712,10 @@ class _SpecialCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  MarketplacePurchaseSlot(
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: MarketplacePurchaseSlot(
                     food: food,
                     cartQty: cartQty,
                     soldOut: Container(
@@ -1853,6 +1803,8 @@ class _SpecialCard extends StatelessWidget {
                             ],
                           ),
                         ),
+                      ),
+                    ),
                   ),
                 ],
               ),

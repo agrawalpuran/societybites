@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../widgets/screen_loading_note.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
   const AdminOrdersScreen({super.key});
@@ -108,9 +109,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
 
   Widget _buildContent() {
     if (_isLoading && _orders.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-      );
+      return const ScreenLoadingNote(message: 'Loading orders…');
     }
     if (_error != null && _orders.isEmpty) {
       return Center(
@@ -140,12 +139,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         itemBuilder: (context, index) {
           if (index == _orders.length) {
             _loadMore();
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(
-                child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-              ),
-            );
+            return const ScreenLoadingNote(message: 'Loading more…');
           }
 
           final order = _orders[index];

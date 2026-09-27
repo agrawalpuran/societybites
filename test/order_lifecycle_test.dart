@@ -36,6 +36,47 @@ void main() {
     expect(life.showReject, isFalse);
   });
 
+  test('seller action badge ignores waiting-on-buyer UPI', () {
+    expect(
+      orderNeedsSellerAction(
+        status: 'pending',
+        paymentStatus: 'pending',
+      ),
+      isTrue,
+    );
+    expect(
+      orderNeedsSellerAction(
+        status: 'accepted',
+        paymentStatus: 'pending',
+        paymentMethod: 'upi',
+      ),
+      isFalse,
+    );
+    expect(
+      orderNeedsSellerAction(
+        status: 'accepted',
+        paymentStatus: 'seller_confirmed',
+        paymentMethod: 'upi',
+      ),
+      isTrue,
+    );
+    expect(
+      orderNeedsSellerAction(
+        status: 'ready',
+        paymentStatus: 'paid',
+        paymentMethod: 'cash',
+      ),
+      isTrue,
+    );
+    expect(
+      orderNeedsSellerAction(
+        status: 'completed',
+        paymentStatus: 'paid',
+      ),
+      isFalse,
+    );
+  });
+
   test('rejected order has no action', () {
     final life = SellerOrderLifecycle.forStatus('rejected');
     expect(life.hasPrimaryAction, isFalse);

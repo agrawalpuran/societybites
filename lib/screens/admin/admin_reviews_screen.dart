@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../widgets/screen_loading_note.dart';
 
 class AdminReviewsScreen extends StatefulWidget {
   const AdminReviewsScreen({super.key});
@@ -60,9 +61,7 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading && _reviews.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-      );
+      return const ScreenLoadingNote(message: 'Loading reviews…');
     }
     if (_error != null && _reviews.isEmpty) {
       return Center(
@@ -92,12 +91,7 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
         itemBuilder: (context, index) {
           if (index == _reviews.length) {
             _loadMore();
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(
-                child: CircularProgressIndicator(color: Color(0xFF0E5A47)),
-              ),
-            );
+            return const ScreenLoadingNote(message: 'Loading more…');
           }
 
           final review = _reviews[index];
