@@ -46,18 +46,28 @@ class PushNotificationService {
     if (!_supported || _initialized) return;
     _initialized = true;
 
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    try {
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-    FirebaseMessaging.onMessage.listen((message) {
-      onForegroundOrderUpdate?.call();
-      _showAndroidForegroundNotification(message);
-    });
+      FirebaseMessaging.onMessage.listen((message) {
+        onForegroundOrderUpdate?.call();
+        _showAndroidForegroundNotification(message);
+      });
 
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleOpen);
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleOpen);
 
-    final initial = await FirebaseMessaging.instance.getInitialMessage();
-    if (initial != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _handleOpen(initial));
+      try {
+        final initial = await FirebaseMessaging.instance.getInitialMessage();
+        if (initial != null) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _handleOpen(initial),
+          );
+        }
+      } catch (err) {
+        debugPrint('[push] getInitialMessage failed: $err');
+      }
+    } catch (err) {
+      debugPrint('[push] init failed: $err');
     }
   }
 

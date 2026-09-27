@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -18,8 +20,6 @@ void main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  await PushNotificationService.init();
-
   ApiService.onSessionInvalidated = () {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final navigator = PushNotificationService.navigatorKey.currentState;
@@ -32,6 +32,8 @@ void main() async {
   };
 
   runApp(const MyApp());
+
+  unawaited(PushNotificationService.init());
 }
 
 class MyApp extends StatelessWidget {
@@ -49,51 +51,82 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
-
-  Future<Widget> _resolveStartScreen() async {
-    if (AuthConfig.usesTwoFactor) {
-      final sessionProvider = await SessionService.getAuthProvider();
-      if (sessionProvider != '2factor') {
-        // Remove stale Firebase-session identity before the one-time migration
-        // login. Firebase SDK/FCM initialization remains intact.
-        await SessionService.clear();
-        return const GuestLandingScreen();
-      }
-
-      final refreshToken = await SessionService.getRefreshToken();
-      if (refreshToken == null || refreshToken.isEmpty) {
-        return const GuestLandingScreen();
-      }
-
-      if (!await ApiService.restoreTwoFactorSession()) {
-        return const GuestLandingScreen();
-      }
-    } else {
-      final token = await SessionService.getToken();
-      if (token == null || token.isEmpty) {
-        return const GuestLandingScreen();
-      }
+/// Normal auth/session routing. Throws are handled by [AuthGate].
+Future<Widget> resolveAuthStartScreen() async {
+  if (AuthConfig.usesTwoFactor) {
+    final sessionProvider = await SessionService.getAuthProvider();
+    if (sessionProvider != '2factor') {
+      // Remove stale Firebase-session identity before the one-time migration
+      // login. Firebase SDK/FCM initialization remains intact.
+      await SessionService.clear();
+      return const GuestLandingScreen();
     }
 
-    if (await SessionService.isOnboarded()) {
-      return const MainShellScreen();
+    final refreshToken = await SessionService.getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      return const GuestLandingScreen();
     }
 
-    final userId = await SessionService.getUserId();
-    if (userId != null) {
-      return const SocietySelectionScreen();
+    if (!await ApiService.restoreTwoFactorSession()) {
+      return const GuestLandingScreen();
     }
+  } else {
+    final token = await SessionService.getToken();
+    if (token == null || token.isEmpty) {
+      return const GuestLandingScreen();
+    }
+  }
 
-    return const GuestLandingScreen();
+  if (await SessionService.isOnboarded()) {
+    return const MainShellScreen();
+  }
+
+  final userId = await SessionService.getUserId();
+  if (userId != null) {
+    return const SocietySelectionScreen();
+  }
+
+  return const GuestLandingScreen();
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key, this.resolveStartScreen});
+
+  /// Test seam. Production uses [resolveAuthStartScreen].
+  final Future<Widget> Function()? resolveStartScreen;
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  late final Future<Widget> _startup;
+
+  @override
+  void initState() {
+    super.initState();
+    _startup = _safeResolve();
+  }
+
+  Future<Widget> _safeResolve() async {
+    try {
+      final resolve = widget.resolveStartScreen ?? resolveAuthStartScreen;
+      return await resolve();
+    } catch (error, stack) {
+      debugPrint('[auth] startup resolve failed: $error\n$stack');
+      return const GuestLandingScreen();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Widget>(
-      future: _resolveStartScreen(),
+      future: _startup,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          debugPrint('[auth] startup future error: ${snapshot.error}');
+          return const GuestLandingScreen();
+        }
         if (!snapshot.hasData) {
           return const Scaffold(
             backgroundColor: Color(0xFFF8FAF9),
