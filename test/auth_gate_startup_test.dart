@@ -35,6 +35,35 @@ void main() {
     expect(find.byKey(const Key('startup-resolved')), findsOneWidget);
     expect(find.text('ready'), findsOneWidget);
     expect(find.text('Loading…'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('AuthGate does not restart session resolve on rebuild', (
+    tester,
+  ) async {
+    var calls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthGate(
+          resolveStartScreen: () async {
+            calls++;
+            await Future<void>.delayed(const Duration(milliseconds: 80));
+            return const Scaffold(body: Text('ready'));
+          },
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
+    await tester.pump(const Duration(milliseconds: 20));
+    expect(calls, 1);
+    expect(find.text('Loading…'), findsOneWidget);
+
+    await tester.pumpAndSettle();
+    expect(find.text('ready'), findsOneWidget);
+    expect(calls, 1);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(

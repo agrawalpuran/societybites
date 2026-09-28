@@ -43,10 +43,10 @@ class PushNotificationService {
       !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
   static Future<void> init() async {
-    if (!_supported || _initialized) return;
-    _initialized = true;
-
     try {
+      if (!_supported || _initialized) return;
+      _initialized = true;
+
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
       FirebaseMessaging.onMessage.listen((message) {
