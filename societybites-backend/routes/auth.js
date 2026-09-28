@@ -20,6 +20,7 @@ const {
   assertSellerPaymentPreferenceUpdate,
 } = require("../lib/sellerPaymentPreference");
 const { assertSellerFssaiUpdate } = require("../lib/fssai");
+const { acceptSellerTermsAndEnable } = require("../lib/sellerTerms");
 const { deleteAuthenticatedAccount } = require("../lib/accountDeletion");
 const { uploadPublicImage } = require("../lib/objectStorage");
 const {
@@ -297,6 +298,27 @@ router.post(
   })
 );
 
+router.post(
+  "/me/seller-terms",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const result = await acceptSellerTermsAndEnable({
+      prisma,
+      user: req.user,
+      body: req.body,
+    });
+    const token = signToken(result.user);
+    res.json({
+      user: await attachSellingReach(result.user, prisma),
+      token,
+      sellerTerms: {
+        termsVersion: result.acceptance.termsVersion,
+        acceptedAt: result.acceptance.acceptedAt,
+      },
+    });
+  })
+);
+
 router.patch(
   "/me/profile",
   requireUser,
@@ -311,13 +333,27 @@ router.patch(
       sellingReachLevel,
       fulfilmentMode,
       deliveryCharge,
+      deliveryChargeInSociety,
+      deliveryChargeNearby,
+      deliveryChargeExtended,
       paymentPreference,
     } = req.body;
     const fssaiBody = req.body && req.body.fssai;
 
     const data = {};
     if (name !== undefined) data.name = name;
-    if (role !== undefined && ["buyer", "seller"].includes(role)) data.role = role;
+    if (role !== undefined && ["buyer", "seller"].includes(role)) {
+      if (
+        role === "seller" &&
+        req.user.role !== "seller" &&
+        req.user.role !== "super_admin"
+      ) {
+        return res.status(400).json({
+          error: "Accept the Seller Terms & Conditions before enabling selling",
+        });
+      }
+      data.role = role;
+    }
     if (sellingReachLevel !== undefined) {
       const nextRole = data.role || req.user.role;
       let societyCity = null;
@@ -335,17 +371,35 @@ router.patch(
         prismaClient: prisma,
       });
     }
-    if (fulfilmentMode !== undefined || deliveryCharge !== undefined) {
+    if (
+      fulfilmentMode !== undefined ||
+      deliveryCharge !== undefined ||
+      deliveryChargeInSociety !== undefined ||
+      deliveryChargeNearby !== undefined ||
+      deliveryChargeExtended !== undefined
+    ) {
       const nextRole = data.role || req.user.role;
       const requestedMode =
         fulfilmentMode !== undefined ? fulfilmentMode : req.user.fulfilmentMode || "BUYER_PICKUP";
       const parsed = assertSellerFulfilmentUpdate({
         requestedMode,
         requestedCharge: deliveryCharge,
+        requestedChargeInSociety: deliveryChargeInSociety,
+        requestedChargeNearby: deliveryChargeNearby,
+        requestedChargeExtended: deliveryChargeExtended,
         role: nextRole,
       });
       if (fulfilmentMode !== undefined) data.fulfilmentMode = parsed.fulfilmentMode;
       if (parsed.deliveryCharge !== undefined) data.deliveryCharge = parsed.deliveryCharge;
+      if (parsed.deliveryChargeInSociety !== undefined) {
+        data.deliveryChargeInSociety = parsed.deliveryChargeInSociety;
+      }
+      if (parsed.deliveryChargeNearby !== undefined) {
+        data.deliveryChargeNearby = parsed.deliveryChargeNearby;
+      }
+      if (parsed.deliveryChargeExtended !== undefined) {
+        data.deliveryChargeExtended = parsed.deliveryChargeExtended;
+      }
     }
     // societyId / flatId are assigned only via POST /societies/join.
     // Photo bytes are accepted only via POST /auth/me/profile-photo.

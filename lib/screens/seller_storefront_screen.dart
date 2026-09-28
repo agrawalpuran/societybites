@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../models/nearby_seller.dart';
+import '../models/seller_fulfilment.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
 import '../widgets/guest_order_auth.dart';
@@ -349,6 +350,9 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
           isCrossSociety: widget.nearbyContext != null,
           sellerFulfilment: widget.nearbyContext?.fulfilment,
           sellerSocietyName: widget.nearbyContext?.societyName,
+          deliveryReachBand: widget.nearbyContext == null
+              ? null
+              : DeliveryReachBand.nearby,
         ),
       ),
     );

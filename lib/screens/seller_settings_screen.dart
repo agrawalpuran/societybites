@@ -19,6 +19,7 @@ class SellerSettingsScreen extends StatelessWidget {
     required this.onChangeSellingReach,
     required this.onChangeFulfilment,
     required this.onEditFssai,
+    this.onSaveAndEnable,
     this.isFirstTimeSetup = false,
   });
 
@@ -33,6 +34,7 @@ class SellerSettingsScreen extends StatelessWidget {
   final VoidCallback onChangeSellingReach;
   final VoidCallback onChangeFulfilment;
   final VoidCallback onEditFssai;
+  final VoidCallback? onSaveAndEnable;
   final bool isFirstTimeSetup;
 
   @override
@@ -124,6 +126,30 @@ class SellerSettingsScreen extends StatelessWidget {
                 ],
               ),
             ),
+            if (onSaveAndEnable != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    key: const Key('seller-settings-enable'),
+                    onPressed: onSaveAndEnable,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0E5A47),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Save / Enable Selling',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

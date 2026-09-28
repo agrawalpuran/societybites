@@ -8,6 +8,7 @@ import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
+import '../widgets/listing_type_badge.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/made_to_order_hint.dart';
@@ -833,7 +834,6 @@ class _SellerListingCard extends StatelessWidget {
                 food: listing,
                 width: 72,
                 height: 72,
-                showTypeBadge: true,
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -841,6 +841,7 @@ class _SellerListingCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: Text(
@@ -858,25 +859,13 @@ class _SellerListingCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 4),
+                    ListingTypeBadge(food: listing, dense: true),
+                    const SizedBox(height: 4),
                     Text(
                       '₹${listing.price.toStringAsFixed(0)}',
                       style: const TextStyle(
                         color: Color(0xFF0E5A47),
                         fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      listing.isPreOrderCatalog
-                          ? 'PRE-ORDER'
-                          : listing.isMadeToOrder
-                              ? 'MADE TO ORDER'
-                              : 'REGULAR',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        letterSpacing: 0.6,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF6A7774),
                       ),
                     ),
                     if (listingSoldCaption(listing.quantitySold).isNotEmpty)

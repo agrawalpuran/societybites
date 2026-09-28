@@ -479,4 +479,25 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('Pre-order form always offers Create catalog', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const MaterialApp(home: CreatePreOrderScreen()));
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('create-preorder-catalog-on-form')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('create-preorder-catalog-on-form')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AddListingScreen), findsOneWidget);
+    expect(find.text('Pre-order'), findsWidgets);
+    expect(
+      find.byType(CreatePreOrderScreen, skipOffstage: false),
+      findsOneWidget,
+    );
+  });
 }

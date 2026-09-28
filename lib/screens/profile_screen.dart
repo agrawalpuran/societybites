@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../models/legal_documents.dart';
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
+import '../models/seller_terms.dart';
 import '../models/selling_reach.dart';
 import '../services/api_service.dart';
 import '../services/profile_photo_processor.dart';
@@ -23,6 +25,7 @@ import 'legal_screen.dart';
 import 'login_screen.dart';
 import 'profile_photo_crop_screen.dart';
 import 'seller_settings_screen.dart';
+import 'seller_terms_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
@@ -38,6 +41,7 @@ class ProfileScreen extends StatefulWidget {
     this.uploadProfilePhoto,
     this.saveProfilePhoto,
     this.startSelling,
+    this.acceptSellerTerms,
   });
 
   /// Switches the main shell tab instead of pushing a new route.
@@ -51,6 +55,9 @@ class ProfileScreen extends StatefulWidget {
     String? sellingReachLevel,
     String? fulfilmentMode,
     double? deliveryCharge,
+    double? deliveryChargeInSociety,
+    double? deliveryChargeNearby,
+    double? deliveryChargeExtended,
     String? paymentPreference,
   })? updateProfile;
 
@@ -81,6 +88,10 @@ class ProfileScreen extends StatefulWidget {
   /// Test seam. Production uses [SellerOnboarding.startSelling].
   final Future<bool> Function(BuildContext context)? startSelling;
 
+  /// Test seam. Production uses [ApiService.acceptSellerTerms].
+  final Future<Map<String, dynamic>> Function(Map<String, dynamic> body)?
+      acceptSellerTerms;
+
   @override
   ProfileScreenState createState() => ProfileScreenState();
 }
@@ -106,6 +117,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   String? _fssaiRegisteredName;
   DateTime? _fssaiExpiry;
   final _sellerSettingsTick = ValueNotifier(0);
+  _PendingSellerEnable? _pendingSellerEnable;
 
   @override
   void initState() {
@@ -327,14 +339,20 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _openSellerSettings({bool firstTime = false}) {
+    if (firstTime) {
+      _pendingSellerEnable = _PendingSellerEnable()
+        ..paymentPreference = defaultSellerPaymentPreference.apiValue;
+      _paymentPreference = defaultSellerPaymentPreference;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ValueListenableBuilder<int>(
           valueListenable: _sellerSettingsTick,
           builder: (context, _, child) {
+            final holdingSetup = firstTime && _pendingSellerEnable != null;
             return SellerSettingsScreen(
-              isFirstTimeSetup: firstTime,
+              isFirstTimeSetup: holdingSetup,
               upiSubtitle: (_upiId != null && _upiId!.isNotEmpty)
                   ? _upiId!
                   : 'Add UPI ID so buyers can pay you',
@@ -349,11 +367,16 @@ class ProfileScreenState extends State<ProfileScreen> {
               onChangeSellingReach: _changeSellingReach,
               onChangeFulfilment: _changeFulfilment,
               onEditFssai: _editFssai,
+              onSaveAndEnable: holdingSetup ? _saveAndEnableSelling : null,
             );
           },
         ),
       ),
-    );
+    ).then((_) async {
+      if (!mounted || _pendingSellerEnable == null) return;
+      _pendingSellerEnable = null;
+      await _loadProfile();
+    });
   }
 
   Future<void> _openProfileEditor() async {
@@ -669,6 +692,23 @@ class ProfileScreenState extends State<ProfileScreen> {
     upiController.dispose();
     nameController.dispose();
 
+    final pending = _pendingSellerEnable;
+    if (pending != null) {
+      setState(() {
+        _upiId = upi;
+        _upiDisplayName = displayName.isEmpty ? null : displayName;
+        pending
+          ..includeUpi = true
+          ..upiId = upi
+          ..upiDisplayName = displayName.isEmpty ? null : displayName;
+      });
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('UPI ID saved')),
+      );
+      return;
+    }
+
     try {
       if (widget.saveUpiDetails != null) {
         await widget.saveUpiDetails!(
@@ -930,6 +970,26 @@ class ProfileScreenState extends State<ProfileScreen> {
         ? ''
         : '${expiry!.year.toString().padLeft(4, '0')}-${expiry!.month.toString().padLeft(2, '0')}-${expiry!.day.toString().padLeft(2, '0')}';
 
+    final pending = _pendingSellerEnable;
+    if (pending != null) {
+      setState(() {
+        _fssaiNumber = number.isEmpty ? _fssaiNumber : number;
+        _fssaiRegisteredName =
+            registeredName.isEmpty ? _fssaiRegisteredName : registeredName;
+        _fssaiExpiry = expiry ?? _fssaiExpiry;
+        pending
+          ..includeFssai = true
+          ..fssaiNumber = number
+          ..fssaiRegisteredName = registeredName.isEmpty ? null : registeredName
+          ..fssaiExpiry = expiryIso.isEmpty ? null : expiryIso;
+      });
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('FSSAI details saved')),
+      );
+      return;
+    }
+
     try {
       if (widget.saveFssaiDetails != null) {
         await widget.saveFssaiDetails!(
@@ -978,6 +1038,63 @@ class ProfileScreenState extends State<ProfileScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Could not enable selling: $e')));
     }
+  }
+
+  Future<void> _saveAndEnableSelling() async {
+    final pending = _pendingSellerEnable;
+    if (pending == null || !mounted) return;
+    final accepted = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const SellerTermsScreen()),
+    );
+    if (accepted != true || !mounted) return;
+    try {
+      final body = pending.toJson();
+      final updated = widget.acceptSellerTerms != null
+          ? await widget.acceptSellerTerms!(body)
+          : await ApiService.acceptSellerTerms(body);
+      if (!mounted) return;
+      try {
+        await SessionService.cacheProfileFromApi(updated);
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() {
+        _applySellerEnableResult(updated);
+        _pendingSellerEnable = null;
+      });
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selling enabled')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not enable selling: $e')),
+      );
+    }
+  }
+
+  void _applySellerEnableResult(Map<String, dynamic> updated) {
+    _role = updated['role'] as String? ?? 'seller';
+    if (updated.containsKey('upiId')) {
+      _upiId = updated['upiId'] as String?;
+    }
+    if (updated.containsKey('upiDisplayName')) {
+      _upiDisplayName = updated['upiDisplayName'] as String?;
+    }
+    if (updated.containsKey('paymentPreference')) {
+      _paymentPreference = paymentPreferenceFromAuthMe(updated);
+    }
+    if (updated.containsKey('sellingReachLevel')) {
+      _sellingReachLevel = parseSellingReachLevel(updated['sellingReachLevel']);
+    }
+    if (updated.containsKey('sellingReach') || updated.containsKey('cityKey')) {
+      _sellingReach = SellingReach.fromAuthMe(updated);
+    }
+    if (updated.containsKey('fulfilmentMode') || updated.containsKey('fulfilment')) {
+      _fulfilment = SellerFulfilment.fromAuthMe(updated);
+    }
+    _applyFssaiFromProfile(updated);
   }
 
   Future<void> _changeProfilePhoto() async {
@@ -1189,6 +1306,19 @@ class ProfileScreenState extends State<ProfileScreen> {
 
     if (selected == null || !mounted || selected == _sellingReachLevel) return;
 
+    final pending = _pendingSellerEnable;
+    if (pending != null) {
+      setState(() {
+        _sellingReachLevel = selected;
+        pending.sellingReachLevel = selected.apiValue;
+      });
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selling reach updated')),
+      );
+      return;
+    }
+
     final previous = _sellingReachLevel;
     try {
       final updated = widget.updateProfile != null
@@ -1221,36 +1351,81 @@ class ProfileScreenState extends State<ProfileScreen> {
     final saved = await showModalBottomSheet<_FulfilmentDraft>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => _FulfilmentSheet(initial: _fulfilment),
+      builder: (ctx) => SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 12),
+        child: _FulfilmentSheet(initial: _fulfilment),
+      ),
     );
 
     if (saved == null || !mounted) return;
 
-    double? charge;
-    if (saved.mode.showsDeliveryCharge) {
-      charge = saved.chargeText.isEmpty ? 0 : double.tryParse(saved.chargeText);
+    double? parseCharge(String raw, String label) {
+      if (!saved.mode.showsDeliveryCharge) return 0;
+      final charge = raw.trim().isEmpty ? 0.0 : double.tryParse(raw.trim());
       if (charge == null || charge < 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter a valid delivery charge of ₹0 or more')),
+          SnackBar(content: Text('Enter a valid $label of ₹0 or more')),
         );
-        return;
+        return null;
       }
+      return charge;
     }
+
+    final inSociety = parseCharge(saved.inSocietyText, 'in-society delivery charge');
+    if (inSociety == null) return;
+    final nearby = parseCharge(saved.nearbyText, 'nearby delivery charge');
+    if (nearby == null) return;
+    final extended = parseCharge(saved.extendedText, 'extended delivery charge');
+    if (extended == null) return;
     final draftMode = saved.mode;
+
+    final pending = _pendingSellerEnable;
+    if (pending != null) {
+      setState(() {
+        _fulfilment = SellerFulfilment(
+          mode: draftMode,
+          deliveryCharge: nearby,
+          deliveryChargeInSociety: inSociety,
+          deliveryChargeNearby: nearby,
+          deliveryChargeExtended: extended,
+        );
+        pending
+          ..includeFulfilment = true
+          ..fulfilmentMode = draftMode.apiValue
+          ..deliveryCharge = nearby
+          ..deliveryChargeInSociety = inSociety
+          ..deliveryChargeNearby = nearby
+          ..deliveryChargeExtended = extended;
+      });
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Fulfilment updated')),
+      );
+      return;
+    }
 
     final previous = _fulfilment;
     try {
       final updated = widget.updateProfile != null
           ? await widget.updateProfile!(
               fulfilmentMode: draftMode.apiValue,
-              deliveryCharge: charge,
+              deliveryCharge: nearby,
+              deliveryChargeInSociety: inSociety,
+              deliveryChargeNearby: nearby,
+              deliveryChargeExtended: extended,
             )
           : await ApiService.updateMyProfile(
               fulfilmentMode: draftMode.apiValue,
-              deliveryCharge: charge,
+              deliveryCharge: nearby,
+              deliveryChargeInSociety: inSociety,
+              deliveryChargeNearby: nearby,
+              deliveryChargeExtended: extended,
             );
       if (!mounted) return;
       setState(() => _fulfilment = SellerFulfilment.fromAuthMe(updated));
@@ -1279,6 +1454,19 @@ class ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (selected == null || !mounted || selected == _paymentPreference) return;
+
+    final pending = _pendingSellerEnable;
+    if (pending != null) {
+      setState(() {
+        _paymentPreference = selected;
+        pending.paymentPreference = selected.apiValue;
+      });
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment methods updated')),
+      );
+      return;
+    }
 
     final previous = _paymentPreference;
     try {
@@ -1480,20 +1668,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                             title: 'Privacy Policy',
                             onTap: () => _openLegal(
                               'Privacy Policy',
-                              'SocietyBites Privacy Policy\n\n'
-                                  'Last updated: July 2026\n\n'
-                                  'SocietyBites collects and processes the following information:\n'
-                                  '• Phone number (for authentication)\n'
-                                  '• Name (for identification within your society)\n'
-                                  '• Flat and block number (for delivery coordination)\n'
-                                  '• UPI ID (for sellers, to receive payments)\n'
-                                  '• Order history\n\n'
-                                  'Your data is:\n'
-                                  '• Never sold to third parties\n'
-                                  '• Only shared within your apartment society\n'
-                                  '• Stored securely on encrypted servers\n'
-                                  '• Deleted upon request\n\n'
-                                  'For questions: support@societybites.in',
+                              kPrivacyPolicyBody,
                             ),
                           ),
                           ProfileMenuTile(
@@ -1501,16 +1676,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                             title: 'Terms of Service',
                             onTap: () => _openLegal(
                               'Terms of Service',
-                              'SocietyBites Terms of Service\n\n'
-                                  'Last updated: July 2026\n\n'
-                                  'By using SocietyBites, you agree to:\n'
-                                  '• Provide accurate information about your residence\n'
-                                  '• Not misuse the platform for commercial resale\n'
-                                  '• Maintain food safety and hygiene standards (sellers)\n'
-                                  '• Complete payments for accepted orders (buyers)\n'
-                                  '• Not share your account credentials\n\n'
-                                  'SocietyBites is a community platform. We reserve the right to suspend accounts that violate community guidelines.\n\n'
-                                  'For disputes: support@societybites.in',
+                              kTermsOfServiceBody,
                             ),
                           ),
                           ProfileMenuTile(
@@ -1601,9 +1767,16 @@ class ProfileScreenState extends State<ProfileScreen> {
 }
 
 class _FulfilmentDraft {
-  const _FulfilmentDraft({required this.mode, required this.chargeText});
+  const _FulfilmentDraft({
+    required this.mode,
+    required this.inSocietyText,
+    required this.nearbyText,
+    required this.extendedText,
+  });
   final FulfilmentMode mode;
-  final String chargeText;
+  final String inSocietyText;
+  final String nearbyText;
+  final String extendedText;
 }
 
 class _FulfilmentSheet extends StatefulWidget {
@@ -1616,165 +1789,239 @@ class _FulfilmentSheet extends StatefulWidget {
 
 class _FulfilmentSheetState extends State<_FulfilmentSheet> {
   late FulfilmentMode _mode;
-  late final TextEditingController _chargeController;
+  late final TextEditingController _inSocietyController;
+  late final TextEditingController _nearbyController;
+  late final TextEditingController _extendedController;
 
   @override
   void initState() {
     super.initState();
     _mode = widget.initial.mode;
-    final amount = widget.initial.deliveryCharge ?? 0;
-    _chargeController = TextEditingController(
-      text: amount == amount.roundToDouble()
-          ? amount.toInt().toString()
-          : amount.toString(),
+    _inSocietyController = TextEditingController(
+      text: _chargeText(widget.initial.inSocietyCharge),
     );
+    _nearbyController = TextEditingController(
+      text: _chargeText(widget.initial.nearbyCharge),
+    );
+    _extendedController = TextEditingController(
+      text: _chargeText(widget.initial.extendedCharge),
+    );
+  }
+
+  String _chargeText(double amount) {
+    return amount == amount.roundToDouble()
+        ? amount.toInt().toString()
+        : amount.toString();
   }
 
   @override
   void dispose() {
-    _chargeController.dispose();
+    _inSocietyController.dispose();
+    _nearbyController.dispose();
+    _extendedController.dispose();
     super.dispose();
+  }
+
+  Widget _chargeField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    Key? key,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF101617),
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            key: key,
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              prefixText: '₹ ',
+              hintText: hint,
+              filled: true,
+              fillColor: const Color(0xFFF5F7F6),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFF0E5A47)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final keyboard = media.viewInsets.bottom;
+    final maxBodyHeight = (media.size.height * 0.68) - keyboard;
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        24,
-        24,
-        24 + MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Seller Fulfilment',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF101617),
-              ),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, 28 + keyboard),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: maxBodyHeight.clamp(180.0, media.size.height),
             ),
-            const SizedBox(height: 6),
-            const Text(
-              'How will buyers receive their orders?',
-              style: TextStyle(fontSize: 14, color: Color(0xFF6A7774)),
-            ),
-            const SizedBox(height: 16),
-            ...FulfilmentMode.values.map((mode) {
-              final selected = mode == _mode;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Material(
-                  color: const Color(0xFFF5F7F6),
-                  borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () => setState(() => _mode = mode),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        children: [
-                          Icon(
-                            selected
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_off,
-                            color: const Color(0xFF0E5A47),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Seller Fulfilment',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF101617),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'How will buyers receive their orders?',
+                    style: TextStyle(fontSize: 14, color: Color(0xFF6A7774)),
+                  ),
+                  const SizedBox(height: 16),
+                  ...FulfilmentMode.values.map((mode) {
+                    final selected = mode == _mode;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Material(
+                        color: const Color(0xFFF5F7F6),
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => setState(() => _mode = mode),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
                               children: [
-                                Text(
-                                  mode.optionTitle,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF101617),
-                                  ),
+                                Icon(
+                                  selected
+                                      ? Icons.radio_button_checked
+                                      : Icons.radio_button_off,
+                                  color: const Color(0xFF0E5A47),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  mode.optionSubtitle,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF6A7774),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        mode.optionTitle,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF101617),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        mode.optionSubtitle,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF6A7774),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
+                        ),
+                      ),
+                    );
+                  }),
+                  if (_mode.showsDeliveryCharge) ...[
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Delivery charges',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF101617),
                       ),
                     ),
-                  ),
-                ),
-              );
-            }),
-            if (_mode.showsDeliveryCharge) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Delivery charge',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF101617),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _chargeController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  prefixText: '₹ ',
-                  hintText: '0',
-                  filled: true,
-                  fillColor: const Color(0xFFF5F7F6),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFF0E5A47)),
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(
-                  context,
-                  _FulfilmentDraft(
-                    mode: _mode,
-                    chargeText: _chargeController.text.trim(),
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0E5A47),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  'Save',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Set a charge for each buyer reach. In society defaults to ₹0.',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF6A7774)),
+                    ),
+                    const SizedBox(height: 10),
+                    _chargeField(
+                      key: const Key('delivery-charge-in-society'),
+                      label: 'In society',
+                      hint: '0',
+                      controller: _inSocietyController,
+                    ),
+                    _chargeField(
+                      key: const Key('delivery-charge-nearby'),
+                      label: 'Nearby',
+                      hint: '0',
+                      controller: _nearbyController,
+                    ),
+                    _chargeField(
+                      key: const Key('delivery-charge-extended'),
+                      label: 'Extended',
+                      hint: '0',
+                      controller: _extendedController,
+                    ),
+                  ],
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              key: const Key('fulfilment-save'),
+              onPressed: () => Navigator.pop(
+                context,
+                _FulfilmentDraft(
+                  mode: _mode,
+                  inSocietyText: _inSocietyController.text,
+                  nearbyText: _nearbyController.text,
+                  extendedText: _extendedController.text,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0E5A47),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Save',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2028,6 +2275,48 @@ class _Chip extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _PendingSellerEnable {
+  bool includeUpi = false;
+  String? upiId;
+  String? upiDisplayName;
+  String? paymentPreference;
+  String? sellingReachLevel;
+  bool includeFulfilment = false;
+  String? fulfilmentMode;
+  double? deliveryCharge;
+  double? deliveryChargeInSociety;
+  double? deliveryChargeNearby;
+  double? deliveryChargeExtended;
+  bool includeFssai = false;
+  String? fssaiNumber;
+  String? fssaiRegisteredName;
+  String? fssaiExpiry;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'termsVersion': sellerTermsVersion,
+      if (includeUpi) 'upiId': upiId,
+      if (includeUpi) 'upiDisplayName': upiDisplayName,
+      if (paymentPreference != null) 'paymentPreference': paymentPreference,
+      if (sellingReachLevel != null) 'sellingReachLevel': sellingReachLevel,
+      if (includeFulfilment) 'fulfilmentMode': fulfilmentMode,
+      if (includeFulfilment && deliveryCharge != null) 'deliveryCharge': deliveryCharge,
+      if (includeFulfilment && deliveryChargeInSociety != null)
+        'deliveryChargeInSociety': deliveryChargeInSociety,
+      if (includeFulfilment && deliveryChargeNearby != null)
+        'deliveryChargeNearby': deliveryChargeNearby,
+      if (includeFulfilment && deliveryChargeExtended != null)
+        'deliveryChargeExtended': deliveryChargeExtended,
+      if (includeFssai)
+        'fssai': {
+          'number': fssaiNumber ?? '',
+          if (fssaiRegisteredName != null) 'registeredName': fssaiRegisteredName,
+          if (fssaiExpiry != null) 'expiry': fssaiExpiry,
+        },
+    };
   }
 }
 

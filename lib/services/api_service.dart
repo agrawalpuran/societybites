@@ -401,6 +401,9 @@ class ApiService {
     String? sellingReachLevel,
     String? fulfilmentMode,
     double? deliveryCharge,
+    double? deliveryChargeInSociety,
+    double? deliveryChargeNearby,
+    double? deliveryChargeExtended,
     String? paymentPreference,
     String? fssaiNumber,
     String? fssaiExpiry,
@@ -421,6 +424,12 @@ class ApiService {
         if (sellingReachLevel != null) 'sellingReachLevel': sellingReachLevel,
         if (fulfilmentMode != null) 'fulfilmentMode': fulfilmentMode,
         if (deliveryCharge != null) 'deliveryCharge': deliveryCharge,
+        if (deliveryChargeInSociety != null)
+          'deliveryChargeInSociety': deliveryChargeInSociety,
+        if (deliveryChargeNearby != null)
+          'deliveryChargeNearby': deliveryChargeNearby,
+        if (deliveryChargeExtended != null)
+          'deliveryChargeExtended': deliveryChargeExtended,
         if (paymentPreference != null) 'paymentPreference': paymentPreference,
         if (!identical(profilePhotoUrl, _omitProfilePhoto))
           'profilePhotoUrl': profilePhotoUrl,
@@ -433,6 +442,28 @@ class ApiService {
             if (fssaiRegisteredName != null) 'registeredName': fssaiRegisteredName,
           },
       }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      if (data['token'] != null &&
+          await SessionService.getAuthProvider() == 'firebase') {
+        await SessionService.saveToken(data['token'] as String);
+      }
+      return Map<String, dynamic>.from(data['user'] as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  /// Records seller-terms acceptance and enables selling. The body must
+  /// include the seller terms version. The server sets acceptedAt.
+  static Future<Map<String, dynamic>> acceptSellerTerms(
+    Map<String, dynamic> body,
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/me/seller-terms'),
+      headers: await _authHeaders(),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode == 200) {

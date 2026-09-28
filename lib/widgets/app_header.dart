@@ -66,70 +66,50 @@ class _AppHeaderState extends State<AppHeader> {
       width: double.infinity,
       child: Padding(
         padding: widget.padding,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-          if (widget.leading != null) widget.leading!,
-          if (widget.leading == null)
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
-              child: const FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      kAppDisplayName,
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.visible,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 20,
-                        color: Color(0xFF0A4638),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (widget.leading != null) widget.leading!,
+                if (widget.leading == null)
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 180),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            kAppDisplayName,
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.visible,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 20,
+                              color: Color(0xFF0A4638),
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(
+                            Icons.restaurant_menu_rounded,
+                            color: Color(0xFF0E5A47),
+                            size: 18,
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(width: 4),
-                    Icon(
-                      Icons.restaurant_menu_rounded,
-                      color: Color(0xFF0E5A47),
-                      size: 18,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
+                  ),
+                const Spacer(),
                 if (widget.actions != null) ...[
                   widget.actions!,
                   const SizedBox(width: 10),
                 ],
-                if (widget.showCart)
-                  ListenableBuilder(
-                    listenable: CartController.instance,
-                    builder: (context, _) {
-                      final count = widget.cartItemCount ??
-                          CartController.instance.itemCount;
-                      if (count <= 0) return const SizedBox.shrink();
-                      return Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CartHeaderButton(
-                            itemCountOverride: widget.cartItemCount,
-                            onPressed: widget.onCartPressed,
-                          ),
-                          if (widget.showUser) const SizedBox(width: 10),
-                        ],
-                      );
-                    },
-                  ),
                 if (widget.showUser)
                   Flexible(
-                    fit: FlexFit.tight,
                     child: Align(
                       alignment: Alignment.centerRight,
                       child: _UserInfoColumn(name: _name),
@@ -137,7 +117,19 @@ class _AppHeaderState extends State<AppHeader> {
                   ),
               ],
             ),
-          ),
+            if (widget.showCart)
+              ListenableBuilder(
+                listenable: CartController.instance,
+                builder: (context, _) {
+                  final count = widget.cartItemCount ??
+                      CartController.instance.itemCount;
+                  if (count <= 0) return const SizedBox.shrink();
+                  return CartHeaderButton(
+                    itemCountOverride: widget.cartItemCount,
+                    onPressed: widget.onCartPressed,
+                  );
+                },
+              ),
           ],
         ),
       ),

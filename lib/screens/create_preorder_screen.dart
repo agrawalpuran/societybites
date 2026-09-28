@@ -211,6 +211,7 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
             ? double.tryParse(_deliveryCharge.text.trim()) ?? 0
             : 0,
         coverImageUrl: coverImageUrl,
+        status: 'open',
       );
       if (!mounted) return;
       final campaign = PreOrderCampaign.fromJson(raw);
@@ -226,6 +227,20 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
+  }
+
+  Future<void> _openCreateCatalog() async {
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AddListingScreen(
+          catalogType: listingCatalogPreorder,
+        ),
+      ),
+    );
+    if (created == true && mounted) {
+      _show('Catalog item saved. You can add it to this pre-order next.');
+    }
   }
 
   @override
@@ -276,6 +291,35 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
                             const SizedBox(height: 14),
                             const ExistingPreorderCatalogNote(),
                           ],
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: OutlinedButton.icon(
+                              key: const Key('create-preorder-catalog-on-form'),
+                              onPressed: _submitting ? null : _openCreateCatalog,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: preorderGreen,
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                side: const BorderSide(color: Color(0xFFD4E8DF)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              icon: const Icon(Icons.menu_book_outlined, size: 16),
+                              label: const Text(
+                                'Create catalog',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
                           if (_settingsLocked) ...[
                             const SizedBox(height: 16),
                             Container(

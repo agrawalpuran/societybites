@@ -43,9 +43,9 @@ const helpCategories = <HelpCategory>[
     faqs: [
       HelpFaq(
         id: 'buying-what',
-        question: 'What is SocietyBites?',
+        question: 'What is SocietyEats?',
         answer:
-            'SocietyBites is a homegrown food marketplace for your apartment community. Neighbours cook, neighbours buy, and you pick up from each other.',
+            'SocietyEats is a homegrown food marketplace for your apartment community. Neighbours cook, neighbours buy, and you pick up from each other.',
         keywords: ['what is', 'app', 'community', 'homemade', 'marketplace'],
       ),
       HelpFaq(
@@ -185,7 +185,7 @@ const helpCategories = <HelpCategory>[
         id: 'fulfilment-seller-delivery',
         question: 'What is Seller Delivery?',
         answer:
-            'Some sellers can bring the order to you themselves. This is arranged by the seller, not by a SocietyBites driver.',
+            'Some sellers can bring the order to you themselves. This is arranged by the seller, not by a SocietyEats driver.',
         keywords: ['delivery', 'seller delivery', 'drop'],
       ),
       HelpFaq(
@@ -360,7 +360,7 @@ const helpCategories = <HelpCategory>[
         id: 'profile-fee',
         question: 'What is the platform fee?',
         answer:
-            'Checkout may add a small platform fee set by SocietyBites. You will see it on the bill before you place the order.',
+            'Checkout may add a small platform fee set by SocietyEats. You will see it on the bill before you place the order.',
         keywords: ['platform fee', 'community fee', 'charges'],
       ),
       HelpFaq(

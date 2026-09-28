@@ -6,6 +6,7 @@ import 'listing_categories.dart';
 import 'order_lifecycle.dart';
 import 'recurring_availability.dart';
 import 'seller_fulfilment.dart';
+import 'seller_payment_preference.dart';
 import 'selling_reach.dart';
 
 const listingCatalogRegular = 'REGULAR';
@@ -146,7 +147,7 @@ class FoodItem {
     this.recurringScheduleSummary = '',
     this.recurringHoursSummary = '',
     this.recurringDailyLimitLabel = '',
-    this.sellerPaymentPreference = 'UPI_AND_COD',
+    this.sellerPaymentPreference = 'COD_IN_SOCIETY_UPI_OUTSIDE',
     this.sellerFulfilment = const SellerFulfilment(),
     this.sellerSellingReachLevel,
     this.distanceKm,
@@ -320,7 +321,8 @@ class FoodItem {
       recurringDailyLimitLabel:
           json['recurringDailyLimitLabel']?.toString() ?? '',
       sellerPaymentPreference:
-          json['sellerPaymentPreference']?.toString() ?? 'UPI_AND_COD',
+          json['sellerPaymentPreference']?.toString() ??
+          defaultSellerPaymentPreference.apiValue,
       sellerFulfilment: SellerFulfilment.fromAuthMe(json),
       sellerSellingReachLevel: json['sellingReachLevel'] == null
           ? null
@@ -1022,7 +1024,7 @@ class PreOrderCampaign {
     this.totalOrders = 0,
     this.totalItems = 0,
     this.foodSubtotal = 0,
-    this.sellerPaymentPreference = 'UPI_AND_COD',
+    this.sellerPaymentPreference = 'COD_IN_SOCIETY_UPI_OUTSIDE',
     this.societyId,
     this.sellingReachLevel,
     this.distanceKm,
@@ -1099,7 +1101,7 @@ class PreOrderCampaign {
               ? Map<String, dynamic>.from(rawProducts.first as Map)['sellerPaymentPreference']
                     ?.toString()
               : null) ??
-          'UPI_AND_COD',
+          defaultSellerPaymentPreference.apiValue,
       societyId: json['societyId']?.toString(),
       sellingReachLevel: json['sellingReachLevel'] == null
           ? null

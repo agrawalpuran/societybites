@@ -1,10 +1,11 @@
 enum SellerPaymentPreference {
-  upiOnly,
-  upiAndCod,
   codInSocietyUpiOutside,
+  upiAndCod,
+  upiOnly,
 }
 
-const defaultSellerPaymentPreference = SellerPaymentPreference.upiAndCod;
+const defaultSellerPaymentPreference =
+    SellerPaymentPreference.codInSocietyUpiOutside;
 
 SellerPaymentPreference parseSellerPaymentPreference(Object? value) {
   switch (value?.toString().trim().toUpperCase()) {
@@ -12,16 +13,16 @@ SellerPaymentPreference parseSellerPaymentPreference(Object? value) {
     case 'UPI-ONLY':
     case 'UPI':
       return SellerPaymentPreference.upiOnly;
+    case 'UPI_AND_COD':
+    case 'UPI+COD':
+    case 'BOTH':
+      return SellerPaymentPreference.upiAndCod;
     case 'COD_IN_SOCIETY_UPI_OUTSIDE':
     case 'COD_IN_SOCIETY':
     case 'COD_SOCIETY':
     case 'IN_SOCIETY_COD':
-      return SellerPaymentPreference.codInSocietyUpiOutside;
-    case 'UPI_AND_COD':
-    case 'UPI+COD':
-    case 'BOTH':
     default:
-      return SellerPaymentPreference.upiAndCod;
+      return SellerPaymentPreference.codInSocietyUpiOutside;
   }
 }
 

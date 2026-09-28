@@ -79,7 +79,7 @@ class ExploreNearbyScreenState extends State<ExploreNearbyScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Selling enabled — complete Seller Settings in Profile',
+            'Complete Seller Settings before selling is turned on',
           ),
           backgroundColor: Color(0xFF0E5A47),
         ),

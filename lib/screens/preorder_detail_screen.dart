@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../services/api_service.dart';
+import '../widgets/content_skeleton.dart';
 import '../widgets/order_items_list.dart';
 import '../widgets/preorder_widgets.dart';
-import '../widgets/screen_loading_note.dart';
 import 'create_preorder_screen.dart';
 
 class PreOrderDetailScreen extends StatefulWidget {
@@ -31,13 +33,32 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
   List<Order> _orders = [];
   bool _loading = true;
   bool _updating = false;
+  bool _slow = false;
+  bool _requestOpen = false;
   String? _error;
   bool _promptShown = false;
+  int _loadGen = 0;
+  Timer? _slowTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _slowTimer?.cancel();
+    super.dispose();
+  }
+
+  void _armSlowTimer() {
+    _slowTimer?.cancel();
+    _slow = false;
+    _slowTimer = Timer(loadSlowThreshold, () {
+      if (!mounted || !_requestOpen) return;
+      setState(() => _slow = true);
+    });
   }
 
   Future<void> reload() => _load();
@@ -61,10 +82,14 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
   }
 
   Future<void> _load() async {
+    final gen = ++_loadGen;
+    _requestOpen = true;
+    _armSlowTimer();
     if (_campaign == null) {
       setState(() {
         _loading = true;
         _error = null;
+        _slow = false;
       });
     }
     try {
@@ -92,13 +117,16 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
             .map(Order.fromJson)
             .toList();
       }
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
+      _requestOpen = false;
+      _slowTimer?.cancel();
       setState(() {
         _campaign = campaign;
         _summary = summary;
         _orders = orders;
         _loading = false;
         _error = null;
+        _slow = false;
       });
       if (widget.promptToAddProduct &&
           !_promptShown &&
@@ -107,12 +135,17 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) => _addProduct());
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || gen != _loadGen) return;
+      _requestOpen = false;
+      _slowTimer?.cancel();
       if (_campaign == null) {
         setState(() {
           _error = cleanApiError(e);
           _loading = false;
+          _slow = false;
         });
+      } else if (_slow) {
+        setState(() => _slow = false);
       }
     }
   }
@@ -132,6 +165,11 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
       ),
     );
     if (added == true) {
+      if (widget.promptToAddProduct) {
+        if (!mounted) return;
+        Navigator.pop(context, true);
+        return;
+      }
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -252,36 +290,62 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
         backgroundColor: preorderBackground,
         foregroundColor: preorderText,
         elevation: 0,
+        leading: widget.promptToAddProduct
+            ? BackButton(onPressed: () => Navigator.pop(context, true))
+            : null,
         title: const Text(
           'Pre-order details',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: _loading && _campaign == null
-          ? const ScreenLoadingNote(message: 'Loading pre-order…')
+          ? _loadingBody()
           : _error != null && _campaign == null
           ? _errorState()
-          : RefreshIndicator(
-              color: preorderGreen,
-              onRefresh: _load,
-              child: _content(),
+          : Column(
+              children: [
+                if (_slow)
+                  InlineLoadStatus.slow(id: 'preorder-detail', onRetry: _load),
+                Expanded(
+                  child: RefreshIndicator(
+                    color: preorderGreen,
+                    onRefresh: _load,
+                    child: _content(),
+                  ),
+                ),
+              ],
             ),
     );
   }
 
-  Widget _errorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_error!, textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: _load, child: const Text('Try again')),
-          ],
+  Widget _loadingBody() {
+    return RefreshIndicator(
+      color: preorderGreen,
+      onRefresh: _load,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
         ),
+        children: [
+          const PreOrderDetailSkeleton(),
+          if (_slow) InlineLoadStatus.slow(id: 'preorder-detail', onRetry: _load),
+        ],
       ),
+    );
+  }
+
+  Widget _errorState() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      children: [
+        InlineLoadStatus.failed(
+          id: 'preorder-detail',
+          detail: _error,
+          onRetry: _load,
+        ),
+      ],
     );
   }
 

@@ -103,7 +103,7 @@ class _AddListingTypeScreenState extends State<AddListingTypeScreen> {
     );
     if (!mounted) return;
     if (created is PreOrderCampaignCreated) {
-      await Navigator.pushReplacement(
+      final posted = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
           builder: (_) => PreOrderDetailScreen(
@@ -112,6 +112,8 @@ class _AddListingTypeScreenState extends State<AddListingTypeScreen> {
           ),
         ),
       );
+      if (!mounted) return;
+      if (posted == true) Navigator.pop(context, true);
       return;
     }
     if (created == true) Navigator.pop(context, true);

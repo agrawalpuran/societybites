@@ -236,7 +236,11 @@ class _MainShellScreenState extends State<MainShellScreen>
               ? SellerDashboardScreen(
                   key: _dashboardKey,
                   onInitialLoadSettled: _preload.onDashboardInitialLoadSettled,
-                  onListingCreated: () => _selectTab(0),
+                  onListingCreated: () {
+                    _dashboardKey.currentState?.refresh();
+                    _homeKey.currentState?.refresh();
+                    _selectTab(0);
+                  },
                   onStartSelling: _onMarketplaceStartSelling,
                   onKitchenAttentionCount: (count) {
                     if (!mounted || count == _kitchenAttentionCount) return;

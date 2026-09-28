@@ -34,7 +34,9 @@ const {
 const {
   authorizeListingForBuyer,
   snapshotRegularFulfilment,
+  DELIVERY_REACH,
 } = require("../lib/crossSocietyOrder");
+const { offersSellerDelivery } = require("../lib/sellerFulfilment");
 const {
   assertPaymentMethodAllowed,
   upiBlocksPreparation,
@@ -615,6 +617,7 @@ router.post(
         quantity,
         crossSociety: listingAccess.crossSociety,
         seller: listingAccess.seller || null,
+        displayReach: listingAccess.displayReach || null,
       });
     }
 
@@ -642,7 +645,14 @@ router.post(
       preparedItems.find((item) => item.seller)?.seller ||
       (await prisma.user.findUnique({
         where: { id: preparedItems[0].listing.sellerId },
-        select: { paymentPreference: true },
+        select: {
+          paymentPreference: true,
+          fulfilmentMode: true,
+          deliveryCharge: true,
+          deliveryChargeInSociety: true,
+          deliveryChargeNearby: true,
+          deliveryChargeExtended: true,
+        },
       }));
     const isCrossSocietyOrder = preparedItems.some((item) => item.crossSociety);
     try {
@@ -679,16 +689,25 @@ router.post(
     const isCrossSocietyRegular =
       orderType === "regular" && preparedItems.some((item) => item.crossSociety);
 
-    if (isCrossSocietyRegular) {
+    if (
+      orderType === "regular" &&
+      (isCrossSocietyRegular || offersSellerDelivery(sellerForPayment && sellerForPayment.fulfilmentMode))
+    ) {
       try {
         const seller =
           preparedItems.find((item) => item.seller)?.seller ||
+          sellerForPayment ||
           (await prisma.user.findUnique({
             where: { id: preparedItems[0].listing.sellerId },
           }));
+        const reachBand =
+          preparedItems.find((item) => item.displayReach)?.displayReach ||
+          (isCrossSocietyRegular ? DELIVERY_REACH.NEARBY : DELIVERY_REACH.IN_SOCIETY);
         const snapshot = snapshotRegularFulfilment({
           seller,
           requestedMethod: req.body.fulfilmentMethod,
+          reachBand,
+          requireMethod: isCrossSocietyRegular,
         });
         fulfilmentMethod = snapshot.fulfilmentMethod;
         deliveryCharge = snapshot.deliveryCharge;

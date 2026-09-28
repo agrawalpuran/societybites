@@ -5,6 +5,7 @@ const prisma = require("../lib/prisma");
 const { signToken } = require("../lib/jwt");
 const {
   DEFAULT_PAYMENT_PREFERENCE,
+  normalizePaymentPreference,
   allowsCod,
   allowsUpi,
   assertPaymentMethodAllowed,
@@ -60,7 +61,9 @@ function jsonRequest(server, { method, path, token, body }) {
 }
 
 async function main() {
-  assert(allowsCod("UPI_AND_COD"), "default preference allows COD");
+  assert(DEFAULT_PAYMENT_PREFERENCE === "COD_IN_SOCIETY_UPI_OUTSIDE", "product default is COD in society / UPI outside");
+  assert(normalizePaymentPreference(null) === DEFAULT_PAYMENT_PREFERENCE, "missing preference uses product default");
+  assert(allowsCod("UPI_AND_COD"), "UPI_AND_COD still allows COD");
   assert(!allowsCod("UPI_ONLY"), "UPI_ONLY hides COD");
   assert(
     allowsCod("COD_IN_SOCIETY_UPI_OUTSIDE", { sameSociety: true }),

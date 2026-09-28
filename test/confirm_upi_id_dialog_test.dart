@@ -50,6 +50,9 @@ Future<void> _pumpProfile(
     String? sellingReachLevel,
     String? fulfilmentMode,
     double? deliveryCharge,
+    double? deliveryChargeInSociety,
+    double? deliveryChargeNearby,
+    double? deliveryChargeExtended,
     String? paymentPreference,
   })? updateProfile,
 }) async {

@@ -81,6 +81,9 @@ async function main() {
   const original = {
     fulfilmentMode: seller.fulfilmentMode,
     deliveryCharge: seller.deliveryCharge,
+    deliveryChargeInSociety: seller.deliveryChargeInSociety,
+    deliveryChargeNearby: seller.deliveryChargeNearby,
+    deliveryChargeExtended: seller.deliveryChargeExtended,
     sellingReachLevel: seller.sellingReachLevel,
   };
 
@@ -172,7 +175,26 @@ async function main() {
     assert(positive.status === 200, "BOTH accepted");
     assert(positive.json.user.fulfilment.mode === "BOTH", "both persisted");
     assert(positive.json.user.fulfilment.deliveryCharge === 40, "positive charge stored");
+    assert(positive.json.user.fulfilment.deliveryChargeNearby === 40, "legacy charge copies to nearby");
+    assert(positive.json.user.fulfilment.deliveryChargeExtended === 40, "legacy charge copies to extended");
     assert(positive.json.user.sellingReachLevel === "MY_SOCIETY", "reach unchanged by fulfilment");
+
+    const bands = await jsonRequest(server, {
+      method: "PATCH",
+      path: "/auth/me/profile",
+      token: sellerToken,
+      body: {
+        fulfilmentMode: "SELLER_DELIVERY",
+        deliveryChargeInSociety: 0,
+        deliveryChargeNearby: 25,
+        deliveryChargeExtended: 45,
+      },
+    });
+    assert(bands.status === 200, "per-reach charges accepted");
+    assert(bands.json.user.fulfilment.deliveryChargeInSociety === 0, "in-society default 0");
+    assert(bands.json.user.fulfilment.deliveryChargeNearby === 25, "nearby charge stored");
+    assert(bands.json.user.fulfilment.deliveryChargeExtended === 45, "extended charge stored");
+    assert(bands.json.user.fulfilment.deliveryCharge === 25, "legacy deliveryCharge follows nearby");
 
     const buyerBlocked = await jsonRequest(server, {
       method: "PATCH",
@@ -231,6 +253,9 @@ async function main() {
       data: {
         fulfilmentMode: original.fulfilmentMode || "BUYER_PICKUP",
         deliveryCharge: original.deliveryCharge || 0,
+        deliveryChargeInSociety: original.deliveryChargeInSociety || 0,
+        deliveryChargeNearby: original.deliveryChargeNearby || 0,
+        deliveryChargeExtended: original.deliveryChargeExtended || 0,
         sellingReachLevel: original.sellingReachLevel || "MY_SOCIETY",
       },
     });

@@ -156,10 +156,12 @@ class PreOrderBadge extends StatelessWidget {
   const PreOrderBadge({
     super.key,
     this.compact = false,
+    this.dense = false,
     this.label = 'PRE-ORDER',
   });
 
   final bool compact;
+  final bool dense;
   final String label;
 
   @override
@@ -176,10 +178,11 @@ class PreOrderBadge extends StatelessWidget {
         : upcoming
         ? const Color(0xFF9A6B00)
         : const Color(0xFFB85C3A);
+    final fontSize = dense ? 8.0 : (compact ? 9.0 : 10.0);
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 7 : 9,
-        vertical: compact ? 3 : 4,
+        horizontal: dense ? 5 : (compact ? 7 : 9),
+        vertical: dense ? 1 : (compact ? 3 : 4),
       ),
       decoration: BoxDecoration(
         color: background,
@@ -189,9 +192,10 @@ class PreOrderBadge extends StatelessWidget {
         label,
         style: TextStyle(
           color: foreground,
-          fontSize: compact ? 9 : 10,
-          letterSpacing: compact ? .5 : .7,
+          fontSize: fontSize,
+          letterSpacing: dense ? .2 : (compact ? .5 : .7),
           fontWeight: FontWeight.w800,
+          height: 1.15,
         ),
       ),
     );

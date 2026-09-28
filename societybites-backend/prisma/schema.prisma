@@ -21,10 +21,14 @@ model User {
   sellingReachLevel String   @default("MY_SOCIETY")
   /// BUYER_PICKUP | SELLER_DELIVERY | BOTH. Independent of sellingReachLevel.
   fulfilmentMode    String   @default("BUYER_PICKUP")
-  /// Seller-stated delivery charge. Money uses Float like Listing.price / Order.total.
+  /// Legacy / nearby alias. Prefer the per-reach fields below.
   deliveryCharge    Float    @default(0)
-  /// UPI_ONLY | UPI_AND_COD. Controls NEW checkout options only; orders snapshot paymentMethod.
-  paymentPreference String   @default("UPI_AND_COD")
+  /// Seller-stated delivery charges by buyer reach. In-society defaults to 0.
+  deliveryChargeInSociety Float @default(0)
+  deliveryChargeNearby    Float @default(0)
+  deliveryChargeExtended  Float @default(0)
+  /// UPI_ONLY | UPI_AND_COD | COD_IN_SOCIETY_UPI_OUTSIDE. Controls NEW checkout options only; orders snapshot paymentMethod.
+  paymentPreference String   @default("COD_IN_SOCIETY_UPI_OUTSIDE")
   /// Capture-only FSSAI licence. No approval or enforcement.
   fssaiNumber         String?
   fssaiExpiry         DateTime?
@@ -41,8 +45,22 @@ model User {
   orders               Order[]            @relation("BuyerOrders")
   reviews              Review[]
   sentMessages         Message[]
+  sellerTermsAcceptances SellerTermsAcceptance[]
   flat                 Flat?              @relation(fields: [flatId], references: [id])
   society              Society?           @relation(fields: [societyId], references: [id])
+}
+
+/// Record that a user accepted a seller-terms version. Existing sellers are not required to have a row.
+model SellerTermsAcceptance {
+  id           String   @id @default(uuid())
+  userId       String
+  termsVersion String
+  /// Set by the server when acceptance is stored. Clients cannot supply this.
+  acceptedAt   DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, termsVersion])
+  @@index([userId])
 }
 
 model Society {

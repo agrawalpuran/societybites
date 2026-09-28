@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/screens/home_screen.dart';
+import 'package:societybites/widgets/app_header.dart';
 import 'package:societybites/screens/my_listings_screen.dart';
 import 'package:societybites/screens/preorder_detail_screen.dart';
 import 'package:societybites/screens/profile_screen.dart';
@@ -93,14 +94,17 @@ void main() {
     await tester.pump();
 
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(find.text('Loading kitchens…'), findsOneWidget);
+    expect(find.byType(AppHeader), findsOneWidget);
+    expect(find.byKey(const Key('home-search-field')), findsOneWidget);
+    expect(find.byKey(const Key('home-feed-skeletons')), findsOneWidget);
+    expect(find.text('Loading kitchens…'), findsNothing);
 
     pending.complete([_listingJson('Paneer Wrap')]);
     await tester.pump();
     await tester.pump();
 
     expect(find.text('Paneer Wrap'), findsOneWidget);
-    expect(find.text('Loading kitchens…'), findsNothing);
+    expect(find.byKey(const Key('home-feed-skeletons')), findsNothing);
   });
 
   testWidgets('Home refresh keeps listings visible and replaces on success', (

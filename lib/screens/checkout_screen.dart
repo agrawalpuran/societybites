@@ -25,6 +25,7 @@ class CheckoutScreen extends StatefulWidget {
     this.sellerFulfilment,
     this.sellerSocietyName,
     this.sellerPaymentPreference,
+    this.deliveryReachBand,
     this.placeOrder,
   });
 
@@ -33,6 +34,7 @@ class CheckoutScreen extends StatefulWidget {
   final SellerFulfilment? sellerFulfilment;
   final String? sellerSocietyName;
   final String? sellerPaymentPreference;
+  final DeliveryReachBand? deliveryReachBand;
   final Future<Map<String, dynamic>> Function({
     required String societyId,
     required List<Map<String, dynamic>> items,
@@ -122,7 +124,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool get _allowsCash {
     final raw = widget.sellerPaymentPreference ??
         (_items.isEmpty
-            ? 'UPI_AND_COD'
+            ? defaultSellerPaymentPreference.apiValue
             : _items.first.food.sellerPaymentPreference);
     return parseSellerPaymentPreference(raw).allowsCodFor(
       sameSociety: !_isCrossSociety,
@@ -132,7 +134,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool get _allowsUpi {
     final raw = widget.sellerPaymentPreference ??
         (_items.isEmpty
-            ? 'UPI_AND_COD'
+            ? defaultSellerPaymentPreference.apiValue
             : _items.first.food.sellerPaymentPreference);
     return parseSellerPaymentPreference(raw).allowsUpiFor(
       sameSociety: !_isCrossSociety,
@@ -142,7 +144,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String get _cashSubtitle {
     final raw = widget.sellerPaymentPreference ??
         (_items.isEmpty
-            ? 'UPI_AND_COD'
+            ? defaultSellerPaymentPreference.apiValue
             : _items.first.food.sellerPaymentPreference);
     if (parseSellerPaymentPreference(raw) ==
         SellerPaymentPreference.codInSocietyUpiOutside) {
@@ -155,9 +157,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _items.fold<double>(0, (sum, item) => sum + item.total);
 
   double get _deliveryCharge {
-    if (!_isCrossSociety) return 0;
     if (_fulfilmentMethod != 'seller_delivery') return 0;
-    return _sellerFulfilment?.deliveryCharge ?? 0;
+    return (_sellerFulfilment ?? const SellerFulfilment()).chargeForBuyer(
+      sameSociety: !_isCrossSociety,
+      band: widget.deliveryReachBand,
+    );
   }
 
   double get _grandTotal => _subtotal + _platformFee + _deliveryCharge;
@@ -331,7 +335,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   'quantity': item.quantity,
                 })
             .toList(),
-        fulfilmentMethod: _isCrossSociety ? _fulfilmentMethod : null,
+        fulfilmentMethod: _fulfilmentMethod,
         requestedReadyAt:
             _showNeedBy && _needBySpecified ? _needBy : null,
       );
@@ -534,7 +538,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             value: 'seller_delivery',
             title: '🛵 Seller Delivery',
             subtitle:
-                'Delivery charge: ₹${_chargeLabel(fulfilment.deliveryCharge ?? 0)}',
+                'Delivery charge: ₹${_chargeLabel(fulfilment.chargeForBuyer(sameSociety: !_isCrossSociety, band: widget.deliveryReachBand))}',
           )
         else ...[
           _fulfilmentTile(
@@ -547,7 +551,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             value: 'seller_delivery',
             title: '🛵 Seller Delivery',
             subtitle:
-                '₹${_chargeLabel(fulfilment.deliveryCharge ?? 0)}',
+                '₹${_chargeLabel(fulfilment.chargeForBuyer(sameSociety: !_isCrossSociety, band: widget.deliveryReachBand))}',
           ),
         ],
       ],

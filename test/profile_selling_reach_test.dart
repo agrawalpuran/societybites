@@ -47,6 +47,9 @@ Future<void> _pumpProfile(
     String? sellingReachLevel,
     String? fulfilmentMode,
     double? deliveryCharge,
+    double? deliveryChargeInSociety,
+    double? deliveryChargeNearby,
+    double? deliveryChargeExtended,
     String? paymentPreference,
   })? updateProfile,
 }) async {
@@ -95,6 +98,9 @@ void main() {
         sellingReachLevel,
         fulfilmentMode,
         deliveryCharge,
+        deliveryChargeInSociety,
+        deliveryChargeNearby,
+        deliveryChargeExtended,
         paymentPreference,
       }) async {
         savedLevel = sellingReachLevel ?? savedLevel;
@@ -141,6 +147,9 @@ void main() {
         sellingReachLevel,
         fulfilmentMode,
         deliveryCharge,
+        deliveryChargeInSociety,
+        deliveryChargeNearby,
+        deliveryChargeExtended,
         paymentPreference,
       }) async {
         throw Exception('city config missing');
@@ -170,6 +179,9 @@ void main() {
         sellingReachLevel,
         fulfilmentMode,
         deliveryCharge,
+        deliveryChargeInSociety,
+        deliveryChargeNearby,
+        deliveryChargeExtended,
         paymentPreference,
       }) async {
         updateCalls++;

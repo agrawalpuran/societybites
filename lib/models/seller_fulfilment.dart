@@ -65,38 +65,78 @@ extension FulfilmentModeApi on FulfilmentMode {
       this == FulfilmentMode.sellerDelivery || this == FulfilmentMode.both;
 }
 
+enum DeliveryReachBand { inSociety, nearby, extended }
+
 class SellerFulfilment {
   const SellerFulfilment({
     this.mode = FulfilmentMode.buyerPickup,
     this.deliveryCharge,
+    this.deliveryChargeInSociety,
+    this.deliveryChargeNearby,
+    this.deliveryChargeExtended,
   });
 
   final FulfilmentMode mode;
   final double? deliveryCharge;
+  final double? deliveryChargeInSociety;
+  final double? deliveryChargeNearby;
+  final double? deliveryChargeExtended;
+
+  double get inSocietyCharge => deliveryChargeInSociety ?? 0;
+
+  double get nearbyCharge =>
+      deliveryChargeNearby ?? deliveryCharge ?? 0;
+
+  double get extendedCharge =>
+      deliveryChargeExtended ?? nearbyCharge;
+
+  double chargeForBuyer({
+    bool sameSociety = true,
+    DeliveryReachBand? band,
+  }) {
+    if (!mode.showsDeliveryCharge) return 0;
+    if (sameSociety || band == DeliveryReachBand.inSociety) {
+      return inSocietyCharge;
+    }
+    if (band == DeliveryReachBand.extended) return extendedCharge;
+    return nearbyCharge;
+  }
 
   String get subtitle {
     if (!mode.showsDeliveryCharge) return 'Buyer collects the order from you.';
-    final amount = deliveryCharge ?? 0;
-    final label = amount == amount.roundToDouble()
-        ? amount.toInt().toString()
-        : amount.toString();
-    return '₹$label delivery charge';
+    return 'In society ₹${_label(inSocietyCharge)} · Nearby ₹${_label(nearbyCharge)} · Extended ₹${_label(extendedCharge)}';
   }
 
   factory SellerFulfilment.fromAuthMe(Map<String, dynamic> me) {
     final nested = me['fulfilment'];
     if (nested is Map) {
       final map = Map<String, dynamic>.from(nested);
+      final nearby = _toDoubleOrNull(map['deliveryChargeNearby']) ??
+          _toDoubleOrNull(map['deliveryCharge']);
       return SellerFulfilment(
         mode: parseFulfilmentMode(map['mode'] ?? me['fulfilmentMode']),
-        deliveryCharge: _toDoubleOrNull(map['deliveryCharge']),
+        deliveryCharge: nearby,
+        deliveryChargeInSociety: _toDoubleOrNull(map['deliveryChargeInSociety']),
+        deliveryChargeNearby: nearby,
+        deliveryChargeExtended: _toDoubleOrNull(map['deliveryChargeExtended']) ?? nearby,
       );
     }
+    final nearby = _toDoubleOrNull(me['deliveryChargeNearby']) ??
+        _toDoubleOrNull(me['deliveryCharge']);
     return SellerFulfilment(
       mode: parseFulfilmentMode(me['fulfilmentMode']),
-      deliveryCharge: _toDoubleOrNull(me['deliveryCharge']),
+      deliveryCharge: nearby,
+      deliveryChargeInSociety: _toDoubleOrNull(me['deliveryChargeInSociety']),
+      deliveryChargeNearby: nearby,
+      deliveryChargeExtended: _toDoubleOrNull(me['deliveryChargeExtended']) ?? nearby,
     );
   }
+}
+
+String _label(double amount) {
+  return amount == amount.roundToDouble()
+      ? amount.toInt().toString()
+      : amount.toString();
 }
 
 double? _toDoubleOrNull(Object? value) {

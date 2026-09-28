@@ -1,7 +1,7 @@
 const prisma = require("./prisma");
 const { canonicalCityKey } = require("./launchCity");
-const { evaluateSellerDiscoveryEligibility } = require("./sellingReachEligibility");
-const { FULFILMENT_MODES, offersSellerDelivery } = require("./sellerFulfilment");
+const { evaluateSellerDiscoveryEligibility, discoveryDisplayReach } = require("./sellingReachEligibility");
+const { FULFILMENT_MODES, deliveryChargeForReach, DELIVERY_REACH } = require("./sellerFulfilment");
 
 const ORDER_FULFILMENT = Object.freeze({
   PICKUP: "pickup",
@@ -42,12 +42,14 @@ function allowedOrderFulfilmentMethods(sellerMode) {
   return [ORDER_FULFILMENT.PICKUP];
 }
 
-function snapshotRegularFulfilment({ seller, requestedMethod }) {
+function snapshotRegularFulfilment({ seller, requestedMethod, reachBand, requireMethod = false }) {
   const allowed = allowedOrderFulfilmentMethods(seller && seller.fulfilmentMode);
   let method = normalizeRequestedFulfilment(requestedMethod);
   if (!method) {
     if (allowed.length === 1) {
       method = allowed[0];
+    } else if (!requireMethod) {
+      method = ORDER_FULFILMENT.PICKUP;
     } else {
       throw httpError(
         400,
@@ -60,8 +62,8 @@ function snapshotRegularFulfilment({ seller, requestedMethod }) {
     throw httpError(400, "This delivery option is no longer available.", "FULFILMENT_UNAVAILABLE");
   }
   const deliveryCharge =
-    method === ORDER_FULFILMENT.SELLER_DELIVERY && offersSellerDelivery(seller && seller.fulfilmentMode)
-      ? Number(seller && seller.deliveryCharge) || 0
+    method === ORDER_FULFILMENT.SELLER_DELIVERY
+      ? deliveryChargeForReach(seller, reachBand || DELIVERY_REACH.NEARBY)
       : 0;
   return { fulfilmentMethod: method, deliveryCharge };
 }
@@ -73,7 +75,7 @@ async function authorizeListingForBuyer({ buyer, listing, clientRadiusKm, client
     throw httpError(400, "You must join a society before placing orders", "SOCIETY_REQUIRED");
   }
   if (listing.societyId === buyer.societyId) {
-    return { crossSociety: false };
+    return { crossSociety: false, displayReach: "inSociety" };
   }
 
   const seller = await prisma.user.findUnique({
@@ -118,11 +120,13 @@ async function authorizeListingForBuyer({ buyer, listing, clientRadiusKm, client
     seller,
     buyerSociety,
     eligibility,
+    displayReach: discoveryDisplayReach(eligibility, config && config.nearbyRadiusKm),
   };
 }
 
 module.exports = {
   ORDER_FULFILMENT,
+  DELIVERY_REACH,
   authorizeListingForBuyer,
   snapshotRegularFulfilment,
   normalizeRequestedFulfilment,

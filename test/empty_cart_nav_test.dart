@@ -88,7 +88,7 @@ void main() {
     expect(CartController.instance.items, isEmpty);
   });
 
-  testWidgets('My Kitchen first load shows copy instead of a spinner page', (
+  testWidgets('My Kitchen first load shows the page shell and skeletons', (
     tester,
   ) async {
     final orders = Completer<List<Map<String, dynamic>>>();
@@ -112,13 +112,15 @@ void main() {
     await tester.pump();
 
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(find.text('Loading orders…'), findsOneWidget);
+    expect(find.text('Orders'), findsWidgets);
+    expect(find.byKey(const Key('kitchen-orders-skeletons')), findsOneWidget);
+    expect(find.text('Loading orders…'), findsNothing);
 
     orders.complete(const []);
     campaigns.complete(const []);
     await tester.pump();
     await tester.pump();
-    expect(find.text('Loading orders…'), findsNothing);
+    expect(find.byKey(const Key('kitchen-orders-skeletons')), findsNothing);
     expect(find.textContaining('No active orders yet'), findsOneWidget);
   });
 }

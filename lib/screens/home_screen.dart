@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/app_header.dart';
@@ -7,6 +9,7 @@ import '../models/data.dart';
 import '../services/api_service.dart';
 import '../services/cart_controller.dart';
 import '../services/session_service.dart';
+import '../widgets/content_skeleton.dart';
 import '../widgets/preorder_widgets.dart';
 import 'buyer_preorder_detail_screen.dart';
 import 'buyer_preorders_screen.dart';
@@ -22,7 +25,7 @@ import '../widgets/food_type_selector.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/floating_cart_bar.dart';
-import '../widgets/screen_loading_note.dart';
+import '../widgets/requested_ready_summary.dart';
 import '../widgets/status_banner.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/seller_avatar.dart';
@@ -66,6 +69,8 @@ class HomeScreenState extends State<HomeScreen> {
   bool _preOrdersLoading = true;
   bool _isLoading = true;
   bool _hasSuccessfullyLoaded = false;
+  bool _homeSlow = false;
+  Timer? _homeSlowTimer;
   String? _error;
   String _searchQuery = '';
   String? _selectedCategory;
@@ -94,6 +99,20 @@ class HomeScreenState extends State<HomeScreen> {
     CartController.instance.onOrderPlaced = _onCartOrderPlaced;
     _loadListings();
     _loadPreOrders();
+  }
+
+  void _armHomeSlowTimer() {
+    _homeSlowTimer?.cancel();
+    _homeSlow = false;
+    _homeSlowTimer = Timer(loadSlowThreshold, () {
+      if (!mounted || !_isLoading) return;
+      setState(() => _homeSlow = true);
+    });
+  }
+
+  void _stopHomeSlowTimer() {
+    _homeSlowTimer?.cancel();
+    _homeSlow = false;
   }
 
   /// Called by MainShell on failed first-load retry, app resume, and FCM.
@@ -145,6 +164,7 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _homeSlowTimer?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     CartController.instance.removeListener(_onCartUpdated);
@@ -180,9 +200,11 @@ class HomeScreenState extends State<HomeScreen> {
   Future<void> _loadListings() async {
     final showSpinner = !_hasSuccessfullyLoaded;
     if (showSpinner) {
+      _armHomeSlowTimer();
       setState(() {
         _isLoading = true;
         _error = null;
+        _homeSlow = false;
       });
     }
 
@@ -195,6 +217,7 @@ class HomeScreenState extends State<HomeScreen> {
         final societyId = await SessionService.getSocietyId();
         if (societyId == null || societyId.isEmpty) {
           if (!mounted) return;
+          _stopHomeSlowTimer();
           if (!_hasSuccessfullyLoaded) {
             setState(() {
               _listings = [];
@@ -231,12 +254,14 @@ class HomeScreenState extends State<HomeScreen> {
       final listings = raw.map(FoodItem.fromJson).toList();
 
       if (!mounted) return;
+      _stopHomeSlowTimer();
 
       setState(() {
         _listings = listings;
         _cityReach = cityReach;
         _isLoading = false;
         _hasSuccessfullyLoaded = true;
+        _homeSlow = false;
         _error = null;
       });
       _notifyInitialLoadSuccess();
@@ -249,11 +274,13 @@ class HomeScreenState extends State<HomeScreen> {
       } catch (_) {}
     } catch (e) {
       if (!mounted) return;
+      _stopHomeSlowTimer();
       if (!_hasSuccessfullyLoaded) {
         setState(() {
           _listings = [];
           _error = 'Unable to load sellers right now.';
           _isLoading = false;
+          _homeSlow = false;
         });
       }
     }
@@ -459,10 +486,18 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                   slivers: [
                     SliverToBoxAdapter(child: _buildHeader()),
-                    if (_isLoading) ...[
-                      const SliverToBoxAdapter(
-                        child: ScreenLoadingNote(message: 'Loading kitchens…'),
-                      ),
+                    if (_isLoading && !_hasSuccessfullyLoaded) ...[
+                      SliverToBoxAdapter(child: _buildSearchBar()),
+                      if (_searchQuery.isEmpty)
+                        SliverToBoxAdapter(child: _buildCategoryChips()),
+                      const SliverToBoxAdapter(child: HomeFeedSkeleton()),
+                      if (_homeSlow)
+                        SliverToBoxAdapter(
+                          child: InlineLoadStatus.slow(
+                            id: 'home-feed',
+                            onRetry: _loadListings,
+                          ),
+                        ),
                     ] else if (_showEmptySocietyState) ...[
                       SliverToBoxAdapter(child: _buildEmptySocietyState()),
                     ] else ...[
@@ -534,7 +569,10 @@ class HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPreOrdersSection() {
     if (_preOrdersLoading) {
-      return const ScreenLoadingNote(message: 'Loading pre-orders…');
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(20, 18, 20, 0),
+        child: HomeFeedSkeleton(),
+      );
     }
     return _buildPreOrderReachCarousel(
       title: 'Pre-orders Campaign in Your Society',
@@ -670,7 +708,7 @@ class HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Selling enabled — complete Seller Settings in Profile',
+            'Complete Seller Settings before selling is turned on',
           ),
           backgroundColor: Color(0xFF0E5A47),
         ),

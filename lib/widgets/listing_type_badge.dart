@@ -24,7 +24,7 @@ class ListingTypeBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (food.isPreOrder || food.isPreOrderCatalog) {
-      return PreOrderBadge(compact: true);
+      return PreOrderBadge(compact: true, dense: dense);
     }
 
     final madeToOrder = food.isMadeToOrder;

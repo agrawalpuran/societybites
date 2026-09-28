@@ -33,7 +33,6 @@ class SellerOnboarding {
       ),
     );
     if (confirmed != true || !context.mounted) return false;
-    await ApiService.updateMyProfile(role: 'seller');
     return true;
   }
 

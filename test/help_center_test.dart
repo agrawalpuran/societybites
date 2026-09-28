@@ -94,13 +94,13 @@ void main() {
     await tester.tap(find.textContaining('Buying'));
     await tester.pumpAndSettle();
 
-    expect(find.text('What is SocietyBites?'), findsOneWidget);
+    expect(find.text('What is SocietyEats?'), findsOneWidget);
     expect(
       find.textContaining('homegrown food marketplace'),
       findsNothing,
     );
 
-    await tester.tap(find.text('What is SocietyBites?'));
+    await tester.tap(find.text('What is SocietyEats?'));
     await tester.pump();
     expect(
       find.textContaining('homegrown food marketplace'),

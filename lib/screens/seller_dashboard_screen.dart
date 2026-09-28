@@ -19,7 +19,7 @@ import '../widgets/profile_menu_tile.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/requested_ready_summary.dart';
 import '../widgets/seller_insights_panel.dart';
-import '../widgets/screen_loading_note.dart';
+import '../widgets/content_skeleton.dart';
 import '../widgets/status_banner.dart';
 import 'add_listing_screen.dart';
 import 'add_listing_type_screen.dart';
@@ -74,6 +74,10 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   Map<String, dynamic> _stats = {};
   List<PreOrderCampaign> _preOrderCampaigns = [];
   bool _preOrdersLoading = true;
+  bool _ordersSlow = false;
+  bool _preOrdersSlow = false;
+  Timer? _ordersSlowTimer;
+  Timer? _preOrdersSlowTimer;
   bool _didNotifyInitialSettle = false;
   int _ordersLoadGen = 0;
   bool _ordersRefreshInFlight = false;
@@ -97,6 +101,27 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     _loadOrders();
     _loadStats();
     _loadPreOrders();
+  }
+
+  @override
+  void dispose() {
+    _ordersSlowTimer?.cancel();
+    _preOrdersSlowTimer?.cancel();
+    super.dispose();
+  }
+
+  void _armSlowTimer({
+    required Timer? timer,
+    required void Function(Timer?) store,
+    required bool Function() stillWaiting,
+    required void Function() markSlow,
+  }) {
+    timer?.cancel();
+    final next = Timer(loadSlowThreshold, () {
+      if (!mounted || !stillWaiting()) return;
+      setState(markSlow);
+    });
+    store(next);
   }
 
   bool get isLoadInProgress => _isLoading || _ordersRefreshInFlight;
@@ -244,6 +269,13 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   Future<void> _loadPreOrders() async {
+    _preOrdersSlow = false;
+    _armSlowTimer(
+      timer: _preOrdersSlowTimer,
+      store: (timer) => _preOrdersSlowTimer = timer,
+      stillWaiting: () => _preOrdersLoading,
+      markSlow: () => _preOrdersSlow = true,
+    );
     try {
       List<Map<String, dynamic>> raw;
       final injected = widget.fetchCampaigns;
@@ -252,16 +284,21 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       } else {
         final societyId = await SessionService.getSocietyId();
         if (societyId == null || societyId.isEmpty) {
+          _preOrdersSlowTimer?.cancel();
           if (mounted) {
             setState(() {
               _preOrderCampaigns = [];
               _preOrdersLoading = false;
+              _preOrdersSlow = false;
             });
           }
           return;
         }
         final sellerId = await SessionService.getUserId();
-        if (sellerId == null) return;
+        if (sellerId == null) {
+          _preOrdersSlowTimer?.cancel();
+          return;
+        }
         raw = await ApiService.getPreOrderCampaigns(
           societyId: societyId,
           sellerId: sellerId,
@@ -296,6 +333,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           }
         }),
       );
+      _preOrdersSlowTimer?.cancel();
       campaigns.removeWhere((campaign) => !campaignShowsInKitchen(campaign));
       campaigns.sort((a, b) {
         const rank = {'open': 0, 'draft': 1, 'closed': 2};
@@ -310,9 +348,16 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       setState(() {
         _preOrderCampaigns = campaigns.take(2).toList();
         _preOrdersLoading = false;
+        _preOrdersSlow = false;
       });
     } catch (_) {
-      if (mounted) setState(() => _preOrdersLoading = false);
+      _preOrdersSlowTimer?.cancel();
+      if (mounted) {
+        setState(() {
+          _preOrdersLoading = false;
+          _preOrdersSlow = false;
+        });
+      }
     }
   }
 
@@ -354,6 +399,13 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     final gen = ++_ordersLoadGen;
     final showSpinner = !_hasSuccessfullyLoaded;
     _ordersRefreshInFlight = true;
+    _ordersSlow = false;
+    _armSlowTimer(
+      timer: _ordersSlowTimer,
+      store: (timer) => _ordersSlowTimer = timer,
+      stillWaiting: () => _isLoading || _ordersRefreshInFlight,
+      markSlow: () => _ordersSlow = true,
+    );
     if (showSpinner) {
       setState(() {
         _isLoading = true;
@@ -435,16 +487,20 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         _isLoading = false;
         _hasSuccessfullyLoaded = true;
         _ordersRefreshInFlight = false;
+        _ordersSlow = false;
       });
+      _ordersSlowTimer?.cancel();
       _publishKitchenAttention();
       _loadStats();
     } catch (e) {
       if (!mounted || gen != _ordersLoadGen) return;
 
+      _ordersSlowTimer?.cancel();
       setState(() {
         _error = e.toString();
         _isLoading = false;
         _ordersRefreshInFlight = false;
+        _ordersSlow = false;
       });
     }
     _notifyInitialLoadSettled();
@@ -702,7 +758,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                         SliverToBoxAdapter(child: _buildKitchenTypeSelector()),
                         if (_showPreOrdersSection)
                           SliverToBoxAdapter(child: _buildPreOrdersSection()),
-                        if (_error != null)
+                        if (_error != null && _hasSuccessfullyLoaded)
                           SliverToBoxAdapter(
                             child: Padding(
                               padding: const EdgeInsets.all(20),
@@ -712,14 +768,26 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                               ),
                             ),
                           ),
-                        if (_isLoading)
-                          const SliverToBoxAdapter(
-                            child: ScreenLoadingNote(
-                              message: 'Loading orders…',
+                        if (_isLoading && !_hasSuccessfullyLoaded)
+                          const SliverToBoxAdapter(child: KitchenOrdersSkeleton())
+                        else if (_error != null && !_hasSuccessfullyLoaded)
+                          SliverToBoxAdapter(
+                            child: InlineLoadStatus.failed(
+                              id: 'kitchen-orders',
+                              detail: _error,
+                              onRetry: _loadOrders,
                             ),
                           )
                         else if (_showKitchenOrderList)
                           SliverToBoxAdapter(child: _buildOrdersSection(context)),
+                        if (_ordersSlow &&
+                            (_isLoading || _ordersRefreshInFlight))
+                          SliverToBoxAdapter(
+                            child: InlineLoadStatus.slow(
+                              id: 'kitchen-orders',
+                              onRetry: _loadOrders,
+                            ),
+                          ),
                         SliverToBoxAdapter(child: _buildExpandCard()),
                         SliverToBoxAdapter(child: _buildAddListingCta(context)),
                         const SliverToBoxAdapter(child: SizedBox(height: 30)),
@@ -1045,9 +1113,14 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          if (_preOrdersLoading)
-            const ScreenLoadingNote(message: 'Loading pre-orders…')
-          else if (_preOrderCampaigns.isEmpty)
+          if (_preOrdersLoading) ...[
+            const KitchenPreOrdersSkeleton(),
+            if (_preOrdersSlow)
+              InlineLoadStatus.slow(
+                id: 'kitchen-preorders',
+                onRetry: _loadPreOrders,
+              ),
+          ] else if (_preOrderCampaigns.isEmpty)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -1330,6 +1403,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     );
     if (created == true && mounted) {
       _loadOrders();
+      _loadPreOrders();
       widget.onListingCreated?.call();
     }
   }

@@ -1,132 +1,96 @@
-# Privacy Policy for SocietyBites
+# Privacy Policy for SocietyEats
 
-**Effective Date:** 11 August 2026
+**Last updated:** 28 September 2026
 
-## Privacy Policy
-
-Thank you for using **SocietyBites** ("the App"). SocietyBites is a hyperlocal community marketplace that enables residents within a residential society to buy and sell homemade food and other community offerings.
-
-We value your privacy and are committed to protecting your personal information. This Privacy Policy explains what information we collect, how we use it, and the choices available to you.
+SocietyEats ("we", "our") is a homemade-food marketplace for apartment communities. This policy explains what information we collect when you use the SocietyEats app, how we use it, and the choices available to you.
 
 ---
 
-## Information We Collect
+## 1. Information we collect
 
-### Account Information
+Depending on how you use SocietyEats, we may collect:
 
-We may collect:
+- Phone number, used for OTP login
+- Name and optional profile photo
+- Society, tower/block, and flat number
+- Listings you create, including title, description, price, category, availability, photos, and pickup notes
+- Orders, order status, fulfilment choice, delivery charges, messages between buyer and seller, ratings, and reviews
+- Seller settings, including UPI ID and display name, payment preference, selling reach, fulfilment, delivery charges, and any FSSAI details you type in
+- Device and app diagnostics, and a notification token so we can send order alerts
 
-- Phone number (used for OTP authentication)
-- Name
-- Profile information
+If you browse as a guest, we collect less until you sign in.
 
-### Society Information
-
-We collect:
-
-- Society name
-- Block/Tower
-- Flat number
-
-This information is used only to identify your residential community.
-
-### Listings
-
-If you are a seller, we collect:
-
-- Listing title
-- Description
-- Price
-- Category
-- Availability
-- Photos uploaded by you
-
-### Orders
-
-When buyers place orders, we collect:
-
-- Order details
-- Buyer information
-- Seller information
-- Order history
-- Order status
-
-### Reviews
-
-We collect ratings and reviews submitted by users.
+We store FSSAI details as you enter them. SocietyEats does not verify a licence or registration for you.
 
 ---
 
-## How We Use Your Information
+## 2. How we use information
 
-We use your information to:
+We use this information to:
 
-- Authenticate users using phone OTP
-- Enable buyers and sellers to interact
-- Display food listings
-- Manage orders
-- Improve the application
-- Provide customer support
-- Prevent misuse of the platform
-
----
-
-## Payments
-
-SocietyEats does not process or store payments.
-
-Payments are made directly between buyers and sellers using third-party UPI applications.
+- Authenticate you and keep your account secure
+- Show kitchens, listings, and orders
+- Run cart, checkout, pickup, and seller-arranged delivery
+- Send order and message notifications
+- Provide support and improve the app
+- Detect misuse, fraud, or safety concerns
 
 ---
 
-## Data Storage
+## 3. Payments
 
-Your information may be securely stored using trusted cloud infrastructure, including Firebase Authentication and secure cloud databases.
+SocietyEats is not a payment gateway and does not hold your money. Buyers pay sellers directly with UPI or cash. We may store a seller's UPI ID and display name. We do not collect UPI PIN, bank passwords, or card details. Checkout may add a small platform fee, which you will see before you place the order.
 
 ---
 
-## Sharing of Information
+## 4. Sharing
 
 We do not sell your personal information.
 
-Information is shared only when necessary to operate the application, such as enabling buyers and sellers to complete transactions.
+We share what is needed to complete an order — for example name, society, listing, and order details — with the other party to that order.
+
+If a seller chooses Nearby or Extended selling, buyers in other societies in the same city may see that seller and place orders. Pickup or seller-arranged delivery details are then shared as needed for that order.
+
+We use trusted processors such as Firebase Authentication and our cloud database and hosting to operate the app.
 
 ---
 
-## Photos
+## 5. Photos
 
-Photos uploaded by sellers become visible to users within the application as part of food listings.
-
----
-
-## Data Retention
-
-We retain information only as long as necessary to provide the service and comply with legal obligations.
+Photos you upload for a listing or profile are shown in the app to users who can see that listing or profile.
 
 ---
 
-## Children's Privacy
+## 6. Location
 
-SocietyBites is not intended for children under the age of 13.
-
----
-
-## Security
-
-We use reasonable technical and organizational measures to protect user information. However, no method of electronic storage or internet transmission is completely secure.
+We use your society and city so we can show relevant kitchens. SocietyEats does not provide live delivery tracking.
 
 ---
 
-## Changes to this Privacy Policy
+## 7. Retention and deletion
 
-We may update this Privacy Policy from time to time. Updates will be posted on this page with a revised Effective Date.
+We keep information while your account is active and as needed to run orders, support, and legal duties. You can delete your account from Profile. Some order records may be kept where we must retain them.
 
 ---
 
-## Contact Us
+## 8. Children
 
-If you have any questions regarding this Privacy Policy, please contact:
+SocietyEats is intended for general audiences and is not directed at children under 13. We do not knowingly collect personal information from children under 13.
 
-**Developer:** Puran Agrawal
+---
 
-**Email:** agrawalpuran@gmail.com
+## 9. Security
+
+We use reasonable technical and organisational measures to protect information. No internet service is completely secure.
+
+---
+
+## 10. Changes
+
+We may update this policy. The "Last updated" date at the top will change when we do.
+
+---
+
+## 11. Contact
+
+**Email:** support@societybites.in

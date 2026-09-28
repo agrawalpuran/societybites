@@ -79,9 +79,18 @@ void main() {
     _ignoreOverflow();
   });
 
-  test('UPI_ONLY hides COD, UPI_AND_COD allows it', () {
+  test('UPI_ONLY hides COD, default is COD in society / UPI outside', () {
+    expect(defaultSellerPaymentPreference, SellerPaymentPreference.codInSocietyUpiOutside);
     expect(parseSellerPaymentPreference('UPI_ONLY').allowsCod, isFalse);
     expect(parseSellerPaymentPreference(null).allowsCod, isTrue);
+    expect(
+      parseSellerPaymentPreference(null).allowsCodFor(sameSociety: true),
+      isTrue,
+    );
+    expect(
+      parseSellerPaymentPreference(null).allowsUpiFor(sameSociety: true),
+      isFalse,
+    );
     expect(parseSellerPaymentPreference('UPI_AND_COD').allowsCod, isTrue);
     expect(
       parseSellerPaymentPreference('COD_IN_SOCIETY_UPI_OUTSIDE')
@@ -181,6 +190,9 @@ void main() {
             sellingReachLevel,
             fulfilmentMode,
             deliveryCharge,
+            deliveryChargeInSociety,
+            deliveryChargeNearby,
+            deliveryChargeExtended,
             paymentPreference,
           }) async {
             saved = paymentPreference ?? saved;

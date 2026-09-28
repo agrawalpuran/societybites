@@ -1467,7 +1467,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 SizedBox(height: 6),
                 Text(
                   'By listing this item, you confirm compliance with local health '
-                  'regulations and SocietyBites food safety guidelines. Ensure all '
+                  'regulations and SocietyEats food safety guidelines. Ensure all '
                   'ingredients are listed to prevent allergen risks.',
                   style: TextStyle(
                     fontSize: 12,

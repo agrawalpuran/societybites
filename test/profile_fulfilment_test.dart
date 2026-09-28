@@ -21,7 +21,14 @@ void _ignoreKnownLayoutNoise() {
 Map<String, dynamic> _sellerMe({
   String fulfilmentMode = 'BUYER_PICKUP',
   double? deliveryCharge,
+  double? deliveryChargeInSociety,
+  double? deliveryChargeNearby,
+  double? deliveryChargeExtended,
 }) {
+  final nearby = deliveryChargeNearby ?? deliveryCharge;
+  final extended = deliveryChargeExtended ?? nearby;
+  final inSociety = deliveryChargeInSociety ?? 0;
+  final offersDelivery = fulfilmentMode != 'BUYER_PICKUP';
   return {
     'id': 'seller-1',
     'name': 'Anita',
@@ -36,8 +43,10 @@ Map<String, dynamic> _sellerMe({
     'fulfilmentMode': fulfilmentMode,
     'fulfilment': {
       'mode': fulfilmentMode,
-      'deliveryCharge':
-          fulfilmentMode == 'BUYER_PICKUP' ? null : deliveryCharge,
+      'deliveryCharge': offersDelivery ? nearby : null,
+      'deliveryChargeInSociety': offersDelivery ? inSociety : null,
+      'deliveryChargeNearby': offersDelivery ? nearby : null,
+      'deliveryChargeExtended': offersDelivery ? extended : null,
     },
     'society': {'name': 'Prestige Notting Hill'},
     'flat': {'flatNumber': '3062'},
@@ -51,6 +60,9 @@ Future<void> _pumpSeller(
     String? sellingReachLevel,
     String? fulfilmentMode,
     double? deliveryCharge,
+    double? deliveryChargeInSociety,
+    double? deliveryChargeNearby,
+    double? deliveryChargeExtended,
     String? paymentPreference,
   })? updateProfile,
 }) async {
@@ -98,9 +110,25 @@ void main() {
     expect(
       const SellerFulfilment(
         mode: FulfilmentMode.sellerDelivery,
-        deliveryCharge: 40,
+        deliveryChargeInSociety: 0,
+        deliveryChargeNearby: 40,
+        deliveryChargeExtended: 60,
       ).subtitle,
-      '₹40 delivery charge',
+      'In society ₹0 · Nearby ₹40 · Extended ₹60',
+    );
+    expect(
+      const SellerFulfilment(
+        mode: FulfilmentMode.sellerDelivery,
+        deliveryChargeNearby: 40,
+      ).chargeForBuyer(sameSociety: true),
+      0,
+    );
+    expect(
+      const SellerFulfilment(
+        mode: FulfilmentMode.sellerDelivery,
+        deliveryChargeNearby: 40,
+      ).chargeForBuyer(sameSociety: false),
+      40,
     );
   });
 
@@ -108,7 +136,9 @@ void main() {
     tester,
   ) async {
     var savedMode = 'BUYER_PICKUP';
-    double? savedCharge;
+    double? savedNearby;
+    double? savedInSociety;
+    double? savedExtended;
     await _pumpSeller(
       tester,
       profile: _sellerMe(),
@@ -116,18 +146,29 @@ void main() {
         sellingReachLevel,
         fulfilmentMode,
         deliveryCharge,
+        deliveryChargeInSociety,
+        deliveryChargeNearby,
+        deliveryChargeExtended,
         paymentPreference,
       }) async {
         savedMode = fulfilmentMode ?? savedMode;
-        savedCharge = deliveryCharge ?? savedCharge;
-        return _sellerMe(fulfilmentMode: savedMode, deliveryCharge: savedCharge);
+        savedNearby = deliveryChargeNearby ?? deliveryCharge ?? savedNearby;
+        savedInSociety = deliveryChargeInSociety ?? savedInSociety;
+        savedExtended = deliveryChargeExtended ?? savedExtended;
+        return _sellerMe(
+          fulfilmentMode: savedMode,
+          deliveryCharge: savedNearby,
+          deliveryChargeInSociety: savedInSociety,
+          deliveryChargeNearby: savedNearby,
+          deliveryChargeExtended: savedExtended,
+        );
       },
     );
 
     await _openSellerSettings(tester);
     expect(find.text('PAYMENTS'), findsOneWidget);
     expect(find.text('Payment Methods'), findsOneWidget);
-    expect(find.text('UPI + Cash on Delivery'), findsOneWidget);
+    expect(find.text('Cash on Delivery in society, UPI outside'), findsOneWidget);
     expect(find.text('Buyer Pickup'), findsOneWidget);
     expect(find.text('Selling Reach'), findsOneWidget);
 
@@ -140,17 +181,44 @@ void main() {
     expect(find.text('Buyer collects the order from you.'), findsWidgets);
     await tester.tap(find.text('Seller Delivery'));
     await tester.pumpAndSettle();
-    expect(find.text('Delivery charge'), findsOneWidget);
+    expect(find.text('Delivery charges'), findsOneWidget);
+    expect(find.text('In society'), findsOneWidget);
+    expect(find.text('Nearby'), findsOneWidget);
+    expect(find.text('Extended'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.byKey(const Key('fulfilment-save')),
+        matching: find.byType(SafeArea),
+      ),
+      findsAtLeastNWidgets(1),
+    );
+    expect(
+      find.descendant(
+        of: find.byType(SingleChildScrollView),
+        matching: find.byKey(const Key('fulfilment-save')),
+      ),
+      findsNothing,
+    );
 
-    await tester.enterText(find.byType(TextField).last, '40');
-    await tester.tap(find.text('Save'));
+    await tester.enterText(find.byKey(const Key('delivery-charge-nearby')), '40');
+    await tester.enterText(
+      find.byKey(const Key('delivery-charge-extended')),
+      '60',
+    );
+    await tester.ensureVisible(find.byKey(const Key('fulfilment-save')));
+    await tester.tap(find.byKey(const Key('fulfilment-save')));
     await tester.pumpAndSettle();
     while (tester.takeException() != null) {}
 
     expect(savedMode, 'SELLER_DELIVERY');
-    expect(savedCharge, 40);
+    expect(savedInSociety, 0);
+    expect(savedNearby, 40);
+    expect(savedExtended, 60);
     expect(find.text('Seller Delivery'), findsOneWidget);
-    expect(find.text('₹40 delivery charge'), findsOneWidget);
+    expect(
+      find.text('In society ₹0 · Nearby ₹40 · Extended ₹60'),
+      findsOneWidget,
+    );
     expect(find.text('Fulfilment updated'), findsOneWidget);
   });
 
@@ -164,6 +232,9 @@ void main() {
         sellingReachLevel,
         fulfilmentMode,
         deliveryCharge,
+        deliveryChargeInSociety,
+        deliveryChargeNearby,
+        deliveryChargeExtended,
         paymentPreference,
       }) async {
         throw Exception('rejected');
@@ -177,7 +248,7 @@ void main() {
     while (tester.takeException() != null) {}
     await tester.tap(find.text('Both'));
     await tester.pumpAndSettle();
-    expect(find.text('Delivery charge'), findsOneWidget);
+    expect(find.text('Delivery charges'), findsOneWidget);
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     while (tester.takeException() != null) {}
