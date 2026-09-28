@@ -62,16 +62,18 @@ class _AppHeaderState extends State<AppHeader> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: widget.padding,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
+    return SizedBox(
+      width: double.infinity,
+      child: Padding(
+        padding: widget.padding,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
           if (widget.leading != null) widget.leading!,
           if (widget.leading == null)
-            const Flexible(
-              fit: FlexFit.loose,
-              child: FittedBox(
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: const FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: Row(
@@ -98,32 +100,46 @@ class _AppHeaderState extends State<AppHeader> {
                 ),
               ),
             ),
-          const Spacer(),
-          if (widget.actions != null) ...[
-            widget.actions!,
-            const SizedBox(width: 10),
-          ],
-          if (widget.showCart)
-            ListenableBuilder(
-              listenable: CartController.instance,
-              builder: (context, _) {
-                final count =
-                    widget.cartItemCount ?? CartController.instance.itemCount;
-                if (count <= 0) return const SizedBox.shrink();
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CartHeaderButton(
-                      itemCountOverride: widget.cartItemCount,
-                      onPressed: widget.onCartPressed,
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (widget.actions != null) ...[
+                  widget.actions!,
+                  const SizedBox(width: 10),
+                ],
+                if (widget.showCart)
+                  ListenableBuilder(
+                    listenable: CartController.instance,
+                    builder: (context, _) {
+                      final count = widget.cartItemCount ??
+                          CartController.instance.itemCount;
+                      if (count <= 0) return const SizedBox.shrink();
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CartHeaderButton(
+                            itemCountOverride: widget.cartItemCount,
+                            onPressed: widget.onCartPressed,
+                          ),
+                          if (widget.showUser) const SizedBox(width: 10),
+                        ],
+                      );
+                    },
+                  ),
+                if (widget.showUser)
+                  Flexible(
+                    fit: FlexFit.tight,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: _UserInfoColumn(name: _name),
                     ),
-                    if (widget.showUser) const SizedBox(width: 10),
-                  ],
-                );
-              },
+                  ),
+              ],
             ),
-          if (widget.showUser) _UserInfoColumn(name: _name),
-        ],
+          ),
+          ],
+        ),
       ),
     );
   }
@@ -147,6 +163,8 @@ class _UserInfoColumn extends StatelessWidget {
     return Text(
       name!,
       textAlign: TextAlign.right,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       style: const TextStyle(
         fontSize: 13,
         height: 1.2,

@@ -88,43 +88,8 @@ function assertRegularOrderAvailabilityMix(listings) {
   }
 }
 
-const BUYER_VISIBLE_STATUSES = ["active", "sold_out"];
-const SINGLE_MADE_TO_ORDER_MESSAGE =
-  "Only one Made to order listing can be live at a time. Buyers need a single prep time. Pause or edit your current Made to order item instead.";
 const MULTIPLE_MADE_TO_ORDER_CART_MESSAGE =
   "This cart can hold one Made to order item at a time so the ready time stays clear. Checkout this one first, then order the other.";
-
-function singleMadeToOrderError() {
-  const err = new Error(SINGLE_MADE_TO_ORDER_MESSAGE);
-  err.statusCode = 400;
-  err.code = "SINGLE_MADE_TO_ORDER";
-  return err;
-}
-
-function isBuyerVisibleMadeToOrder(listing) {
-  return (
-    isMadeToOrderListing(listing) &&
-    BUYER_VISIBLE_STATUSES.includes(listing.status || "active")
-  );
-}
-
-async function assertSingleBuyerVisibleMadeToOrder(
-  prisma,
-  { sellerId, excludeListingId } = {}
-) {
-  const existing = await prisma.listing.findFirst({
-    where: {
-      sellerId,
-      campaignId: null,
-      catalogType: { not: "PREORDER" },
-      availabilityMode: "MADE_TO_ORDER",
-      status: { in: BUYER_VISIBLE_STATUSES },
-      ...(excludeListingId ? { id: { not: excludeListingId } } : {}),
-    },
-    select: { id: true },
-  });
-  if (existing) throw singleMadeToOrderError();
-}
 
 function assertSingleMadeToOrderListingInOrder(listings) {
   const ids = new Set();
@@ -269,10 +234,7 @@ module.exports = {
   parseMaxDailyOrders,
   isMadeToOrderListing,
   assertRegularOrderAvailabilityMix,
-  assertSingleBuyerVisibleMadeToOrder,
   assertSingleMadeToOrderListingInOrder,
-  isBuyerVisibleMadeToOrder,
-  SINGLE_MADE_TO_ORDER_MESSAGE,
   MULTIPLE_MADE_TO_ORDER_CART_MESSAGE,
   availabilityWriteFields,
   availabilityUpdateFields,

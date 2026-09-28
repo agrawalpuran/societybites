@@ -53,6 +53,13 @@ void main() {
     expect(find.text('AM'), findsOneWidget);
     expect(find.text('PM'), findsOneWidget);
     expect(find.byType(TimePickerDialog), findsNothing);
+    expect(
+      find.ancestor(
+        of: find.byKey(const Key('simple-time-done')),
+        matching: find.byType(SafeArea),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('simple-time-done')));
     await tester.pumpAndSettle();

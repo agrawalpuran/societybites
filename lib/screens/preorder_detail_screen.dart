@@ -946,7 +946,7 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
       border: Border.all(color: const Color(0xFFFFE0CC)),
     ),
     child: const Text(
-      'SocietyBites does not currently provide delivery services. Pickup or '
+      'SocietyEats does not currently provide delivery services. Pickup or '
       'seller-arranged delivery is coordinated directly with the seller.',
       style: TextStyle(
         color: Color(0xFF7A5A42),

@@ -81,8 +81,15 @@ Future<void> _pumpProfile(
   );
   await tester.pump();
   await tester.pump();
-  await tester.ensureVisible(find.text('Seller Settings'));
-  await tester.tap(find.text('Seller Settings'));
+}
+
+Future<void> _openProfilePhotoAction(
+  WidgetTester tester, {
+  String action = 'Change profile photo',
+}) async {
+  await tester.tap(find.byKey(const Key('profile-edit-button')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(action));
   await tester.pumpAndSettle();
 }
 
@@ -152,13 +159,10 @@ void main() {
       },
     );
 
-    expect(find.text('Profile Photo'), findsOneWidget);
-    expect(find.text('Change Photo'), findsOneWidget);
-    expect(find.text('Remove'), findsNothing);
+    expect(find.byKey(const Key('profile-edit-button')), findsOneWidget);
+    expect(find.text('Profile Photo'), findsNothing);
 
-    await tester.ensureVisible(find.text('Change Photo'));
-    await tester.tap(find.text('Change Photo'));
-    await tester.pumpAndSettle();
+    await _openProfilePhotoAction(tester);
     expect(find.text('Take Photo'), findsOneWidget);
     expect(find.text('Choose from Gallery'), findsOneWidget);
     await tester.tap(find.text('Choose from Gallery'));
@@ -166,10 +170,8 @@ void main() {
     expect(pickedSource, ImageSource.gallery);
     expect(cropped, isTrue);
     expect(uploads, 1);
-    expect(find.text('Remove'), findsOneWidget);
 
-    await tester.tap(find.text('Change Photo'));
-    await tester.pumpAndSettle();
+    await _openProfilePhotoAction(tester);
     await tester.tap(find.text('Take Photo'));
     await tester.pumpAndSettle();
     expect(pickedSource, ImageSource.camera);
@@ -186,9 +188,7 @@ void main() {
         throw const ProfilePhotoRejected(profilePhotoTooLargeMessage);
       },
     );
-    await tester.ensureVisible(find.text('Change Photo'));
-    await tester.tap(find.text('Change Photo'));
-    await tester.pumpAndSettle();
+    await _openProfilePhotoAction(tester);
     await tester.tap(find.text('Take Photo'));
     await tester.pumpAndSettle();
     expect(find.text(profilePhotoTooLargeMessage), findsOneWidget);
@@ -201,10 +201,13 @@ void main() {
       profile: _sellerProfile(photo: 'https://cdn.example/anita.jpg'),
       save: ({profilePhotoUrl}) async => _sellerProfile(),
     );
-    expect(find.text('Remove'), findsOneWidget);
-    await tester.tap(find.text('Remove'));
+    await _openProfilePhotoAction(
+      tester,
+      action: 'Remove profile photo',
+    );
+    await tester.tap(find.byKey(const Key('profile-edit-button')));
     await tester.pumpAndSettle();
-    expect(find.text('Remove'), findsNothing);
+    expect(find.text('Remove profile photo'), findsNothing);
   });
 
   testWidgets('crop screen shows circular adjust and Use Photo', (tester) async {
@@ -253,7 +256,7 @@ void main() {
     expect(avatar.photoUrl, 'https://cdn.example/anita.jpg');
   });
 
-  testWidgets('buyer profile does not show seller photo editor', (tester) async {
+  testWidgets('buyer profile shows the main profile editor', (tester) async {
     _ignoreOverflow();
     SharedPreferences.setMockInitialValues({
       'user_id': 'buyer-1',
@@ -277,6 +280,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump();
+    expect(find.byKey(const Key('profile-edit-button')), findsOneWidget);
     expect(find.text('Profile Photo'), findsNothing);
     expect(find.text('FSSAI details'), findsNothing);
     expect(find.text('Seller Settings'), findsNothing);

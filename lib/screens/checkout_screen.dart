@@ -63,18 +63,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.initState();
     _items = List<CartItem>.from(widget.cartItems);
     _isCrossSociety = widget.isCrossSociety;
-    _sellerFulfilment = widget.sellerFulfilment;
+    _sellerFulfilment = widget.sellerFulfilment ??
+        (_items.isEmpty ? null : _items.first.food.sellerFulfilment);
     _loadPlatformFee();
-    if (!_allowsCash) {
-      _payment = PaymentMethod.upi;
-    }
+    _applyDefaultPaymentMethod();
     _applyDefaultFulfilmentMethod();
     _inferCrossSocietyFromCart();
   }
 
+  void _applyDefaultPaymentMethod() {
+    if (!_allowsUpi && _allowsCash) {
+      _payment = PaymentMethod.cash;
+    } else if (!_allowsCash) {
+      _payment = PaymentMethod.upi;
+    }
+  }
+
   void _applyDefaultFulfilmentMethod() {
     final fulfilment = _sellerFulfilment;
-    if (!_isCrossSociety || fulfilment == null) return;
+    if (fulfilment == null) return;
     if (fulfilment.mode == FulfilmentMode.buyerPickup) {
       _fulfilmentMethod = 'pickup';
     } else if (fulfilment.mode == FulfilmentMode.sellerDelivery) {
@@ -98,7 +105,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _sellerFulfilment ??=
           _items.isEmpty ? null : _items.first.food.sellerFulfilment;
       _applyDefaultFulfilmentMethod();
-      if (!_allowsCash) _payment = PaymentMethod.upi;
+      _applyDefaultPaymentMethod();
     });
   }
 
@@ -118,6 +125,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ? 'UPI_AND_COD'
             : _items.first.food.sellerPaymentPreference);
     return parseSellerPaymentPreference(raw).allowsCodFor(
+      sameSociety: !_isCrossSociety,
+    );
+  }
+
+  bool get _allowsUpi {
+    final raw = widget.sellerPaymentPreference ??
+        (_items.isEmpty
+            ? 'UPI_AND_COD'
+            : _items.first.food.sellerPaymentPreference);
+    return parseSellerPaymentPreference(raw).allowsUpiFor(
       sameSociety: !_isCrossSociety,
     );
   }
@@ -418,7 +435,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               onPickDateTime: _pickNeedBy,
                             ),
                           const SizedBox(height: 24),
-                          if (_isCrossSociety) ...[
+                          if (_sellerFulfilment != null) ...[
                             _buildFulfilmentSection(),
                             const SizedBox(height: 24),
                           ],
@@ -482,7 +499,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Delivery mechanism',
+          'Delivery Mechanism',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w800,
@@ -647,17 +664,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ],
         ),
         const SizedBox(height: 14),
-        _PaymentOption(
-          key: const Key('payment-upi'),
-          icon: Icons.account_balance_wallet_rounded,
-          iconColor: const Color(0xFF0E5A47),
-          title: 'UPI',
-          subtitle: "Instant transfer to seller's wallet",
-          isSelected: _payment == PaymentMethod.upi,
-          onTap: () => setState(() => _payment = PaymentMethod.upi),
-        ),
+        if (_allowsUpi)
+          _PaymentOption(
+            key: const Key('payment-upi'),
+            icon: Icons.account_balance_wallet_rounded,
+            iconColor: const Color(0xFF0E5A47),
+            title: 'UPI',
+            subtitle: "Instant transfer to seller's wallet",
+            isSelected: _payment == PaymentMethod.upi,
+            onTap: () => setState(() => _payment = PaymentMethod.upi),
+          ),
         if (_allowsCash) ...[
-          const SizedBox(height: 10),
+          if (_allowsUpi) const SizedBox(height: 10),
           _PaymentOption(
             key: const Key('payment-cash'),
             icon: Icons.money_rounded,

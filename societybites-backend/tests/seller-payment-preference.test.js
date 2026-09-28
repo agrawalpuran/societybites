@@ -6,6 +6,7 @@ const { signToken } = require("../lib/jwt");
 const {
   DEFAULT_PAYMENT_PREFERENCE,
   allowsCod,
+  allowsUpi,
   assertPaymentMethodAllowed,
   upiBlocksPreparation,
 } = require("../lib/sellerPaymentPreference");
@@ -69,6 +70,14 @@ async function main() {
     !allowsCod("COD_IN_SOCIETY_UPI_OUTSIDE", { sameSociety: false }),
     "in-society COD hidden outside society"
   );
+  assert(
+    !allowsUpi("COD_IN_SOCIETY_UPI_OUTSIDE", { sameSociety: true }),
+    "UPI hidden for neighbours when seller selected in-society COD"
+  );
+  assert(
+    allowsUpi("COD_IN_SOCIETY_UPI_OUTSIDE", { sameSociety: false }),
+    "UPI allowed outside society"
+  );
   assertPaymentMethodAllowed({ preference: "UPI_ONLY", paymentMethod: "upi" });
   try {
     assertPaymentMethodAllowed({ preference: "UPI_ONLY", paymentMethod: "cash" });
@@ -93,6 +102,17 @@ async function main() {
     paymentMethod: "cash",
     sameSociety: true,
   });
+  try {
+    assertPaymentMethodAllowed({
+      preference: "COD_IN_SOCIETY_UPI_OUTSIDE",
+      paymentMethod: "upi",
+      sameSociety: true,
+    });
+    throw new Error("expected in-society UPI reject");
+  } catch (err) {
+    if (err.message === "expected in-society UPI reject") throw err;
+    assert(err.statusCode === 400, "in-society UPI reject is 400");
+  }
   assert(
     upiBlocksPreparation({ paymentMethod: "upi", paymentStatus: "pending" }),
     "UPI pending blocks prep"

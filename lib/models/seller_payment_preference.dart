@@ -50,6 +50,16 @@ extension SellerPaymentPreferenceApi on SellerPaymentPreference {
     }
   }
 
+  bool allowsUpiFor({required bool sameSociety}) {
+    switch (this) {
+      case SellerPaymentPreference.upiOnly:
+      case SellerPaymentPreference.upiAndCod:
+        return true;
+      case SellerPaymentPreference.codInSocietyUpiOutside:
+        return !sameSociety;
+    }
+  }
+
   String get title {
     switch (this) {
       case SellerPaymentPreference.upiOnly:
@@ -57,7 +67,7 @@ extension SellerPaymentPreferenceApi on SellerPaymentPreference {
       case SellerPaymentPreference.upiAndCod:
         return 'UPI + Cash on Delivery';
       case SellerPaymentPreference.codInSocietyUpiOutside:
-        return 'Cash in society, UPI outside';
+        return 'Cash on Delivery in society, UPI outside';
     }
   }
 

@@ -211,8 +211,33 @@ async function main() {
         preparationTimeMinutes: 60,
       },
     });
-    assert(secondLive.status === 400, "second live MADE_TO_ORDER must be 400");
-    assert(secondLive.json.code === "SINGLE_MADE_TO_ORDER", "single MTO code");
+    assert(
+      secondLive.status === 201,
+      `multiple live MADE_TO_ORDER listings are allowed ${JSON.stringify(secondLive.json)}`
+    );
+    listingIds.push(secondLive.json.id);
+
+    const multipleMadeToOrderCart = await jsonRequest(server, {
+      method: "POST",
+      path: "/orders",
+      token: buyerToken,
+      body: {
+        societyId: seller.societyId,
+        paymentMethod: "cash",
+        items: [
+          { listingId: made.json.id, quantity: 1 },
+          { listingId: secondLive.json.id, quantity: 1 },
+        ],
+      },
+    });
+    assert(
+      multipleMadeToOrderCart.status === 400,
+      "multiple MTO listings remain blocked in one order"
+    );
+    assert(
+      multipleMadeToOrderCart.json.code === "MULTIPLE_MADE_TO_ORDER",
+      "multiple MTO order code remains enforced"
+    );
 
     const edited = await jsonRequest(server, {
       method: "PATCH",

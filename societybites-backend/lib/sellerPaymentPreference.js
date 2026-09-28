@@ -69,6 +69,14 @@ function allowsCod(preference, { sameSociety = true } = {}) {
   return normalized === PAYMENT_PREFERENCES.UPI_AND_COD;
 }
 
+function allowsUpi(preference, { sameSociety = true } = {}) {
+  const normalized = normalizePaymentPreference(preference);
+  if (normalized === PAYMENT_PREFERENCES.COD_IN_SOCIETY_UPI_OUTSIDE) {
+    return sameSociety === false;
+  }
+  return true;
+}
+
 function assertSellerPaymentPreferenceUpdate({ requested, role }) {
   if (!isSellerRole(role)) {
     throw httpError(400, "Only sellers can change payment methods");
@@ -84,6 +92,12 @@ function assertPaymentMethodAllowed({
   const method = String(paymentMethod || "upi").trim().toLowerCase();
   if (method !== "upi" && method !== "cash") {
     throw httpError(400, "paymentMethod must be 'upi' or 'cash'");
+  }
+  if (method === "upi" && !allowsUpi(preference, { sameSociety })) {
+    throw httpError(
+      400,
+      "This seller accepts cash on delivery from buyers in the same society"
+    );
   }
   if (method === "cash" && !allowsCod(preference, { sameSociety })) {
     const inSocietyOnly =
@@ -125,6 +139,7 @@ module.exports = {
   normalizePaymentPreference,
   parsePaymentPreference,
   allowsCod,
+  allowsUpi,
   assertSellerPaymentPreferenceUpdate,
   assertPaymentMethodAllowed,
   isUpiPaymentConfirmed,

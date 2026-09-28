@@ -8,40 +8,32 @@ import '../widgets/profile_menu_tile.dart';
 class SellerSettingsScreen extends StatelessWidget {
   const SellerSettingsScreen({
     super.key,
-    required this.photoUrl,
-    required this.displayName,
-    required this.savingPhoto,
     required this.upiSubtitle,
     required this.paymentTitle,
     required this.sellingReachSubtitle,
     required this.fulfilmentTitle,
     required this.fulfilmentSubtitle,
     required this.fssaiSubtitle,
-    required this.onChangePhoto,
-    this.onRemovePhoto,
     required this.onEditUpi,
     required this.onChangePaymentPreference,
     required this.onChangeSellingReach,
     required this.onChangeFulfilment,
     required this.onEditFssai,
+    this.isFirstTimeSetup = false,
   });
 
-  final String? photoUrl;
-  final String displayName;
-  final bool savingPhoto;
   final String upiSubtitle;
   final String paymentTitle;
   final String sellingReachSubtitle;
   final String fulfilmentTitle;
   final String fulfilmentSubtitle;
   final String fssaiSubtitle;
-  final VoidCallback onChangePhoto;
-  final VoidCallback? onRemovePhoto;
   final VoidCallback onEditUpi;
   final VoidCallback onChangePaymentPreference;
   final VoidCallback onChangeSellingReach;
   final VoidCallback onChangeFulfilment;
   final VoidCallback onEditFssai;
+  final bool isFirstTimeSetup;
 
   @override
   Widget build(BuildContext context) {
@@ -67,9 +59,11 @@ class SellerSettingsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Manage payments, fulfilment, profile & FSSAI',
-                    style: TextStyle(
+                  Text(
+                    isFirstTimeSetup
+                        ? 'Fill in payment methods, UPI, selling reach, fulfilment, and FSSAI so you can start listing.'
+                        : 'Manage payments, fulfilment & FSSAI',
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                       color: Color(0xFF6A7774),
@@ -99,16 +93,6 @@ class SellerSettingsScreen extends StatelessWidget {
                     title: 'UPI for Payments',
                     subtitle: upiSubtitle,
                     onTap: onEditUpi,
-                  ),
-                  const SizedBox(height: 10),
-                  const _SectionLabel('SELLER PROFILE'),
-                  const SizedBox(height: 10),
-                  ProfilePhotoSection(
-                    photoUrl: photoUrl,
-                    name: displayName,
-                    saving: savingPhoto,
-                    onChangePhoto: onChangePhoto,
-                    onRemovePhoto: onRemovePhoto,
                   ),
                   const SizedBox(height: 20),
                   const _SectionLabel('SELLING'),

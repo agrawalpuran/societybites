@@ -854,7 +854,7 @@ class _SellerListingCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _StatusBadge(status: listing.status),
+                        _StatusBadge(listing: listing),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -893,7 +893,7 @@ class _SellerListingCard extends StatelessWidget {
                       ),
                     if (listing.isMadeToOrder)
                       MadeToOrderHint(food: listing, compact: true),
-                    if (listing.isRecurringReadyNow) ...[
+                    if (listing.showsBuyerAvailabilityHint) ...[
                       const SizedBox(height: 4),
                       Text(
                         [
@@ -908,6 +908,19 @@ class _SellerListingCard extends StatelessWidget {
                           height: 1.3,
                         ),
                       ),
+                      if (listing.recurringUnavailable &&
+                          listing.recurringNextLabel.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                            listing.recurringNextLabel,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF9A6B00),
+                            ),
+                          ),
+                        ),
                     ],
                   ],
                 ),
@@ -1170,9 +1183,9 @@ class _ListingIconAction extends StatelessWidget {
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
+  const _StatusBadge({required this.listing});
 
-  final String status;
+  final FoodItem listing;
 
   @override
   Widget build(BuildContext context) {
@@ -1180,7 +1193,7 @@ class _StatusBadge extends StatelessWidget {
     late final Color bg;
     late final Color fg;
 
-    switch (status) {
+    switch (listing.status) {
       case 'paused':
         label = 'PAUSED';
         bg = const Color(0xFFFFF3E0);
@@ -1198,9 +1211,21 @@ class _StatusBadge extends StatelessWidget {
         break;
       case 'active':
       default:
-        label = 'ACTIVE';
-        bg = const Color(0xFFE8F5EE);
-        fg = const Color(0xFF0E5A47);
+        if (listing.recurringNextLabel.toLowerCase().contains('sold out')) {
+          label = 'SOLD OUT TODAY';
+          bg = const Color(0xFFFFEBEE);
+          fg = const Color(0xFFC62828);
+        } else if (listing.recurringUnavailable) {
+          label = listing.recurringNextLabel.isEmpty
+              ? 'NOT LIVE NOW'
+              : 'NOT LIVE YET';
+          bg = const Color(0xFFFFF8E8);
+          fg = const Color(0xFF9A6B00);
+        } else {
+          label = 'ACTIVE';
+          bg = const Color(0xFFE8F5EE);
+          fg = const Color(0xFF0E5A47);
+        }
         break;
     }
 

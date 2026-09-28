@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:societybites/models/data.dart';
-import 'package:societybites/models/listing_availability.dart';
 import 'package:societybites/screens/add_listing_screen.dart';
 import 'package:societybites/screens/add_listing_type_screen.dart';
 import 'package:societybites/screens/create_preorder_screen.dart';
@@ -28,7 +27,6 @@ void main() {
       MaterialApp(
         home: AddListingTypeScreen(
           fetchPreorderCatalog: () async => [],
-          fetchMadeToOrderListings: () async => [],
         ),
       ),
     );
@@ -78,46 +76,8 @@ void main() {
     expect(find.text('HOW WILL YOU FULFIL THIS?'), findsNothing);
     expect(find.text('PREPARATION TIME'), findsOneWidget);
     expect(find.text('30 minutes'), findsOneWidget);
+    expect(find.textContaining('Only one Made to order'), findsNothing);
   });
-
-  testWidgets(
-    'Made to Order is blocked when a live listing already exists',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1600));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        MaterialApp(
-          home: AddListingTypeScreen(
-            fetchPreorderCatalog: () async => [],
-            fetchMadeToOrderListings: () async => [
-              {
-                'id': 'cake-1',
-                'name': 'Cake',
-                'sellerId': 's1',
-                'sellerName': 'Anita',
-                'price': 650,
-                'status': 'active',
-                'catalogType': listingCatalogRegular,
-                'availabilityMode': listingAvailabilityMadeToOrder,
-                'preparationTimeMinutes': 240,
-              },
-            ],
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
-
-      await tester.tap(find.byKey(const Key('listing-type-made-to-order')));
-      await tester.pump();
-
-      expect(find.text(singleMadeToOrderListingMessage), findsOneWidget);
-      await tester.tap(find.byKey(const Key('listing-type-continue')));
-      await tester.pumpAndSettle();
-      expect(find.byType(AddListingTypeScreen), findsOneWidget);
-      expect(find.byType(AddListingScreen), findsNothing);
-    },
-  );
 
   testWidgets('Pre-Order continue opens existing campaign flow', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1600));

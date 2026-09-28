@@ -758,6 +758,7 @@ class _TrendChart extends StatelessWidget {
                   children: [
                     const Text(
                       'Orders',
+                      key: Key('trend-left-y-axis-label'),
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
@@ -781,7 +782,7 @@ class _TrendChart extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 38),
                   ],
                 ),
               ),
@@ -820,16 +821,27 @@ class _TrendChart extends StatelessWidget {
                           ),
                       ],
                     ),
+                    const SizedBox(height: 3),
+                    const Text(
+                      'Date',
+                      key: Key('trend-x-axis-label'),
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6A7774),
+                      ),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(width: 4),
               SizedBox(
-                width: 36,
+                width: 44,
                 child: Column(
                   children: [
                     const Text(
-                      '₹',
+                      'Sales ₹',
+                      key: Key('trend-right-y-axis-label'),
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
@@ -868,7 +880,7 @@ class _TrendChart extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 38),
                   ],
                 ),
               ),

@@ -558,7 +558,7 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
           ),
         const SizedBox(height: 8),
         const Text(
-          'SocietyBites does not currently provide delivery services.',
+          'SocietyEats does not currently provide delivery services.',
           style: TextStyle(
             color: preorderMuted,
             fontSize: 12,

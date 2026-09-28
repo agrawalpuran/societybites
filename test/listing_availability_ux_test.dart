@@ -582,12 +582,10 @@ void main() {
     expect(find.text('Dry fruit dessert'), findsWidgets);
     expect(find.text('Hyderabadi Chicken Biryani'), findsWidgets);
 
-    await tester.tap(find.byKey(const ValueKey('home-food-type-toggle')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('home-food-type-toggle')));
+    await tester.tap(find.byKey(const ValueKey('home-food-type-Non-veg')));
     await tester.pump();
 
-    expect(find.text('Non-Veg'), findsOneWidget);
+    expect(find.text('Non-veg'), findsOneWidget);
     expect(find.text('goungura pickle'), findsNothing);
     expect(find.text('Dry fruit dessert'), findsNothing);
     expect(find.text('Hyderabadi Chicken Biryani'), findsWidgets);

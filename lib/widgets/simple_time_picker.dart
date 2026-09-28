@@ -53,7 +53,10 @@ Future<TimeOfDay?> showSimpleTimePicker(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (ctx) => _SimpleTimeSheet(initialTime: snapToSimpleTime(initialTime)),
+    builder: (ctx) => SafeArea(
+      top: false,
+      child: _SimpleTimeSheet(initialTime: snapToSimpleTime(initialTime)),
+    ),
   );
 }
 

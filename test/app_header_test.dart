@@ -25,6 +25,9 @@ void main() {
     expect(find.text('Puran Agrawal'), findsOneWidget);
     expect(find.text('Flat 3062'), findsNothing);
     expect(find.textContaining('Prestige'), findsNothing);
+    final header = tester.getRect(find.byType(AppHeader));
+    final name = tester.getRect(find.text('Puran Agrawal'));
+    expect(name.right, closeTo(header.right - 20, 0.1));
   });
 
   testWidgets('brand name stays on one line on a narrow phone', (tester) async {

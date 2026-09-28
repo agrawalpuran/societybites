@@ -94,101 +94,119 @@ class FoodTypeFilterChips extends StatelessWidget {
   final String? selectedFoodType;
   final ValueChanged<String?> onChanged;
 
-  static const _trackWidth = 52.0;
-  static const _trackHeight = 30.0;
-  static const _thumbSize = 22.0;
-  static const _animation = Duration(milliseconds: 200);
-
-  bool get _isOn => selectedFoodType != null;
-
-  String get _label {
-    if (selectedFoodType == foodTypeVeg) return 'Veg';
-    if (selectedFoodType == foodTypeNonVeg) return 'Non-Veg';
-    return 'All';
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F7F6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE6EBE9)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _FilterChoice(
+            label: 'All',
+            selected: selectedFoodType == null,
+            selectedColor: const Color(0xFF0E5A47),
+            onTap: () => onChanged(null),
+          ),
+          _FilterChoice(
+            label: 'Veg',
+            markColor: const Color(0xFF14804A),
+            selected: selectedFoodType == foodTypeVeg,
+            selectedColor: const Color(0xFF0E5A47),
+            onTap: () => onChanged(foodTypeVeg),
+          ),
+          _FilterChoice(
+            label: 'Non-veg',
+            markColor: const Color(0xFFC0392B),
+            selected: selectedFoodType == foodTypeNonVeg,
+            selectedColor: const Color(0xFF9A4444),
+            onTap: () => onChanged(foodTypeNonVeg),
+          ),
+        ],
+      ),
+    );
   }
+}
 
-  Color get _trackColor {
-    if (selectedFoodType == foodTypeVeg) return const Color(0xFF3D8B6E);
-    if (selectedFoodType == foodTypeNonVeg) return const Color(0xFFC46B6B);
-    return const Color(0xFFDDE3E0);
-  }
+class _FilterChoice extends StatelessWidget {
+  const _FilterChoice({
+    required this.label,
+    required this.selected,
+    required this.selectedColor,
+    required this.onTap,
+    this.markColor,
+  });
 
-  Color get _labelColor {
-    if (selectedFoodType == foodTypeVeg) return const Color(0xFF0E5A47);
-    if (selectedFoodType == foodTypeNonVeg) return const Color(0xFF9A4444);
-    return const Color(0xFF6A7774);
-  }
-
-  String? _nextValue() {
-    if (selectedFoodType == null) return foodTypeVeg;
-    if (selectedFoodType == foodTypeVeg) return foodTypeNonVeg;
-    return null;
-  }
+  final String label;
+  final bool selected;
+  final Color selectedColor;
+  final VoidCallback onTap;
+  final Color? markColor;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: 'Food preference $_label',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          key: const ValueKey('home-food-type-toggle'),
-          onTap: () => onChanged(_nextValue()),
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(6, 8, 4, 8),
+    final labelColor = selected ? Colors.white : const Color(0xFF6A7774);
+    return Material(
+      color: selected ? selectedColor : Colors.transparent,
+      borderRadius: BorderRadius.circular(9),
+      child: InkWell(
+        key: ValueKey('home-food-type-$label'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(9),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Center(
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AnimatedContainer(
-                  duration: _animation,
-                  curve: Curves.easeInOut,
-                  width: _trackWidth,
-                  height: _trackHeight,
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: _trackColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: AnimatedAlign(
-                    duration: _animation,
-                    curve: Curves.easeInOut,
-                    alignment: _isOn
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
-                    child: Container(
-                      width: _thumbSize,
-                      height: _thumbSize,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 2,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 62),
-                  child: Text(
-                    _label,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _labelColor,
-                    ),
+                if (markColor != null) ...[
+                  _FoodMark(color: selected ? Colors.white : markColor!),
+                  const SizedBox(width: 4),
+                ],
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1,
+                    fontWeight: FontWeight.w700,
+                    color: labelColor,
                   ),
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The small square-and-dot mark used on Indian menus: green for veg, red for non-veg.
+class _FoodMark extends StatelessWidget {
+  const _FoodMark({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 11,
+      height: 11,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(1.5),
+          border: Border.all(color: color, width: 1.2),
+        ),
+        child: Center(
+          child: Container(
+            width: 4.5,
+            height: 4.5,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
         ),
       ),

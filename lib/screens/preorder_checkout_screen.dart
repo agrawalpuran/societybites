@@ -38,6 +38,7 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
         widget.campaign.offeredFulfilmentMethods.contains('pickup')
         ? 'pickup'
         : 'seller_delivery';
+    _applyDefaultPaymentMethod();
     _loadPlatformFee();
     _resolveSameSociety();
   }
@@ -51,13 +52,25 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
     if (!mounted) return;
     setState(() {
       _sameSociety = same;
-      if (!_allowsCash) _payment = PreOrderPaymentMethod.upi;
+      _applyDefaultPaymentMethod();
     });
+  }
+
+  void _applyDefaultPaymentMethod() {
+    if (!_allowsUpi && _allowsCash) {
+      _payment = PreOrderPaymentMethod.cash;
+    } else if (!_allowsCash) {
+      _payment = PreOrderPaymentMethod.upi;
+    }
   }
 
   bool get _allowsCash =>
       parseSellerPaymentPreference(widget.campaign.sellerPaymentPreference)
           .allowsCodFor(sameSociety: _sameSociety);
+
+  bool get _allowsUpi =>
+      parseSellerPaymentPreference(widget.campaign.sellerPaymentPreference)
+          .allowsUpiFor(sameSociety: _sameSociety);
 
   Future<void> _loadPlatformFee() async {
     try {
@@ -260,14 +273,15 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
                   ),
                 const SizedBox(height: 22),
                 _section('PAYMENT METHOD'),
-                _paymentOption(
-                  PreOrderPaymentMethod.upi,
-                  Icons.account_balance_wallet_rounded,
-                  'UPI',
-                  "Direct transfer to the seller's UPI",
-                ),
+                if (_allowsUpi)
+                  _paymentOption(
+                    PreOrderPaymentMethod.upi,
+                    Icons.account_balance_wallet_rounded,
+                    'UPI',
+                    "Direct transfer to the seller's UPI",
+                  ),
                 if (_allowsCash) ...[
-                  const SizedBox(height: 10),
+                  if (_allowsUpi) const SizedBox(height: 10),
                   _paymentOption(
                     PreOrderPaymentMethod.cash,
                     Icons.money_rounded,
@@ -468,7 +482,7 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
       border: Border.all(color: const Color(0xFFFFE0CC)),
     ),
     child: const Text(
-      'SocietyBites does not currently provide delivery services. Delivery '
+      'SocietyEats does not currently provide delivery services. Delivery '
       'is arranged directly with the seller. Any delivery charge is paid/'
       'settled with the seller.',
       style: TextStyle(
@@ -607,7 +621,7 @@ class PreOrderConfirmationScreen extends StatelessWidget {
                   if (sellerDelivery) ...[
                     const SizedBox(height: 14),
                     const Text(
-                      'SocietyBites does not currently provide delivery services. '
+                      'SocietyEats does not currently provide delivery services. '
                       'Delivery is arranged directly with the seller.',
                       textAlign: TextAlign.center,
                       style: TextStyle(

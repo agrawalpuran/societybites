@@ -78,7 +78,9 @@ class ExploreNearbyScreenState extends State<ExploreNearbyScreen> {
       if (!enabled || !mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Selling enabled — add a listing from Dashboard'),
+          content: Text(
+            'Selling enabled — complete Seller Settings in Profile',
+          ),
           backgroundColor: Color(0xFF0E5A47),
         ),
       );

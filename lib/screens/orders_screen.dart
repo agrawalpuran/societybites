@@ -16,7 +16,6 @@ import 'feedback_screen.dart';
 import 'food_detail_screen.dart';
 import 'seller_storefront_screen.dart';
 import 'payment_screen.dart';
-import 'tab_select_load.dart';
 
 class _RoleOrders {
   List<Order> active = [];
@@ -43,7 +42,7 @@ class OrdersScreen extends StatefulWidget {
   final Future<List<Map<String, dynamic>>> Function({required String role})?
       fetchOrders;
 
-  /// Fired once when the first load of the default (Buying) role finishes,
+  /// Fired once when the first buyer-order load finishes,
   /// success or failure, so MainShell can continue sequential preload.
   final VoidCallback? onInitialLoadSettled;
 
@@ -55,13 +54,7 @@ class OrdersScreenState extends State<OrdersScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _buyer = _RoleOrders(isLoading: true);
-  final _seller = _RoleOrders();
-
-  /// Buying = orders you placed; Selling = orders for your listings.
-  bool _isSellingView = false;
   bool _didNotifyInitialSettle = false;
-
-  _RoleOrders get _currentRole => _isSellingView ? _seller : _buyer;
 
   @override
   void initState() {
@@ -71,8 +64,8 @@ class OrdersScreenState extends State<OrdersScreen>
     _loadOrders(isInitial: true);
   }
 
-  bool get isLoadInProgress => _currentRole.isLoading;
-  bool get hasSuccessfullyLoaded => _currentRole.hasSuccessfullyLoaded;
+  bool get isLoadInProgress => _buyer.isLoading;
+  bool get hasSuccessfullyLoaded => _buyer.hasSuccessfullyLoaded;
 
   /// Called by MainShell on failed first-load retry, app resume, and FCM.
   void refresh() => _loadOrders();
@@ -81,8 +74,7 @@ class OrdersScreenState extends State<OrdersScreen>
   Future<void> refreshUnread() => _applyUnreadCounts();
 
   Future<void> _loadOrders({bool isInitial = false}) async {
-    final selling = _isSellingView;
-    final bucket = selling ? _seller : _buyer;
+    final bucket = _buyer;
     final showSpinner = !bucket.hasSuccessfullyLoaded;
     if (showSpinner) {
       setState(() {
@@ -94,7 +86,7 @@ class OrdersScreenState extends State<OrdersScreen>
     try {
       final fetch = widget.fetchOrders ??
           ({required String role}) => ApiService.getOrders(role: role);
-      final orders = await fetch(role: selling ? 'seller' : 'buyer');
+      final orders = await fetch(role: 'buyer');
       var parsed = orders.map(Order.fromJson).toList();
       final campaignIds = parsed
           .where((order) => order.isPreOrder && order.campaignId != null)
@@ -127,13 +119,8 @@ class OrdersScreenState extends State<OrdersScreen>
       if (!mounted) return;
 
       setState(() {
-        if (selling) {
-          bucket.active = parsed.where((o) => !o.isTerminal).toList();
-          bucket.past = parsed.where((o) => o.isTerminal).toList();
-        } else {
-          bucket.active = parsed.where((o) => o.isInBuyerActiveTab()).toList();
-          bucket.past = parsed.where((o) => !o.isInBuyerActiveTab()).toList();
-        }
+        bucket.active = parsed.where((o) => o.isInBuyerActiveTab()).toList();
+        bucket.past = parsed.where((o) => !o.isInBuyerActiveTab()).toList();
         bucket.isLoading = false;
         bucket.hasSuccessfullyLoaded = true;
         bucket.error = null;
@@ -152,37 +139,31 @@ class OrdersScreenState extends State<OrdersScreen>
   }
 
   Future<void> _applyUnreadCounts() async {
-    if (!_buyer.hasSuccessfullyLoaded && !_seller.hasSuccessfullyLoaded) return;
+    if (!_buyer.hasSuccessfullyLoaded) return;
     try {
       final fetch = widget.fetchOrders ??
           ({required String role}) => ApiService.getOrders(role: role);
-      final roles = <bool>[];
-      if (_buyer.hasSuccessfullyLoaded) roles.add(false);
-      if (_seller.hasSuccessfullyLoaded) roles.add(true);
-      for (final selling in roles) {
-        final bucket = selling ? _seller : _buyer;
-        final orders = await fetch(role: selling ? 'seller' : 'buyer');
-        final counts = <String, int>{};
-        for (final json in orders) {
-          final parsed = Order.fromJson(json);
-          counts[parsed.id] = parsed.unreadMessageCount;
-        }
-        if (!mounted) return;
-        var changed = false;
-        List<Order> mapped(List<Order> list) => list.map((order) {
-          final next = counts[order.id] ?? 0;
-          if (next == order.unreadMessageCount) return order;
-          changed = true;
-          return order.withUnreadCount(next);
-        }).toList();
-        final nextActive = mapped(bucket.active);
-        final nextPast = mapped(bucket.past);
-        if (changed) {
-          setState(() {
-            bucket.active = nextActive;
-            bucket.past = nextPast;
-          });
-        }
+      final orders = await fetch(role: 'buyer');
+      final counts = <String, int>{};
+      for (final json in orders) {
+        final parsed = Order.fromJson(json);
+        counts[parsed.id] = parsed.unreadMessageCount;
+      }
+      if (!mounted) return;
+      var changed = false;
+      List<Order> mapped(List<Order> list) => list.map((order) {
+        final next = counts[order.id] ?? 0;
+        if (next == order.unreadMessageCount) return order;
+        changed = true;
+        return order.withUnreadCount(next);
+      }).toList();
+      final nextActive = mapped(_buyer.active);
+      final nextPast = mapped(_buyer.past);
+      if (changed) {
+        setState(() {
+          _buyer.active = nextActive;
+          _buyer.past = nextPast;
+        });
       }
     } catch (_) {}
   }
@@ -195,25 +176,6 @@ class OrdersScreenState extends State<OrdersScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) callback();
     });
-  }
-
-  void _selectRole({required bool selling}) {
-    if (_isSellingView == selling) return;
-    final bucket = selling ? _seller : _buyer;
-    final shouldFetch = shouldFetchOnTabSelect(
-      hasSuccessfullyLoaded: bucket.hasSuccessfullyLoaded,
-      isLoadInProgress: bucket.isLoading,
-    );
-    setState(() {
-      _isSellingView = selling;
-      if (shouldFetch) {
-        bucket.isLoading = true;
-        bucket.error = null;
-      }
-    });
-    if (shouldFetch) {
-      _loadOrders();
-    }
   }
 
   @override
@@ -243,13 +205,11 @@ class OrdersScreenState extends State<OrdersScreen>
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
               child: Text(
-                _isSellingView
-                    ? 'Orders from neighbors for your kitchen.'
-                    : 'Manage your community kitchen favorites.',
-                style: const TextStyle(
+                'Manage your community kitchen favorites.',
+                style: TextStyle(
                   fontSize: 14,
                   color: Color(0xFF6A7774),
                   fontWeight: FontWeight.w500,
@@ -257,19 +217,17 @@ class OrdersScreenState extends State<OrdersScreen>
               ),
             ),
             const SizedBox(height: 14),
-            _buildRoleToggle(),
-            const SizedBox(height: 14),
             _buildTabs(),
             const SizedBox(height: 16),
-            if (_currentRole.isLoading)
+            if (_buyer.isLoading)
               const Expanded(
                 child: ScreenLoadingNote(message: 'Loading orders…'),
               )
-            else if (_currentRole.error != null)
+            else if (_buyer.error != null)
               Expanded(
                 child: Align(
                   alignment: Alignment.topCenter,
-                  child: StatusBanner(message: _currentRole.error!),
+                  child: StatusBanner(message: _buyer.error!),
                 ),
               )
             else
@@ -278,15 +236,15 @@ class OrdersScreenState extends State<OrdersScreen>
                   controller: _tabController,
                   children: [
                     _ActiveTab(
-                      orders: _currentRole.active,
+                      orders: _buyer.active,
                       onRefresh: _loadOrders,
-                      isSellerView: _isSellingView,
+                      isSellerView: false,
                     ),
                     _PastTab(
-                      orders: _currentRole.past,
+                      orders: _buyer.past,
                       onRefresh: _loadOrders,
                       onExploreHome: widget.onExploreHome,
-                      isSellerView: _isSellingView,
+                      isSellerView: false,
                     ),
                   ],
                 ),
@@ -299,37 +257,6 @@ class OrdersScreenState extends State<OrdersScreen>
 
   Widget _buildHeader() {
     return const AppHeader();
-  }
-
-  Widget _buildRoleToggle() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        height: 44,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF0F2F1),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: _RoleChip(
-                label: 'Buying',
-                selected: !_isSellingView,
-                onTap: () => _selectRole(selling: false),
-              ),
-            ),
-            Expanded(
-              child: _RoleChip(
-                label: 'Selling',
-                selected: _isSellingView,
-                onTap: () => _selectRole(selling: true),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildTabs() {
@@ -356,46 +283,9 @@ class OrdersScreenState extends State<OrdersScreen>
             fontSize: 14,
           ),
           tabs: [
-            Tab(text: 'Active (${_currentRole.active.length})'),
-            Tab(text: 'Past (${_currentRole.past.length})'),
+            Tab(text: 'Active (${_buyer.active.length})'),
+            Tab(text: 'Past (${_buyer.past.length})'),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RoleChip extends StatelessWidget {
-  const _RoleChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(3),
-      child: Material(
-        color: selected ? const Color(0xFF0E5A47) : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: selected ? Colors.white : const Color(0xFF6A7774),
-              ),
-            ),
-          ),
         ),
       ),
     );
@@ -957,7 +847,7 @@ class _PreOrderFulfilmentCard extends StatelessWidget {
           if (sellerDelivery) ...[
             const SizedBox(height: 6),
             const Text(
-              'SocietyBites does not provide delivery. Coordinate directly with the seller.',
+              'SocietyEats does not provide delivery. Coordinate directly with the seller.',
               style: TextStyle(
                 color: Color(0xFF6A7774),
                 fontSize: 12,

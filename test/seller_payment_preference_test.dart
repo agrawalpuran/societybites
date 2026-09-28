@@ -93,6 +93,16 @@ void main() {
           .allowsCodFor(sameSociety: false),
       isFalse,
     );
+    expect(
+      parseSellerPaymentPreference('COD_IN_SOCIETY_UPI_OUTSIDE')
+          .allowsUpiFor(sameSociety: true),
+      isFalse,
+    );
+    expect(
+      parseSellerPaymentPreference('COD_IN_SOCIETY_UPI_OUTSIDE')
+          .allowsUpiFor(sameSociety: false),
+      isTrue,
+    );
   });
 
   test('UPI pending blocks mark ready and time; COD does not', () {
@@ -202,7 +212,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('UPI Only'), findsWidgets);
     expect(find.text('Buyers must pay through UPI.'), findsWidgets);
-    expect(find.text('Cash in society, UPI outside'), findsOneWidget);
+    expect(
+      find.text('Cash on Delivery in society, UPI outside'),
+      findsOneWidget,
+    );
     await tester.tap(find.text('UPI Only').last);
     await tester.pump();
     await tester.tap(find.text('Save'));
@@ -302,11 +315,12 @@ void main() {
     expect(find.text('Cash on Delivery'), findsNothing);
   });
 
-  testWidgets('in-society COD is offered to neighbours', (tester) async {
+  testWidgets('in-society buyers are offered COD only', (tester) async {
     SharedPreferences.setMockInitialValues({
       'user_id': 'user-1',
       'society_id': 'society-a',
     });
+    String? sent;
     await tester.pumpWidget(
       MaterialApp(
         home: CheckoutScreen(
@@ -322,13 +336,21 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
-          }) async =>
-              {'id': 'o1'},
+          }) async {
+            sent = paymentMethod;
+            return {'id': 'o1'};
+          },
         ),
       ),
     );
     await tester.pump();
     expect(find.text('Cash on Delivery'), findsOneWidget);
+    expect(find.text('UPI'), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('confirm-order')));
+    await tester.tap(find.byKey(const Key('confirm-order')));
+    await tester.pump();
+    await tester.pump();
+    expect(sent, 'cash');
   });
 
   testWidgets('existing I Have Paid remains on UPI payment screen', (tester) async {

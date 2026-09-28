@@ -37,6 +37,7 @@ class ProfileScreen extends StatefulWidget {
     this.cropProfilePhoto,
     this.uploadProfilePhoto,
     this.saveProfilePhoto,
+    this.startSelling,
   });
 
   /// Switches the main shell tab instead of pushing a new route.
@@ -77,9 +78,14 @@ class ProfileScreen extends StatefulWidget {
   final Future<Map<String, dynamic>> Function({String? profilePhotoUrl})?
       saveProfilePhoto;
 
+  /// Test seam. Production uses [SellerOnboarding.startSelling].
+  final Future<bool> Function(BuildContext context)? startSelling;
+
   @override
   ProfileScreenState createState() => ProfileScreenState();
 }
+
+enum _ProfileEditAction { displayName, changePhoto, removePhoto }
 
 class ProfileScreenState extends State<ProfileScreen> {
   String? _name;
@@ -314,7 +320,13 @@ class ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _openSellerSettings() {
+  Future<void> openSellerSettingsAfterEnable() async {
+    await _loadProfile();
+    if (!mounted) return;
+    _openSellerSettings(firstTime: true);
+  }
+
+  void _openSellerSettings({bool firstTime = false}) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -322,9 +334,7 @@ class ProfileScreenState extends State<ProfileScreen> {
           valueListenable: _sellerSettingsTick,
           builder: (context, _, child) {
             return SellerSettingsScreen(
-              photoUrl: _profilePhotoUrl,
-              displayName: _displayName,
-              savingPhoto: _savingProfilePhoto,
+              isFirstTimeSetup: firstTime,
               upiSubtitle: (_upiId != null && _upiId!.isNotEmpty)
                   ? _upiId!
                   : 'Add UPI ID so buyers can pay you',
@@ -334,9 +344,6 @@ class ProfileScreenState extends State<ProfileScreen> {
               fulfilmentTitle: _fulfilment.mode.title,
               fulfilmentSubtitle: _fulfilment.subtitle,
               fssaiSubtitle: _fssaiSubtitle,
-              onChangePhoto: _changeProfilePhoto,
-              onRemovePhoto:
-                  _profilePhotoUrl == null ? null : _removeProfilePhoto,
               onEditUpi: () => _editUpi(),
               onChangePaymentPreference: _changePaymentPreference,
               onChangeSellingReach: _changeSellingReach,
@@ -347,6 +354,76 @@ class ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openProfileEditor() async {
+    final action = await showModalBottomSheet<_ProfileEditAction>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  'Edit Profile',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF101617),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.badge_outlined),
+                title: const Text('Change display name'),
+                onTap: () => Navigator.pop(
+                  context,
+                  _ProfileEditAction.displayName,
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.add_a_photo_outlined),
+                title: const Text('Change profile photo'),
+                onTap: () => Navigator.pop(
+                  context,
+                  _ProfileEditAction.changePhoto,
+                ),
+              ),
+              if (_profilePhotoUrl != null)
+                ListTile(
+                  leading: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFD94F4F),
+                  ),
+                  title: const Text('Remove profile photo'),
+                  onTap: () => Navigator.pop(
+                    context,
+                    _ProfileEditAction.removePhoto,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _ProfileEditAction.displayName:
+        await _editProfile();
+      case _ProfileEditAction.changePhoto:
+        await _changeProfilePhoto();
+      case _ProfileEditAction.removePhoto:
+        await _removeProfilePhoto();
+    }
   }
 
   Future<void> _editProfile() async {
@@ -890,22 +967,11 @@ class ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _enableSelling() async {
     try {
-      final enabled = await SellerOnboarding.startSelling(context);
+      final enabled = widget.startSelling != null
+          ? await widget.startSelling!(context)
+          : await SellerOnboarding.startSelling(context);
       if (!enabled || !mounted) return;
-      await _loadProfile();
-      if (!mounted) return;
-
-      final needsUpi = _upiId == null || _upiId!.isEmpty;
-      if (needsUpi) {
-        await _editUpi(afterEnableSelling: true);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Selling enabled — open Dashboard to add a listing'),
-            backgroundColor: Color(0xFF0E5A47),
-          ),
-        );
-      }
+      await openSellerSettingsAfterEnable();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -1326,46 +1392,45 @@ class ProfileScreenState extends State<ProfileScreen> {
                             societyName: _societyName,
                             flatNumber: _flatNumber,
                             photoUrl: _profilePhotoUrl,
+                            onEdit: _openProfileEditor,
                           ),
-                          const SizedBox(height: 24),
-                          const Text(
-                            'ACCOUNT',
-                            style: TextStyle(
-                              fontSize: 12,
-                              letterSpacing: 1.4,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF8A9491),
+                          if (_role == 'buyer' ||
+                              _role == null ||
+                              _role == 'super_admin') ...[
+                            const SizedBox(height: 24),
+                            const Text(
+                              'ACCOUNT',
+                              style: TextStyle(
+                                fontSize: 12,
+                                letterSpacing: 1.4,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF8A9491),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          ProfileMenuTile(
-                            icon: Icons.edit_rounded,
-                            title: 'Edit Profile',
-                            subtitle: 'Update your display name',
-                            onTap: _editProfile,
-                          ),
-                          if (_role == 'buyer' || _role == null)
-                            ProfileMenuTile(
-                              icon: Icons.storefront_rounded,
-                              title: 'Start Selling',
-                              subtitle:
-                                  'List food for neighbors in your society',
-                              onTap: _enableSelling,
-                            ),
-                          if (_role == 'super_admin')
-                            ProfileMenuTile(
-                              icon: Icons.admin_panel_settings_rounded,
-                              title: 'Admin Portal',
-                              subtitle: 'Manage platform settings',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const AdminShellScreen(),
-                                  ),
-                                );
-                              },
-                            ),
+                            const SizedBox(height: 10),
+                            if (_role == 'buyer' || _role == null)
+                              ProfileMenuTile(
+                                icon: Icons.storefront_rounded,
+                                title: 'Start Selling',
+                                subtitle:
+                                    'List food for neighbors in your society',
+                                onTap: _enableSelling,
+                              ),
+                            if (_role == 'super_admin')
+                              ProfileMenuTile(
+                                icon: Icons.admin_panel_settings_rounded,
+                                title: 'Admin Portal',
+                                subtitle: 'Manage platform settings',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const AdminShellScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
                           if (_isSeller) ...[
                             const SizedBox(height: 20),
                             const Text(
@@ -1382,7 +1447,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.settings_outlined,
                               title: 'Seller Settings',
                               subtitle:
-                                  'Manage payments, fulfilment, profile & FSSAI',
+                                  'Manage payments, fulfilment & FSSAI',
                               onTap: _openSellerSettings,
                             ),
                           ],
@@ -1842,6 +1907,7 @@ class _ProfileCard extends StatelessWidget {
     required this.role,
     required this.societyName,
     required this.flatNumber,
+    required this.onEdit,
     this.photoUrl,
   });
 
@@ -1851,6 +1917,7 @@ class _ProfileCard extends StatelessWidget {
   final String? societyName;
   final String? flatNumber;
   final String? photoUrl;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -1924,6 +1991,14 @@ class _ProfileCard extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+          IconButton(
+            key: const Key('profile-edit-button'),
+            tooltip: 'Edit profile',
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_rounded),
+            color: const Color(0xFF0E5A47),
+            visualDensity: VisualDensity.compact,
           ),
         ],
       ),

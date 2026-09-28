@@ -87,14 +87,14 @@ const helpCategories = <HelpCategory>[
         id: 'selling-start',
         question: 'How do I start selling?',
         answer:
-            'Go to Profile and tap Start Selling. Then add your UPI ID so neighbours can pay you, and create a listing from My Listings or the Seller Dashboard.',
+            'Go to Profile and tap Start Selling. Complete Seller Settings — payment methods, UPI, selling reach, fulfilment, and FSSAI — then add a listing from My Kitchen.',
         keywords: ['become seller', 'enable selling', 'onboard'],
       ),
       HelpFaq(
         id: 'selling-upi',
         question: 'Do I need a UPI ID to sell?',
         answer:
-            'Yes. Buyers pay you directly. Add your UPI ID in Profile before you publish a listing.',
+            'Yes. Buyers pay you directly. Add your UPI ID in Profile → Seller Settings before you publish a listing.',
         keywords: ['upi', 'payment', 'payout'],
       ),
       HelpFaq(
@@ -199,7 +199,7 @@ const helpCategories = <HelpCategory>[
         id: 'fulfilment-track',
         question: 'Can I track a delivery live?',
         answer:
-            'No. SocietyBites does not show live tracking or a delivery ETA. Follow the order status and message the seller if you need an update.',
+            'No. SocietyEats does not show live tracking or a delivery ETA. Follow the order status and message the seller if you need an update.',
         keywords: ['tracking', 'eta', 'driver', 'live', 'gps'],
       ),
       HelpFaq(
@@ -346,7 +346,7 @@ const helpCategories = <HelpCategory>[
         id: 'profile-pay',
         question: 'How do payments work?',
         answer:
-            'SocietyBites does not take the payment. You pay the seller directly with UPI or cash. There is no in-app payment gateway.',
+            'SocietyEats does not take the payment. You pay the seller directly with UPI or cash. There is no in-app payment gateway.',
         keywords: ['upi', 'cash', 'gateway', 'razorpay', 'pay'],
       ),
       HelpFaq(
@@ -367,7 +367,7 @@ const helpCategories = <HelpCategory>[
         id: 'profile-upi',
         question: 'How do I add my UPI ID?',
         answer:
-            'Open Profile and tap UPI for Payments. Enter an ID like name@bank and a display name buyers will see.',
+            'Open Profile → Seller Settings → UPI for Payments. Enter an ID like name@bank and a display name buyers will see.',
         keywords: ['upi id', 'add upi', 'seller payment'],
       ),
     ],

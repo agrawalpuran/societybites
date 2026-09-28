@@ -278,7 +278,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump();
-    expect(find.text('Delivery mechanism'), findsOneWidget);
+    expect(find.text('Delivery Mechanism'), findsOneWidget);
     expect(find.text("As per the seller's preference"), findsOneWidget);
     expect(find.text('🏠 Buyer Pickup'), findsOneWidget);
     expect(find.text('🛵 Seller Delivery'), findsOneWidget);
@@ -354,7 +354,7 @@ void main() {
     );
   });
 
-  testWidgets('same-society checkout has no nearby fulfilment picker', (
+  testWidgets('same-society checkout shows seller pickup preference', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -380,7 +380,8 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('🏠 Buyer Pickup'), findsNothing);
+    expect(find.text('Delivery Mechanism'), findsOneWidget);
+    expect(find.text('🏠 Buyer Pickup'), findsOneWidget);
     expect(find.text('🛵 Seller Delivery'), findsNothing);
     expect(find.text('Review your\ncommunity order'), findsOneWidget);
   });

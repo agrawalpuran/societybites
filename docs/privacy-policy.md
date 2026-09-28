@@ -73,7 +73,7 @@ We use your information to:
 
 ## Payments
 
-SocietyBites does not process or store payments.
+SocietyEats does not process or store payments.
 
 Payments are made directly between buyers and sellers using third-party UPI applications.
 

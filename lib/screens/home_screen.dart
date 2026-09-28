@@ -669,7 +669,9 @@ class HomeScreenState extends State<HomeScreen> {
       if (!enabled || !mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Selling enabled — add a listing from Dashboard'),
+          content: Text(
+            'Selling enabled — complete Seller Settings in Profile',
+          ),
           backgroundColor: Color(0xFF0E5A47),
         ),
       );
@@ -688,7 +690,11 @@ class HomeScreenState extends State<HomeScreen> {
     }
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ExploreNearbyScreen()),
+      MaterialPageRoute(
+        builder: (_) => ExploreNearbyScreen(
+          onStartSelling: _startSellingFromHome,
+        ),
+      ),
     );
   }
 
@@ -728,77 +734,72 @@ class HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 12, 4),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
       child: Row(
         children: [
           Expanded(
             child: Container(
-              height: 52,
+              height: 40,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFE6EBE9)),
               ),
               child: Row(
                 children: [
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 10),
                   const Icon(
                     Icons.search_rounded,
                     color: Color(0xFF8A9491),
-                    size: 22,
+                    size: 18,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: TextField(
                       key: const Key('home-search-field'),
                       controller: _searchController,
                       decoration: const InputDecoration(
-                        hintText: 'Search meals, sellers, blocks…',
+                        hintText: 'Search meals…',
                         hintStyle: TextStyle(
                           color: Color(0xFFADB5B2),
-                          fontSize: 15,
+                          fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
                         border: InputBorder.none,
-                        isDense: true,
+                        isCollapsed: true,
+                        contentPadding: EdgeInsets.zero,
                       ),
                       style: const TextStyle(
                         color: Color(0xFF223531),
-                        fontSize: 15,
+                        fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
                   if (_searchQuery.isNotEmpty)
                     IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 28,
+                        minHeight: 28,
+                      ),
                       onPressed: () {
                         _searchController.clear();
                       },
                       icon: const Icon(
                         Icons.close_rounded,
                         color: Color(0xFF8A9491),
-                        size: 20,
+                        size: 16,
                       ),
                     )
                   else
-                    Container(
-                      width: 38,
-                      height: 38,
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F7F6),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.tune_rounded,
-                        color: Color(0xFF3A4644),
-                        size: 20,
-                      ),
-                    ),
+                    const SizedBox(width: 8),
                 ],
               ),
             ),
           ),
+          const SizedBox(width: 8),
           FoodTypeFilterChips(
             selectedFoodType: _selectedFoodType,
             onChanged: (value) {

@@ -1158,7 +1158,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       ),
                       const SizedBox(height: 18),
                       _buildField(
-                        label: 'AVAILABLE IN',
+                        label: 'CATEGORY',
                         isRequired: true,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1176,7 +1176,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                             if (_selectedCategories.isNotEmpty) ...[
                               const SizedBox(height: 8),
                               Text(
-                                'Available in: ${formatAvailableIn(_selectedCategories)}',
+                                'Category: ${formatAvailableIn(_selectedCategories)}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,

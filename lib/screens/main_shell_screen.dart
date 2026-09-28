@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/cart_controller.dart';
 import '../services/push_notification_service.dart';
+import '../services/seller_onboarding.dart';
 import '../widgets/app_bottom_nav.dart';
 import 'home_screen.dart';
 import 'orders_screen.dart';
@@ -27,6 +28,7 @@ class _MainShellScreenState extends State<MainShellScreen>
   final _homeKey = GlobalKey<HomeScreenState>();
   final _ordersKey = GlobalKey<OrdersScreenState>();
   final _dashboardKey = GlobalKey<SellerDashboardScreenState>();
+  final _profileKey = GlobalKey<ProfileScreenState>();
 
   late final HomeFirstPreload _preload;
   var _ordersMounted = false;
@@ -195,6 +197,23 @@ class _MainShellScreenState extends State<MainShellScreen>
     }
   }
 
+  Future<void> _onMarketplaceStartSelling() async {
+    try {
+      final enabled = await SellerOnboarding.startSelling(context);
+      if (!enabled || !mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      _selectTab(3);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _profileKey.currentState?.openSellerSettingsAfterEnable();
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not enable selling: $error')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -204,6 +223,7 @@ class _MainShellScreenState extends State<MainShellScreen>
           HomeScreen(
             key: _homeKey,
             onInitialLoadSuccess: _preload.onHomeInitialLoadSuccess,
+            onStartSelling: _onMarketplaceStartSelling,
           ),
           _ordersMounted
               ? OrdersScreen(
@@ -216,6 +236,8 @@ class _MainShellScreenState extends State<MainShellScreen>
               ? SellerDashboardScreen(
                   key: _dashboardKey,
                   onInitialLoadSettled: _preload.onDashboardInitialLoadSettled,
+                  onListingCreated: () => _selectTab(0),
+                  onStartSelling: _onMarketplaceStartSelling,
                   onKitchenAttentionCount: (count) {
                     if (!mounted || count == _kitchenAttentionCount) return;
                     setState(() => _kitchenAttentionCount = count);
@@ -223,7 +245,10 @@ class _MainShellScreenState extends State<MainShellScreen>
                 )
               : const SizedBox.shrink(),
           _profileMounted
-              ? ProfileScreen(onSelectTab: _selectTab)
+              ? ProfileScreen(
+                  key: _profileKey,
+                  onSelectTab: _selectTab,
+                )
               : const SizedBox.shrink(),
         ],
       ),

@@ -1,6 +1,6 @@
 # Payment Flow
 
-SocietyBites does not act as a payment gateway.
+SocietyEats does not act as a payment gateway.
 
 Buyer pays seller directly using UPI.
 

@@ -468,7 +468,7 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
                               ),
                             ),
                             child: const Text(
-                              'SocietyBites does not currently provide delivery services. '
+                              'SocietyEats does not currently provide delivery services. '
                               'Pickup or seller-arranged delivery is coordinated directly '
                               'with the seller.',
                               style: TextStyle(

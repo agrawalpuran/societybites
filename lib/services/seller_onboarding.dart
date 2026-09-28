@@ -14,7 +14,8 @@ class SellerOnboarding {
         title: const Text('Start selling?'),
         content: const Text(
           'You will be able to list homemade food for neighbors in your society. '
-          'You will need a UPI ID so buyers can pay you directly.',
+          'Next, complete Seller Settings — payment methods, UPI, selling reach, '
+          'fulfilment, and FSSAI.',
         ),
         actions: [
           TextButton(
@@ -61,7 +62,7 @@ class SellerOnboarding {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Add your UPI ID in Profile before creating a listing',
+              'Add your UPI ID in Profile → Seller Settings before creating a listing',
             ),
           ),
         );

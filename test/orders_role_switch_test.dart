@@ -35,12 +35,6 @@ final _buyerOrder = _orderJson(
   itemName: 'Buyer Biryani',
 );
 
-final _sellerOrder = _orderJson(
-  id: 'seller-order-1',
-  orderNumber: 'SELL-1',
-  itemName: 'Seller Pasta',
-);
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -66,76 +60,7 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('first Buying load calls the buyer API', (tester) async {
-    final roles = <String>[];
-    await pumpOrders(
-      tester,
-      fetchOrders: ({required String role}) async {
-        roles.add(role);
-        return role == 'buyer' ? [_buyerOrder] : [_sellerOrder];
-      },
-    );
-
-    expect(roles, ['buyer']);
-    expect(find.text('Buyer Biryani'), findsOneWidget);
-    expect(find.text('Seller Pasta'), findsNothing);
-  });
-
-  testWidgets('first Selling switch calls the seller API', (tester) async {
-    final roles = <String>[];
-    await pumpOrders(
-      tester,
-      fetchOrders: ({required String role}) async {
-        roles.add(role);
-        return role == 'buyer' ? [_buyerOrder] : [_sellerOrder];
-      },
-    );
-
-    await tester.tap(find.text('Selling'));
-    await tester.pump();
-    await tester.pump();
-
-    expect(roles, ['buyer', 'seller']);
-    expect(find.text('Seller Pasta'), findsOneWidget);
-    expect(find.text('Buyer Biryani'), findsNothing);
-  });
-
-  testWidgets(
-    'switching roles after both loaded reuses cache without refetch or spinner',
-    (tester) async {
-      final roles = <String>[];
-      await pumpOrders(
-        tester,
-        fetchOrders: ({required String role}) async {
-          roles.add(role);
-          return role == 'buyer' ? [_buyerOrder] : [_sellerOrder];
-        },
-      );
-
-      await tester.tap(find.text('Selling'));
-      await tester.pump();
-      await tester.pump();
-      expect(roles, ['buyer', 'seller']);
-      expect(find.text('Seller Pasta'), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
-
-      await tester.tap(find.text('Buying'));
-      await tester.pump();
-      expect(roles, ['buyer', 'seller']);
-      expect(find.text('Buyer Biryani'), findsOneWidget);
-      expect(find.text('Seller Pasta'), findsNothing);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
-
-      await tester.tap(find.text('Selling'));
-      await tester.pump();
-      expect(roles, ['buyer', 'seller']);
-      expect(find.text('Seller Pasta'), findsOneWidget);
-      expect(find.text('Buyer Biryani'), findsNothing);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
-    },
-  );
-
-  testWidgets('pull-to-refresh fetches the currently selected role', (
+  testWidgets('Orders loads buyer orders without Buying or Selling toggles', (
     tester,
   ) async {
     final roles = <String>[];
@@ -143,14 +68,27 @@ void main() {
       tester,
       fetchOrders: ({required String role}) async {
         roles.add(role);
-        return role == 'buyer' ? [_buyerOrder] : [_sellerOrder];
+        return [_buyerOrder];
       },
     );
 
-    await tester.tap(find.text('Selling'));
-    await tester.pump();
-    await tester.pump();
-    expect(roles, ['buyer', 'seller']);
+    expect(roles, ['buyer']);
+    expect(find.text('Buyer Biryani'), findsOneWidget);
+    expect(find.text('Buying'), findsNothing);
+    expect(find.text('Selling'), findsNothing);
+  });
+
+  testWidgets('pull-to-refresh fetches buyer orders', (
+    tester,
+  ) async {
+    final roles = <String>[];
+    await pumpOrders(
+      tester,
+      fetchOrders: ({required String role}) async {
+        roles.add(role);
+        return [_buyerOrder];
+      },
+    );
 
     await tester.fling(find.byType(ListView), const Offset(0, 400), 1000);
     await tester.pump();
@@ -158,46 +96,40 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(roles, ['buyer', 'seller', 'seller']);
+    expect(roles, ['buyer', 'buyer']);
   });
 
-  testWidgets('failed initial load can still be retried by switching back', (
+  testWidgets('failed initial load can be retried explicitly', (
     tester,
   ) async {
     var buyerAttempts = 0;
     final roles = <String>[];
+    final key = GlobalKey<OrdersScreenState>();
     await pumpOrders(
       tester,
+      key: key,
       fetchOrders: ({required String role}) async {
         roles.add(role);
-        if (role == 'buyer') {
-          buyerAttempts++;
-          if (buyerAttempts == 1) {
-            throw Exception('network down');
-          }
-          return [_buyerOrder];
+        buyerAttempts++;
+        if (buyerAttempts == 1) {
+          throw Exception('network down');
         }
-        return [_sellerOrder];
+        return [_buyerOrder];
       },
     );
 
     expect(roles, ['buyer']);
     expect(find.textContaining('network down'), findsOneWidget);
 
-    await tester.tap(find.text('Selling'));
-    await tester.pump();
-    await tester.pump();
-    expect(find.text('Seller Pasta'), findsOneWidget);
-
-    await tester.tap(find.text('Buying'));
+    key.currentState!.refresh();
     await tester.pump();
     await tester.pump();
 
-    expect(roles, ['buyer', 'seller', 'buyer']);
+    expect(roles, ['buyer', 'buyer']);
     expect(find.text('Buyer Biryani'), findsOneWidget);
   });
 
-  testWidgets('FCM-style explicit refresh still fetches the current role', (
+  testWidgets('FCM-style explicit refresh fetches buyer orders', (
     tester,
   ) async {
     final roles = <String>[];
@@ -207,29 +139,15 @@ void main() {
       key: key,
       fetchOrders: ({required String role}) async {
         roles.add(role);
-        return role == 'buyer' ? [_buyerOrder] : [_sellerOrder];
+        return [_buyerOrder];
       },
     );
 
-    await tester.tap(find.text('Selling'));
-    await tester.pump();
-    await tester.pump();
-    expect(roles, ['buyer', 'seller']);
-
     key.currentState!.refresh();
     await tester.pump();
     await tester.pump();
 
-    expect(roles, ['buyer', 'seller', 'seller']);
-    expect(find.text('Seller Pasta'), findsOneWidget);
-
-    await tester.tap(find.text('Buying'));
-    await tester.pump();
-    key.currentState!.refresh();
-    await tester.pump();
-    await tester.pump();
-
-    expect(roles, ['buyer', 'seller', 'seller', 'buyer']);
+    expect(roles, ['buyer', 'buyer']);
     expect(find.text('Buyer Biryani'), findsOneWidget);
   });
 
@@ -302,38 +220,4 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
-  testWidgets('Selling refresh keeps existing orders and failed refresh retains them', (
-    tester,
-  ) async {
-    var sellerCalls = 0;
-    final hang = Completer<List<Map<String, dynamic>>>();
-    final key = GlobalKey<OrdersScreenState>();
-    await pumpOrders(
-      tester,
-      key: key,
-      fetchOrders: ({required String role}) {
-        if (role == 'buyer') return Future.value([_buyerOrder]);
-        sellerCalls++;
-        if (sellerCalls == 1) return Future.value([_sellerOrder]);
-        if (sellerCalls == 2) return hang.future;
-        return Future.error(Exception('seller refresh failed'));
-      },
-    );
-
-    await tester.tap(find.text('Selling'));
-    await tester.pump();
-    await tester.pump();
-    expect(find.text('Seller Pasta'), findsOneWidget);
-
-    key.currentState!.refresh();
-    await tester.pump();
-    expect(find.text('Seller Pasta'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-
-    hang.completeError(Exception('seller refresh failed'));
-    await tester.pump();
-    await tester.pump();
-    expect(find.text('Seller Pasta'), findsOneWidget);
-    expect(find.textContaining('seller refresh failed'), findsNothing);
-  });
 }

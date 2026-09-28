@@ -89,6 +89,9 @@ void main() {
     expect(find.text('Asha'), findsOneWidget);
     expect(find.text('22'), findsWidgets);
     expect(find.text('23'), findsWidgets);
+    expect(find.byKey(const Key('trend-x-axis-label')), findsOneWidget);
+    expect(find.byKey(const Key('trend-left-y-axis-label')), findsOneWidget);
+    expect(find.byKey(const Key('trend-right-y-axis-label')), findsOneWidget);
   });
 
   testWidgets('See all recent orders invokes the callback', (tester) async {

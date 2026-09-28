@@ -34,6 +34,8 @@ class SellerDashboardScreen extends StatefulWidget {
     super.key,
     this.onInitialLoadSettled,
     this.onKitchenAttentionCount,
+    this.onListingCreated,
+    this.onStartSelling,
     this.fetchOrders,
     this.fetchCampaigns,
   });
@@ -43,6 +45,12 @@ class SellerDashboardScreen extends StatefulWidget {
 
   /// Pending seller orders that still need accept/reject.
   final ValueChanged<int>? onKitchenAttentionCount;
+
+  /// Returns the main shell to Home after a new regular listing is created.
+  final VoidCallback? onListingCreated;
+
+  /// First-time selling from My Kitchen. Production uses MainShell.
+  final VoidCallback? onStartSelling;
 
   /// Test seam. Production uses [ApiService.getOrders].
   final Future<List<Map<String, dynamic>>> Function()? fetchOrders;
@@ -77,10 +85,15 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   int _ordersTab = 0;
 
   KitchenOrderCategory? _kitchenFilter;
+  String? _role;
+  bool _roleLoaded = false;
+
+  bool get _canSell => _role == 'seller' || _role == 'super_admin';
 
   @override
   void initState() {
     super.initState();
+    _loadRole();
     _loadOrders();
     _loadStats();
     _loadPreOrders();
@@ -91,6 +104,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   /// Called by MainShell on failed first-load retry, app resume, and FCM.
   void refresh() {
+    _loadRole();
     _loadOrders();
     _loadStats();
     _loadPreOrders();
@@ -136,8 +150,37 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   /// Bottom-nav entry into My Kitchen always lands on seller orders.
   void showKitchenOrders() {
+    _loadRole();
     if (!mounted || _areaTab == 0) return;
     setState(() => _areaTab = 0);
+  }
+
+  Future<void> _loadRole() async {
+    final role = await SessionService.getRole();
+    if (!mounted) return;
+    if (_roleLoaded && role == _role) return;
+    setState(() {
+      _role = role;
+      _roleLoaded = true;
+    });
+  }
+
+  Future<void> _startSelling() async {
+    if (widget.onStartSelling != null) {
+      widget.onStartSelling!();
+      return;
+    }
+    try {
+      final enabled = await SellerOnboarding.startSelling(context);
+      if (!enabled || !mounted) return;
+      await _loadRole();
+      await _refreshDashboard();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not enable selling: $error')),
+      );
+    }
   }
 
   List<KitchenOrderCategory> get _visibleKitchenCategories =>
@@ -639,6 +682,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         child: Column(
           children: [
             const AppHeader(),
+            if (_roleLoaded && !_canSell)
+              Expanded(child: _buildBuyerStartSelling())
+            else ...[
             _buildAreaTabs(),
             Expanded(
               child: IndexedStack(
@@ -703,9 +749,42 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 ],
               ),
             ),
+            ],
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildBuyerStartSelling() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+      children: [
+        const Text(
+          'My Kitchen',
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF101617),
+          ),
+        ),
+        const SizedBox(height: 16),
+        StatusBanner(
+          padding: EdgeInsets.zero,
+          title: 'Start selling homemade food',
+          message:
+              'List food for neighbors in your society. Next you will complete Seller Settings.',
+          action: FilledButton(
+            key: const Key('my-kitchen-start-selling'),
+            onPressed: _startSelling,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF0E5A47),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: const Text('Start Selling'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1251,6 +1330,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     );
     if (created == true && mounted) {
       _loadOrders();
+      widget.onListingCreated?.call();
     }
   }
 

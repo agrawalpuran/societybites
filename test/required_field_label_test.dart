@@ -18,7 +18,7 @@ void main() {
     expect(find.text('Available now order'), findsOneWidget);
     expect(find.text('PRICE PER PORTION'), findsOneWidget);
     expect(find.text('QUANTITY AVAILABLE'), findsOneWidget);
-    expect(find.text('AVAILABLE IN'), findsOneWidget);
+    expect(find.text('CATEGORY'), findsOneWidget);
     expect(find.text('FOOD TYPE'), findsOneWidget);
     expect(find.text('HOW WILL YOU FULFIL THIS?'), findsNothing);
     expect(find.text('DESCRIPTION & INGREDIENTS'), findsOneWidget);
@@ -37,7 +37,7 @@ void main() {
         'ITEM NAME',
         'PRICE PER PORTION',
         'QUANTITY AVAILABLE',
-        'AVAILABLE IN',
+        'CATEGORY',
         'FOOD TYPE',
       ]),
     );

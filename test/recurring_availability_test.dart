@@ -185,7 +185,7 @@ void main() {
       MaterialApp(
         home: MyListingsScreen(
           fetchListings: () async => [
-            _listingJson(recurring: true),
+            _listingJson(recurring: true, unavailable: true),
           ],
         ),
       ),
@@ -196,6 +196,8 @@ void main() {
     expect(find.textContaining('Mon–Sat'), findsOneWidget);
     expect(find.textContaining('7:00 AM – 11:00 AM'), findsOneWidget);
     expect(find.textContaining('20/day'), findsOneWidget);
+    expect(find.text('NOT LIVE YET'), findsOneWidget);
+    expect(find.text('Available tomorrow from 7:00 AM'), findsOneWidget);
   });
 
   testWidgets('buyer sees friendly recurring availability copy', (tester) async {

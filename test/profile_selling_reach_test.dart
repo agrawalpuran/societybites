@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:societybites/models/selling_reach.dart';
 import 'package:societybites/screens/profile_screen.dart';
 
 void _ignoreKnownLayoutNoise() {
@@ -104,7 +103,7 @@ void main() {
     );
 
     expect(find.text('Seller Settings'), findsOneWidget);
-    expect(find.text('Edit Profile'), findsOneWidget);
+    expect(find.byKey(const Key('profile-edit-button')), findsOneWidget);
     expect(find.text('SELLER FULFILMENT'), findsNothing);
     expect(find.text('PAYMENT METHODS'), findsNothing);
 
@@ -225,6 +224,6 @@ void main() {
     expect(find.text('Start Selling'), findsOneWidget);
     expect(find.text('Seller Settings'), findsNothing);
     expect(find.text('PAYMENT METHODS'), findsNothing);
-    expect(find.text('Edit Profile'), findsOneWidget);
+    expect(find.byKey(const Key('profile-edit-button')), findsOneWidget);
   });
 }

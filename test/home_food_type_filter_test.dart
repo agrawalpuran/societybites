@@ -276,7 +276,7 @@ void main() {
     expect(selected, foodTypeNonVeg);
   });
 
-  testWidgets('Home food type toggle cycles All → Veg → Non-Veg without fetching', (
+  testWidgets('Home food type chips select All, Veg, and Non-veg without fetching', (
     tester,
   ) async {
     var fetches = 0;
@@ -301,21 +301,20 @@ void main() {
 
     expect(selected, isNull);
     expect(find.text('All'), findsOneWidget);
+    expect(find.text('Veg'), findsOneWidget);
+    expect(find.text('Non-veg'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('home-food-type-toggle')));
+    await tester.tap(find.byKey(const ValueKey('home-food-type-Veg')));
     await tester.pump();
     expect(selected, foodTypeVeg);
-    expect(find.text('Veg'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('home-food-type-toggle')));
+    await tester.tap(find.byKey(const ValueKey('home-food-type-Non-veg')));
     await tester.pump();
     expect(selected, foodTypeNonVeg);
-    expect(find.text('Non-Veg'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('home-food-type-toggle')));
+    await tester.tap(find.byKey(const ValueKey('home-food-type-All')));
     await tester.pump();
     expect(selected, isNull);
-    expect(find.text('All'), findsOneWidget);
     expect(fetches, 0);
   });
 
