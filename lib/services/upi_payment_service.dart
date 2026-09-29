@@ -15,6 +15,13 @@ bool shouldOfferUpiAppShortcuts({
       (platform == TargetPlatform.android || platform == TargetPlatform.iOS);
 }
 
+/// iOS GPay/PhonePe collect (`://upi/pay`) is a merchant rail. Personal
+/// neighbour VPAs fail there with HDFC's fake bank-limit screen. Open the
+/// UPI app instead and let the buyer paste the copied VPA.
+bool shouldHandoffUpiCollect({required TargetPlatform platform}) {
+  return platform == TargetPlatform.iOS;
+}
+
 class UpiAppLaunchTarget {
   const UpiAppLaunchTarget({
     required this.scheme,
@@ -28,7 +35,9 @@ class UpiAppLaunchTarget {
 
   String get baseUrl {
     final authority = host ?? '';
-    if (authority.isEmpty) return '$scheme:$path';
+    if (authority.isEmpty) {
+      return path.isEmpty ? '$scheme://' : '$scheme:$path';
+    }
     return '$scheme://$authority$path';
   }
 }
@@ -56,12 +65,9 @@ class UpiAppOption {
   }
 }
 
-/// Preferred launch targets. Query always comes from [buildUpiPayQuery].
-///
-/// iOS GPay/PhonePe only honor `://upi/pay`. `phonepe://pay` opens PhonePe's
-/// gallery-QR flow (₹2,000 cap / dismiss), not a normal collect.
-/// iOS GPay is probed as `tez://upi/pay` first (Indian PSP convention), then
-/// `gpay://upi/pay`.
+/// Preferred Android collect targets. Query always comes from
+/// [buildUpiAppLaunchUri]. iOS never uses these hosts — see
+/// [shouldHandoffUpiCollect].
 const configuredUpiApps = <UpiAppOption>[
   UpiAppOption(
     id: 'gpay',
@@ -179,13 +185,31 @@ List<UpiAppLaunchTarget> launchTargetsFor(
   UpiAppOption app, {
   required TargetPlatform platform,
 }) {
-  if (app.id == 'gpay' && platform == TargetPlatform.iOS) {
-    return const [
-      UpiAppLaunchTarget(scheme: 'tez', host: 'upi', path: '/pay'),
-      UpiAppLaunchTarget(scheme: 'gpay', host: 'upi', path: '/pay'),
+  if (shouldHandoffUpiCollect(platform: platform)) {
+    if (app.id == 'gpay') {
+      return const [
+        UpiAppLaunchTarget(scheme: 'tez'),
+        UpiAppLaunchTarget(scheme: 'gpay'),
+      ];
+    }
+    final seen = <String>{};
+    return [
+      for (final target in app.launchTargets)
+        if (seen.add(target.scheme)) UpiAppLaunchTarget(scheme: target.scheme),
     ];
   }
   return app.launchTargets;
+}
+
+Uri buildUpiAppOpenUri(UpiAppLaunchTarget target) {
+  return Uri.parse(target.baseUrl);
+}
+
+String upiHandoffCopyHint({
+  required String appName,
+  required String amount,
+}) {
+  return 'UPI ID copied. Pay ₹$amount in $appName to the copied ID.';
 }
 
 /// [Uri.parse] / [Uri.toString] turn spaces into `+`. Keep NPCI `%20`.
@@ -220,7 +244,7 @@ String upiLaunchString(Uri uri) {
   final authority = uri.host;
   final path = uri.path;
   final base = authority.isEmpty
-      ? '${uri.scheme}:$path'
+      ? (path.isEmpty ? '${uri.scheme}://' : '${uri.scheme}:$path')
       : '${uri.scheme}://$authority$path';
   return query.isEmpty ? base : '$base?${query.join('&')}';
 }
@@ -238,7 +262,9 @@ Future<List<UpiAppOption>> getAvailableUpiApps(
   final available = <UpiAppOption>[];
   for (final app in configuredUpiApps) {
     for (final target in launchTargetsFor(app, platform: platform)) {
-      final uri = buildUpiAppLaunchUri(upiPayUri: upiPayUri, target: target);
+      final uri = shouldHandoffUpiCollect(platform: platform)
+          ? buildUpiAppOpenUri(target)
+          : buildUpiAppLaunchUri(upiPayUri: upiPayUri, target: target);
       final launchable = await _safeCanLaunch(canLaunch, uri);
       if (launchable) {
         available.add(app.withLaunchUri(uri));

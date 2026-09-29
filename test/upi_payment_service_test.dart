@@ -188,10 +188,10 @@ void main() {
     );
     expect(onlyPhonePe.map((app) => app.id), ['phonepe']);
     expect(onlyPhonePe.single.resolvedLaunchUri?.scheme, 'phonepe');
-    expect(onlyPhonePe.single.resolvedLaunchUri?.host, 'upi');
+    expect(onlyPhonePe.single.resolvedLaunchUri?.host, isEmpty);
     expect(
       upiLaunchString(onlyPhonePe.single.resolvedLaunchUri!),
-      startsWith('phonepe://upi/pay?'),
+      'phonepe://',
     );
 
     final iosGpay = await getAvailableUpiApps(
@@ -202,8 +202,10 @@ void main() {
     );
     expect(iosGpay.first.id, 'gpay');
     expect(iosGpay.first.resolvedLaunchUri?.scheme, 'tez');
-    expect(iosGpay.first.resolvedLaunchUri?.host, 'upi');
-    expect(iosGpay.first.resolvedLaunchUri?.path, '/pay');
+    expect(iosGpay.first.resolvedLaunchUri?.host, isEmpty);
+    expect(iosGpay.first.resolvedLaunchUri?.path, isEmpty);
+    expect(upiLaunchString(iosGpay.first.resolvedLaunchUri!), 'tez://');
+    expect(iosGpay.first.resolvedLaunchUri?.query, isEmpty);
 
     final androidGpay = await getAvailableUpiApps(
       upi,
@@ -213,6 +215,29 @@ void main() {
     );
     expect(androidGpay.first.id, 'gpay');
     expect(androidGpay.first.resolvedLaunchUri?.scheme, 'gpay');
+  });
+
+  test('iOS UPI shortcuts open the app without a collect URI', () {
+    expect(shouldHandoffUpiCollect(platform: TargetPlatform.iOS), isTrue);
+    expect(shouldHandoffUpiCollect(platform: TargetPlatform.android), isFalse);
+
+    final gpay = configuredUpiApps.first;
+    final iosTargets = launchTargetsFor(gpay, platform: TargetPlatform.iOS);
+    expect(iosTargets.map((t) => t.scheme).toList(), ['tez', 'gpay']);
+    expect(iosTargets.first.host, isNull);
+    expect(upiLaunchString(buildUpiAppOpenUri(iosTargets.first)), 'tez://');
+    expect(
+      upiHandoffCopyHint(appName: 'GPay', amount: '220.00'),
+      'UPI ID copied. Pay ₹220.00 in GPay to the copied ID.',
+    );
+
+    final androidTargets = launchTargetsFor(
+      gpay,
+      platform: TargetPlatform.android,
+    );
+    expect(androidTargets.first.scheme, 'gpay');
+    expect(androidTargets.first.host, 'upi');
+    expect(androidTargets.first.path, '/pay');
   });
 
   test('sanitizes UPI transaction references', () {

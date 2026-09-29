@@ -56,6 +56,7 @@ class _PaymentScreenState extends State<PaymentScreen>
   String? _sellerUpiDisplayName;
   String? _loadError;
   String? _upiLaunchError;
+  String? _upiHandoffHint;
   List<UpiAppOption> _availableApps = const [];
 
   bool get _hasUpi => _sellerUpiId != null && isValidUpiId(_sellerUpiId!);
@@ -264,26 +265,46 @@ class _PaymentScreenState extends State<PaymentScreen>
   Future<void> _launchSelectedUpiApp(UpiAppOption app) async {
     final resolved = app.resolvedLaunchUri;
     if (resolved == null || _order.orderTotal <= 0) return;
-    final launchUri = buildUpiAppLaunchUri(
-      upiPayUri: _upiPaymentUri,
-      target: launchTargetFromUri(resolved),
+    final handoff = shouldHandoffUpiCollect(
+      platform: defaultTargetPlatform,
     );
+    final launchUri = handoff
+        ? resolved
+        : buildUpiAppLaunchUri(
+            upiPayUri: _upiPaymentUri,
+            target: launchTargetFromUri(resolved),
+          );
     try {
-      setState(() => _upiLaunchError = null);
-      if (!kIsWeb &&
-          defaultTargetPlatform == TargetPlatform.iOS &&
-          widget.launchUpi == null) {
-        final upiId = _sellerUpiId?.trim();
-        if (upiId != null && upiId.isNotEmpty) {
-          await Clipboard.setData(ClipboardData(text: upiId));
+      setState(() {
+        _upiLaunchError = null;
+        _upiHandoffHint = null;
+      });
+      if (handoff) {
+        try {
+          final upiId = _sellerUpiId?.trim();
+          if (upiId != null && upiId.isNotEmpty) {
+            await Clipboard.setData(ClipboardData(text: upiId));
+          }
+        } catch (_) {
+          // Opening the UPI app still works if copy is blocked.
         }
       }
       final launch = widget.launchUpi;
       final launched = launch != null
           ? await launch(launchUri)
           : await _launchUpiUri(launchUri);
-      if (!launched && mounted) {
+      if (!mounted) return;
+      if (!launched) {
         setState(() => _upiLaunchError = _noUpiAppMessage);
+        return;
+      }
+      if (handoff) {
+        setState(() {
+          _upiHandoffHint = upiHandoffCopyHint(
+            appName: app.displayName,
+            amount: _amount,
+          );
+        });
       }
     } catch (_) {
       if (!mounted) return;
@@ -681,9 +702,11 @@ class _PaymentScreenState extends State<PaymentScreen>
             const SizedBox(height: 16),
             _buildOrDivider(),
             const SizedBox(height: 12),
-            const Text(
-              'Pay using your UPI app',
-              style: TextStyle(
+            Text(
+              shouldHandoffUpiCollect(platform: defaultTargetPlatform)
+                  ? 'Open your UPI app'
+                  : 'Pay using your UPI app',
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF101617),
@@ -698,6 +721,10 @@ class _PaymentScreenState extends State<PaymentScreen>
                 for (final app in _availableApps) _buildUpiAppShortcut(app),
               ],
             ),
+          ],
+          if (_upiHandoffHint != null) ...[
+            const SizedBox(height: 12),
+            _buildUpiHandoffHint(),
           ],
           if (_upiLaunchError != null) ...[
             const SizedBox(height: 12),
@@ -822,6 +849,28 @@ class _PaymentScreenState extends State<PaymentScreen>
         ),
         Expanded(child: Divider(color: Color(0xFFE0E5E3))),
       ],
+    );
+  }
+
+  Widget _buildUpiHandoffHint() {
+    return Container(
+      key: const ValueKey('upi-handoff-hint'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF4F2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFC5D9D2)),
+      ),
+      child: Text(
+        _upiHandoffHint!,
+        style: const TextStyle(
+          color: Color(0xFF0E5A47),
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          height: 1.35,
+        ),
+      ),
     );
   }
 
