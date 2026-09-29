@@ -461,73 +461,13 @@ void main() {
       await tester.pump();
 
       expect(find.text('Pay with UPI App'), findsNothing);
-      expect(find.text('Open your UPI app'), findsOneWidget);
+      expect(find.text('Open your UPI app'), findsNothing);
       expect(find.text('Pay using your UPI app'), findsNothing);
-      expect(find.byKey(const ValueKey('upi-app-gpay')), findsOneWidget);
+      expect(find.byKey(const ValueKey('upi-app-gpay')), findsNothing);
+      expect(find.byKey(const ValueKey('upi-app-phonepe')), findsNothing);
       expect(find.byKey(const ValueKey('copy-upi-id')), findsOneWidget);
       expect(find.text('Scan QR code'), findsOneWidget);
       expect(find.text("I've Paid via UPI"), findsOneWidget);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
-
-  testWidgets('iOS GPay copies the UPI ID and opens GPay without collect', (
-    tester,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    Uri? launchedUri;
-    tester.view.physicalSize = const Size(800, 2000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    try {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: PaymentScreen(
-            order: const Order(
-              id: 'order-1',
-              orderId: 'SB-1001',
-              items: [],
-              date: 'Today',
-              status: 'accepted',
-              statusStep: 1,
-              orderTotal: 220,
-              subtotal: 220,
-              communityFee: 0,
-              paymentMethod: 'upi',
-              paymentStatus: 'pending',
-            ),
-            fetchOrder: (_) async => _orderJson(total: 220),
-            fetchPaymentInfo: _paymentInfo,
-            launchUpi: (uri) async {
-              launchedUri = uri;
-              return true;
-            },
-            canLaunchUpi: (_) async => true,
-            pollInterval: const Duration(hours: 1),
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
-
-      expect(find.text('Open your UPI app'), findsOneWidget);
-      final gpay = tester.widget<InkWell>(
-        find.byKey(const ValueKey('upi-app-gpay')),
-      );
-      gpay.onTap!();
-      await tester.pump();
-      await tester.pump();
-
-      expect(launchedUri?.scheme, 'tez');
-      expect(launchedUri?.host, isEmpty);
-      expect(launchedUri?.queryParameters, isEmpty);
-      expect(
-        find.text('UPI ID copied. Pay ₹220.00 in GPay to the copied ID.'),
-        findsOneWidget,
-      );
-      expect(find.byKey(const ValueKey('upi-handoff-hint')), findsOneWidget);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

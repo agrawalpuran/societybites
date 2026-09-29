@@ -11,8 +11,9 @@ bool shouldOfferUpiAppShortcuts({
   required bool isWeb,
   required TargetPlatform platform,
 }) {
-  return !isWeb &&
-      (platform == TargetPlatform.android || platform == TargetPlatform.iOS);
+  // iOS in-app UPI collect cannot credit a personal VPA. Hide app icons
+  // there; buyers use QR or copy UPI ID instead.
+  return !isWeb && platform == TargetPlatform.android;
 }
 
 /// iOS GPay/PhonePe collect (`://upi/pay`) is a merchant rail. Personal

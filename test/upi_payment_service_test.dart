@@ -68,14 +68,14 @@ void main() {
     );
   });
 
-  test('offers UPI app shortcuts on Android and iOS only', () {
+  test('offers UPI app shortcuts on Android only', () {
     expect(
       shouldOfferUpiAppShortcuts(isWeb: false, platform: TargetPlatform.android),
       isTrue,
     );
     expect(
       shouldOfferUpiAppShortcuts(isWeb: false, platform: TargetPlatform.iOS),
-      isTrue,
+      isFalse,
     );
     expect(
       shouldOfferUpiAppShortcuts(isWeb: true, platform: TargetPlatform.android),
@@ -180,32 +180,13 @@ void main() {
     );
     expect(web, isEmpty);
 
-    final onlyPhonePe = await getAvailableUpiApps(
-      upi,
-      canLaunch: (uri) async => uri.scheme == 'phonepe',
-      isWeb: false,
-      platform: TargetPlatform.iOS,
-    );
-    expect(onlyPhonePe.map((app) => app.id), ['phonepe']);
-    expect(onlyPhonePe.single.resolvedLaunchUri?.scheme, 'phonepe');
-    expect(onlyPhonePe.single.resolvedLaunchUri?.host, isEmpty);
-    expect(
-      upiLaunchString(onlyPhonePe.single.resolvedLaunchUri!),
-      'phonepe://',
-    );
-
-    final iosGpay = await getAvailableUpiApps(
+    final ios = await getAvailableUpiApps(
       upi,
       canLaunch: (_) async => true,
       isWeb: false,
       platform: TargetPlatform.iOS,
     );
-    expect(iosGpay.first.id, 'gpay');
-    expect(iosGpay.first.resolvedLaunchUri?.scheme, 'tez');
-    expect(iosGpay.first.resolvedLaunchUri?.host, isEmpty);
-    expect(iosGpay.first.resolvedLaunchUri?.path, isEmpty);
-    expect(upiLaunchString(iosGpay.first.resolvedLaunchUri!), 'tez://');
-    expect(iosGpay.first.resolvedLaunchUri?.query, isEmpty);
+    expect(ios, isEmpty);
 
     final androidGpay = await getAvailableUpiApps(
       upi,
@@ -217,27 +198,10 @@ void main() {
     expect(androidGpay.first.resolvedLaunchUri?.scheme, 'gpay');
   });
 
-  test('iOS UPI shortcuts open the app without a collect URI', () {
+  test('iOS does not load UPI app shortcuts', () {
+    expect(shouldOfferUpiAppShortcuts(isWeb: false, platform: TargetPlatform.iOS), isFalse);
     expect(shouldHandoffUpiCollect(platform: TargetPlatform.iOS), isTrue);
     expect(shouldHandoffUpiCollect(platform: TargetPlatform.android), isFalse);
-
-    final gpay = configuredUpiApps.first;
-    final iosTargets = launchTargetsFor(gpay, platform: TargetPlatform.iOS);
-    expect(iosTargets.map((t) => t.scheme).toList(), ['tez', 'gpay']);
-    expect(iosTargets.first.host, isNull);
-    expect(upiLaunchString(buildUpiAppOpenUri(iosTargets.first)), 'tez://');
-    expect(
-      upiHandoffCopyHint(appName: 'GPay', amount: '220.00'),
-      'UPI ID copied. Pay ₹220.00 in GPay to the copied ID.',
-    );
-
-    final androidTargets = launchTargetsFor(
-      gpay,
-      platform: TargetPlatform.android,
-    );
-    expect(androidTargets.first.scheme, 'gpay');
-    expect(androidTargets.first.host, 'upi');
-    expect(androidTargets.first.path, '/pay');
   });
 
   test('sanitizes UPI transaction references', () {
