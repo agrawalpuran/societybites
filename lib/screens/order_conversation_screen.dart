@@ -172,15 +172,21 @@ class _OrderConversationScreenState extends State<OrderConversationScreen>
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF101617),
         elevation: 0,
+        toolbarHeight: 64,
         title: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Messages',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
             ),
             Text(
               'Order #${widget.orderNumber}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -387,10 +393,13 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isBuyer = message.isFromBuyer;
     final time = _formatTime(message.createdAt);
-    return Align(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxBubble = (constraints.maxWidth - 8).clamp(160.0, 320.0);
+        return Align(
       alignment: isBuyer ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 280),
+        constraints: BoxConstraints(maxWidth: maxBubble),
         child: Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
@@ -411,7 +420,8 @@ class _MessageBubble extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                message.message,
+                _softBreak(message.message),
+                softWrap: true,
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.35,
@@ -430,7 +440,23 @@ class _MessageBubble extends StatelessWidget {
           ),
         ),
       ),
+        );
+      },
     );
+  }
+
+  static String _softBreak(String value) {
+    return value.replaceAllMapped(RegExp(r'\S{18,}'), (match) {
+      final word = match.group(0)!;
+      final buffer = StringBuffer();
+      for (var i = 0; i < word.length; i++) {
+        buffer.write(word[i]);
+        if (i % 12 == 11 && i != word.length - 1) {
+          buffer.write('\u200B');
+        }
+      }
+      return buffer.toString();
+    });
   }
 
   static String _formatTime(DateTime dt) {

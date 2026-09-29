@@ -59,11 +59,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyB9LJcTWHB2PcXaRCcZXMCmG-mr0lHFTNc',
-    appId: '1:959244904791:ios:123a1638e0d7450091f612',
+    appId: '1:959244904791:ios:18180ea77ee7072b91f612',
     messagingSenderId: '959244904791',
     projectId: 'society-bites',
     storageBucket: 'society-bites.firebasestorage.app',
-    iosBundleId: 'com.example.societybites',
+    iosBundleId: 'com.societybites.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(

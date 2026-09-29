@@ -362,10 +362,10 @@ void main() {
       expect(launchedUri?.queryParameters['pn'], 'Test Seller');
       expect(launchedUri?.queryParameters['am'], '245.00');
       expect(launchedUri?.queryParameters['cu'], 'INR');
-      expect(launchedUri?.queryParameters['tr'], startsWith('SB1001'));
-      expect(launchedUri?.queryParameters['mc'], '');
-      expect(launchedUri?.queryParameters['mode'], '00');
-      expect(launchedUri?.queryParameters['tn'], 'SocietyBites Order SB-1001');
+      expect(launchedUri?.queryParameters.containsKey('tr'), isFalse);
+      expect(launchedUri?.queryParameters.containsKey('mc'), isFalse);
+      expect(launchedUri?.queryParameters.containsKey('mode'), isFalse);
+      expect(launchedUri?.queryParameters.containsKey('tn'), isFalse);
       expect(find.text("I've Paid via UPI"), findsOneWidget);
     } finally {
       debugDefaultTargetPlatformOverride = null;

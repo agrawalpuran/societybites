@@ -101,28 +101,26 @@ void main() {
     final gpay = buildUpiAppLaunchUri(
       upiPayUri: upi,
       target: const UpiAppLaunchTarget(scheme: 'gpay', host: 'upi', path: '/pay'),
-      transactionRef: 'SB1023',
     );
     expect(gpay.scheme, 'gpay');
     expect(gpay.host, 'upi');
     expect(gpay.path, '/pay');
     expect(gpay.queryParameters['pa'], upi.queryParameters['pa']);
     expect(gpay.queryParameters['am'], '245.00');
-    expect(gpay.queryParameters['tr'], 'SB1023');
-    expect(gpay.queryParameters['mc'], '');
-    expect(gpay.queryParameters['mode'], '00');
+    expect(gpay.queryParameters.containsKey('tr'), isFalse);
+    expect(gpay.queryParameters.containsKey('mc'), isFalse);
+    expect(gpay.queryParameters.containsKey('mode'), isFalse);
+    expect(gpay.queryParameters.containsKey('tn'), isFalse);
     expect(upiLaunchString(gpay), startsWith('gpay://upi/pay?'));
-    expect(upiLaunchString(gpay), contains('SocietyBites%20Order%20SB-1023'));
-    expect(upiLaunchString(gpay), contains('mc='));
-    expect(upiLaunchString(gpay), contains('tr=SB1023'));
+    expect(upiLaunchString(gpay), contains('pn=Sharma%20Snacks'));
+    expect(upiLaunchString(gpay), isNot(contains('SocietyBites')));
+    expect(upiLaunchString(gpay), isNot(contains('mc=')));
+    expect(upiLaunchString(gpay), isNot(contains('tr=')));
     expect(upiLaunchString(gpay), isNot(contains('+')));
-    expect(encodedUpiLaunchUri(gpay).toString(), contains('%20'));
-    expect(encodedUpiLaunchUri(gpay).toString(), isNot(contains('+')));
 
     final phonepe = buildUpiAppLaunchUri(
       upiPayUri: upi,
       target: const UpiAppLaunchTarget(scheme: 'phonepe', host: 'upi', path: '/pay'),
-      transactionRef: 'SB1023',
     );
     expect(phonepe.scheme, 'phonepe');
     expect(phonepe.host, 'upi');
@@ -132,7 +130,6 @@ void main() {
     final paytm = buildUpiAppLaunchUri(
       upiPayUri: upi,
       target: const UpiAppLaunchTarget(scheme: 'paytm', host: 'upi', path: '/pay'),
-      transactionRef: 'SB1023',
     );
     expect(upiLaunchString(paytm), startsWith('paytm://upi/pay?'));
     expect(paytm.queryParameters['pa'], upi.queryParameters['pa']);
@@ -140,12 +137,11 @@ void main() {
     final bhim = buildUpiAppLaunchUri(
       upiPayUri: upi,
       target: const UpiAppLaunchTarget(scheme: 'bhim', host: 'upi', path: '/pay'),
-      transactionRef: 'SB1023',
     );
     expect(upiLaunchString(bhim), startsWith('bhim://upi/pay?'));
   });
 
-  test('app launch uses a unique tr per attempt', () {
+  test('app launch omits merchant collect fields', () {
     final upi = buildUpiPaymentUri(
       upiId: 'seller.name@okaxis',
       payeeName: 'Sharma Snacks',
@@ -154,20 +150,9 @@ void main() {
       transactionRef: 'SB-1023',
     );
     const target = UpiAppLaunchTarget(scheme: 'gpay', host: 'upi', path: '/pay');
-    final first = buildUpiAppLaunchUri(
-      upiPayUri: upi,
-      target: target,
-      now: DateTime.utc(2026, 9, 29, 5),
-    );
-    final second = buildUpiAppLaunchUri(
-      upiPayUri: upi,
-      target: target,
-      now: DateTime.utc(2026, 9, 29, 6),
-    );
-    expect(first.queryParameters['tr'], isNot(second.queryParameters['tr']));
-    expect(first.queryParameters['tr'], startsWith('SB1023'));
-    expect(first.queryParameters['mc'], '');
-    expect(first.queryParameters['mode'], '00');
+    final launched = buildUpiAppLaunchUri(upiPayUri: upi, target: target);
+    expect(launched.queryParameters.keys.toList(), ['pa', 'pn', 'am', 'cu']);
+    expect(upiLaunchString(launched), 'gpay://upi/pay?pa=seller.name@okaxis&pn=Sharma%20Snacks&am=245.00&cu=INR');
   });
 
   test('getAvailableUpiApps hides apps that cannot launch', () async {

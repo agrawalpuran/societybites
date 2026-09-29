@@ -270,6 +270,14 @@ class _PaymentScreenState extends State<PaymentScreen>
     );
     try {
       setState(() => _upiLaunchError = null);
+      if (!kIsWeb &&
+          defaultTargetPlatform == TargetPlatform.iOS &&
+          widget.launchUpi == null) {
+        final upiId = _sellerUpiId?.trim();
+        if (upiId != null && upiId.isNotEmpty) {
+          await Clipboard.setData(ClipboardData(text: upiId));
+        }
+      }
       final launch = widget.launchUpi;
       final launched = launch != null
           ? await launch(launchUri)

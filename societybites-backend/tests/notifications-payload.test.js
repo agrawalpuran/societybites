@@ -22,5 +22,8 @@ assert(
 );
 assert(ANDROID_CHANNEL_ID === "societybites_orders", "channel constant");
 assert(message.data.notificationType === "order_accepted", "data type");
+assert(message.apns.headers["apns-priority"] === "10", "apns priority");
+assert(message.apns.payload.aps.sound === "default", "apns sound");
+assert(message.apns.payload.aps.alert.title === "Order confirmed", "apns title");
 
 console.log("notifications-payload.test.js passed");

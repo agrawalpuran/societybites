@@ -148,32 +148,21 @@ String buildUpiPayQuery({
   return parts.join('&');
 }
 
-/// GPay in-app collect is a P2M rail. Personal VPAs fail with a fake HDFC
-/// "bank limit" unless `mc` is present (empty is OK) and `tr` is unique per
-/// tap. QR stays a P2P `upi://pay` string without `mc`.
+/// App shortcuts must look like a P2P send-to-VPA. `mc`, `tr`, `tn`, and
+/// `mode` make GPay treat a neighbour's personal VPA as a merchant collect.
+/// HDFC then rejects Pay with a fake "bank limit" even though the same
+/// amount succeeds when the UPI ID is pasted in GPay. QR stays the full
+/// NPCI `upi://pay` string.
 Uri buildUpiAppLaunchUri({
   required Uri upiPayUri,
   required UpiAppLaunchTarget target,
-  String? transactionRef,
-  DateTime? now,
 }) {
   final params = Map<String, String>.from(upiPayUri.queryParameters);
-  final tr = sanitizeUpiTransactionRef(
-    transactionRef ??
-        uniqueUpiTransactionRef(
-          params['tr'] ?? params['tn'] ?? 'SBORDER',
-          now: now,
-        ),
-  );
   final query = [
     if (params['pa'] != null) 'pa=${params['pa']}',
     if (params['pn'] != null) 'pn=${encodeUpiQueryValue(params['pn']!)}',
-    'mc=',
-    'tr=$tr',
-    if (params['tn'] != null) 'tn=${encodeUpiQueryValue(params['tn']!)}',
     if (params['am'] != null) 'am=${params['am']}',
     if (params['cu'] != null) 'cu=${params['cu']}',
-    'mode=00',
   ].join('&');
   return encodedUpiLaunchUri(Uri.parse('${target.baseUrl}?$query'));
 }

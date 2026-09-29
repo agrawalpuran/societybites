@@ -16,6 +16,20 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
+/// iOS FCM tokens are unavailable until APNs has registered.
+Future<String?> waitForApnsToken({
+  required Future<String?> Function() readToken,
+  int attempts = 15,
+  Duration delay = const Duration(milliseconds: 400),
+}) async {
+  for (var i = 0; i < attempts; i++) {
+    final token = await readToken();
+    if (token != null && token.isNotEmpty) return token;
+    await Future.delayed(delay);
+  }
+  return null;
+}
+
 /// Optional soft FCM registration + foreground/tap handling.
 /// Never blocks login or orders if permission is denied.
 class PushNotificationService {
@@ -48,6 +62,12 @@ class PushNotificationService {
       _initialized = true;
 
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
       FirebaseMessaging.onMessage.listen((message) {
         onForegroundOrderUpdate?.call();
@@ -94,7 +114,7 @@ class PushNotificationService {
         return;
       }
 
-      final token = await messaging.getToken();
+      final token = await _fcmToken(messaging);
       if (kDebugMode) {
         debugPrint(
           '[push] fcmToken ${token == null || token.isEmpty ? 'missing' : 'obtained'}',
@@ -131,6 +151,19 @@ class PushNotificationService {
         debugPrint('[push] registerIfPossible failed: $err');
       }
     }
+  }
+
+  static Future<String?> _fcmToken(FirebaseMessaging messaging) async {
+    if (Platform.isIOS) {
+      final apns = await waitForApnsToken(readToken: messaging.getAPNSToken);
+      if (apns == null || apns.isEmpty) {
+        if (kDebugMode) {
+          debugPrint('[push] APNS token not ready');
+        }
+        return null;
+      }
+    }
+    return messaging.getToken();
   }
 
   static Future<void> unregister() async {

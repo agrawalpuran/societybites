@@ -2055,8 +2055,10 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
             ),
           ],
           const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -2081,10 +2083,8 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
               _PaymentBadge(paymentStatus: order.paymentStatus),
-              if (isCash) ...[
-                const SizedBox(width: 8),
+              if (isCash)
                 const Text(
                   'CASH',
                   style: TextStyle(
@@ -2094,9 +2094,6 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                     color: Color(0xFF8A9491),
                   ),
                 ),
-              ],
-              const Spacer(),
-              const SizedBox(width: 8),
               OrderMessagesButton(
                 order: order,
                 isSellerView: true,
@@ -2685,8 +2682,10 @@ class SellerPastOrderCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -2707,10 +2706,7 @@ class SellerPastOrderCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
               _PaymentBadge(paymentStatus: order.paymentStatus),
-              const Spacer(),
-              const SizedBox(width: 8),
               OrderMessagesButton(
                 order: order,
                 isSellerView: true,

@@ -132,6 +132,8 @@ class _OrderMessagesButtonState extends State<OrderMessagesButton>
             const SizedBox(width: 8),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: boxed || _hasUnread ? 13 : 12,

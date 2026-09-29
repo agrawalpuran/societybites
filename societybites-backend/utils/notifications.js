@@ -37,6 +37,17 @@ function buildFcmMessage(token, { title, body, data }) {
         sound: "default",
       },
     },
+    apns: {
+      headers: {
+        "apns-priority": "10",
+      },
+      payload: {
+        aps: {
+          alert: { title, body },
+          sound: "default",
+        },
+      },
+    },
   };
 }
 
