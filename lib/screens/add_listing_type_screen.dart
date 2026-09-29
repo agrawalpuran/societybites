@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../web/web_page_frame.dart';
+
 import '../models/data.dart';
 import '../models/listing_availability.dart';
 import '../services/api_service.dart';
@@ -121,7 +123,9 @@ class _AddListingTypeScreenState extends State<AddListingTypeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       body: SafeArea(
         child: Column(
@@ -256,6 +260,8 @@ class _AddListingTypeScreenState extends State<AddListingTypeScreen> {
           ],
         ),
       ),
+    ),
+      maxWidth: 840,
     );
   }
 }

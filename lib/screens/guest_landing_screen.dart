@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../config/launch_config.dart';
 import '../models/guest_discovery.dart';
+import '../web/web_breakpoints.dart';
 import '../widgets/app_header.dart';
 import 'guest_kitchens_screen.dart';
 import 'login_screen.dart';
@@ -77,8 +78,87 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
     );
   }
 
+  Widget _buildWebLanding() {
+    final width = MediaQuery.sizeOf(context).width;
+    final sideBySide = width >= 980;
+
+    return Scaffold(
+      backgroundColor: webPageBackground,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1080),
+            child: ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 28),
+              children: [
+                _SocietyBitesHeader(onSignIn: _openSignIn),
+                if (sideBySide)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: _HeroSection(
+                          onExplore: () => _openRealMarketplace(),
+                          onBrowseGuest: () => _openRealMarketplace(),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 6,
+                        child: _HeroCarousel(
+                          controller: _pageController,
+                          height: 300,
+                          page: _page,
+                          onPageChanged: (index) =>
+                              setState(() => _page = index),
+                        ),
+                      ),
+                    ],
+                  )
+                else ...[
+                  _HeroSection(
+                    onExplore: () => _openRealMarketplace(),
+                    onBrowseGuest: () => _openRealMarketplace(),
+                  ),
+                  _HeroCarousel(
+                    controller: _pageController,
+                    height: 240,
+                    page: _page,
+                    onPageChanged: (index) => setState(() => _page = index),
+                  ),
+                ],
+                const _CuratedCategoriesHeading(),
+                const _CuratedCategories(),
+                _ExploreKitchensSection(
+                  onTap: () => _openRealMarketplace(),
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(24, 16, 24, 8),
+                  child: Text(
+                    'No account required to browse. Sign in only when ordering.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF8A9491),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (useWebMarketplaceLayout(context)) {
+      return _buildWebLanding();
+    }
+
     final width = MediaQuery.sizeOf(context).width;
     final heroHeight = (width / 1.5).clamp(210.0, 300.0);
 

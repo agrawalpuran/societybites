@@ -101,20 +101,28 @@ void main() {
     final gpay = buildUpiAppLaunchUri(
       upiPayUri: upi,
       target: const UpiAppLaunchTarget(scheme: 'gpay', host: 'upi', path: '/pay'),
+      transactionRef: 'SB1023',
     );
     expect(gpay.scheme, 'gpay');
     expect(gpay.host, 'upi');
     expect(gpay.path, '/pay');
     expect(gpay.queryParameters['pa'], upi.queryParameters['pa']);
     expect(gpay.queryParameters['am'], '245.00');
-    expect(gpay.queryParameters.containsKey('tr'), isFalse);
+    expect(gpay.queryParameters['tr'], 'SB1023');
+    expect(gpay.queryParameters['mc'], '');
+    expect(gpay.queryParameters['mode'], '00');
     expect(upiLaunchString(gpay), startsWith('gpay://upi/pay?'));
     expect(upiLaunchString(gpay), contains('SocietyBites%20Order%20SB-1023'));
+    expect(upiLaunchString(gpay), contains('mc='));
+    expect(upiLaunchString(gpay), contains('tr=SB1023'));
     expect(upiLaunchString(gpay), isNot(contains('+')));
+    expect(encodedUpiLaunchUri(gpay).toString(), contains('%20'));
+    expect(encodedUpiLaunchUri(gpay).toString(), isNot(contains('+')));
 
     final phonepe = buildUpiAppLaunchUri(
       upiPayUri: upi,
       target: const UpiAppLaunchTarget(scheme: 'phonepe', host: 'upi', path: '/pay'),
+      transactionRef: 'SB1023',
     );
     expect(phonepe.scheme, 'phonepe');
     expect(phonepe.host, 'upi');
@@ -124,6 +132,7 @@ void main() {
     final paytm = buildUpiAppLaunchUri(
       upiPayUri: upi,
       target: const UpiAppLaunchTarget(scheme: 'paytm', host: 'upi', path: '/pay'),
+      transactionRef: 'SB1023',
     );
     expect(upiLaunchString(paytm), startsWith('paytm://upi/pay?'));
     expect(paytm.queryParameters['pa'], upi.queryParameters['pa']);
@@ -131,8 +140,34 @@ void main() {
     final bhim = buildUpiAppLaunchUri(
       upiPayUri: upi,
       target: const UpiAppLaunchTarget(scheme: 'bhim', host: 'upi', path: '/pay'),
+      transactionRef: 'SB1023',
     );
     expect(upiLaunchString(bhim), startsWith('bhim://upi/pay?'));
+  });
+
+  test('app launch uses a unique tr per attempt', () {
+    final upi = buildUpiPaymentUri(
+      upiId: 'seller.name@okaxis',
+      payeeName: 'Sharma Snacks',
+      amount: 245,
+      transactionNote: 'SocietyBites Order SB-1023',
+      transactionRef: 'SB-1023',
+    );
+    const target = UpiAppLaunchTarget(scheme: 'gpay', host: 'upi', path: '/pay');
+    final first = buildUpiAppLaunchUri(
+      upiPayUri: upi,
+      target: target,
+      now: DateTime.utc(2026, 9, 29, 5),
+    );
+    final second = buildUpiAppLaunchUri(
+      upiPayUri: upi,
+      target: target,
+      now: DateTime.utc(2026, 9, 29, 6),
+    );
+    expect(first.queryParameters['tr'], isNot(second.queryParameters['tr']));
+    expect(first.queryParameters['tr'], startsWith('SB1023'));
+    expect(first.queryParameters['mc'], '');
+    expect(first.queryParameters['mode'], '00');
   });
 
   test('getAvailableUpiApps hides apps that cannot launch', () async {
@@ -173,10 +208,37 @@ void main() {
       upiLaunchString(onlyPhonePe.single.resolvedLaunchUri!),
       startsWith('phonepe://upi/pay?'),
     );
+
+    final iosGpay = await getAvailableUpiApps(
+      upi,
+      canLaunch: (_) async => true,
+      isWeb: false,
+      platform: TargetPlatform.iOS,
+    );
+    expect(iosGpay.first.id, 'gpay');
+    expect(iosGpay.first.resolvedLaunchUri?.scheme, 'tez');
+    expect(iosGpay.first.resolvedLaunchUri?.host, 'upi');
+    expect(iosGpay.first.resolvedLaunchUri?.path, '/pay');
+
+    final androidGpay = await getAvailableUpiApps(
+      upi,
+      canLaunch: (_) async => true,
+      isWeb: false,
+      platform: TargetPlatform.android,
+    );
+    expect(androidGpay.first.id, 'gpay');
+    expect(androidGpay.first.resolvedLaunchUri?.scheme, 'gpay');
   });
 
   test('sanitizes UPI transaction references', () {
     expect(sanitizeUpiTransactionRef('SB-307454'), 'SB307454');
     expect(sanitizeUpiTransactionRef(''), 'SBORDER');
+    expect(
+      uniqueUpiTransactionRef(
+        'SB-1023',
+        now: DateTime.utc(2026, 9, 29, 5),
+      ),
+      'SB1023${DateTime.utc(2026, 9, 29, 5).millisecondsSinceEpoch}',
+    );
   });
 }

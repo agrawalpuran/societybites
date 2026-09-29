@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'my_listings_cache.dart';
+import 'order_message_cache.dart';
 
 class SessionService {
   static const _secureStorage = FlutterSecureStorage();
@@ -243,6 +244,7 @@ class SessionService {
 
   static Future<void> clear() async {
     MyListingsCache.clear();
+    OrderMessageCache.clear();
     _memoryJwt = null;
     _memoryRefresh = null;
     _clearedThisProcess = true;

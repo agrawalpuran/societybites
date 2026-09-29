@@ -373,21 +373,25 @@ router.get(
 
     assertOrderParticipant(order, req.user.id);
 
-    await prisma.message.updateMany({
-      where: {
-        orderId: order.id,
-        senderId: { not: req.user.id },
-        readAt: null,
-      },
-      data: { readAt: new Date() },
-    });
-
     const rows = await prisma.message.findMany({
       where: { orderId: order.id },
       orderBy: { createdAt: "asc" },
     });
 
     res.json(rows.map((row) => serializeMessage(row, order)));
+
+    try {
+      await prisma.message.updateMany({
+        where: {
+          orderId: order.id,
+          senderId: { not: req.user.id },
+          readAt: null,
+        },
+        data: { readAt: new Date() },
+      });
+    } catch (_) {
+      // Messages already returned; unread badges catch up on the next poll.
+    }
   })
 );
 

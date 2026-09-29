@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../web/web_breakpoints.dart';
 import '../widgets/screen_loading_note.dart';
 
 String _humanizeStatus(String status) {
@@ -303,6 +304,159 @@ class _InsightsBody extends StatelessWidget {
     final trend = (data['dailyTrend'] as List?) ?? const [];
     final topItems = (data['topItems'] as List?) ?? const [];
     final recent = (data['recentOrders'] as List?) ?? const [];
+
+    if (useWebMarketplaceLayout(context)) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final kpis = constraints.maxWidth >= 900
+              ? Row(
+                  children: [
+                    Expanded(child: _KpiCard(label: 'Orders', value: '$orders')),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _KpiCard(label: 'Sales', value: _rupees(sales)),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _KpiCard(label: 'Items sold', value: '$itemsSold'),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _KpiCard(label: 'Avg order', value: _rupees(aov)),
+                    ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _KpiCard(label: 'Orders', value: '$orders'),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _KpiCard(label: 'Sales', value: _rupees(sales)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _KpiCard(
+                            label: 'Items sold',
+                            value: '$itemsSold',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _KpiCard(
+                            label: 'Avg order',
+                            value: _rupees(aov),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+          final trendCard = _SectionCard(
+            title: 'Sales & orders',
+            child: _TrendChart(points: trend),
+          );
+          final status = _SectionCard(
+            title: 'Order status',
+            child: Column(
+              children: [
+                for (final row in breakdown)
+                  _StatusRow(
+                    status: (row as Map)['status']?.toString() ?? '',
+                    count: (row['count'] as num?)?.toInt() ?? 0,
+                  ),
+              ],
+            ),
+          );
+          final top = _SectionCard(
+            title: 'Top selling items',
+            child: topItems.isEmpty
+                ? const Text(
+                    'No completed sales in this period yet.',
+                    style: TextStyle(color: Color(0xFF6A7774), fontSize: 13),
+                  )
+                : Column(
+                    children: [
+                      for (final item in topItems)
+                        _TopItemRow(
+                          item: Map<String, dynamic>.from(item as Map),
+                        ),
+                    ],
+                  ),
+          );
+          final recentCard = _SectionCard(
+            title: 'Recent orders',
+            trailing: onSeeAllOrders == null
+                ? null
+                : TextButton(
+                    onPressed: onSeeAllOrders,
+                    child: const Text('See all'),
+                  ),
+            child: recent.isEmpty
+                ? const Text(
+                    'No orders in this period.',
+                    style: TextStyle(color: Color(0xFF6A7774), fontSize: 13),
+                  )
+                : Column(
+                    children: [
+                      for (final order in recent)
+                        _RecentOrderRow(
+                          order: Map<String, dynamic>.from(order as Map),
+                        ),
+                    ],
+                  ),
+          );
+          if (constraints.maxWidth < 900) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                kpis,
+                const SizedBox(height: 12),
+                trendCard,
+                const SizedBox(height: 12),
+                status,
+                const SizedBox(height: 12),
+                top,
+                const SizedBox(height: 12),
+                recentCard,
+              ],
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              kpis,
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: trendCard),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        status,
+                        const SizedBox(height: 12),
+                        top,
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              recentCard,
+            ],
+          );
+        },
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

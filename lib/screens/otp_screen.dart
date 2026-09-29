@@ -9,6 +9,8 @@ import 'main_shell_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_config.dart';
 import '../services/session_service.dart';
+import '../web/web_auth_aside.dart';
+import '../web/web_breakpoints.dart';
 import '../widgets/otp_verify_heading.dart';
 
 export '../widgets/otp_verify_heading.dart';
@@ -356,118 +358,230 @@ class _OtpScreenState extends State<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (useWebMarketplaceLayout(context)) return _buildWebOtp();
     final size = MediaQuery.of(context).size;
     final horizontalPadding = size.width * 0.08;
+    final contentWidth = size.width - horizontalPadding * 2;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAF9),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned(
-              left: 0,
-              right: 0,
-              top: 0,
-              child: IgnorePointer(
-                child: Container(
-                  height: size.height * 0.23,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color(0xFF0D5745),
-                        Color(0x550D5745),
-                        Color(0x00F8FAF9),
-                      ],
-                    ),
+    return OtpKeyboardSafeScaffold(
+      gradientHeight: size.height * 0.23,
+      horizontalPadding: horizontalPadding,
+      scrollChild: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _BackButton(onTap: () => Navigator.pop(context)),
+          const SizedBox(height: 22),
+          _SecurityBadge(),
+          const SizedBox(height: 18),
+          const OtpVerifyHeading(),
+          const SizedBox(height: 12),
+          Text(
+            'Enter the code sent to your mobile.\n'
+            'We\'ve sent a 6-digit verification code to\n'
+            '${widget.phoneNumber}.',
+            style: const TextStyle(
+              fontSize: 18,
+              color: Color(0xFF3B4745),
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 42),
+          AutofillGroup(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(
+                _OtpScreenState._otpLength,
+                (index) => SizedBox(
+                  width:
+                      (contentWidth -
+                          (_OtpScreenState._otpLength - 1) * 8) /
+                      _OtpScreenState._otpLength,
+                  child: _OtpInputBox(
+                    controller: _controllers[index],
+                    focusNode: _focusNodes[index],
+                    autoFocus: index == 0,
+                    enableOtpAutofill: index == 0,
+                    onChanged: (value) => _onOtpChanged(index, value),
+                    isPrimary: index == 0,
                   ),
                 ),
               ),
             ),
-            SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: 20,
+          ),
+          const SizedBox(height: 28),
+          const Center(
+            child: Text(
+              'Didn\'t receive the code?',
+              style: TextStyle(
+                fontSize: 15,
+                color: Color(0xFF2F3D3A),
+                fontWeight: FontWeight.w500,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _BackButton(onTap: () => Navigator.pop(context)),
-                  const SizedBox(height: 22),
-                  _SecurityBadge(),
-                  const SizedBox(height: 18),
-                  const OtpVerifyHeading(),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Enter the code sent to your mobile.\n'
-                    'We\'ve sent a 6-digit verification code to\n'
-                    '${widget.phoneNumber}.',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      color: Color(0xFF3B4745),
-                      height: 1.45,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 42),
-                  AutofillGroup(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(
-                        _OtpScreenState._otpLength,
-                        (index) => SizedBox(
-                          width:
-                              (size.width -
-                                  (horizontalPadding * 2) -
-                                  (_OtpScreenState._otpLength - 1) * 8) /
-                              _OtpScreenState._otpLength,
-                          child: _OtpInputBox(
-                            controller: _controllers[index],
-                            focusNode: _focusNodes[index],
-                            autoFocus: index == 0,
-                            enableOtpAutofill: index == 0,
-                            onChanged: (value) => _onOtpChanged(index, value),
-                            isPrimary: index == 0,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-                  _PrimaryActionButton(
-                    text: 'Verify & Continue  →',
-                    isLoading: _isVerifying,
-                    onTap: _isVerifying ? null : _verifyOtp,
-                  ),
-                  const SizedBox(height: 28),
-                  const Center(
-                    child: Text(
-                      'Didn\'t receive the code?',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Color(0xFF2F3D3A),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Center(
-                    child: _ResendOtpButton(
-                      isLoading: _isResending,
-                      secondsRemaining: _resendSecondsRemaining,
-                      onTap: _isResending || _resendSecondsRemaining > 0
-                          ? null
-                          : _resendOtp,
-                    ),
-                  ),
-                  const SizedBox(height: 64),
-                  const _SecurityInfoCard(),
-                ],
-              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Center(
+            child: _ResendOtpButton(
+              isLoading: _isResending,
+              secondsRemaining: _resendSecondsRemaining,
+              onTap: _isResending || _resendSecondsRemaining > 0
+                  ? null
+                  : _resendOtp,
+            ),
+          ),
+          const SizedBox(height: 64),
+          const _SecurityInfoCard(),
+        ],
+      ),
+      bottomBar: _PrimaryActionButton(
+        text: 'Verify & Continue  →',
+        isLoading: _isVerifying,
+        onTap: _isVerifying ? null : _verifyOtp,
+      ),
+    );
+  }
+
+  Widget _buildWebOtp() {
+    final form = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 460),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: webLine),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x140E5A47),
+              blurRadius: 28,
+              offset: Offset(0, 16),
             ),
           ],
         ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(32, 20, 32, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  tooltip: 'Back',
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_rounded, color: webInk),
+                ),
+              ),
+              const OtpVerifyHeading(),
+              const SizedBox(height: 12),
+              Text(
+                'Enter the 6-digit code sent to ${widget.phoneNumber}.',
+                style: const TextStyle(
+                  fontSize: 16,
+                  height: 1.4,
+                  color: Color(0xFF3B4745),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 24),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const gap = 8.0;
+                  final boxWidth =
+                      (constraints.maxWidth - gap * (kOtpLength - 1)) /
+                      kOtpLength;
+                  return AutofillGroup(
+                    child: Row(
+                      children: [
+                        for (var index = 0; index < kOtpLength; index++) ...[
+                          if (index > 0) const SizedBox(width: gap),
+                          SizedBox(
+                            width: boxWidth,
+                            child: _OtpInputBox(
+                              controller: _controllers[index],
+                              focusNode: _focusNodes[index],
+                              autoFocus: index == 0,
+                              enableOtpAutofill: index == 0,
+                              onChanged: (value) => _onOtpChanged(index, value),
+                              isPrimary: index == 0,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 22),
+              const Center(
+                child: Text(
+                  'Didn\'t receive the code?',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Color(0xFF2F3D3A),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Center(
+                child: _ResendOtpButton(
+                  isLoading: _isResending,
+                  secondsRemaining: _resendSecondsRemaining,
+                  onTap: _isResending || _resendSecondsRemaining > 0
+                      ? null
+                      : _resendOtp,
+                ),
+              ),
+              const SizedBox(height: 22),
+              _PrimaryActionButton(
+                text: 'Verify & Continue  →',
+                isLoading: _isVerifying,
+                onTap: _isVerifying ? null : _verifyOtp,
+              ),
+              const SizedBox(height: 18),
+              const _SecurityInfoCard(),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return Scaffold(
+      backgroundColor: webPageBackground,
+      resizeToAvoidBottomInset: true,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 980) {
+            return SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 32,
+                  ),
+                  child: form,
+                ),
+              ),
+            );
+          }
+          return Row(
+            children: [
+              const Expanded(child: WebAuthAside()),
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 32,
+                    ),
+                    child: form,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -559,7 +673,8 @@ class _OtpInputBox extends StatelessWidget {
           ? const [AutofillHints.oneTimeCode]
           : null,
       autocorrect: false,
-      enableSuggestions: false,
+      // iOS shows the SMS OTP chip on the QuickType bar only if suggestions stay on.
+      enableSuggestions: enableOtpAutofill,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       onChanged: onChanged,
       style: const TextStyle(
@@ -607,6 +722,7 @@ class _PrimaryActionButton extends StatelessWidget {
       width: double.infinity,
       height: otpVerifyButtonHeight,
       child: ElevatedButton(
+        key: const Key('otp-verify-continue'),
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF0E5A47),

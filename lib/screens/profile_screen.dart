@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -13,6 +14,7 @@ import '../services/profile_photo_processor.dart';
 import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../services/push_notification_service.dart';
+import '../web/web_breakpoints.dart';
 import '../widgets/app_header.dart';
 import '../widgets/confirm_upi_id_dialog.dart';
 import '../widgets/photo_source_sheet.dart';
@@ -20,6 +22,7 @@ import '../widgets/profile_menu_tile.dart';
 import '../widgets/seller_avatar.dart';
 import 'admin/admin_shell_screen.dart';
 import 'guest_landing_screen.dart';
+import 'main_shell_screen.dart';
 import 'help_center_screen.dart';
 import 'legal_screen.dart';
 import 'login_screen.dart';
@@ -241,7 +244,10 @@ class ProfileScreenState extends State<ProfileScreen> {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(
+        builder: (_) =>
+            kIsWeb ? const MainShellScreen() : const LoginScreen(),
+      ),
       (_) => false,
     );
   }
@@ -316,7 +322,10 @@ class ProfileScreenState extends State<ProfileScreen> {
 
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const GuestLandingScreen()),
+        MaterialPageRoute(
+          builder: (_) =>
+              kIsWeb ? const MainShellScreen() : const GuestLandingScreen(),
+        ),
         (_) => false,
       );
     } catch (e) {
@@ -1543,8 +1552,205 @@ class ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildWebProfile() {
+    final identity = _ProfileCard(
+      name: _displayName,
+      phone: _phone,
+      role: _roleLabel,
+      societyName: _societyName,
+      flatNumber: _flatNumber,
+      photoUrl: _profilePhotoUrl,
+      onEdit: _openProfileEditor,
+    );
+    final account = <Widget>[
+      if (_role == 'buyer' || _role == null || _role == 'super_admin') ...[
+        const _WebSectionLabel('ACCOUNT'),
+        if (_role == 'buyer' || _role == null)
+          ProfileMenuTile(
+            icon: Icons.storefront_rounded,
+            title: 'Start Selling',
+            subtitle: 'List food for neighbors in your society',
+            onTap: _enableSelling,
+          ),
+        if (_role == 'super_admin')
+          ProfileMenuTile(
+            icon: Icons.admin_panel_settings_rounded,
+            title: 'Admin Portal',
+            subtitle: 'Manage platform settings',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AdminShellScreen(),
+                ),
+              );
+            },
+          ),
+      ],
+      if (_isSeller) ...[
+        const _WebSectionLabel('SELLER'),
+        ProfileMenuTile(
+          icon: Icons.settings_outlined,
+          title: 'Seller Settings',
+          subtitle: 'Manage payments, fulfilment & FSSAI',
+          onTap: _openSellerSettings,
+        ),
+      ],
+      const _WebSectionLabel('SUPPORT'),
+      ProfileMenuTile(
+        icon: Icons.help_outline_rounded,
+        title: 'Help Center',
+        subtitle: 'FAQs and community support',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const HelpCenterScreen()),
+          );
+        },
+      ),
+      ProfileMenuTile(
+        icon: Icons.privacy_tip_outlined,
+        title: 'Privacy Policy',
+        onTap: () => _openLegal('Privacy Policy', kPrivacyPolicyBody),
+      ),
+      ProfileMenuTile(
+        icon: Icons.description_outlined,
+        title: 'Terms of Service',
+        onTap: () => _openLegal('Terms of Service', kTermsOfServiceBody),
+      ),
+      ProfileMenuTile(
+        icon: Icons.info_outline_rounded,
+        title: 'About',
+        subtitle: 'App version and info',
+        onTap: _showAbout,
+      ),
+      const _WebSectionLabel('ACCOUNT & SECURITY'),
+      ProfileMenuTile(
+        icon: Icons.delete_outline_rounded,
+        title: 'Delete Account',
+        subtitle:
+            'Permanently delete your SocietyBites account and associated personal data.',
+        destructive: true,
+        onTap: _deletingAccount ? () {} : _confirmDeleteAccount,
+      ),
+      if (_deletingAccount) ...[
+        const SizedBox(height: 12),
+        const Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFFD94F4F),
+              ),
+            ),
+            SizedBox(width: 10),
+            Text(
+              'Deleting your account...',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF6A7774),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ];
+    final logout = SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: OutlinedButton.icon(
+        onPressed: _deletingAccount ? null : _logout,
+        icon: const Icon(Icons.logout_rounded, size: 20),
+        label: const Text(
+          'Log out',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFFD94F4F),
+          side: const BorderSide(color: Color(0xFFE8B4B4)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+    );
+
+    return Scaffold(
+      backgroundColor: webPageBackground,
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: webFrameMaxWidth),
+          child: RefreshIndicator(
+            color: webGreen,
+            onRefresh: _loadProfile,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
+              children: [
+                const Text(
+                  'My Profile',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w800,
+                    color: webInk,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final menus = Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: account,
+                    );
+                    if (constraints.maxWidth < 900) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          identity,
+                          const SizedBox(height: 8),
+                          menus,
+                          const SizedBox(height: 28),
+                          logout,
+                        ],
+                      );
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 380,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              identity,
+                              const SizedBox(height: 20),
+                              logout,
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 28),
+                        Expanded(child: menus),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (useWebMarketplaceLayout(context)) return _buildWebProfile();
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       body: SafeArea(
@@ -1557,7 +1763,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                   ),
                   padding: const EdgeInsets.only(bottom: 32),
                   children: [
-                    const AppHeader(),
+                    if (!useWebMarketplaceLayout(context)) const AppHeader(),
                     const SizedBox(height: 20),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -2317,6 +2523,28 @@ class _PendingSellerEnable {
           if (fssaiExpiry != null) 'expiry': fssaiExpiry,
         },
     };
+  }
+}
+
+class _WebSectionLabel extends StatelessWidget {
+  const _WebSectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 18, bottom: 10),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12,
+          letterSpacing: 1.4,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF8A9491),
+        ),
+      ),
+    );
   }
 }
 

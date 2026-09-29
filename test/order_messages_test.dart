@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/models/order_lifecycle.dart';
+import 'package:societybites/models/order_message.dart';
 import 'package:societybites/screens/order_conversation_screen.dart';
 import 'package:societybites/screens/orders_screen.dart';
 import 'package:societybites/screens/seller_dashboard_screen.dart';
+import 'package:societybites/services/order_message_cache.dart';
 import 'package:societybites/widgets/order_messages_button.dart';
 
 Map<String, dynamic> _orderJson({
@@ -46,6 +50,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
+    OrderMessageCache.clear();
     SharedPreferences.setMockInitialValues({
       'user_name': 'Test Neighbor',
       'flat_number': '101',
@@ -183,6 +188,89 @@ void main() {
     expect(find.byType(OrderConversationScreen), findsOneWidget);
     expect(find.text('Messages'), findsOneWidget);
     expect(find.text('Order #SB-545661'), findsOneWidget);
+  });
+
+  testWidgets('conversation chrome is visible while messages load', (tester) async {
+    final gate = Completer<List<Map<String, dynamic>>>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OrderConversationScreen(
+          orderId: 'o1',
+          orderNumber: 'SB-545661',
+          viewerIsSeller: false,
+          pollInterval: Duration.zero,
+          fetchMessages: (_) => gate.future,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Messages'), findsOneWidget);
+    expect(find.byKey(const Key('message-input')), findsOneWidget);
+    expect(find.byKey(const Key('messages-loading-bar')), findsOneWidget);
+    expect(find.text('Loading messages…'), findsOneWidget);
+    expect(find.text('No messages yet'), findsNothing);
+    expect(find.text('Type a message...'), findsOneWidget);
+
+    gate.complete([]);
+    await tester.pumpAndSettle();
+
+    expect(find.text('No messages yet'), findsOneWidget);
+    expect(find.byKey(const Key('messages-loading-bar')), findsNothing);
+  });
+
+  testWidgets('cached thread shows immediately while refresh runs', (tester) async {
+    OrderMessageCache.replace('o1', [
+      OrderMessage(
+        id: 'm1',
+        orderId: 'o1',
+        senderId: 'buyer',
+        message: 'Can I collect at 5:30?',
+        createdAt: DateTime.parse('2026-09-18T10:00:00.000Z'),
+        senderRole: 'buyer',
+      ),
+    ]);
+    final gate = Completer<List<Map<String, dynamic>>>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OrderConversationScreen(
+          orderId: 'o1',
+          orderNumber: 'SB-545661',
+          viewerIsSeller: false,
+          pollInterval: Duration.zero,
+          fetchMessages: (_) => gate.future,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Can I collect at 5:30?'), findsOneWidget);
+    expect(find.byKey(const Key('messages-loading-bar')), findsOneWidget);
+    expect(find.text('Loading messages…'), findsNothing);
+    expect(find.byKey(const Key('message-input')), findsOneWidget);
+
+    gate.complete([
+      {
+        'id': 'm1',
+        'orderId': 'o1',
+        'senderId': 'buyer',
+        'message': 'Can I collect at 5:30?',
+        'createdAt': '2026-09-18T10:00:00.000Z',
+        'senderRole': 'buyer',
+      },
+      {
+        'id': 'm2',
+        'orderId': 'o1',
+        'senderId': 'seller',
+        'message': "Yes, that's fine.",
+        'createdAt': '2026-09-18T10:01:00.000Z',
+        'senderRole': 'seller',
+      },
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(find.text("Yes, that's fine."), findsOneWidget);
+    expect(find.byKey(const Key('messages-loading-bar')), findsNothing);
   });
 
   testWidgets('conversation screen empty state', (tester) async {

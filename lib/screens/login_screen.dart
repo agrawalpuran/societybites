@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'otp_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_config.dart';
+import '../web/web_auth_aside.dart';
+import '../web/web_breakpoints.dart';
 import '../widgets/app_header.dart';
 
 bool get _isIosLayout => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
@@ -154,8 +156,107 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Widget _buildWebLogin() {
+    final theme = Theme.of(context);
+    final form = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 460),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: webLine),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x140E5A47),
+              blurRadius: 28,
+              offset: Offset(0, 16),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(32, 28, 32, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (Navigator.canPop(context))
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 20,
+                    ),
+                    color: const Color(0xFF3A4644),
+                  ),
+                ),
+              _HeaderSection(theme: theme),
+              const SizedBox(height: 22),
+              _InputSection(
+                controller: _phoneController,
+                focusNode: _phoneFocusNode,
+              ),
+              const SizedBox(height: 22),
+              _SendOtpButton(
+                isLoading: _isSendingOtp,
+                onTap: _isSendingOtp ? null : _sendOtp,
+              ),
+              const SizedBox(height: 22),
+              const _TrustIndicatorsRow(),
+              const SizedBox(height: 8),
+              const _FooterLinks(),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return Scaffold(
+      backgroundColor: webPageBackground,
+      resizeToAvoidBottomInset: true,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 980) {
+            return SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 32,
+                  ),
+                  child: form,
+                ),
+              ),
+            );
+          }
+          return Row(
+            children: [
+              const Expanded(child: WebAuthAside()),
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 32,
+                    ),
+                    child: form,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (useWebMarketplaceLayout(context)) {
+      return _buildWebLogin();
+    }
+
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
     final isIos = _isIosLayout;

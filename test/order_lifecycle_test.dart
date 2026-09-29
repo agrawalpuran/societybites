@@ -162,6 +162,25 @@ void main() {
     expect(BuyerOrderLifecycle.progressStep('accepted'), 1);
   });
 
+  test('progress step labels wrap only at the last space', () {
+    expect(
+      BuyerOrderLifecycle.progressStepDisplayLabel('Order Placed'),
+      'Order\nPlaced',
+    );
+    expect(
+      BuyerOrderLifecycle.progressStepDisplayLabel('Ready for Pickup'),
+      'Ready for\nPickup',
+    );
+    expect(
+      BuyerOrderLifecycle.progressStepDisplayLabel('Confirmed'),
+      'Confirmed',
+    );
+    expect(
+      BuyerOrderLifecycle.progressStepDisplayLabel('Completed'),
+      'Completed',
+    );
+  });
+
   test('buyer sees Ready for Pickup after READY', () {
     expect(BuyerOrderLifecycle.headline('ready'), 'Ready for Pickup');
     expect(

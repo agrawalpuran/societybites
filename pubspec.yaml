@@ -41,6 +41,7 @@ dependencies:
   image_picker: ^1.1.2
   image: ^4.5.4
   url_launcher: ^6.2.0
+  url_launcher_platform_interface: ^2.3.2
   qr_flutter: ^4.1.0
   firebase_messaging: 14.7.19
   flutter_secure_storage: 9.2.4
@@ -59,7 +60,7 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: true
-  ios: false
+  ios: true
   image_path: assets/branding/societybites_launcher_icon.png
   adaptive_icon_background: "#006837"
   adaptive_icon_foreground: assets/branding/societybites_launcher_icon.png

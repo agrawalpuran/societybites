@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:societybites/models/order_lifecycle.dart';
+import 'package:societybites/widgets/order_status_tracker.dart';
 
 List<String> _collectOverflows() {
   final overflows = <String>[];
@@ -135,24 +136,33 @@ void main() {
 
   testWidgets('order status steps wrap on a narrow iPhone width', (tester) async {
     final overflows = _collectOverflows();
-    await tester.binding.setSurfaceSize(const Size(320, 720));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.view.physicalSize = const Size(320, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: Padding(
-            padding: const EdgeInsets.all(18),
-            child: _StatusTrackerHarness(
-              currentStep: 2,
-              steps: BuyerOrderLifecycle.progressSteps,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              child: const OrderStatusTracker(
+                currentStep: 0,
+                steps: BuyerOrderLifecycle.progressSteps,
+              ),
             ),
           ),
         ),
       ),
     );
     await tester.pump();
-    expect(find.text('Ready for Pickup'), findsOneWidget);
+    expect(find.text('Ready for\nPickup'), findsOneWidget);
+    expect(find.text('Confirmed'), findsOneWidget);
+    expect(find.text('Completed'), findsOneWidget);
+    expect(tester.getSize(find.text('Confirmed')).height, lessThan(20));
+    expect(tester.getSize(find.text('Completed')).height, lessThan(20));
+    expect(tester.getSize(find.text('Order\nPlaced')).height, greaterThan(20));
     expect(overflows, isEmpty, reason: overflows.join('\n'));
   });
 }
@@ -188,51 +198,6 @@ class _TrustChip extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _StatusTrackerHarness extends StatelessWidget {
-  const _StatusTrackerHarness({
-    required this.currentStep,
-    required this.steps,
-  });
-
-  final int currentStep;
-  final List<String> steps;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(steps.length * 2 - 1, (i) {
-        if (i.isOdd) {
-          return Expanded(
-            child: Container(height: 2, color: const Color(0xFF0E5A47)),
-          );
-        }
-        final stepIndex = i ~/ 2;
-        return Expanded(
-          child: Column(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF0E5A47),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                steps[stepIndex],
-                textAlign: TextAlign.center,
-                softWrap: true,
-                style: const TextStyle(fontSize: 10, height: 1.2),
-              ),
-            ],
-          ),
-        );
-      }),
     );
   }
 }

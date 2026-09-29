@@ -38,6 +38,7 @@ class SellerAvatar extends StatelessWidget {
         child: hasUrl
             ? Image.network(
                 ApiService.imageUrl(url),
+                webHtmlElementStrategy: WebHtmlElementStrategy.never,
                 width: innerSize,
                 height: innerSize,
                 fit: BoxFit.cover,

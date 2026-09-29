@@ -60,6 +60,8 @@ class UpiAppOption {
 ///
 /// iOS GPay/PhonePe only honor `://upi/pay`. `phonepe://pay` opens PhonePe's
 /// gallery-QR flow (₹2,000 cap / dismiss), not a normal collect.
+/// iOS GPay is probed as `tez://upi/pay` first (Indian PSP convention), then
+/// `gpay://upi/pay`.
 const configuredUpiApps = <UpiAppOption>[
   UpiAppOption(
     id: 'gpay',
@@ -146,45 +148,92 @@ String buildUpiPayQuery({
   return parts.join('&');
 }
 
-/// Copies the already-encoded NPCI query onto an app scheme without `+` encoding.
+/// GPay in-app collect is a P2M rail. Personal VPAs fail with a fake HDFC
+/// "bank limit" unless `mc` is present (empty is OK) and `tr` is unique per
+/// tap. QR stays a P2P `upi://pay` string without `mc`.
 Uri buildUpiAppLaunchUri({
   required Uri upiPayUri,
   required UpiAppLaunchTarget target,
-  bool includeTransactionRef = false,
+  String? transactionRef,
+  DateTime? now,
 }) {
   final params = Map<String, String>.from(upiPayUri.queryParameters);
-  if (!includeTransactionRef) {
-    params.remove('tr');
-  }
+  final tr = sanitizeUpiTransactionRef(
+    transactionRef ??
+        uniqueUpiTransactionRef(
+          params['tr'] ?? params['tn'] ?? 'SBORDER',
+          now: now,
+        ),
+  );
   final query = [
     if (params['pa'] != null) 'pa=${params['pa']}',
     if (params['pn'] != null) 'pn=${encodeUpiQueryValue(params['pn']!)}',
+    'mc=',
+    'tr=$tr',
+    if (params['tn'] != null) 'tn=${encodeUpiQueryValue(params['tn']!)}',
     if (params['am'] != null) 'am=${params['am']}',
     if (params['cu'] != null) 'cu=${params['cu']}',
-    if (params['tn'] != null) 'tn=${encodeUpiQueryValue(params['tn']!)}',
-    if (includeTransactionRef && params['tr'] != null) 'tr=${params['tr']}',
+    'mode=00',
   ].join('&');
-  return Uri.parse('${target.baseUrl}?$query');
+  return encodedUpiLaunchUri(Uri.parse('${target.baseUrl}?$query'));
+}
+
+UpiAppLaunchTarget launchTargetFromUri(Uri uri) {
+  return UpiAppLaunchTarget(
+    scheme: uri.scheme,
+    host: uri.host.isEmpty ? null : uri.host,
+    path: uri.path,
+  );
+}
+
+List<UpiAppLaunchTarget> launchTargetsFor(
+  UpiAppOption app, {
+  required TargetPlatform platform,
+}) {
+  if (app.id == 'gpay' && platform == TargetPlatform.iOS) {
+    return const [
+      UpiAppLaunchTarget(scheme: 'tez', host: 'upi', path: '/pay'),
+      UpiAppLaunchTarget(scheme: 'gpay', host: 'upi', path: '/pay'),
+    ];
+  }
+  return app.launchTargets;
+}
+
+/// [Uri.parse] / [Uri.toString] turn spaces into `+`. Keep NPCI `%20`.
+Uri encodedUpiLaunchUri(Uri uri) {
+  final launch = upiLaunchString(uri);
+  final queryStart = launch.indexOf('?');
+  if (queryStart < 0) return uri;
+  final parsed = Uri.parse(launch);
+  return Uri(
+    scheme: parsed.scheme,
+    host: parsed.host.isEmpty ? null : parsed.host,
+    path: parsed.path,
+    query: launch.substring(queryStart + 1),
+  );
 }
 
 /// Canonical string for [launchUrl] / QR so spaces stay `%20`.
 String upiLaunchString(Uri uri) {
   final params = uri.queryParameters;
-  final keys = ['pa', 'pn', 'am', 'cu', 'tn', 'tr']
-      .where((key) => params[key] != null && params[key]!.isNotEmpty);
-  final query = keys.map((key) {
+  const keys = ['pa', 'pn', 'mc', 'tr', 'tn', 'am', 'cu', 'mode'];
+  final query = <String>[];
+  for (final key in keys) {
+    if (!params.containsKey(key) || params[key] == null) continue;
     final value = params[key]!;
+    if (value.isEmpty && key != 'mc') continue;
     if (key == 'pn' || key == 'tn') {
-      return '$key=${encodeUpiQueryValue(value)}';
+      query.add('$key=${encodeUpiQueryValue(value)}');
+    } else {
+      query.add('$key=$value');
     }
-    return '$key=$value';
-  }).join('&');
+  }
   final authority = uri.host;
   final path = uri.path;
   final base = authority.isEmpty
       ? '${uri.scheme}:$path'
       : '${uri.scheme}://$authority$path';
-  return query.isEmpty ? base : '$base?$query';
+  return query.isEmpty ? base : '$base?${query.join('&')}';
 }
 
 Future<List<UpiAppOption>> getAvailableUpiApps(
@@ -199,7 +248,7 @@ Future<List<UpiAppOption>> getAvailableUpiApps(
 
   final available = <UpiAppOption>[];
   for (final app in configuredUpiApps) {
-    for (final target in app.launchTargets) {
+    for (final target in launchTargetsFor(app, platform: platform)) {
       final uri = buildUpiAppLaunchUri(upiPayUri: upiPayUri, target: target);
       final launchable = await _safeCanLaunch(canLaunch, uri);
       if (launchable) {
@@ -232,6 +281,12 @@ String sanitizeUpiTransactionRef(String value) {
   final sanitized = value.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
   if (sanitized.isEmpty) return 'SBORDER';
   return sanitized.length <= 35 ? sanitized : sanitized.substring(0, 35);
+}
+
+/// GPay rejects reused `tr` values as a fake bank-limit error.
+String uniqueUpiTransactionRef(String seed, {DateTime? now}) {
+  final timestamp = (now ?? DateTime.now()).millisecondsSinceEpoch.toString();
+  return sanitizeUpiTransactionRef('$seed$timestamp');
 }
 
 Uri buildUpiPaymentUri({

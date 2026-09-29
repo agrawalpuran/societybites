@@ -41,6 +41,7 @@ class PreOrderCoverImage extends StatelessWidget {
                 resolvedUrl,
                 key: const ValueKey('preorder-cover-image'),
                 fit: BoxFit.cover,
+                webHtmlElementStrategy: WebHtmlElementStrategy.never,
                 errorBuilder: (context, error, stackTrace) =>
                     const PreOrderCoverPlaceholder(),
               ),

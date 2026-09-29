@@ -196,6 +196,13 @@ class BuyerOrderLifecycle {
     'Completed',
   ];
 
+  /// Wrap only at the last space so single words like Confirmed are not split.
+  static String progressStepDisplayLabel(String step) {
+    final lastSpace = step.lastIndexOf(' ');
+    if (lastSpace <= 0) return step;
+    return '${step.substring(0, lastSpace)}\n${step.substring(lastSpace + 1)}';
+  }
+
   static int progressStep(String status) {
     switch (status) {
       case 'pending':

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../web/web_page_frame.dart';
+
 import '../models/data.dart';
 import '../models/nearby_seller.dart';
 import '../models/seller_fulfilment.dart';
@@ -407,7 +409,9 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: preorderBackground,
       appBar: AppBar(
         backgroundColor: preorderBackground,
@@ -436,6 +440,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
               ),
             ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    ),
     );
   }
 

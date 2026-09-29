@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../web/web_page_frame.dart';
+
 import '../models/data.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
@@ -201,7 +203,9 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: preorderBackground,
       appBar: AppBar(
         backgroundColor: preorderBackground,
@@ -262,6 +266,7 @@ class _BuyerPreOrdersScreenState extends State<BuyerPreOrdersScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 }

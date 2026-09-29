@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../web/web_page_frame.dart';
+
 import '../models/help_center.dart';
 
 class HelpCenterScreen extends StatefulWidget {
@@ -25,7 +27,9 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     final hits = searchHelpFaqs(_query);
     final searching = _query.trim().isNotEmpty;
 
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -120,6 +124,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
           ],
         ],
       ),
+    ),
+      maxWidth: 860,
     );
   }
 }
@@ -138,7 +144,9 @@ class _HelpCategoryScreenState extends State<HelpCategoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -175,6 +183,8 @@ class _HelpCategoryScreenState extends State<HelpCategoryScreen> {
             )
             .toList(),
       ),
+    ),
+      maxWidth: 860,
     );
   }
 }

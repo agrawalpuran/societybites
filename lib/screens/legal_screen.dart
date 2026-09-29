@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../web/web_page_frame.dart';
+
 class LegalScreen extends StatelessWidget {
   const LegalScreen({super.key, required this.title, required this.content});
 
@@ -8,7 +10,9 @@ class LegalScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -26,6 +30,8 @@ class LegalScreen extends StatelessWidget {
           style: const TextStyle(fontSize: 14, height: 1.6, color: Color(0xFF3A4644)),
         ),
       ),
+    ),
+      maxWidth: 760,
     );
   }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../web/web_page_frame.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../widgets/app_header.dart';
@@ -838,7 +840,9 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       body: SafeArea(
         child: Column(
@@ -1243,6 +1247,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
           ],
         ),
       ),
+    ),
+      maxWidth: 840,
     );
   }
 

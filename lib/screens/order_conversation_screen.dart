@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../models/order_message.dart';
 import '../services/api_service.dart';
+import '../services/order_message_cache.dart';
+import '../web/web_breakpoints.dart';
 import '../widgets/screen_loading_note.dart';
 import '../widgets/status_banner.dart';
 
@@ -21,6 +23,7 @@ class OrderConversationScreen extends StatefulWidget {
     required this.viewerIsSeller,
     this.fetchMessages,
     this.sendMessage,
+    this.pendingFetch,
     this.pollInterval = const Duration(seconds: 8),
   });
 
@@ -29,6 +32,7 @@ class OrderConversationScreen extends StatefulWidget {
   final bool viewerIsSeller;
   final OrderMessagesLoader? fetchMessages;
   final OrderMessageSender? sendMessage;
+  final Future<List<Map<String, dynamic>>>? pendingFetch;
   final Duration pollInterval;
 
   @override
@@ -40,15 +44,20 @@ class _OrderConversationScreenState extends State<OrderConversationScreen>
     with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _scroll = ScrollController();
-  List<OrderMessage> _messages = [];
-  bool _loading = true;
+  late List<OrderMessage> _messages;
+  late bool _loading;
+  bool _refreshing = false;
   bool _sending = false;
+  bool _consumedPending = false;
   String? _error;
   Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
+    _messages = OrderMessageCache.peek(widget.orderId);
+    _loading = _messages.isEmpty;
+    _refreshing = _messages.isNotEmpty;
     WidgetsBinding.instance.addObserver(this);
     _load();
     if (widget.pollInterval > Duration.zero) {
@@ -73,6 +82,10 @@ class _OrderConversationScreenState extends State<OrderConversationScreen>
   }
 
   Future<List<Map<String, dynamic>>> _fetch(String orderId) {
+    if (!_consumedPending && widget.pendingFetch != null) {
+      _consumedPending = true;
+      return widget.pendingFetch!;
+    }
     return widget.fetchMessages != null
         ? widget.fetchMessages!(orderId)
         : ApiService.getOrderMessages(orderId);
@@ -89,18 +102,31 @@ class _OrderConversationScreenState extends State<OrderConversationScreen>
       final rows = await _fetch(widget.orderId);
       if (!mounted) return;
       setState(() {
-        _messages = rows.map(OrderMessage.fromJson).toList();
+        _messages = _mergeFetched(rows.map(OrderMessage.fromJson).toList());
         _loading = false;
+        _refreshing = false;
         _error = null;
       });
+      OrderMessageCache.replace(widget.orderId, _messages);
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToLatest());
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        if (!silent) _error = 'Could not load messages. Please try again.';
+        _refreshing = false;
+        if (!silent && _messages.isEmpty) {
+          _error = 'Could not load messages. Please try again.';
+        }
       });
     }
+  }
+
+  List<OrderMessage> _mergeFetched(List<OrderMessage> fetched) {
+    final fetchedIds = fetched.map((m) => m.id).toSet();
+    final pendingLocal = _messages.where((m) => !fetchedIds.contains(m.id));
+    return [...fetched, ...pendingLocal]..sort(
+      (a, b) => a.createdAt.compareTo(b.createdAt),
+    );
   }
 
   void _scrollToLatest() {
@@ -119,7 +145,9 @@ class _OrderConversationScreenState extends State<OrderConversationScreen>
         _messages = [..._messages, OrderMessage.fromJson(created)];
         _sending = false;
         _error = null;
+        _loading = false;
       });
+      OrderMessageCache.replace(widget.orderId, _messages);
       _input.clear();
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToLatest());
     } catch (e) {
@@ -137,7 +165,7 @@ class _OrderConversationScreenState extends State<OrderConversationScreen>
         ? 'Use this space to communicate with the buyer about this order.'
         : 'Use this space to communicate with the seller about your order.';
 
-    return Scaffold(
+    final screen = Scaffold(
       key: const Key('order-conversation-screen'),
       backgroundColor: const Color(0xFFF7F8F7),
       appBar: AppBar(
@@ -164,32 +192,14 @@ class _OrderConversationScreenState extends State<OrderConversationScreen>
       ),
       body: Column(
         children: [
-          Expanded(
-            child: _loading
-                ? const ScreenLoadingNote(message: 'Loading messages…')
-                : _error != null && _messages.isEmpty
-                ? Align(
-                    alignment: Alignment.topCenter,
-                    child: StatusBanner(message: _error!),
-                  )
-                : _messages.isEmpty
-                ? Align(
-                    alignment: Alignment.topCenter,
-                    child: StatusBanner(
-                      key: const Key('empty-messages'),
-                      title: 'No messages yet',
-                      message: emptyHint,
-                    ),
-                  )
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      return _MessageBubble(message: _messages[index]);
-                    },
-                  ),
-          ),
+          if (_loading || _refreshing)
+            const LinearProgressIndicator(
+              key: Key('messages-loading-bar'),
+              minHeight: 2,
+              color: Color(0xFF0E5A47),
+              backgroundColor: Color(0xFFE8F0EC),
+            ),
+          Expanded(child: _buildThread(emptyHint)),
           SafeArea(
             top: false,
             child: Container(
@@ -255,6 +265,114 @@ class _OrderConversationScreenState extends State<OrderConversationScreen>
             ),
           ),
         ],
+      ),
+    );
+    if (!useWebMarketplaceLayout(context)) return screen;
+    return ColoredBox(
+      color: webPageBackground,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: webLine),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x140E5A47),
+                    blurRadius: 24,
+                    offset: Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: screen,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThread(String emptyHint) {
+    if (_error != null && _messages.isEmpty) {
+      return Align(
+        alignment: Alignment.topCenter,
+        child: StatusBanner(message: _error!),
+      );
+    }
+    if (_messages.isEmpty && _loading) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ScreenLoadingNote(message: 'Loading messages…'),
+          _ThreadPlaceholder(),
+        ],
+      );
+    }
+    if (_messages.isEmpty) {
+      return Align(
+        alignment: Alignment.topCenter,
+        child: StatusBanner(
+          key: const Key('empty-messages'),
+          title: 'No messages yet',
+          message: emptyHint,
+        ),
+      );
+    }
+    return ListView.builder(
+      controller: _scroll,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      itemCount: _messages.length,
+      itemBuilder: (context, index) {
+        return _MessageBubble(message: _messages[index]);
+      },
+    );
+  }
+}
+
+class _ThreadPlaceholder extends StatelessWidget {
+  const _ThreadPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Column(
+        children: [
+          _SkeletonBubble(alignRight: false, width: 188),
+          _SkeletonBubble(alignRight: true, width: 148),
+          _SkeletonBubble(alignRight: false, width: 210),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkeletonBubble extends StatelessWidget {
+  const _SkeletonBubble({required this.alignRight, required this.width});
+
+  final bool alignRight;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        width: width,
+        height: 52,
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8EDEC),
+          borderRadius: BorderRadius.circular(16),
+        ),
       ),
     );
   }

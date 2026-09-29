@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -8,6 +9,7 @@ import 'screens/guest_landing_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/society_selection_screen.dart';
 import 'theme/app_theme.dart';
+import 'web/web_marketplace_states.dart';
 import 'widgets/app_header.dart';
 import 'widgets/screen_loading_note.dart';
 import 'services/api_service.dart';
@@ -25,7 +27,10 @@ void main() async {
       final navigator = PushNotificationService.navigatorKey.currentState;
       if (navigator == null) return;
       navigator.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        MaterialPageRoute(
+          builder: (_) =>
+              kIsWeb ? const MainShellScreen() : const LoginScreen(),
+        ),
         (_) => false,
       );
     });
@@ -51,6 +56,12 @@ class MyApp extends StatelessWidget {
   }
 }
 
+/// Logged-out start. Web opens the marketplace. Mobile keeps the landing page.
+Widget signedOutStartScreen() {
+  if (kIsWeb) return const MainShellScreen();
+  return const GuestLandingScreen();
+}
+
 /// Normal auth/session routing. Throws are handled by [AuthGate].
 Future<Widget> resolveAuthStartScreen() async {
   if (AuthConfig.usesTwoFactor) {
@@ -59,21 +70,21 @@ Future<Widget> resolveAuthStartScreen() async {
       // Remove stale Firebase-session identity before the one-time migration
       // login. Firebase SDK/FCM initialization remains intact.
       await SessionService.clear();
-      return const GuestLandingScreen();
+      return signedOutStartScreen();
     }
 
     final refreshToken = await SessionService.getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) {
-      return const GuestLandingScreen();
+      return signedOutStartScreen();
     }
 
     if (!await ApiService.restoreTwoFactorSession()) {
-      return const GuestLandingScreen();
+      return signedOutStartScreen();
     }
   } else {
     final token = await SessionService.getToken();
     if (token == null || token.isEmpty) {
-      return const GuestLandingScreen();
+      return signedOutStartScreen();
     }
   }
 
@@ -86,7 +97,7 @@ Future<Widget> resolveAuthStartScreen() async {
     return const SocietySelectionScreen();
   }
 
-  return const GuestLandingScreen();
+  return signedOutStartScreen();
 }
 
 class AuthGate extends StatefulWidget {
@@ -114,7 +125,7 @@ class _AuthGateState extends State<AuthGate> {
       return await resolve();
     } catch (error, stack) {
       debugPrint('[auth] startup resolve failed: $error\n$stack');
-      return const GuestLandingScreen();
+      return signedOutStartScreen();
     }
   }
 
@@ -125,9 +136,10 @@ class _AuthGateState extends State<AuthGate> {
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           debugPrint('[auth] startup future error: ${snapshot.error}');
-          return const GuestLandingScreen();
+          return signedOutStartScreen();
         }
         if (!snapshot.hasData) {
+          if (kIsWeb) return const WebStartupFrame();
           return const Scaffold(
             backgroundColor: Color(0xFFF8FAF9),
             body: SafeArea(

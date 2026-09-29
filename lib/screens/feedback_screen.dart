@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../web/web_page_frame.dart';
 import '../widgets/app_header.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
@@ -88,7 +90,9 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       body: SafeArea(
         child: Column(
@@ -130,6 +134,8 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
           ],
         ),
       ),
+    ),
+      maxWidth: 720,
     );
   }
 

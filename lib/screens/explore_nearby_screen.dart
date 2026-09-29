@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../web/web_page_frame.dart';
+
 import '../models/nearby_seller.dart';
 import '../services/api_service.dart';
 import '../services/seller_onboarding.dart';
@@ -124,7 +126,9 @@ class ExploreNearbyScreenState extends State<ExploreNearbyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
         backgroundColor: const Color(0xFFF8FAF9),
@@ -140,6 +144,7 @@ class ExploreNearbyScreenState extends State<ExploreNearbyScreen> {
         onRefresh: _load,
         child: _body(),
       ),
+    ),
     );
   }
 

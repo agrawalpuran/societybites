@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../screens/order_conversation_screen.dart';
+import '../services/api_service.dart';
 
 class OrderMessagesButton extends StatefulWidget {
   const OrderMessagesButton({
@@ -64,6 +65,7 @@ class _OrderMessagesButtonState extends State<OrderMessagesButton>
   }
 
   Future<void> _open() async {
+    final inflight = ApiService.getOrderMessages(widget.order.id);
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
@@ -71,6 +73,7 @@ class _OrderMessagesButtonState extends State<OrderMessagesButton>
           orderId: widget.order.id,
           orderNumber: widget.order.orderId,
           viewerIsSeller: widget.isSellerView,
+          pendingFetch: inflight,
         ),
       ),
     );

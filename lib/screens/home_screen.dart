@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/app_header.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/recurring_availability_hint.dart';
 import '../models/data.dart';
+import '../models/guest_kitchen.dart';
+import '../models/listing_categories.dart';
 import '../services/api_service.dart';
 import '../services/cart_controller.dart';
 import '../services/session_service.dart';
@@ -25,10 +28,12 @@ import '../widgets/food_type_selector.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/floating_cart_bar.dart';
-import '../widgets/requested_ready_summary.dart';
+import '../widgets/guest_order_auth.dart';
 import '../widgets/status_banner.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/seller_avatar.dart';
+import '../web/web_breakpoints.dart';
+import '../web/web_marketplace_home.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -38,6 +43,7 @@ class HomeScreen extends StatefulWidget {
     this.fetchNearbySellers,
     this.onStartSelling,
     this.onExploreNearby,
+    this.onSelectTab,
     this.initialCategory,
   });
 
@@ -53,6 +59,7 @@ class HomeScreen extends StatefulWidget {
 
   final VoidCallback? onStartSelling;
   final VoidCallback? onExploreNearby;
+  final ValueChanged<int>? onSelectTab;
   final String? initialCategory;
 
   @override
@@ -69,6 +76,7 @@ class HomeScreenState extends State<HomeScreen> {
   bool _preOrdersLoading = true;
   bool _isLoading = true;
   bool _hasSuccessfullyLoaded = false;
+  bool _webGuestBrowse = false;
   bool _homeSlow = false;
   Timer? _homeSlowTimer;
   String? _error;
@@ -188,6 +196,21 @@ class HomeScreenState extends State<HomeScreen> {
     setState(() => _searchQuery = _searchController.text.trim());
   }
 
+  String? get webSelectedFoodType => _selectedFoodType;
+
+  void setWebSearch(String value) {
+    if (_searchController.text == value) return;
+    _searchController.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+  }
+
+  void setWebFoodType(String? value) {
+    if (!mounted || _selectedFoodType == value) return;
+    setState(() => _selectedFoodType = value);
+  }
+
   List<FoodItem> get _filteredListings {
     return applyHomeListingFilters(
       _listings,
@@ -216,6 +239,10 @@ class HomeScreenState extends State<HomeScreen> {
       } else {
         final societyId = await SessionService.getSocietyId();
         if (societyId == null || societyId.isEmpty) {
+          if (kIsWeb) {
+            await _loadGuestMarketplace();
+            return;
+          }
           if (!mounted) return;
           _stopHomeSlowTimer();
           if (!_hasSuccessfullyLoaded) {
@@ -258,6 +285,7 @@ class HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         _listings = listings;
+        _webGuestBrowse = false;
         _cityReach = cityReach;
         _isLoading = false;
         _hasSuccessfullyLoaded = true;
@@ -313,6 +341,53 @@ class HomeScreenState extends State<HomeScreen> {
     return _available.take(homeAllItemsPreviewCount).toList();
   }
 
+  Future<void> _loadGuestMarketplace() async {
+    try {
+      final raw = await ApiService.getGuestKitchens();
+      final result = GuestKitchensResult.fromJson(raw);
+      final listings = <FoodItem>[];
+      for (final kitchen in result.kitchens) {
+        for (final item in kitchen.listings) {
+          try {
+            listings.add(FoodItem.fromJson(item));
+          } catch (_) {}
+        }
+      }
+      if (!mounted) return;
+      _stopHomeSlowTimer();
+      setState(() {
+        _listings = listings;
+        _webGuestBrowse = true;
+        _isLoading = false;
+        _hasSuccessfullyLoaded = true;
+        _homeSlow = false;
+        _error = null;
+      });
+      _notifyInitialLoadSuccess();
+    } catch (_) {
+      if (!mounted) return;
+      _stopHomeSlowTimer();
+      if (!_hasSuccessfullyLoaded) {
+        setState(() {
+          _listings = [];
+          _error = 'Unable to load kitchens right now.';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<bool> _webVisitorNeedsSignIn() async {
+    if (!kIsWeb) return false;
+    final token = await SessionService.getToken();
+    final refresh = await SessionService.getRefreshToken();
+    final signedIn = (token != null && token.isNotEmpty) ||
+        (refresh != null && refresh.isNotEmpty);
+    if (signedIn || !mounted) return false;
+    await showGuestOrderAuthDialog(context);
+    return true;
+  }
+
   Future<void> _addToCart(FoodItem food) async {
     if (!food.canAddToCart) {
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -341,6 +416,9 @@ class HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
+
+    if (await _webVisitorNeedsSignIn()) return;
+    if (!mounted) return;
 
     if (_cart.isNotEmpty) {
       final cartSellerId = _cart.first.food.sellerId;
@@ -441,6 +519,7 @@ class HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(
         builder: (_) => FoodDetailScreen(
           food: food,
+          requireAuthToOrder: _webGuestBrowse,
           onSellerTap: () => _openSeller(sellerFromListing(food)),
         ),
       ),
@@ -455,6 +534,7 @@ class HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(
         builder: (_) => SellerStorefrontScreen(
           seller: seller,
+          guestBrowse: _webGuestBrowse,
           cartItems: _cart,
           onCartChanged: () {
             CartController.instance.notify();
@@ -470,8 +550,134 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Map<String, int> _webCategoryCounts() {
+    final base = applyHomeListingFilters(
+      _listings,
+      searchQuery: _searchQuery,
+      foodType: _selectedFoodType,
+    );
+    final counts = <String, int>{'All': base.length};
+    for (final category in _categories) {
+      if (category == 'All') continue;
+      counts[category] = base
+          .where(
+            (food) => listingMatchesHomeCategory(
+              food.listingCategories,
+              selectedCategory: category,
+              legacyCategory: food.category,
+            ),
+          )
+          .length;
+    }
+    return counts;
+  }
+
+  List<FoodItem> _webRegularFor(HomeListingReach reach) {
+    return _listingsForReach(reach).where((food) => !food.isMadeToOrder).toList();
+  }
+
+  List<FoodItem> get _webReadyNow {
+    return _filteredListings.where((food) {
+      return !food.isMadeToOrder &&
+          !food.isPreOrder &&
+          !food.isPreOrderCatalog &&
+          food.canAddToCart;
+    }).toList();
+  }
+
+  List<FoodItem> get _webMadeToOrder {
+    return _filteredListings.where((food) => food.isMadeToOrder).toList();
+  }
+
+  List<FoodItem> _webUnscopedRegular() {
+    return _filteredListings.where((food) {
+      if (food.isMadeToOrder) return false;
+      return homeListingReachFor(
+            food,
+            buyerSocietyId: _buyerSocietyId,
+            nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+          ) ==
+          null;
+    }).toList();
+  }
+
+  List<FoodItem> _webHeroFoods() {
+    final withImages = _filteredListings.where((food) {
+      final url = food.imageUrl?.trim();
+      return url != null && url.isNotEmpty && url != 'null';
+    }).take(2).toList();
+    if (withImages.isNotEmpty) return withImages;
+    return _filteredListings.take(1).toList();
+  }
+
+  String? _webNearbySubtitle() {
+    final km = _cityReach.nearbyRadiusKm;
+    if (km == null) return null;
+    return 'Sellers within ~${formatReachRadiusKm(km)} km';
+  }
+
+  String? _webExtendedSubtitle() {
+    final km = _cityReach.extendedRadiusKm;
+    if (km == null) return null;
+    return 'From other societies (within ~${formatReachRadiusKm(km)} km)';
+  }
+
+  Widget _buildWebMarketplace() {
+    return WebMarketplaceHome(
+      isInitialLoading: _isLoading && !_hasSuccessfullyLoaded,
+      isSlow: _homeSlow,
+      errorMessage: _error,
+      showEmptySociety: _showEmptySocietyState,
+      searching: _searchQuery.isNotEmpty,
+      searchQuery: _searchQuery,
+      selectedCategory: _selectedCategory,
+      categories: _categories,
+      categoryCounts: _webCategoryCounts(),
+      heroFoods: _webHeroFoods(),
+      allFiltered: _filteredListings,
+      highlights: _webRegularFor(HomeListingReach.inSociety),
+      highlightSellers: _societySellers,
+      sellerListings: _listings,
+      readyNow: _webReadyNow,
+      madeToOrder: _webMadeToOrder,
+      nearbyListings: _webRegularFor(HomeListingReach.nearby),
+      nearbySellers: _nearbySellers,
+      nearbySubtitle: _webNearbySubtitle(),
+      extendedListings: _webRegularFor(HomeListingReach.extended),
+      extendedSellers: _extendedSellers,
+      extendedSubtitle: _webExtendedSubtitle(),
+      otherListings: _webUnscopedRegular(),
+      inSocietyPreorders: _campaignsForReach(HomeListingReach.inSociety),
+      nearbyPreorders: _campaignsForReach(HomeListingReach.nearby),
+      extendedPreorders: _campaignsForReach(HomeListingReach.extended),
+      preordersLoading: _preOrdersLoading,
+      viewerUserId: _viewerUserId,
+      expandedReach: _expandedReach,
+      cartQtyFor: _cartQtyFor,
+      onAdd: _addToCart,
+      onRemove: _removeFromCart,
+      onOpenFood: _openDetail,
+      onOpenSeller: _openSeller,
+      onOpenCampaign: _openBuyerPreOrderDetail,
+      onSeePreorders: _openBuyerPreOrders,
+      onCategorySelected: (category) {
+        setState(() => _selectedCategory = category);
+      },
+      onExpandReach: _expandReach,
+      onCollapseReach: _collapseReach,
+      onRetry: _loadListings,
+      onRefresh: _refreshHome,
+      onStartSelling: _startSellingFromHome,
+      onExploreNearby: _openExploreNearby,
+      onSelectTab: (index) => widget.onSelectTab?.call(index),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (useWebMarketplaceLayout(context)) {
+      return _buildWebMarketplace();
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       floatingActionButton: const FloatingCartBar(),

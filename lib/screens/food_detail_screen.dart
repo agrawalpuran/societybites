@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../web/web_breakpoints.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/app_header.dart';
@@ -26,6 +28,7 @@ class FoodDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (useWebMarketplaceLayout(context)) return _buildWebDetail(context);
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -51,6 +54,94 @@ class FoodDetailScreen extends StatelessWidget {
           ),
           _BottomCta(food: food, requireAuthToOrder: requireAuthToOrder),
         ],
+      ),
+    );
+  }
+
+  Widget _buildWebDetail(BuildContext context) {
+    final info = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _QuickInfoRow(food: food),
+        _SellerCard(food: food, onTap: onSellerTap),
+        _StorySection(food: food),
+        _ReviewsSection(food: food),
+        const SizedBox(height: 16),
+        _BottomCta(food: food, requireAuthToOrder: requireAuthToOrder),
+      ],
+    );
+    final image = ListingImage(
+      food: food,
+      width: double.infinity,
+      height: 420,
+      borderRadius: 24,
+      iconSize: 96,
+    );
+
+    return Scaffold(
+      backgroundColor: webPageBackground,
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: webFrameMaxWidth),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 28, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Back',
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back_rounded, color: webInk),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        food.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: webInk,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(28, 8, 28, 32),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth < 860) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            image,
+                            info,
+                          ],
+                        );
+                      }
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(flex: 5, child: image),
+                          const SizedBox(width: 28),
+                          Expanded(flex: 6, child: info),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

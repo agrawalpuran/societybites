@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../web/web_page_frame.dart';
+
 import '../models/data.dart';
 import '../services/api_service.dart';
 import '../services/seller_onboarding.dart';
@@ -210,7 +212,9 @@ class SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: preorderBackground,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _create,
@@ -338,6 +342,7 @@ class SellerPreOrdersScreenState extends State<SellerPreOrdersScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 }

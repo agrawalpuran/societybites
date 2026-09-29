@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import '../web/web_breakpoints.dart';
+import '../web/web_page_frame.dart';
 import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/order_fulfilment_banner.dart';
 import '../widgets/order_timing_notice.dart';
 import '../widgets/order_items_list.dart';
+import '../widgets/order_status_tracker.dart';
 import '../widgets/order_lifecycle_dialogs.dart';
 import '../widgets/order_messages_button.dart';
 import '../widgets/requested_ready_summary.dart';
@@ -186,6 +189,7 @@ class OrdersScreenState extends State<OrdersScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (useWebMarketplaceLayout(context)) return _buildWebOrders();
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       body: SafeArea(
@@ -255,7 +259,86 @@ class OrdersScreenState extends State<OrdersScreen>
     );
   }
 
+  Widget _buildWebOrders() {
+    return Scaffold(
+      backgroundColor: webPageBackground,
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: webFrameMaxWidth),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(28, 28, 28, 0),
+                child: Text(
+                  'My Orders',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w800,
+                    color: webInk,
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(28, 4, 28, 0),
+                child: Text(
+                  'Manage your community kitchen favorites.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: webMuted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: _buildTabs(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_buyer.isLoading)
+                const Expanded(
+                  child: ScreenLoadingNote(message: 'Loading orders…'),
+                )
+              else if (_buyer.error != null)
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: StatusBanner(message: _buyer.error!),
+                  ),
+                )
+              else
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _ActiveTab(
+                        orders: _buyer.active,
+                        onRefresh: _loadOrders,
+                        isSellerView: false,
+                      ),
+                      _PastTab(
+                        orders: _buyer.past,
+                        onRefresh: _loadOrders,
+                        onExploreHome: widget.onExploreHome,
+                        isSellerView: false,
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader() {
+    if (useWebMarketplaceLayout(context)) return const SizedBox.shrink();
     return const AppHeader();
   }
 
@@ -310,6 +393,32 @@ class _ActiveTab extends StatelessWidget {
         alignment: Alignment.topCenter,
         child: StatusBanner(
           message: isSellerView ? 'No active sales.' : 'No active orders.',
+        ),
+      );
+    }
+    if (useWebMarketplaceLayout(context)) {
+      return RefreshIndicator(
+        color: const Color(0xFF0E5A47),
+        onRefresh: onRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
+          children: [
+            WebCardRows(
+              children: [
+                for (final order in orders)
+                  !isSellerView && order.isTerminal
+                      ? _PastOrderTile(order: order, onRefresh: onRefresh)
+                      : _ActiveOrderCard(
+                          order: order,
+                          onRefresh: onRefresh,
+                          isSellerView: isSellerView,
+                        ),
+              ],
+            ),
+          ],
         ),
       );
     }
@@ -492,7 +601,7 @@ class _ActiveOrderCard extends StatelessWidget {
           OrderTotalRow(order: order),
           const SizedBox(height: 20),
           if (BuyerOrderLifecycle.progressStep(order.status) >= 0)
-            _StatusTracker(
+            OrderStatusTracker(
               currentStep: BuyerOrderLifecycle.progressStep(order.status),
               steps: _steps,
             ),
@@ -861,76 +970,6 @@ class _PreOrderFulfilmentCard extends StatelessWidget {
   }
 }
 
-class _StatusTracker extends StatelessWidget {
-  const _StatusTracker({required this.currentStep, required this.steps});
-  final int currentStep;
-  final List<String> steps;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(steps.length * 2 - 1, (i) {
-        if (i.isOdd) {
-          final stepBefore = i ~/ 2;
-          final isDone = stepBefore < currentStep;
-          return Expanded(
-            child: Container(
-              height: 2,
-              color: isDone ? const Color(0xFF0E5A47) : const Color(0xFFD4DBD8),
-            ),
-          );
-        }
-        final stepIndex = i ~/ 2;
-        final isActive = stepIndex <= currentStep;
-        final isCurrent = stepIndex == currentStep;
-
-        return Expanded(
-          child: Column(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isActive
-                      ? const Color(0xFF0E5A47)
-                      : const Color(0xFFF0F2F1),
-                  border: isCurrent
-                      ? Border.all(color: const Color(0xFF0E5A47), width: 2)
-                      : null,
-                ),
-                child: isActive
-                    ? Icon(
-                        isCurrent
-                            ? Icons.restaurant_rounded
-                            : Icons.check_rounded,
-                        size: 14,
-                        color: Colors.white,
-                      )
-                    : null,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                steps[stepIndex],
-                textAlign: TextAlign.center,
-                softWrap: true,
-                style: TextStyle(
-                  fontSize: 10,
-                  height: 1.2,
-                  fontWeight: FontWeight.w600,
-                  color: isActive
-                      ? const Color(0xFF0E5A47)
-                      : const Color(0xFF8A9491),
-                ),
-              ),
-            ],
-          ),
-        );
-      }),
-    );
-  }
-}
-
 class _PastTab extends StatelessWidget {
   const _PastTab({
     required this.orders,
@@ -946,6 +985,7 @@ class _PastTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (useWebMarketplaceLayout(context)) return _buildWeb();
     return RefreshIndicator(
       color: const Color(0xFF0E5A47),
       onRefresh: onRefresh,
@@ -983,6 +1023,52 @@ class _PastTab extends StatelessWidget {
           ),
         const SizedBox(height: 20),
         if (!isSellerView) _ExploreBanner(onExploreHome: onExploreHome),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeb() {
+    return RefreshIndicator(
+      color: const Color(0xFF0E5A47),
+      onRefresh: onRefresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              isSellerView ? 'Past Sales' : 'Past Orders',
+              style: const TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: webInk,
+              ),
+            ),
+          ),
+          if (orders.isEmpty)
+            StatusBanner(
+              padding: const EdgeInsets.only(bottom: 16),
+              message: isSellerView
+                  ? 'No completed sales yet. When a buyer marks an order complete, it appears here.'
+                  : 'No past orders yet.',
+            )
+          else
+            WebCardRows(
+              children: [
+                for (final order in orders)
+                  _PastOrderTile(
+                    order: order,
+                    onRefresh: onRefresh,
+                    isSellerView: isSellerView,
+                  ),
+              ],
+            ),
+          const SizedBox(height: 20),
+          if (!isSellerView) _ExploreBanner(onExploreHome: onExploreHome),
         ],
       ),
     );

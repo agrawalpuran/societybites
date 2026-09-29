@@ -5,12 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
 import '../models/data.dart';
 import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
 import '../services/upi_payment_service.dart';
 import '../widgets/upi_app_brand_icon.dart';
+import '../web/web_breakpoints.dart';
+import '../web/web_page_frame.dart';
 import '../widgets/screen_loading_note.dart';
 
 typedef PaymentApiCall = Future<Map<String, dynamic>> Function(String orderId);
@@ -222,9 +225,11 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   Future<bool> _launchUpiUri(Uri uri) async {
     try {
-      return await launchUrl(
-        Uri.parse(upiLaunchString(uri)),
-        mode: LaunchMode.externalApplication,
+      // launchUrl(Uri) calls uri.toString(), which turns %20 into +. Pass the
+      // NPCI string through so GPay iOS keeps spaces in pn/tn.
+      return await UrlLauncherPlatform.instance.launchUrl(
+        upiLaunchString(uri),
+        const LaunchOptions(mode: PreferredLaunchMode.externalApplication),
       );
     } catch (_) {
       return false;
@@ -259,12 +264,16 @@ class _PaymentScreenState extends State<PaymentScreen>
   Future<void> _launchSelectedUpiApp(UpiAppOption app) async {
     final resolved = app.resolvedLaunchUri;
     if (resolved == null || _order.orderTotal <= 0) return;
+    final launchUri = buildUpiAppLaunchUri(
+      upiPayUri: _upiPaymentUri,
+      target: launchTargetFromUri(resolved),
+    );
     try {
       setState(() => _upiLaunchError = null);
       final launch = widget.launchUpi;
       final launched = launch != null
-          ? await launch(resolved)
-          : await _launchUpiUri(resolved);
+          ? await launch(launchUri)
+          : await _launchUpiUri(launchUri);
       if (!launched && mounted) {
         setState(() => _upiLaunchError = _noUpiAppMessage);
       }
@@ -309,7 +318,10 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    if (useWebMarketplaceLayout(context)) return _buildWebPayment();
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
         backgroundColor: const Color(0xFFF8FAF9),
@@ -365,6 +377,124 @@ class _PaymentScreenState extends State<PaymentScreen>
               ),
             ],
             const SizedBox(height: 30),
+          ],
+        ),
+      ),
+    ),
+      maxWidth: 720,
+    );
+  }
+
+  Widget _buildWebPayment() {
+    return Scaffold(
+      backgroundColor: webPageBackground,
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: webFrameMaxWidth),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 28, 4),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Back',
+                      onPressed: () => Navigator.pop(context, true),
+                      icon: const Icon(Icons.arrow_back_rounded, color: webInk),
+                    ),
+                    const SizedBox(width: 4),
+                    const Expanded(
+                      child: Text(
+                        'Payment',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: webInk,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(28, 8, 28, 32),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final summary = _buildOrderSummary();
+                      final pay = _webPayPanel();
+                      if (constraints.maxWidth < 860) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            summary,
+                            const SizedBox(height: 20),
+                            pay,
+                          ],
+                        );
+                      }
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: summary),
+                          const SizedBox(width: 24),
+                          Expanded(child: pay),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _webPayPanel() {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: webLine),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_isAwaitingSeller)
+              _buildAwaitingSeller()
+            else if (_isLoadingUpi)
+              const ScreenLoadingNote(message: 'Loading payment details…')
+            else if (_hasUpi) ...[
+              _buildQrSection(),
+              const SizedBox(height: 16),
+              _buildMarkPaidButton(label: "I've Paid via UPI"),
+            ] else ...[
+              _buildNoUpiMessage(),
+              if (_loadError != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Could not refresh seller UPI: $_loadError',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFD94F4F),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              const SizedBox(height: 16),
+              _buildMarkPaidButton(
+                label: _isCashOrder
+                    ? "I've arranged cash payment"
+                    : "I've paid / will pay at pickup",
+              ),
+            ],
           ],
         ),
       ),

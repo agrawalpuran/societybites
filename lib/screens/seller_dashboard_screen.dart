@@ -1,6 +1,8 @@
 ﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../web/web_breakpoints.dart';
+import '../web/web_page_frame.dart';
 import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/order_items_list.dart';
@@ -732,12 +734,13 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (useWebMarketplaceLayout(context)) return _buildWebKitchen();
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       body: SafeArea(
         child: Column(
           children: [
-            const AppHeader(),
+            if (!useWebMarketplaceLayout(context)) const AppHeader(),
             if (_roleLoaded && !_canSell)
               Expanded(child: _buildBuyerStartSelling())
             else ...[
@@ -825,18 +828,21 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   Widget _buildBuyerStartSelling() {
+    final web = useWebMarketplaceLayout(context);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+      padding: EdgeInsets.fromLTRB(20, web ? 8 : 18, 20, 32),
       children: [
-        const Text(
-          'My Kitchen',
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF101617),
+        if (!web) ...[
+          const Text(
+            'My Kitchen',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF101617),
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 16),
+        ],
         StatusBanner(
           padding: EdgeInsets.zero,
           title: 'Start selling homemade food',
@@ -856,8 +862,154 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     );
   }
 
+  Widget _buildWebKitchen() {
+    return Scaffold(
+      backgroundColor: webPageBackground,
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: webFrameMaxWidth),
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(28, 24, 28, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'My Kitchen',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          color: webInk,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Orders, listings, and how your kitchen is doing.',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: webMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_roleLoaded && !_canSell)
+                Expanded(child: _buildBuyerStartSelling())
+              else ...[
+                _buildAreaTabs(),
+                Expanded(
+                  child: IndexedStack(
+                    index: _areaTab,
+                    children: [
+                      RefreshIndicator(
+                        color: const Color(0xFF0E5A47),
+                        onRefresh: _refreshDashboard,
+                        child: CustomScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          slivers: [
+                            SliverToBoxAdapter(child: _buildOrdersHeader()),
+                            SliverToBoxAdapter(
+                              child: _buildKitchenTypeSelector(),
+                            ),
+                            if (_showPreOrdersSection)
+                              SliverToBoxAdapter(
+                                child: _buildPreOrdersSection(),
+                              ),
+                            if (_error != null && _hasSuccessfullyLoaded)
+                              SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Text(
+                                    _error!,
+                                    style: const TextStyle(
+                                      color: Color(0xFFD94F4F),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (_isLoading && !_hasSuccessfullyLoaded)
+                              const SliverToBoxAdapter(
+                                child: KitchenOrdersSkeleton(),
+                              )
+                            else if (_error != null && !_hasSuccessfullyLoaded)
+                              SliverToBoxAdapter(
+                                child: InlineLoadStatus.failed(
+                                  id: 'kitchen-orders',
+                                  detail: _error,
+                                  onRetry: _loadOrders,
+                                ),
+                              )
+                            else if (_showKitchenOrderList)
+                              SliverToBoxAdapter(
+                                child: _buildOrdersSection(context),
+                              ),
+                            if (_ordersSlow &&
+                                (_isLoading || _ordersRefreshInFlight))
+                              SliverToBoxAdapter(
+                                child: InlineLoadStatus.slow(
+                                  id: 'kitchen-orders',
+                                  onRetry: _loadOrders,
+                                ),
+                              ),
+                            SliverToBoxAdapter(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(child: _buildExpandCard()),
+                                  Expanded(child: _buildAddListingCta(context)),
+                                ],
+                              ),
+                            ),
+                            const SliverToBoxAdapter(
+                              child: SizedBox(height: 30),
+                            ),
+                          ],
+                        ),
+                      ),
+                      RefreshIndicator(
+                        color: const Color(0xFF0E5A47),
+                        onRefresh: _refreshDashboard,
+                        child: CustomScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          slivers: [
+                            SliverToBoxAdapter(child: _buildDashboardHeader()),
+                            SliverToBoxAdapter(child: _buildSatisfactionRow()),
+                            SliverToBoxAdapter(
+                              child: SellerInsightsPanel(
+                                showHeading: false,
+                                onSeeAllOrders: () =>
+                                    setState(() => _areaTab = 0),
+                              ),
+                            ),
+                            const SliverToBoxAdapter(
+                              child: SizedBox(height: 30),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAreaTabs() {
-    return Padding(
+    final tabs = Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       child: Container(
         height: 46,
@@ -887,6 +1039,14 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             ),
           ],
         ),
+      ),
+    );
+    if (!useWebMarketplaceLayout(context)) return tabs;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: tabs,
       ),
     );
   }
@@ -979,7 +1139,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     final cats = _visibleKitchenCategories;
     if (cats.length <= 1) return const SizedBox.shrink();
     final selected = _resolvedKitchenCategory;
-    return Padding(
+    final selector = Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: SizedBox(
         height: 44,
@@ -1024,10 +1184,18 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         ),
       ),
     );
+    if (!useWebMarketplaceLayout(context)) return selector;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: selector,
+      ),
+    );
   }
 
   Widget _buildSatisfactionRow() {
-    return Padding(
+    final card = Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: _SatisfactionCard(
         rating: (_stats['avgRating'] as num?)?.toDouble() ?? 0,
@@ -1039,6 +1207,14 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             ),
           );
         },
+      ),
+    );
+    if (!useWebMarketplaceLayout(context)) return card;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: card,
       ),
     );
   }
@@ -1155,6 +1331,26 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 ],
               ),
             )
+          else if (useWebMarketplaceLayout(context))
+            WebCardRows(
+              children: [
+                for (final campaign in _preOrderCampaigns)
+                  PreOrderCampaignCard(
+                    campaign: campaign,
+                    compact: true,
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PreOrderDetailScreen(campaignId: campaign.id),
+                        ),
+                      );
+                      _loadPreOrders();
+                    },
+                  ),
+              ],
+            )
           else
             ..._preOrderCampaigns.map(
               (campaign) => PreOrderCampaignCard(
@@ -1183,39 +1379,49 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     final past = _ordersForCategory(_pastOrders);
     final orders = showingPast ? past : active;
     final typedEmpty = _visibleKitchenCategories.length > 1;
+    final orderTabs = Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F2F1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _OrdersSegment(
+              label: 'Active (${active.length})',
+              selected: !showingPast,
+              badgeCount: _activeActionCount,
+              badgeKey: const Key('kitchen-active-badge'),
+              onTap: () => setState(() => _ordersTab = 0),
+            ),
+          ),
+          Expanded(
+            child: _OrdersSegment(
+              label: 'Past (${past.length})',
+              selected: showingPast,
+              onTap: () => setState(() => _ordersTab = 1),
+            ),
+          ),
+        ],
+      ),
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F2F1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _OrdersSegment(
-                    label: 'Active (${active.length})',
-                    selected: !showingPast,
-                    badgeCount: _activeActionCount,
-                    badgeKey: const Key('kitchen-active-badge'),
-                    onTap: () => setState(() => _ordersTab = 0),
-                  ),
-                ),
-                Expanded(
-                  child: _OrdersSegment(
-                    label: 'Past (${past.length})',
-                    selected: showingPast,
-                    onTap: () => setState(() => _ordersTab = 1),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          if (useWebMarketplaceLayout(context))
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: orderTabs,
+              ),
+            )
+          else
+            orderTabs,
           const SizedBox(height: 14),
           if ((showingPast && past.isNotEmpty) ||
               (!showingPast && active.isNotEmpty && _hasOlderActive))
@@ -1246,6 +1452,28 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                       : _hasOlderActive
                       ? 'No recent orders'
                       : 'No active orders yet. When neighbors order your food, they show up here.'),
+            )
+          else if (useWebMarketplaceLayout(context))
+            WebCardRows(
+              children: [
+                for (final order in orders)
+                  if (showingPast)
+                    SellerPastOrderCard(
+                      order: order,
+                      onRefresh: _loadOrders,
+                    )
+                  else
+                    SellerActiveOrderCard(
+                      key: ValueKey(order.id),
+                      order: order,
+                      onAction: _updateStatus,
+                      onOrderUpdated: _upsertOrder,
+                      onPaymentConfirmed: _loadOrders,
+                      onReject: _rejectOrder,
+                      onReadyBy: _editReadyBy,
+                      rejectBusy: _rejectingOrderId == order.id,
+                    ),
+              ],
             )
           else if (showingPast)
             ...orders.map(
@@ -1342,9 +1570,11 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Join our "Pro Kitchen" program and\nreach 5x more neighbors with\nshared delivery logistics.',
-              style: TextStyle(
+            Text(
+              useWebMarketplaceLayout(context)
+                  ? 'Join our "Pro Kitchen" program and reach 5x more neighbors with shared delivery logistics.'
+                  : 'Join our "Pro Kitchen" program and\nreach 5x more neighbors with\nshared delivery logistics.',
+              style: const TextStyle(
                 fontSize: 13,
                 color: Color(0xFF3A6B56),
                 fontWeight: FontWeight.w500,

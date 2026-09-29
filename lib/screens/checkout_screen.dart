@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../web/web_breakpoints.dart';
 import 'main_shell_screen.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_header.dart';
@@ -366,6 +368,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (useWebMarketplaceLayout(context)) return _buildWebCheckout();
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -458,6 +461,172 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         selectedIndex: 0,
         onTap: _goToShell,
       ),
+    );
+  }
+
+  Widget _buildWebCheckout() {
+    return Scaffold(
+      backgroundColor: webPageBackground,
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: webFrameMaxWidth),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 28, 4),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Back',
+                      onPressed: () {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.pop(context);
+                          return;
+                        }
+                        _goToShell(0);
+                      },
+                      icon: const Icon(Icons.arrow_back_rounded, color: webInk),
+                    ),
+                    const SizedBox(width: 4),
+                    const Expanded(
+                      child: Text(
+                        'Your cart',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: webInk,
+                        ),
+                      ),
+                    ),
+                    if (_items.isNotEmpty)
+                      Text(
+                        '$_totalQuantity ${_totalQuantity == 1 ? 'item' : 'items'}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: webMuted,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _items.isEmpty
+                    ? Align(
+                        alignment: Alignment.topCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.all(28),
+                          child: StatusBanner(
+                            title: 'Your cart is empty',
+                            message:
+                                'Add something from a neighbour\'s kitchen to continue.',
+                            action: FilledButton(
+                              onPressed: () => _goToShell(0),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFF0E5A47),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              child: const Text('Browse food'),
+                            ),
+                          ),
+                        ),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.fromLTRB(28, 8, 28, 28),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final summary =
+                                _buildBillSummary(MediaQuery.sizeOf(context));
+                            final details = _webCartDetails();
+                            if (constraints.maxWidth < 860) {
+                              return SingleChildScrollView(
+                                physics: const BouncingScrollPhysics(),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    details,
+                                    const SizedBox(height: 20),
+                                    summary,
+                                  ],
+                                ),
+                              );
+                            }
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: SingleChildScrollView(
+                                    physics: const BouncingScrollPhysics(),
+                                    child: details,
+                                  ),
+                                ),
+                                const SizedBox(width: 24),
+                                SizedBox(
+                                  width: 340,
+                                  child: Align(
+                                    alignment: Alignment.topCenter,
+                                    child: SingleChildScrollView(
+                                      physics: const BouncingScrollPhysics(),
+                                      child: summary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _webCartDetails() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Review your order',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: webInk,
+          ),
+        ),
+        const SizedBox(height: 16),
+        ..._items.asMap().entries.map(
+              (e) => _OrderItemCard(
+                item: e.value,
+                onIncrement: () => _updateQuantity(e.key, 1),
+                onDecrement: () => _updateQuantity(e.key, -1),
+              ),
+            ),
+        OrderTimingNotice(foods: _items.map((item) => item.food)),
+        if (_showNeedBy)
+          NeedByCheckoutField(
+            specified: _needBySpecified,
+            value: _needBy,
+            onSpecifiedChanged: (next) {
+              setState(() {
+                _needBySpecified = next;
+                if (!next) _needBy = null;
+              });
+            },
+            onPickDateTime: _pickNeedBy,
+          ),
+        const SizedBox(height: 8),
+        if (_sellerFulfilment != null) ...[
+          _buildFulfilmentSection(),
+          const SizedBox(height: 24),
+        ],
+        _buildPaymentSection(),
+      ],
     );
   }
 

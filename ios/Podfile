@@ -52,5 +52,21 @@ post_install do |installer|
         end
       end
     end
+
+    if target.name == 'gRPC-Core'
+      basic_seq = File.expand_path(
+        File.join('Pods', 'gRPC-Core', 'src', 'core', 'lib', 'promise', 'detail', 'basic_seq.h'),
+        __dir__
+      )
+      if File.exist?(basic_seq)
+        contents = File.read(basic_seq)
+        broken = 'Traits::template CallSeqFactory(f_, *cur_, std::move(arg))'
+        fixed = 'Traits::CallSeqFactory(f_, *cur_, std::move(arg))'
+        if contents.include?(broken)
+          File.chmod(0o644, basic_seq) unless File.writable?(basic_seq)
+          File.write(basic_seq, contents.sub(broken, fixed))
+        end
+      end
+    end
   end
 end

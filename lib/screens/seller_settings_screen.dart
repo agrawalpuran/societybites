@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../web/web_page_frame.dart';
+
 import '../widgets/app_header.dart';
 import '../widgets/profile_menu_tile.dart';
 
@@ -39,7 +41,9 @@ class SellerSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       body: SafeArea(
         child: Column(
@@ -153,6 +157,8 @@ class SellerSettingsScreen extends StatelessWidget {
           ],
         ),
       ),
+    ),
+      maxWidth: 720,
     );
   }
 }

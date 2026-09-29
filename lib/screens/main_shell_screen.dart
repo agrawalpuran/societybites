@@ -1,15 +1,21 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../services/cart_controller.dart';
 import '../services/push_notification_service.dart';
 import '../services/seller_onboarding.dart';
+import '../services/session_service.dart';
+import '../web/web_breakpoints.dart';
+import '../web/web_cart_dock.dart';
+import '../web/web_shell_header.dart';
 import '../widgets/app_bottom_nav.dart';
 import 'home_screen.dart';
 import 'orders_screen.dart';
 import 'profile_screen.dart';
 import 'seller_dashboard_screen.dart';
+import 'login_screen.dart';
 import 'tab_preload.dart';
 import 'tab_select_load.dart';
 
@@ -35,6 +41,8 @@ class _MainShellScreenState extends State<MainShellScreen>
   var _dashboardMounted = false;
   var _profileMounted = false;
   var _kitchenAttentionCount = 0;
+  bool? _signedIn;
+  Future<void>? _sessionCheck;
   Timer? _unreadPoll;
 
   @override
@@ -55,9 +63,43 @@ class _MainShellScreenState extends State<MainShellScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.registerIfPossible();
     });
+    _sessionCheck = _refreshSignedIn();
     _unreadPoll = Timer.periodic(const Duration(seconds: 12), (_) {
       _pollUnread();
     });
+  }
+
+  Future<void> _refreshSignedIn() async {
+    final token = await SessionService.getToken();
+    final refresh = await SessionService.getRefreshToken();
+    if (!mounted) return;
+    setState(() {
+      _signedIn = (token != null && token.isNotEmpty) ||
+          (refresh != null && refresh.isNotEmpty);
+    });
+  }
+
+  void _openSignIn() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  }
+
+  void _onWebTab(int index) {
+    if (kIsWeb && _signedIn == false && index != 0) {
+      _openSignIn();
+      return;
+    }
+    _selectTab(index);
+  }
+
+  void _onHomeReady() {
+    unawaited(() async {
+      await _sessionCheck;
+      if (!mounted || (kIsWeb && _signedIn == false)) return;
+      _preload.onHomeInitialLoadSuccess();
+    }());
   }
 
   @override
@@ -216,14 +258,14 @@ class _MainShellScreenState extends State<MainShellScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _navIndex,
-        children: [
+    final pages = IndexedStack(
+      index: _navIndex,
+      children: [
           HomeScreen(
             key: _homeKey,
-            onInitialLoadSuccess: _preload.onHomeInitialLoadSuccess,
+            onInitialLoadSuccess: _onHomeReady,
             onStartSelling: _onMarketplaceStartSelling,
+            onSelectTab: _selectTab,
           ),
           _ordersMounted
               ? OrdersScreen(
@@ -255,7 +297,37 @@ class _MainShellScreenState extends State<MainShellScreen>
                 )
               : const SizedBox.shrink(),
         ],
-      ),
+    );
+    if (useWebMarketplaceLayout(context)) {
+      return Scaffold(
+        backgroundColor: webPageBackground,
+        body: Column(
+          children: [
+            WebShellHeader(
+              selectedTab: _navIndex,
+              kitchenAttentionCount: _kitchenAttentionCount,
+              signedIn: _signedIn,
+              selectedFoodType: _homeKey.currentState?.webSelectedFoodType,
+              onSelectTab: _onWebTab,
+              onSignIn: _openSignIn,
+              onFoodTypeChanged: (value) {
+                _homeKey.currentState?.setWebFoodType(value);
+                if (_navIndex != 0) _selectTab(0);
+                setState(() {});
+              },
+              onSearchChanged: (value) {
+                _homeKey.currentState?.setWebSearch(value);
+                if (_navIndex != 0) _selectTab(0);
+              },
+            ),
+            Expanded(child: pages),
+            const WebCartDock(),
+          ],
+        ),
+      );
+    }
+    return Scaffold(
+      body: pages,
       bottomNavigationBar: AppBottomNav(
         selectedIndex: _navIndex,
         kitchenAttentionCount: _kitchenAttentionCount,

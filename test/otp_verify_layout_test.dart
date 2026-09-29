@@ -45,4 +45,69 @@ void main() {
     expect(text.data, 'Verify your number');
     expect(text.maxLines, 1);
   });
+
+  testWidgets('verify CTA stays above an iOS keyboard inset', (tester) async {
+    const logical = Size(390, 844);
+    tester.view.physicalSize = logical;
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 336);
+    tester.view.padding = const FakeViewPadding(top: 47, bottom: 34);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OtpKeyboardSafeScaffold(
+          gradientHeight: 180,
+          horizontalPadding: 24,
+          scrollChild: const SizedBox(height: 900, child: Text('otp fields')),
+          bottomBar: SizedBox(
+            key: const Key('otp-verify-continue'),
+            height: otpVerifyButtonHeight,
+            width: double.infinity,
+            child: const ColoredBox(color: Color(0xFF0E5A47)),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final button = tester.getRect(find.byKey(const Key('otp-verify-continue')));
+    expect(button.bottom, lessThanOrEqualTo(logical.height - 336 + 1));
+    expect(button.top, greaterThan(0));
+    expect(find.text('otp fields'), findsOneWidget);
+  });
+
+  testWidgets('iOS keyboard leaves a gap for SMS OTP autofill', (tester) async {
+    const logical = Size(390, 844);
+    tester.view.physicalSize = logical;
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 336);
+    tester.view.padding = const FakeViewPadding(top: 47, bottom: 34);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.iOS),
+        home: OtpKeyboardSafeScaffold(
+          gradientHeight: 180,
+          horizontalPadding: 24,
+          scrollChild: const SizedBox(height: 900, child: Text('otp fields')),
+          bottomBar: SizedBox(
+            key: const Key('otp-verify-continue'),
+            height: otpVerifyButtonHeight,
+            width: double.infinity,
+            child: const ColoredBox(color: Color(0xFF0E5A47)),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final button = tester.getRect(find.byKey(const Key('otp-verify-continue')));
+    expect(
+      button.bottom,
+      lessThanOrEqualTo(logical.height - 336 - otpIosAutofillBarGap + 2),
+    );
+    expect(button.top, greaterThan(0));
+  });
 }
