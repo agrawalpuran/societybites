@@ -122,7 +122,20 @@ class NearbySellerCard {
       listings: listingsRaw is List
           ? listingsRaw
                 .whereType<Map>()
-                .map((item) => FoodItem.fromJson(Map<String, dynamic>.from(item)))
+                .map((item) {
+                  final map = Map<String, dynamic>.from(item);
+                  final society = (seller['societyName'] ?? '').toString().trim();
+                  if (society.isNotEmpty &&
+                      (map['sellerSocietyName'] == null ||
+                          map['sellerSocietyName'].toString().trim().isEmpty)) {
+                    map['sellerSocietyName'] = society;
+                  }
+                  final km = seller['distanceKm'] ?? json['distanceKm'];
+                  if (km != null && map['distanceKm'] == null) {
+                    map['distanceKm'] = km;
+                  }
+                  return FoodItem.fromJson(map);
+                })
                 .toList()
           : const [],
     );

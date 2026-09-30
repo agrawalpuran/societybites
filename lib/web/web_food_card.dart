@@ -117,11 +117,11 @@ class WebFoodCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (food.locationLabel.isNotEmpty)
+              if (food.buyerPlaceLabel.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
                   child: Text(
-                    food.locationLabel,
+                    food.buyerPlaceLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

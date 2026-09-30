@@ -99,6 +99,9 @@ class FoodItem {
   final SellingReachLevel? sellerSellingReachLevel;
   /// Great-circle km from the buyer's society. Set from nearby-sellers cards.
   final double? distanceKm;
+
+  /// Apartment name for a nearby or extended seller. Absent for same-society dishes.
+  final String? sellerSocietyName;
   final String? sellerProfilePhotoUrl;
 
   const FoodItem({
@@ -151,6 +154,7 @@ class FoodItem {
     this.sellerFulfilment = const SellerFulfilment(),
     this.sellerSellingReachLevel,
     this.distanceKm,
+    this.sellerSocietyName,
     this.sellerProfilePhotoUrl,
   });
 
@@ -222,6 +226,19 @@ class FoodItem {
     }
     if (parts.isEmpty) return 'Pickup at seller home';
     return parts.join(', ');
+  }
+
+  /// Nearby and extended dishes show the apartment and a rough distance.
+  /// Same-society dishes keep [locationLabel] (flat and block).
+  String get buyerPlaceLabel {
+    final society = sellerSocietyName?.trim();
+    if (society == null || society.isEmpty) return locationLabel;
+    final km = distanceKm;
+    if (km == null || km <= 0) return society;
+    final text = km == km.roundToDouble()
+        ? km.toInt().toString()
+        : km.toStringAsFixed(1);
+    return '$society · ~$text km';
   }
 
   static const _icons = [
@@ -330,6 +347,11 @@ class FoodItem {
       distanceKm: json['distanceKm'] == null
           ? null
           : _asDouble(json['distanceKm']),
+      sellerSocietyName: () {
+        final raw = json['sellerSocietyName']?.toString().trim();
+        if (raw == null || raw.isEmpty || raw == 'null') return null;
+        return raw;
+      }(),
       sellerProfilePhotoUrl: _photoUrl(
         json['sellerProfilePhotoUrl'] ?? json['profilePhotoUrl'],
       ),

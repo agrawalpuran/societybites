@@ -212,6 +212,8 @@ List<Map<String, dynamic>> listingMapsFromNearbyPayload(
         : const <String, dynamic>{};
     final reach = sellerInfo['sellingReachLevel'];
     final distanceKm = sellerInfo['distanceKm'] ?? seller['distanceKm'];
+    final societyName =
+        (sellerInfo['societyName'] ?? seller['societyName'])?.toString();
     final items = seller['listings'];
     if (items is! List) continue;
     for (final item in items) {
@@ -222,6 +224,13 @@ List<Map<String, dynamic>> listingMapsFromNearbyPayload(
       }
       if (distanceKm != null && map['distanceKm'] == null) {
         map['distanceKm'] = distanceKm;
+      }
+      final society = societyName?.trim();
+      if (society != null &&
+          society.isNotEmpty &&
+          (map['sellerSocietyName'] == null ||
+              map['sellerSocietyName'].toString().trim().isEmpty)) {
+        map['sellerSocietyName'] = society;
       }
       listings.add(map);
     }
@@ -235,10 +244,24 @@ List<Map<String, dynamic>> listingMapsFromNearbySellerCard(
 ) {
   final listings = payload['listings'];
   if (listings is! List) return const [];
-  return listings
-      .whereType<Map>()
-      .map((item) => Map<String, dynamic>.from(item))
-      .toList();
+  final seller = payload['seller'] is Map
+      ? Map<String, dynamic>.from(payload['seller'] as Map)
+      : const <String, dynamic>{};
+  final distanceKm = seller['distanceKm'] ?? payload['distanceKm'];
+  final societyName = seller['societyName']?.toString().trim();
+  return listings.whereType<Map>().map((item) {
+    final map = Map<String, dynamic>.from(item);
+    if (distanceKm != null && map['distanceKm'] == null) {
+      map['distanceKm'] = distanceKm;
+    }
+    if (societyName != null &&
+        societyName.isNotEmpty &&
+        (map['sellerSocietyName'] == null ||
+            map['sellerSocietyName'].toString().trim().isEmpty)) {
+      map['sellerSocietyName'] = societyName;
+    }
+    return map;
+  }).toList();
 }
 
 /// Society listings first; nearby listings fill in without duplicating ids.

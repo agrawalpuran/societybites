@@ -390,7 +390,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
   }
 
   String? get _location {
-    if (_products.isNotEmpty) return _products.first.locationLabel;
+    if (_products.isNotEmpty) return _products.first.buyerPlaceLabel;
     final block = widget.seller.block.trim();
     return block.isEmpty || block == 'Block ?' ? null : block;
   }

@@ -348,6 +348,7 @@ void main() {
             'id': 'aarav',
             'sellingReachLevel': 'EXTENDED',
             'distanceKm': 0.16,
+            'societyName': 'Palm Grove',
           },
           'listings': [
             {'id': 'sushi', 'name': 'veg Sushi'},
@@ -357,6 +358,10 @@ void main() {
     });
     expect(nearby.single['sellingReachLevel'], 'EXTENDED');
     expect(nearby.single['distanceKm'], 0.16);
+    expect(nearby.single['sellerSocietyName'], 'Palm Grove');
+    final dish = FoodItem.fromJson(nearby.single);
+    expect(dish.buyerPlaceLabel, 'Palm Grove · ~0.2 km');
+    expect(dish.locationLabel, isNot('Palm Grove · ~0.2 km'));
   });
 
   test('home reach buckets use societyId then distance vs nearby radius', () {

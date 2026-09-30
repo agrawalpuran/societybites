@@ -4,23 +4,25 @@ bool shouldOfferUpiIntent({
   required bool isWeb,
   required TargetPlatform platform,
 }) {
-  return !isWeb && platform == TargetPlatform.android;
+  // Collect (`upi://pay` / `://upi/pay`) fails on personal VPAs.
+  // Buyers scan the QR or copy the UPI ID instead.
+  return false;
 }
 
 bool shouldOfferUpiAppShortcuts({
   required bool isWeb,
   required TargetPlatform platform,
 }) {
-  // iOS in-app UPI collect cannot credit a personal VPA. Hide app icons
-  // there; buyers use QR or copy UPI ID instead.
-  return !isWeb && platform == TargetPlatform.android;
+  return !isWeb &&
+      (platform == TargetPlatform.android || platform == TargetPlatform.iOS);
 }
 
-/// iOS GPay/PhonePe collect (`://upi/pay`) is a merchant rail. Personal
-/// neighbour VPAs fail there with HDFC's fake bank-limit screen. Open the
-/// UPI app instead and let the buyer paste the copied VPA.
+/// In-app collect (`://upi/pay`) is a merchant rail. Personal neighbour
+/// VPAs fail there with HDFC's fake bank-limit screen. Open the UPI app
+/// instead and let the buyer paste the copied VPA.
 bool shouldHandoffUpiCollect({required TargetPlatform platform}) {
-  return platform == TargetPlatform.iOS;
+  return platform == TargetPlatform.iOS ||
+      platform == TargetPlatform.android;
 }
 
 class UpiAppLaunchTarget {
@@ -66,9 +68,8 @@ class UpiAppOption {
   }
 }
 
-/// Preferred Android collect targets. Query always comes from
-/// [buildUpiAppLaunchUri]. iOS never uses these hosts — see
-/// [shouldHandoffUpiCollect].
+/// Installed-app probe targets. Live launches use [shouldHandoffUpiCollect]
+/// open URIs, not these collect hosts.
 const configuredUpiApps = <UpiAppOption>[
   UpiAppOption(
     id: 'gpay',
@@ -98,7 +99,7 @@ const configuredUpiApps = <UpiAppOption>[
   ),
   UpiAppOption(
     id: 'bhim',
-    displayName: 'BHIM',
+    displayName: 'BHIM Pay',
     launchTargets: [
       UpiAppLaunchTarget(scheme: 'bhim', host: 'upi', path: '/pay'),
       UpiAppLaunchTarget(scheme: 'bhim', host: 'pay'),
@@ -188,9 +189,15 @@ List<UpiAppLaunchTarget> launchTargetsFor(
 }) {
   if (shouldHandoffUpiCollect(platform: platform)) {
     if (app.id == 'gpay') {
+      if (platform == TargetPlatform.iOS) {
+        return const [
+          UpiAppLaunchTarget(scheme: 'tez'),
+          UpiAppLaunchTarget(scheme: 'gpay'),
+        ];
+      }
       return const [
-        UpiAppLaunchTarget(scheme: 'tez'),
         UpiAppLaunchTarget(scheme: 'gpay'),
+        UpiAppLaunchTarget(scheme: 'tez'),
       ];
     }
     final seen = <String>{};

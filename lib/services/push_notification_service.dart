@@ -70,6 +70,11 @@ class PushNotificationService {
       );
 
       FirebaseMessaging.onMessage.listen((message) {
+        if (kDebugMode) {
+          debugPrint(
+            '[push] onMessage type=${message.data['notificationType'] ?? 'none'}',
+          );
+        }
         onForegroundOrderUpdate?.call();
         _showAndroidForegroundNotification(message);
       });

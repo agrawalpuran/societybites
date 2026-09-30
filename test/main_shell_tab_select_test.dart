@@ -172,17 +172,9 @@ class _TestShellState extends State<_TestShell> {
   }
 
   void _refreshVisibleTab() {
-    switch (_index) {
-      case 0:
-        _homeKey.currentState?.refresh();
-        break;
-      case 1:
-        _ordersKey.currentState?.refresh();
-        break;
-      case 2:
-        _dashboardKey.currentState?.refresh();
-        break;
-    }
+    _homeKey.currentState?.refresh();
+    _ordersKey.currentState?.refresh();
+    _dashboardKey.currentState?.refresh();
   }
 
   void _selectTab(int index) {
@@ -498,7 +490,9 @@ void main() {
 
     shellKey.currentState!.onForegroundRefresh?.call();
     await tester.pump();
+    expect(loads['Home'], 2);
     expect(loads['Orders'], 2);
+    expect(loads['Dashboard'], 2);
   });
 
   testWidgets('failed home load can be retried by tapping Home again', (

@@ -178,17 +178,9 @@ class _MainShellScreenState extends State<MainShellScreen>
   }
 
   void _refreshVisibleTab() {
-    switch (_navIndex) {
-      case 0:
-        _homeKey.currentState?.refresh();
-        break;
-      case 1:
-        _ordersKey.currentState?.refresh();
-        break;
-      case 2:
-        _dashboardKey.currentState?.refresh();
-        break;
-    }
+    _homeKey.currentState?.refresh();
+    _ordersKey.currentState?.refresh();
+    _dashboardKey.currentState?.refresh();
   }
 
   void _selectTab(int index) {

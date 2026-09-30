@@ -323,7 +323,7 @@ class _QuickInfoRow extends StatelessWidget {
             child: _InfoChip(
               label: 'PICKUP',
               value: food.pickupTime,
-              sub: food.locationLabel,
+              sub: food.buyerPlaceLabel,
             ),
           ),
         ],
@@ -436,7 +436,7 @@ class _SellerCard extends StatelessWidget {
                       ],
                     ),
                     Text(
-                      food.locationLabel,
+                      food.buyerPlaceLabel,
                       style: const TextStyle(
                         fontSize: 13,
                         color: Color(0xFF6A7774),

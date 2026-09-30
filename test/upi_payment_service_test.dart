@@ -53,10 +53,10 @@ void main() {
     );
   });
 
-  test('offers UPI intent only on native Android', () {
+  test('does not offer UPI collect intent on any platform', () {
     expect(
       shouldOfferUpiIntent(isWeb: false, platform: TargetPlatform.android),
-      isTrue,
+      isFalse,
     );
     expect(
       shouldOfferUpiIntent(isWeb: true, platform: TargetPlatform.android),
@@ -68,14 +68,14 @@ void main() {
     );
   });
 
-  test('offers UPI app shortcuts on Android only', () {
+  test('offers UPI app shortcuts on Android and iOS only', () {
     expect(
       shouldOfferUpiAppShortcuts(isWeb: false, platform: TargetPlatform.android),
       isTrue,
     );
     expect(
       shouldOfferUpiAppShortcuts(isWeb: false, platform: TargetPlatform.iOS),
-      isFalse,
+      isTrue,
     );
     expect(
       shouldOfferUpiAppShortcuts(isWeb: true, platform: TargetPlatform.android),
@@ -186,7 +186,10 @@ void main() {
       isWeb: false,
       platform: TargetPlatform.iOS,
     );
-    expect(ios, isEmpty);
+    expect(ios.map((app) => app.id), ['gpay', 'phonepe', 'paytm', 'bhim']);
+    expect(ios.first.resolvedLaunchUri?.scheme, 'tez');
+    expect(ios.first.resolvedLaunchUri?.query, isEmpty);
+    expect(upiLaunchString(ios.first.resolvedLaunchUri!), 'tez://');
 
     final androidGpay = await getAvailableUpiApps(
       upi,
@@ -196,12 +199,25 @@ void main() {
     );
     expect(androidGpay.first.id, 'gpay');
     expect(androidGpay.first.resolvedLaunchUri?.scheme, 'gpay');
+    expect(androidGpay.first.resolvedLaunchUri?.query, isEmpty);
+    expect(upiLaunchString(androidGpay.first.resolvedLaunchUri!), 'gpay://');
   });
 
-  test('iOS does not load UPI app shortcuts', () {
-    expect(shouldOfferUpiAppShortcuts(isWeb: false, platform: TargetPlatform.iOS), isFalse);
+  test('UPI shortcuts open the app without a collect URI', () {
     expect(shouldHandoffUpiCollect(platform: TargetPlatform.iOS), isTrue);
-    expect(shouldHandoffUpiCollect(platform: TargetPlatform.android), isFalse);
+    expect(shouldHandoffUpiCollect(platform: TargetPlatform.android), isTrue);
+    final iosTargets = launchTargetsFor(
+      configuredUpiApps.first,
+      platform: TargetPlatform.iOS,
+    );
+    expect(iosTargets.map((t) => t.scheme).toList(), ['tez', 'gpay']);
+    expect(upiLaunchString(buildUpiAppOpenUri(iosTargets.first)), 'tez://');
+    final androidTargets = launchTargetsFor(
+      configuredUpiApps.first,
+      platform: TargetPlatform.android,
+    );
+    expect(androidTargets.map((t) => t.scheme).toList(), ['gpay', 'tez']);
+    expect(upiLaunchString(buildUpiAppOpenUri(androidTargets.first)), 'gpay://');
   });
 
   test('sanitizes UPI transaction references', () {

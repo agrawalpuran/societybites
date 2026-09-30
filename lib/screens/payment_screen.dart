@@ -661,7 +661,7 @@ class _PaymentScreenState extends State<PaymentScreen>
       child: Column(
         children: [
           const Text(
-            'Scan QR code',
+            'Scan QR code to pay',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -698,21 +698,21 @@ class _PaymentScreenState extends State<PaymentScreen>
               ),
             ),
           ),
-          if (_availableApps.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _buildOrDivider(),
-            const SizedBox(height: 12),
-            Text(
-              shouldHandoffUpiCollect(platform: defaultTargetPlatform)
-                  ? 'Open your UPI app'
-                  : 'Pay using your UPI app',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF101617),
-              ),
+          const SizedBox(height: 16),
+          _buildOrDivider(),
+          const SizedBox(height: 12),
+          const Text(
+            'Copy the UPI ID and pay',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF101617),
             ),
-            const SizedBox(height: 10),
+          ),
+          const SizedBox(height: 10),
+          _buildCopyUpiIdRow(),
+          if (_availableApps.isNotEmpty) ...[
+            const SizedBox(height: 12),
             Wrap(
               alignment: WrapAlignment.center,
               spacing: 8,
@@ -730,8 +730,6 @@ class _PaymentScreenState extends State<PaymentScreen>
             const SizedBox(height: 12),
             _buildUpiLaunchError(),
           ],
-          const SizedBox(height: 16),
-          _buildCopyUpiIdRow(),
         ],
       ),
     );
