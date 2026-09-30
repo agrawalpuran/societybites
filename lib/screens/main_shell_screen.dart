@@ -125,6 +125,7 @@ class _MainShellScreenState extends State<MainShellScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      PushNotificationService.registerIfPossible();
       _refreshVisibleTab();
     }
   }

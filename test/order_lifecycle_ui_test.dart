@@ -17,6 +17,10 @@ Map<String, dynamic> _orderJson({
   String? cancelledAt,
   String? rejectReason,
   bool hasReview = false,
+  String? fulfilmentMethod,
+  String? sellerSocietyName,
+  String? flatNumber,
+  String? block,
 }) {
   return {
     'id': id,
@@ -34,6 +38,8 @@ Map<String, dynamic> _orderJson({
     'cancelledAt': cancelledAt,
     'rejectReason': rejectReason,
     'hasReview': hasReview,
+    if (fulfilmentMethod != null) 'fulfilmentMethod': fulfilmentMethod,
+    if (sellerSocietyName != null) 'sellerSocietyName': sellerSocietyName,
     'items': [
       {
         'quantity': 1,
@@ -44,6 +50,9 @@ Map<String, dynamic> _orderJson({
           'sellerId': 'seller-1',
           'sellerName': 'Test Seller',
           'price': 115,
+          if (flatNumber != null) 'flatNumber': flatNumber,
+          if (block != null) 'block': block,
+          if (sellerSocietyName != null) 'sellerSocietyName': sellerSocietyName,
         },
       },
     ],
@@ -176,7 +185,9 @@ void main() {
     expect(find.textContaining('SB-up · $placed'), findsOneWidget);
   });
 
-  testWidgets('Cancel order dialog shows item name and message', (tester) async {
+  testWidgets('Cancel order dialog shows item name and message', (
+    tester,
+  ) async {
     await pumpOrders(tester, [
       _orderJson(
         id: '717489',
@@ -188,7 +199,10 @@ void main() {
     await tester.tap(find.text('Cancel Order'));
     await tester.pumpAndSettle();
     expect(find.text('Cancel order?'), findsOneWidget);
-    expect(find.textContaining('SB-717489 · Fresh Kachori Chat'), findsOneWidget);
+    expect(
+      find.textContaining('SB-717489 · Fresh Kachori Chat'),
+      findsOneWidget,
+    );
     expect(
       find.textContaining(
         'The seller will be notified and inventory will be restored.',
@@ -270,6 +284,7 @@ void main() {
     expect(find.text('Active (1)'), findsOneWidget);
     expect(find.text('Past (0)'), findsOneWidget);
     expect(find.text('COMPLETED'), findsOneWidget);
+    expect(find.text('View details'), findsOneWidget);
     expect(find.text('Rate\nExperience'), findsOneWidget);
   });
 
@@ -285,7 +300,66 @@ void main() {
     await tester.tap(find.textContaining('Past'));
     await tester.pumpAndSettle();
     expect(find.text('COMPLETED'), findsOneWidget);
+    expect(find.text('View details'), findsOneWidget);
     expect(find.text('Rate\nExperience'), findsOneWidget);
+  });
+
+  testWidgets('buyer can open recent completed order details without editing', (
+    tester,
+  ) async {
+    final completedAt = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(hours: 2))
+        .toIso8601String();
+    await pumpOrders(tester, [
+      _orderJson(
+        id: 'c-details',
+        status: 'completed',
+        completedAt: completedAt,
+        paymentStatus: 'seller_confirmed',
+        fulfilmentMethod: 'pickup',
+        sellerSocietyName: 'Green Valley Apartments',
+        flatNumber: '12A',
+        block: 'B',
+      ),
+    ]);
+    expect(find.text('Pickup details'), findsNothing);
+    await tester.tap(find.text('View details'));
+    await tester.pumpAndSettle();
+    expect(find.text('ORDER DETAILS'), findsOneWidget);
+    expect(find.text('Pickup details'), findsOneWidget);
+    expect(find.textContaining('Green Valley Apartments'), findsWidgets);
+    expect(find.textContaining('Flat 12A'), findsWidgets);
+    expect(find.text('Pay Now'), findsNothing);
+    expect(find.text('Cancel Order'), findsNothing);
+  });
+
+  testWidgets('buyer can open past completed order details for pickup info', (
+    tester,
+  ) async {
+    final completedAt = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(hours: 30))
+        .toIso8601String();
+    await pumpOrders(tester, [
+      _orderJson(
+        id: 'c-past-details',
+        status: 'completed',
+        completedAt: completedAt,
+        fulfilmentMethod: 'pickup',
+        sellerSocietyName: 'Lakeview Residency',
+        flatNumber: '204',
+      ),
+    ]);
+    await tester.tap(find.textContaining('Past'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('View details'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pickup details'), findsOneWidget);
+    expect(find.textContaining('Lakeview Residency'), findsWidgets);
+    expect(find.textContaining('Flat 204'), findsWidgets);
+    expect(find.text('Pay Now'), findsNothing);
+    expect(find.text('Cancel Order'), findsNothing);
   });
 
   testWidgets('reviewed completed in Active shows Reviewed', (tester) async {
@@ -306,7 +380,7 @@ void main() {
     expect(find.text('Message Seller'), findsOneWidget);
   });
 
-  testWidgets('recent rejected stays in Active with reason', (tester) async {
+  testWidgets('recent rejected goes to Past with reason', (tester) async {
     final rejectedAt = DateTime.now()
         .toUtc()
         .subtract(const Duration(hours: 5))
@@ -319,10 +393,14 @@ void main() {
         rejectReason: 'Ingredients unavailable\nSorry, out of stock',
       ),
     ]);
+    expect(find.text('Active (0)'), findsOneWidget);
+    expect(find.textContaining('Past (1)'), findsOneWidget);
+    await tester.tap(find.textContaining('Past'));
+    await tester.pumpAndSettle();
     expect(find.text('ORDER REJECTED'), findsOneWidget);
     expect(find.textContaining('Ingredients unavailable'), findsOneWidget);
     expect(find.textContaining('Sorry, out of stock'), findsOneWidget);
-    expect(find.textContaining('Past (0)'), findsOneWidget);
+    expect(find.text('View details'), findsOneWidget);
     expect(find.text('Order\nAgain'), findsNothing);
     expect(find.text('Message Seller'), findsOneWidget);
   });
@@ -369,13 +447,9 @@ void main() {
         rejectReason: 'Not available today',
       ),
       _orderJson(id: 'c-old', status: 'completed', completedAt: old),
-      _orderJson(
-        id: 'x-old',
-        status: 'cancelled',
-        cancelledAt: old,
-      ),
+      _orderJson(id: 'x-old', status: 'cancelled', cancelledAt: old),
     ]);
-    expect(find.text('Active (3)'), findsOneWidget);
-    expect(find.text('Past (2)'), findsOneWidget);
+    expect(find.text('Active (2)'), findsOneWidget);
+    expect(find.text('Past (3)'), findsOneWidget);
   });
 }

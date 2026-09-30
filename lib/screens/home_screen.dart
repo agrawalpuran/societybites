@@ -28,6 +28,7 @@ import '../widgets/food_type_selector.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/floating_cart_bar.dart';
+import '../widgets/carousel_page_dots.dart';
 import '../widgets/home_distance_chip.dart';
 import '../widgets/guest_order_auth.dart';
 import '../widgets/status_banner.dart';
@@ -1300,17 +1301,13 @@ class HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        SizedBox(
+        PagedHorizontalList(
           height: 100,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: sellers.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 16),
-            itemBuilder: (_, i) => _SellerChip(
-              seller: sellers[i],
-              onTap: () => _openSeller(sellers[i]),
-            ),
+          itemCount: sellers.length,
+          separatorBuilder: (context, index) => const SizedBox(width: 16),
+          itemBuilder: (_, i) => _SellerChip(
+            seller: sellers[i],
+            onTap: () => _openSeller(sellers[i]),
           ),
         ),
       ],
@@ -1456,26 +1453,21 @@ class HomeScreenState extends State<HomeScreen> {
             ),
           )
         else
-          SizedBox(
+          PagedHorizontalList(
             height: 268,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: visible.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 14),
-              itemBuilder: (_, i) {
-                final food = visible[i];
-                return _SpecialCard(
-                  key: ValueKey('home-reach-card-${food.id}'),
-                  food: food,
-                  cartQty: _cartQtyFor(food),
-                  onAdd: () => _addToCart(food),
-                  onRemove: () => _removeFromCart(food),
-                  onTap: () => _openDetail(food),
-                  onSellerTap: () => _openSeller(sellerFromListing(food)),
-                );
-              },
-            ),
+            itemCount: visible.length,
+            itemBuilder: (_, i) {
+              final food = visible[i];
+              return _SpecialCard(
+                key: ValueKey('home-reach-card-${food.id}'),
+                food: food,
+                cartQty: _cartQtyFor(food),
+                onAdd: () => _addToCart(food),
+                onRemove: () => _removeFromCart(food),
+                onTap: () => _openDetail(food),
+                onSellerTap: () => _openSeller(sellerFromListing(food)),
+              );
+            },
           ),
       ],
     );
@@ -1686,9 +1678,8 @@ class _SellerChip extends StatelessWidget {
   }
 }
 
-/// Today's Specials carousel with scroll-synced pagination dots.
-/// Page count is derived from scroll extent vs card stride (not one-dot-per-item).
-class _TodaysSpecialsSection extends StatefulWidget {
+/// Today's Specials carousel. Dots under the row show there is more to scroll.
+class _TodaysSpecialsSection extends StatelessWidget {
   const _TodaysSpecialsSection({
     required this.specials,
     required this.cartQtyFor,
@@ -1710,73 +1701,12 @@ class _TodaysSpecialsSection extends StatefulWidget {
   final VoidCallback? onSeeAll;
 
   @override
-  State<_TodaysSpecialsSection> createState() => _TodaysSpecialsSectionState();
-}
-
-class _TodaysSpecialsSectionState extends State<_TodaysSpecialsSection> {
-  static const double _cardWidth = 190;
-  static const double _gap = 14;
-  static const double _stride = _cardWidth + _gap;
-
-  final ScrollController _scrollController = ScrollController();
-  final ValueNotifier<_SpecialsPageInfo> _pageInfo = ValueNotifier(
-    const _SpecialsPageInfo(activePage: 0, pageCount: 1),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_syncPageFromScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _syncPageFromScroll());
-  }
-
-  @override
-  void didUpdateWidget(covariant _TodaysSpecialsSection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.specials.length != widget.specials.length) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _syncPageFromScroll(),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_syncPageFromScroll);
-    _scrollController.dispose();
-    _pageInfo.dispose();
-    super.dispose();
-  }
-
-  void _syncPageFromScroll() {
-    if (!_scrollController.hasClients) return;
-
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    final pageCount = maxScroll <= 0 ? 1 : (maxScroll / _stride).ceil() + 1;
-    final offset = _scrollController.offset.clamp(0.0, maxScroll);
-    final activePage = (pageCount <= 1 || maxScroll <= 0)
-        ? 0
-        : ((offset / maxScroll) * (pageCount - 1)).round().clamp(
-            0,
-            pageCount - 1,
-          );
-
-    final next = _SpecialsPageInfo(
-      activePage: activePage,
-      pageCount: pageCount,
-    );
-    if (_pageInfo.value != next) {
-      _pageInfo.value = next;
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 2),
+          padding: const EdgeInsets.fromLTRB(20, 24, 8, 2),
           child: Row(
             children: [
               const Expanded(
@@ -1789,10 +1719,10 @@ class _TodaysSpecialsSectionState extends State<_TodaysSpecialsSection> {
                   ),
                 ),
               ),
-              if (widget.showSeeAll)
+              if (showSeeAll)
                 TextButton(
                   key: const Key('home-see-all-in-society'),
-                  onPressed: widget.onSeeAll,
+                  onPressed: onSeeAll,
                   child: const Text(
                     'SEE ALL',
                     style: TextStyle(
@@ -1802,75 +1732,30 @@ class _TodaysSpecialsSectionState extends State<_TodaysSpecialsSection> {
                       letterSpacing: 0.5,
                     ),
                   ),
-                )
-              else
-                ValueListenableBuilder<_SpecialsPageInfo>(
-                  valueListenable: _pageInfo,
-                  builder: (context, info, _) {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: List.generate(
-                        info.pageCount,
-                        (i) => Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(left: 5),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: i == info.activePage
-                                ? const Color(0xFF0E5A47)
-                                : const Color(0xFFD4DBD8),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
                 ),
             ],
           ),
         ),
         const SizedBox(height: 14),
-        SizedBox(
+        PagedHorizontalList(
           height: 268,
-          child: ListView.separated(
-            controller: _scrollController,
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: widget.specials.length,
-            separatorBuilder: (context, index) => const SizedBox(width: _gap),
-            itemBuilder: (_, i) {
-              final food = widget.specials[i];
-              return _SpecialCard(
-                key: ValueKey('home-special-card-${food.id}'),
-                food: food,
-                cartQty: widget.cartQtyFor(food),
-                onAdd: () => widget.onAdd(food),
-                onRemove: () => widget.onRemove(food),
-                onTap: () => widget.onTap(food),
-                onSellerTap: () => widget.onSellerTap(food),
-              );
-            },
-          ),
+          itemCount: specials.length,
+          itemBuilder: (_, i) {
+            final food = specials[i];
+            return _SpecialCard(
+              key: ValueKey('home-special-card-${food.id}'),
+              food: food,
+              cartQty: cartQtyFor(food),
+              onAdd: () => onAdd(food),
+              onRemove: () => onRemove(food),
+              onTap: () => onTap(food),
+              onSellerTap: () => onSellerTap(food),
+            );
+          },
         ),
       ],
     );
   }
-}
-
-class _SpecialsPageInfo {
-  const _SpecialsPageInfo({required this.activePage, required this.pageCount});
-
-  final int activePage;
-  final int pageCount;
-
-  @override
-  bool operator ==(Object other) =>
-      other is _SpecialsPageInfo &&
-      other.activePage == activePage &&
-      other.pageCount == pageCount;
-
-  @override
-  int get hashCode => Object.hash(activePage, pageCount);
 }
 
 class _SpecialCard extends StatelessWidget {

@@ -52,6 +52,7 @@ class PushNotificationService {
 
   static bool _initialized = false;
   static bool _tokenRefreshBound = false;
+  static int _tokenRetries = 0;
 
   static bool get _supported =>
       !kIsWeb && (Platform.isAndroid || Platform.isIOS);
@@ -119,41 +120,53 @@ class PushNotificationService {
         return;
       }
 
+      final platform = Platform.isIOS ? 'ios' : 'android';
+      if (!_tokenRefreshBound) {
+        _tokenRefreshBound = true;
+        messaging.onTokenRefresh.listen((newToken) async {
+          await _saveDeviceToken(newToken, platform);
+        });
+      }
+
       final token = await _fcmToken(messaging);
       if (kDebugMode) {
         debugPrint(
           '[push] fcmToken ${token == null || token.isEmpty ? 'missing' : 'obtained'}',
         );
       }
-      if (token == null || token.isEmpty) return;
+      if (token == null || token.isEmpty) {
+        _scheduleTokenRetry();
+        return;
+      }
 
-      final platform = Platform.isIOS ? 'ios' : 'android';
+      _tokenRetries = 0;
+      await _saveDeviceToken(token, platform);
+    } catch (err) {
+      if (kDebugMode) {
+        debugPrint('[push] registerIfPossible failed: $err');
+      }
+    }
+  }
+
+  static void _scheduleTokenRetry() {
+    if (_tokenRetries >= 4) return;
+    _tokenRetries += 1;
+    final wait = Duration(seconds: 4 * _tokenRetries);
+    Future.delayed(wait, () {
+      if (_supported) registerIfPossible();
+    });
+  }
+
+  static Future<void> _saveDeviceToken(String token, String platform) async {
+    if (token.isEmpty) return;
+    try {
       await ApiService.registerDeviceToken(token, platform: platform);
       if (kDebugMode) {
         debugPrint('[push] device token registered');
       }
-
-      if (!_tokenRefreshBound) {
-        _tokenRefreshBound = true;
-        messaging.onTokenRefresh.listen((newToken) async {
-          try {
-            await ApiService.registerDeviceToken(
-              newToken,
-              platform: platform,
-            );
-            if (kDebugMode) {
-              debugPrint('[push] refreshed device token registered');
-            }
-          } catch (err) {
-            if (kDebugMode) {
-              debugPrint('[push] token refresh register failed');
-            }
-          }
-        });
-      }
     } catch (err) {
       if (kDebugMode) {
-        debugPrint('[push] registerIfPossible failed: $err');
+        debugPrint('[push] device token register failed: $err');
       }
     }
   }
@@ -204,6 +217,7 @@ class PushNotificationService {
     final tabIndex = type == 'order_message'
         ? (recipientRole == 'seller' ? 2 : 1)
         : (_sellerTypes.contains(type) ? 2 : 1);
+    onForegroundOrderUpdate?.call();
     final nav = navigatorKey.currentState;
     if (nav == null) return;
 

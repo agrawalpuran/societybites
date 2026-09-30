@@ -39,6 +39,7 @@ function buildFcmMessage(token, { title, body, data }) {
     },
     apns: {
       headers: {
+        "apns-push-type": "alert",
         "apns-priority": "10",
       },
       payload: {
