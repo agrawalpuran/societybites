@@ -504,6 +504,7 @@ class Order {
   final String? buyerBlock;
   final String? buyerSocietyName;
   final String? sellerSocietyName;
+  final double? distanceKm;
   final int unreadMessageCount;
 
   const Order({
@@ -540,6 +541,7 @@ class Order {
     this.buyerBlock,
     this.buyerSocietyName,
     this.sellerSocietyName,
+    this.distanceKm,
     this.unreadMessageCount = 0,
   });
 
@@ -637,6 +639,16 @@ class Order {
     return parts.join(' · ');
   }
 
+  /// Rough society-to-society distance. Empty for same-society orders.
+  String get approxDistanceLabel {
+    final km = distanceKm;
+    if (km == null || km <= 0) return '';
+    final text = km == km.roundToDouble()
+        ? km.toInt().toString()
+        : km.toStringAsFixed(1);
+    return '~$text km';
+  }
+
   FoodItem get food => items.isNotEmpty ? items.first.food : _placeholderFood;
 
   int get quantity => items.fold<int>(0, (sum, item) => sum + item.quantity);
@@ -713,6 +725,7 @@ class Order {
       buyerBlock: buyerBlock,
       buyerSocietyName: buyerSocietyName,
       sellerSocietyName: sellerSocietyName,
+      distanceKm: distanceKm,
       unreadMessageCount: unreadMessageCount,
     );
   }
@@ -753,6 +766,7 @@ class Order {
       buyerBlock: buyerBlock,
       buyerSocietyName: buyerSocietyName,
       sellerSocietyName: sellerSocietyName,
+      distanceKm: distanceKm,
       unreadMessageCount: count,
     );
   }
@@ -827,6 +841,7 @@ class Order {
       buyerBlock: json['buyerBlock'] as String?,
       buyerSocietyName: json['buyerSocietyName'] as String?,
       sellerSocietyName: json['sellerSocietyName'] as String?,
+      distanceKm: (json['distanceKm'] as num?)?.toDouble(),
       unreadMessageCount: (json['unreadMessageCount'] as num?)?.toInt() ?? 0,
     );
   }

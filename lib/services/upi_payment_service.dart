@@ -209,6 +209,23 @@ List<UpiAppLaunchTarget> launchTargetsFor(
   return app.launchTargets;
 }
 
+/// Probe URLs used only to detect an installed app. Open-home first, then
+/// collect hosts (`gpay://upi/pay`) that GPay actually advertises. Launch
+/// still uses the matching URI with no `pa`/`am` query.
+List<UpiAppLaunchTarget> handoffProbeTargetsFor(
+  UpiAppOption app, {
+  required TargetPlatform platform,
+}) {
+  final seen = <String>{};
+  return [
+    for (final target in [
+      ...launchTargetsFor(app, platform: platform),
+      ...app.launchTargets,
+    ])
+      if (seen.add(target.baseUrl)) target,
+  ];
+}
+
 Uri buildUpiAppOpenUri(UpiAppLaunchTarget target) {
   return Uri.parse(target.baseUrl);
 }
@@ -268,9 +285,13 @@ Future<List<UpiAppOption>> getAvailableUpiApps(
   }
 
   final available = <UpiAppOption>[];
+  final handoff = shouldHandoffUpiCollect(platform: platform);
   for (final app in configuredUpiApps) {
-    for (final target in launchTargetsFor(app, platform: platform)) {
-      final uri = shouldHandoffUpiCollect(platform: platform)
+    final targets = handoff
+        ? handoffProbeTargetsFor(app, platform: platform)
+        : launchTargetsFor(app, platform: platform);
+    for (final target in targets) {
+      final uri = handoff
           ? buildUpiAppOpenUri(target)
           : buildUpiAppLaunchUri(upiPayUri: upiPayUri, target: target);
       final launchable = await _safeCanLaunch(canLaunch, uri);

@@ -83,6 +83,179 @@ const homeReachPreviewCount = 6;
 
 enum HomeListingReach { inSociety, nearby, extended }
 
+/// Buyer-side Home distance. A null selection means the widest option,
+/// which is today's full feed.
+class BuyerDistanceChoice {
+  const BuyerDistanceChoice.mySociety() : maxKm = null, societyOnly = true;
+
+  const BuyerDistanceChoice.within(this.maxKm) : societyOnly = false;
+
+  const BuyerDistanceChoice.extended() : maxKm = null, societyOnly = false;
+
+  final double? maxKm;
+  final bool societyOnly;
+
+  bool get isExtended => !societyOnly && maxKm == null;
+
+  String get optionKey {
+    if (societyOnly) return 'mySociety';
+    if (maxKm == null) return 'extended';
+    return maxKm.toString();
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is BuyerDistanceChoice &&
+        other.societyOnly == societyOnly &&
+        other.maxKm == maxKm;
+  }
+
+  @override
+  int get hashCode => Object.hash(societyOnly, maxKm);
+}
+
+const _buyerDistanceStepsKm = <double>[0.5, 1, 2, 3, 5, 7, 10];
+
+BuyerDistanceChoice effectiveBuyerDistance(
+  BuyerDistanceChoice? selected,
+  SellingReach reach,
+) {
+  final choices = buyerDistanceChoices(reach);
+  if (selected != null && choices.contains(selected)) return selected;
+  return choices.last;
+}
+
+List<BuyerDistanceChoice> buyerDistanceChoices(SellingReach reach) {
+  final cap = reach.extendedRadiusKm ?? reach.nearbyRadiusKm;
+  final steps = <double>{};
+  if (cap != null && cap > 0) {
+    for (final km in _buyerDistanceStepsKm) {
+      if (km < cap) steps.add(km);
+    }
+    final nearby = reach.nearbyRadiusKm;
+    if (nearby != null && nearby > 0 && nearby < cap) steps.add(nearby);
+  }
+  final sorted = steps.toList()..sort();
+  return [
+    const BuyerDistanceChoice.mySociety(),
+    for (final km in sorted) BuyerDistanceChoice.within(km),
+    if (cap != null && reach.extendedAvailable)
+      const BuyerDistanceChoice.extended()
+    else if (cap != null)
+      BuyerDistanceChoice.within(cap),
+  ];
+}
+
+String formatBuyerDistanceKm(double km) {
+  if (km > 0 && km < 1) {
+    return '${(km * 1000).round()} m';
+  }
+  final text = km == km.roundToDouble()
+      ? km.toInt().toString()
+      : km.toStringAsFixed(1);
+  return '$text km';
+}
+
+String buyerDistanceLabel(BuyerDistanceChoice choice, SellingReach _) {
+  if (choice.societyOnly) return 'My Society';
+  if (choice.isExtended) return 'Extended';
+  return 'Within ${formatBuyerDistanceKm(choice.maxKm!)}';
+}
+
+String buyerDistanceSubtitle(BuyerDistanceChoice choice, SellingReach reach) {
+  if (choice.societyOnly) return 'Listings from your own society';
+  if (choice.isExtended) {
+    final km = reach.extendedRadiusKm;
+    if (km == null) return 'The widest range available';
+    return 'Up to ${formatBuyerDistanceKm(km)}';
+  }
+  return 'Up to ${formatBuyerDistanceKm(choice.maxKm!)}';
+}
+
+/// Hides dishes already outside the chosen radius. Extended keeps the feed
+/// the server already returned, including dishes with no distance.
+bool foodMatchesBuyerDistance(
+  FoodItem food, {
+  required BuyerDistanceChoice choice,
+  required String? buyerSocietyId,
+  double? nearbyRadiusKm,
+}) {
+  if (choice.isExtended) return true;
+  final band = homeListingReachFor(
+    food,
+    buyerSocietyId: buyerSocietyId,
+    nearbyRadiusKm: nearbyRadiusKm,
+  );
+  if (band == HomeListingReach.inSociety) return true;
+  final km = food.distanceKm;
+  if (choice.societyOnly) {
+    return band == null && (km == null || km <= 0);
+  }
+  if (km == null) return band != HomeListingReach.extended;
+  return km <= choice.maxKm!;
+}
+
+bool campaignMatchesBuyerDistance(
+  PreOrderCampaign campaign, {
+  required BuyerDistanceChoice choice,
+  required String? buyerSocietyId,
+  String? viewerUserId,
+  double? nearbyRadiusKm,
+}) {
+  if (choice.isExtended) return true;
+  final band = homeCampaignReachFor(
+    campaign,
+    buyerSocietyId: buyerSocietyId,
+    viewerUserId: viewerUserId,
+    nearbyRadiusKm: nearbyRadiusKm,
+  );
+  if (band == HomeListingReach.inSociety) return true;
+  final km = campaign.distanceKm;
+  if (choice.societyOnly) {
+    return band == null && (km == null || km <= 0);
+  }
+  if (km == null) return band != HomeListingReach.extended;
+  return km <= choice.maxKm!;
+}
+
+List<FoodItem> listingsMatchingBuyerDistance(
+  Iterable<FoodItem> listings, {
+  required BuyerDistanceChoice choice,
+  required String? buyerSocietyId,
+  double? nearbyRadiusKm,
+}) {
+  return listings
+      .where(
+        (food) => foodMatchesBuyerDistance(
+          food,
+          choice: choice,
+          buyerSocietyId: buyerSocietyId,
+          nearbyRadiusKm: nearbyRadiusKm,
+        ),
+      )
+      .toList();
+}
+
+List<PreOrderCampaign> campaignsMatchingBuyerDistance(
+  Iterable<PreOrderCampaign> campaigns, {
+  required BuyerDistanceChoice choice,
+  required String? buyerSocietyId,
+  String? viewerUserId,
+  double? nearbyRadiusKm,
+}) {
+  return campaigns
+      .where(
+        (campaign) => campaignMatchesBuyerDistance(
+          campaign,
+          choice: choice,
+          buyerSocietyId: buyerSocietyId,
+          viewerUserId: viewerUserId,
+          nearbyRadiusKm: nearbyRadiusKm,
+        ),
+      )
+      .toList();
+}
+
 /// Own society first. Cross-society Home groups by distance vs the city
 /// nearby radius (already returned on nearby-sellers), not by the seller's
 /// opted-in level. Opted-in level only decides who is eligible to appear.

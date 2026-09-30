@@ -1,3 +1,4 @@
+const { distanceKmBetweenCoordinates } = require("../lib/geoDistance");
 const { listingCategoriesFromRecord } = require("./listingCategories");
 const { serializePaymentPreference } = require("../lib/sellerPaymentPreference");
 const { serializeFulfilment } = require("../lib/sellerFulfilment");
@@ -116,6 +117,11 @@ async function attachQuantitySold(prisma, listings) {
   return list;
 }
 
+function roundKm(value) {
+  if (!Number.isFinite(value)) return null;
+  return Math.round(value * 10) / 10;
+}
+
 function serializeOrder(order) {
   const items = (order.items || []).map((item) => ({
     id: item.id,
@@ -128,6 +134,15 @@ function serializeOrder(order) {
   const buyer = order.buyer || {};
   const buyerFlat = buyer.flat || null;
   const buyerSociety = buyer.society || null;
+  const sellerSociety =
+    order.items &&
+    order.items[0] &&
+    order.items[0].listing &&
+    order.items[0].listing.seller &&
+    order.items[0].listing.seller.society;
+  const distanceKm = roundKm(
+    distanceKmBetweenCoordinates(buyerSociety, sellerSociety)
+  );
 
   return {
     id: order.id,
@@ -152,16 +167,8 @@ function serializeOrder(order) {
     buyerBlock: buyerFlat?.block || null,
     buyerSocietyName: buyerSociety?.name || null,
     sellerName: items[0]?.listing?.sellerName || null,
-    sellerSocietyName:
-      (items[0] &&
-        items[0].listing &&
-        order.items &&
-        order.items[0] &&
-        order.items[0].listing &&
-        order.items[0].listing.seller &&
-        order.items[0].listing.seller.society &&
-        order.items[0].listing.seller.society.name) ||
-      null,
+    sellerSocietyName: (sellerSociety && sellerSociety.name) || null,
+    distanceKm,
     isCrossSociety: Boolean(
       items[0] &&
         items[0].listing &&

@@ -305,7 +305,7 @@ void main() {
         rejectedAt: now.subtract(const Duration(hours: 5)),
         now: now,
       ),
-      isTrue,
+      isFalse,
     );
     expect(
       BuyerOrderVisibility.isInBuyerActiveTab(

@@ -38,6 +38,16 @@ function serveStaticWithCors(urlPath, directory) {
 
 app.use(cors());
 app.use(express.json({ limit: "8mb" }));
+app.set("etag", false);
+
+app.use((req, res, next) => {
+  const path = req.path || "";
+  if (path.startsWith("/uploads") || path.startsWith("/seed-images")) {
+    return next();
+  }
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
 
 app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -51,7 +61,10 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (req.path !== "/health" && req.path !== "/ready") {
-      logger.info("http", `${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+      logger.info(
+        "http",
+        `${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`
+      );
     }
   });
   next();
@@ -121,6 +134,10 @@ app.use((err, _req, res, _next) => {
 });
 
 const server = app.listen(PORT, () => {
+  // Chrome reuses sockets longer than Node's 5s default and then reports
+  // "Failed to fetch" when Node has already closed them.
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 66000;
   logger.info("server", `Server running on port ${PORT}`);
   logger.info("server", `Serving uploads from ${UPLOADS_DIR}`);
   logger.info(

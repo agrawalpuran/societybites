@@ -28,6 +28,7 @@ import '../widgets/food_type_selector.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/floating_cart_bar.dart';
+import '../widgets/home_distance_chip.dart';
 import '../widgets/guest_order_auth.dart';
 import '../widgets/status_banner.dart';
 import '../widgets/listing_type_badge.dart';
@@ -88,6 +89,7 @@ class HomeScreenState extends State<HomeScreen> {
   String? _buyerSocietyId;
   HomeListingReach? _expandedReach;
   SellingReach _cityReach = const SellingReach();
+  BuyerDistanceChoice? _distanceChoice;
   final _reachSectionKeys = <HomeListingReach, GlobalKey>{
     HomeListingReach.inSociety: GlobalKey(),
     HomeListingReach.nearby: GlobalKey(),
@@ -324,12 +326,23 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  List<FoodItem> get _available => _filteredListings;
+  BuyerDistanceChoice get _effectiveDistance =>
+      effectiveBuyerDistance(_distanceChoice, _cityReach);
+
+  List<FoodItem> get _distanceFiltered => listingsMatchingBuyerDistance(
+        _filteredListings,
+        choice: _effectiveDistance,
+        buyerSocietyId: _buyerSocietyId,
+        nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+      );
+
+  List<FoodItem> get _available => _distanceFiltered;
 
   bool get _isBrowsingUnfiltered =>
       _searchQuery.isEmpty &&
       _selectedCategory == null &&
-      _selectedFoodType == null;
+      _selectedFoodType == null &&
+      _distanceChoice == null;
 
   bool get _shouldPreviewAllItems =>
       !_showAllItems &&
@@ -752,6 +765,7 @@ class HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     SliverToBoxAdapter(child: _buildSearchBar()),
+                    SliverToBoxAdapter(child: _buildDistanceChip()),
                     if (_searchQuery.isEmpty) ...[
                       SliverToBoxAdapter(child: _buildCategoryChips()),
                       SliverToBoxAdapter(child: _buildHomeDiscoverySections()),
@@ -773,6 +787,40 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildDistanceChip() {
+    return HomeDistanceChip(
+      reach: _cityReach,
+      selected: _distanceChoice,
+      itemCount: _distanceFiltered.length,
+      onSelected: (choice) => setState(() => _distanceChoice = choice),
+    );
+  }
+
+  List<FoodItem> _mobileListingsForReach(HomeListingReach reach) {
+    return listingsForHomeReach(
+      _distanceFiltered,
+      reach: reach,
+      buyerSocietyId: _buyerSocietyId,
+      nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+    );
+  }
+
+  List<PreOrderCampaign> _mobileCampaignsForReach(HomeListingReach reach) {
+    return campaignsForHomeReach(
+      campaignsMatchingBuyerDistance(
+        _preOrderCampaigns,
+        choice: _effectiveDistance,
+        buyerSocietyId: _buyerSocietyId,
+        viewerUserId: _viewerUserId,
+        nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+      ),
+      reach: reach,
+      buyerSocietyId: _buyerSocietyId,
+      viewerUserId: _viewerUserId,
+      nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+    );
+  }
+
   Widget _buildPreOrdersSection() {
     if (_preOrdersLoading) {
       return const Padding(
@@ -782,7 +830,7 @@ class HomeScreenState extends State<HomeScreen> {
     }
     return _buildPreOrderReachCarousel(
       title: 'Pre-orders Campaign in Your Society',
-      campaigns: _campaignsForReach(HomeListingReach.inSociety),
+      campaigns: _mobileCampaignsForReach(HomeListingReach.inSociety),
     );
   }
 
@@ -1138,7 +1186,9 @@ class HomeScreenState extends State<HomeScreen> {
         _buildSellerReachCarousel(
           key: const Key('home-sellers-in-society'),
           title: 'Top Sellers in Your Society',
-          sellers: _societySellers,
+          sellers: sellersFromListings(
+            _mobileListingsForReach(HomeListingReach.inSociety),
+          ),
         ),
         _buildSpecialsSection(),
         _buildPreOrdersSection(),
@@ -1148,15 +1198,17 @@ class HomeScreenState extends State<HomeScreen> {
           subtitle: _cityReach.nearbyRadiusKm == null
               ? null
               : 'Sellers within ~${formatReachRadiusKm(_cityReach.nearbyRadiusKm!)} km',
-          sellers: _nearbySellers,
+          sellers: sellersFromListings(
+            _mobileListingsForReach(HomeListingReach.nearby),
+          ),
         ),
         _buildReachSection(
           reach: HomeListingReach.nearby,
-          listings: _listingsForReach(HomeListingReach.nearby),
+          listings: _mobileListingsForReach(HomeListingReach.nearby),
         ),
         _buildPreOrderReachCarousel(
           title: 'Pre-orders Nearby',
-          campaigns: _campaignsForReach(HomeListingReach.nearby),
+          campaigns: _mobileCampaignsForReach(HomeListingReach.nearby),
         ),
         _buildSellerReachCarousel(
           key: const Key('home-sellers-extended'),
@@ -1164,15 +1216,17 @@ class HomeScreenState extends State<HomeScreen> {
           subtitle: _cityReach.extendedRadiusKm == null
               ? null
               : 'From other societies (within ~${formatReachRadiusKm(_cityReach.extendedRadiusKm!)} km)',
-          sellers: _extendedSellers,
+          sellers: sellersFromListings(
+            _mobileListingsForReach(HomeListingReach.extended),
+          ),
         ),
         _buildReachSection(
           reach: HomeListingReach.extended,
-          listings: _listingsForReach(HomeListingReach.extended),
+          listings: _mobileListingsForReach(HomeListingReach.extended),
         ),
         _buildPreOrderReachCarousel(
           title: 'Pre-orders Around You',
-          campaigns: _campaignsForReach(HomeListingReach.extended),
+          campaigns: _mobileCampaignsForReach(HomeListingReach.extended),
         ),
       ],
     );
@@ -1264,7 +1318,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSpecialsSection() {
-    final listings = _listingsForReach(HomeListingReach.inSociety);
+    final listings = _mobileListingsForReach(HomeListingReach.inSociety);
     if (listings.isEmpty) return const SizedBox.shrink();
     if (_expandedReach == HomeListingReach.inSociety) {
       return _buildReachSection(
@@ -1496,6 +1550,62 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildAvailableList() {
+    if (_distanceFiltered.isEmpty && _filteredListings.isNotEmpty) {
+      final distance = _effectiveDistance;
+      final within = distance.societyOnly
+          ? 'in your society'
+          : distance.isExtended
+          ? 'in the extended range'
+          : 'within ${formatBuyerDistanceKm(distance.maxKm!)}';
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'No food available $within',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF101617),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Try expanding your search radius.',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF6A7774),
+                ),
+              ),
+              TextButton(
+                key: const Key('home-distance-expand'),
+                onPressed: () async {
+                  final picked = await showHomeDistanceSheet(
+                    context,
+                    reach: _cityReach,
+                    current: _effectiveDistance,
+                  );
+                  if (picked != null && mounted) {
+                    setState(() => _distanceChoice = picked);
+                  }
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF0E5A47),
+                  padding: const EdgeInsets.only(left: 0),
+                ),
+                child: const Text(
+                  'Expand distance',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     if (_filteredListings.isEmpty) {
       return SliverToBoxAdapter(
         child: StatusBanner(

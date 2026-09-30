@@ -158,9 +158,8 @@ class BuyerOrderVisibility {
     DateTime? cancelledAt,
     DateTime? now,
   }) {
-    if (status != 'completed' &&
-        status != 'rejected' &&
-        status != 'cancelled') {
+    if (status == 'rejected') return false;
+    if (status != 'completed' && status != 'cancelled') {
       return true;
     }
     final at = terminalAt(

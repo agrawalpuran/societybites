@@ -499,7 +499,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
       _ordersSlowTimer?.cancel();
       setState(() {
-        _error = e.toString();
+        _error = ApiService.userFacingError(e);
         _isLoading = false;
         _ordersRefreshInFlight = false;
         _ordersSlow = false;
@@ -519,6 +519,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           updated,
           ..._pastOrders.where((order) => order.id != updated.id),
         ];
+        if (updated.isRejected) _ordersTab = 1;
         return;
       }
       _pastOrders =
@@ -1446,7 +1447,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                       ? 'No orders yet. Orders for this type will appear here when buyers place them.'
                       : _hasOlderPast
                       ? 'No recent orders'
-                      : 'No past orders yet. Completed and cancelled sales will appear here.')
+                      : 'No past orders yet. Completed, cancelled, and rejected sales will appear here.')
                   : (typedEmpty
                       ? 'No orders yet. Orders for this type will appear here when buyers place them.'
                       : _hasOlderActive

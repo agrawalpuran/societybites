@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../web/web_breakpoints.dart';
 import '../web/web_page_frame.dart';
@@ -10,7 +12,7 @@ import '../widgets/order_status_tracker.dart';
 import '../widgets/order_lifecycle_dialogs.dart';
 import '../widgets/order_messages_button.dart';
 import '../widgets/requested_ready_summary.dart';
-import '../widgets/screen_loading_note.dart';
+import '../widgets/content_skeleton.dart';
 import '../widgets/status_banner.dart';
 import '../models/data.dart';
 import '../models/order_lifecycle.dart';
@@ -58,6 +60,8 @@ class OrdersScreenState extends State<OrdersScreen>
   late TabController _tabController;
   final _buyer = _RoleOrders(isLoading: true);
   bool _didNotifyInitialSettle = false;
+  bool _ordersSlow = false;
+  Timer? _ordersSlowTimer;
 
   @override
   void initState() {
@@ -80,6 +84,7 @@ class OrdersScreenState extends State<OrdersScreen>
     final bucket = _buyer;
     final showSpinner = !bucket.hasSuccessfullyLoaded;
     if (showSpinner) {
+      _armSlowTimer();
       setState(() {
         bucket.isLoading = true;
         bucket.error = null;
@@ -121,6 +126,7 @@ class OrdersScreenState extends State<OrdersScreen>
 
       if (!mounted) return;
 
+      _stopSlowTimer();
       setState(() {
         bucket.active = parsed.where((o) => o.isInBuyerActiveTab()).toList();
         bucket.past = parsed.where((o) => !o.isInBuyerActiveTab()).toList();
@@ -132,9 +138,10 @@ class OrdersScreenState extends State<OrdersScreen>
       if (!mounted) return;
 
       if (!bucket.hasSuccessfullyLoaded) {
+        _stopSlowTimer();
         setState(() {
           bucket.isLoading = false;
-          bucket.error = e.toString();
+          bucket.error = ApiService.userFacingError(e);
         });
       }
     }
@@ -181,8 +188,23 @@ class OrdersScreenState extends State<OrdersScreen>
     });
   }
 
+  void _armSlowTimer() {
+    _ordersSlowTimer?.cancel();
+    _ordersSlow = false;
+    _ordersSlowTimer = Timer(loadSlowThreshold, () {
+      if (!mounted || !_buyer.isLoading) return;
+      setState(() => _ordersSlow = true);
+    });
+  }
+
+  void _stopSlowTimer() {
+    _ordersSlowTimer?.cancel();
+    _ordersSlow = false;
+  }
+
   @override
   void dispose() {
+    _ordersSlowTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -223,36 +245,7 @@ class OrdersScreenState extends State<OrdersScreen>
             const SizedBox(height: 14),
             _buildTabs(),
             const SizedBox(height: 16),
-            if (_buyer.isLoading)
-              const Expanded(
-                child: ScreenLoadingNote(message: 'Loading orders…'),
-              )
-            else if (_buyer.error != null)
-              Expanded(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: StatusBanner(message: _buyer.error!),
-                ),
-              )
-            else
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _ActiveTab(
-                      orders: _buyer.active,
-                      onRefresh: _loadOrders,
-                      isSellerView: false,
-                    ),
-                    _PastTab(
-                      orders: _buyer.past,
-                      onRefresh: _loadOrders,
-                      onExploreHome: widget.onExploreHome,
-                      isSellerView: false,
-                    ),
-                  ],
-                ),
-              ),
+            _buildOrderBody(),
           ],
         ),
       ),
@@ -300,39 +293,61 @@ class OrdersScreenState extends State<OrdersScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              if (_buyer.isLoading)
-                const Expanded(
-                  child: ScreenLoadingNote(message: 'Loading orders…'),
-                )
-              else if (_buyer.error != null)
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: StatusBanner(message: _buyer.error!),
-                  ),
-                )
-              else
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _ActiveTab(
-                        orders: _buyer.active,
-                        onRefresh: _loadOrders,
-                        isSellerView: false,
-                      ),
-                      _PastTab(
-                        orders: _buyer.past,
-                        onRefresh: _loadOrders,
-                        onExploreHome: widget.onExploreHome,
-                        isSellerView: false,
-                      ),
-                    ],
-                  ),
-                ),
+              _buildOrderBody(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildOrderBody() {
+    final firstLoad = _buyer.isLoading && !_buyer.hasSuccessfullyLoaded;
+    if (firstLoad) {
+      return Expanded(
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          children: [
+            const KitchenOrdersSkeleton(),
+            if (_ordersSlow)
+              InlineLoadStatus.slow(
+                id: 'buyer-orders',
+                onRetry: () => _loadOrders(),
+              ),
+          ],
+        ),
+      );
+    }
+    if (_buyer.error != null && !_buyer.hasSuccessfullyLoaded) {
+      return Expanded(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: InlineLoadStatus.failed(
+            id: 'buyer-orders',
+            detail: _buyer.error,
+            onRetry: () => _loadOrders(),
+          ),
+        ),
+      );
+    }
+    return Expanded(
+      child: TabBarView(
+        controller: _tabController,
+        children: [
+          _ActiveTab(
+            orders: _buyer.active,
+            onRefresh: _loadOrders,
+            isSellerView: false,
+          ),
+          _PastTab(
+            orders: _buyer.past,
+            onRefresh: _loadOrders,
+            onExploreHome: widget.onExploreHome,
+            isSellerView: false,
+          ),
+        ],
       ),
     );
   }
@@ -722,9 +737,11 @@ class _ActiveOrderCard extends StatelessWidget {
               preOrderFulfilmentAt: order.fulfilmentAt,
             ),
             const SizedBox(height: 10),
-            order.isPreOrder
-                ? _PreOrderFulfilmentCard(order: order)
-                : _PickupInfoCard(order: order),
+            if (order.isPreOrder)
+              _PreOrderFulfilmentCard(order: order)
+            else if (order.fulfilmentMethod == null ||
+                order.fulfilmentMethod!.isEmpty)
+              _PickupInfoCard(order: order),
             const SizedBox(height: 10),
             OrderMessagesButton(
               order: order,

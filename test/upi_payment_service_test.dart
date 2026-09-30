@@ -201,6 +201,23 @@ void main() {
     expect(androidGpay.first.resolvedLaunchUri?.scheme, 'gpay');
     expect(androidGpay.first.resolvedLaunchUri?.query, isEmpty);
     expect(upiLaunchString(androidGpay.first.resolvedLaunchUri!), 'gpay://');
+
+    final androidGpayViaCollectHost = await getAvailableUpiApps(
+      upi,
+      canLaunch: (uri) async =>
+          uri.scheme == 'gpay' && uri.host == 'upi' && uri.path == '/pay',
+      isWeb: false,
+      platform: TargetPlatform.android,
+    );
+    expect(androidGpayViaCollectHost.map((app) => app.id), ['gpay']);
+    expect(
+      upiLaunchString(androidGpayViaCollectHost.single.resolvedLaunchUri!),
+      'gpay://upi/pay',
+    );
+    expect(
+      androidGpayViaCollectHost.single.resolvedLaunchUri?.queryParameters,
+      isEmpty,
+    );
   });
 
   test('UPI shortcuts open the app without a collect URI', () {
@@ -218,6 +235,13 @@ void main() {
     );
     expect(androidTargets.map((t) => t.scheme).toList(), ['gpay', 'tez']);
     expect(upiLaunchString(buildUpiAppOpenUri(androidTargets.first)), 'gpay://');
+    expect(
+      handoffProbeTargetsFor(
+        configuredUpiApps.first,
+        platform: TargetPlatform.android,
+      ).map((t) => t.baseUrl),
+      containsAll(['gpay://', 'gpay://upi/pay', 'tez://upi/pay']),
+    );
   });
 
   test('sanitizes UPI transaction references', () {

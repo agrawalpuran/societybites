@@ -159,7 +159,8 @@ void main() {
     );
 
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(find.text('Loading orders…'), findsOneWidget);
+    expect(find.text('Loading orders…'), findsNothing);
+    expect(find.byKey(const Key('kitchen-orders-skeletons')), findsOneWidget);
 
     pending.complete([_buyerOrder]);
     await tester.pump();

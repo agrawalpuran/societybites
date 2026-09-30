@@ -53,8 +53,8 @@ assert.strictEqual(
     { status: "rejected", rejectedAt: hoursAgo(5) },
     now
   ),
-  true,
-  "rejected <24h is active"
+  false,
+  "rejected goes to past"
 );
 assert.strictEqual(
   isBuyerActiveOrder(

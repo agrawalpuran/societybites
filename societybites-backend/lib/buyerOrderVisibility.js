@@ -17,7 +17,8 @@ function terminalOccurredAt(order) {
 
 function isBuyerActiveOrder(order, now = new Date()) {
   const status = order.status;
-  if (status !== "completed" && status !== "rejected" && status !== "cancelled") {
+  if (status === "rejected") return false;
+  if (status !== "completed" && status !== "cancelled") {
     return true;
   }
   const at = terminalOccurredAt(order);

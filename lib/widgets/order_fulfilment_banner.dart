@@ -43,10 +43,17 @@ class OrderFulfilmentBanner extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           if (isSellerView) ...[
-            if (order.buyerSocietyName != null &&
+            if (delivery)
+              _placeLine(
+                _buyerDeliveryAddress(order),
+                order.approxDistanceLabel,
+              )
+            else if (order.buyerSocietyName != null &&
                 order.buyerSocietyName!.isNotEmpty)
               Text(
                 'Buyer Society: ${order.buyerSocietyName}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Color(0xFF3A4644)),
               ),
             Text(
@@ -56,18 +63,37 @@ class OrderFulfilmentBanner extends StatelessWidget {
               style: const TextStyle(color: Color(0xFF3A4644)),
             ),
           ] else ...[
-            if (order.sellerSocietyName != null &&
+            if (!delivery) ...[
+              _placeLine(
+                _buyerPickupPlace(order),
+                order.approxDistanceLabel,
+              ),
+              if (order.sellerLabel.trim().isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  order.sellerLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF3A4644),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ] else if (order.sellerSocietyName != null &&
                 order.sellerSocietyName!.isNotEmpty)
               Text(
                 'Seller Society: ${order.sellerSocietyName}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Color(0xFF3A4644)),
               ),
-            Text(
-              delivery
-                  ? 'Seller will deliver your order.'
-                  : 'You will pick up your order from the seller.',
-              style: const TextStyle(color: Color(0xFF3A4644)),
-            ),
+            if (delivery)
+              const Text(
+                'Seller will deliver your order.',
+                style: TextStyle(color: Color(0xFF3A4644)),
+              ),
             if (delivery) ...[
               const SizedBox(height: 4),
               Text(
@@ -83,4 +109,63 @@ class OrderFulfilmentBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Apartment and door on one line. Distance is drawn beside it.
+String _buyerPickupPlace(Order order) {
+  final parts = <String>[];
+  final society = order.sellerSocietyName?.trim() ?? '';
+  if (society.isNotEmpty) parts.add(society);
+  final door = order.food.locationLabel.trim();
+  if (door.isNotEmpty && door != 'Pickup at seller home') parts.add(door);
+  return parts.join(' · ');
+}
+
+/// Apartment, then flat, on one line. Distance stays visible at the end.
+String _buyerDeliveryAddress(Order order) {
+  final parts = <String>[];
+  final society = order.buyerSocietyName?.trim() ?? '';
+  if (society.isNotEmpty) parts.add(society);
+  final location = <String>[];
+  final block = order.buyerBlock?.trim() ?? '';
+  final flat = order.buyerFlatNumber?.trim() ?? '';
+  if (block.isNotEmpty) location.add('Block $block');
+  if (flat.isNotEmpty) location.add('Flat $flat');
+  if (location.isNotEmpty) parts.add(location.join(', '));
+  return parts.join(' · ');
+}
+
+Widget _placeLine(String place, String distance) {
+  if (place.isEmpty && distance.isEmpty) return const SizedBox.shrink();
+  const style = TextStyle(
+    color: Color(0xFF3A4644),
+    fontSize: 13,
+    height: 1.2,
+  );
+  if (distance.isEmpty) {
+    return Text(
+      place,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: style,
+    );
+  }
+  return Row(
+    children: [
+      if (place.isNotEmpty)
+        Flexible(
+          child: Text(
+            place,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: style,
+          ),
+        ),
+      Text(
+        place.isEmpty ? distance : '  $distance',
+        maxLines: 1,
+        style: style,
+      ),
+    ],
+  );
 }

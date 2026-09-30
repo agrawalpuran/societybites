@@ -561,4 +561,89 @@ void main() {
       HomeListingReach.inSociety,
     );
   });
+
+  test('buyer distance keeps society food and cuts farther dishes', () {
+    FoodItem dish({
+      required String id,
+      String? societyId,
+      double? distanceKm,
+    }) {
+      return FoodItem.fromJson({
+        'id': id,
+        'name': id,
+        'sellerId': 's',
+        'sellerName': 'A',
+        'price': 10,
+        'societyId': ?societyId,
+        'distanceKm': ?distanceKm,
+      });
+    }
+
+    final society = dish(id: 'dal', societyId: 'mine');
+    final close = dish(id: 'cake', societyId: 'other', distanceKm: 0.4);
+    final far = dish(id: 'sushi', societyId: 'far', distanceKm: 8);
+    const reach = SellingReach(nearbyRadiusKm: 5, extendedRadiusKm: 10);
+
+    expect(
+      effectiveBuyerDistance(null, reach),
+      const BuyerDistanceChoice.extended(),
+    );
+    expect(
+      foodMatchesBuyerDistance(
+        far,
+        choice: const BuyerDistanceChoice.extended(),
+        buyerSocietyId: 'mine',
+        nearbyRadiusKm: 5,
+      ),
+      isTrue,
+    );
+    expect(
+      foodMatchesBuyerDistance(
+        far,
+        choice: const BuyerDistanceChoice.within(1),
+        buyerSocietyId: 'mine',
+        nearbyRadiusKm: 5,
+      ),
+      isFalse,
+    );
+    expect(
+      foodMatchesBuyerDistance(
+        close,
+        choice: const BuyerDistanceChoice.within(1),
+        buyerSocietyId: 'mine',
+        nearbyRadiusKm: 5,
+      ),
+      isTrue,
+    );
+    expect(
+      foodMatchesBuyerDistance(
+        society,
+        choice: const BuyerDistanceChoice.mySociety(),
+        buyerSocietyId: 'mine',
+        nearbyRadiusKm: 5,
+      ),
+      isTrue,
+    );
+    expect(
+      foodMatchesBuyerDistance(
+        close,
+        choice: const BuyerDistanceChoice.mySociety(),
+        buyerSocietyId: 'mine',
+        nearbyRadiusKm: 5,
+      ),
+      isFalse,
+    );
+    expect(
+      buyerDistanceLabel(const BuyerDistanceChoice.within(1), reach),
+      'Within 1 km',
+    );
+    expect(
+      buyerDistanceChoices(reach).map((choice) => choice.optionKey),
+      ['mySociety', '0.5', '1.0', '2.0', '3.0', '5.0', '7.0', 'extended'],
+    );
+    expect(
+      buyerDistanceChoices(const SellingReach()).map((c) => c.optionKey),
+      ['mySociety'],
+    );
+  });
 }

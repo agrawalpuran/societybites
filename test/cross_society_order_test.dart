@@ -422,6 +422,84 @@ void main() {
     expect(find.text('Delivery charge: ₹30'), findsOneWidget);
   });
 
+  testWidgets('buyer pickup order shows apartment with distance', (tester) async {
+    final order = Order.fromJson({
+      'id': 'o2',
+      'orderNumber': 'SB-2',
+      'status': 'accepted',
+      'total': 80,
+      'subtotal': 80,
+      'fulfilmentMethod': 'pickup',
+      'sellerSocietyName': 'Palm Grove',
+      'distanceKm': 1.2,
+      'sellerName': 'Sarika',
+      'items': [
+        {
+          'quantity': 1,
+          'unitPrice': 80,
+          'listing': {
+            'id': 'l1',
+            'name': 'Rice',
+            'sellerId': 's',
+            'sellerName': 'Sarika',
+            'price': 80,
+            'flatNumber': '36',
+            'block': 'Block 36',
+          },
+        },
+      ],
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OrderFulfilmentBanner(order: order, isSellerView: false),
+        ),
+      ),
+    );
+    expect(find.text('Palm Grove · Flat 36, Block 36'), findsOneWidget);
+    expect(find.text('  ~1.2 km'), findsOneWidget);
+    expect(find.text('Sarika'), findsOneWidget);
+    expect(find.text('You will pick up your order from the seller.'), findsNothing);
+  });
+
+  testWidgets('seller delivery shows buyer address with distance', (tester) async {
+    final order = Order.fromJson({
+      'id': 'o3',
+      'orderNumber': 'SB-3',
+      'status': 'accepted',
+      'total': 110,
+      'subtotal': 80,
+      'fulfilmentMethod': 'seller_delivery',
+      'deliveryCharge': 30,
+      'buyerSocietyName': 'Palm Grove',
+      'buyerBlock': 'C',
+      'buyerFlatNumber': '3062',
+      'distanceKm': 0.8,
+      'items': [
+        {
+          'quantity': 1,
+          'unitPrice': 80,
+          'listing': {
+            'id': 'l1',
+            'name': 'Rice',
+            'sellerId': 's',
+            'sellerName': "Anita's Kitchen",
+            'price': 80,
+          },
+        },
+      ],
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OrderFulfilmentBanner(order: order, isSellerView: true),
+        ),
+      ),
+    );
+    expect(find.text('Palm Grove · Block C, Flat 3062'), findsOneWidget);
+    expect(find.text('  ~0.8 km'), findsOneWidget);
+  });
+
   testWidgets('Home with listings still shows society marketplace', (
     tester,
   ) async {
