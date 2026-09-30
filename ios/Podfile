@@ -53,9 +53,9 @@ post_install do |installer|
       end
     end
 
-    if target.name == 'gRPC-Core'
+    if target.name == 'gRPC-C++'
       basic_seq = File.expand_path(
-        File.join('Pods', 'gRPC-Core', 'src', 'core', 'lib', 'promise', 'detail', 'basic_seq.h'),
+        File.join('Pods', 'gRPC-C++', 'src', 'core', 'lib', 'promise', 'detail', 'basic_seq.h'),
         __dir__
       )
       if File.exist?(basic_seq)
