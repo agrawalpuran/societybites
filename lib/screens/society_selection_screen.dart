@@ -415,7 +415,7 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
       const SizedBox(height: 6),
       _TextFieldBox(
         controller: _nameController,
-        hintText: 'e.g. Puran Agrawal',
+        hintText: 'e.g. Pranav Agrawal',
         textCapitalization: TextCapitalization.words,
         textInputAction: TextInputAction.next,
         onChanged: (_) => setState(() {}),
