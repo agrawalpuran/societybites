@@ -10,14 +10,12 @@ const INVALID_TOKEN_CODES = new Set([
 /** Must match Android MainActivity CHANNEL_ID and AndroidManifest default channel. */
 const ANDROID_CHANNEL_ID = "societybites_orders";
 
-/** Hosts can freeze an idle instance once a response is sent, which strands an
- * in-flight FCM request until the next wake-up. Callers await the send, so this
- * cap keeps a slow FCM from holding the order response. */
+/** Upper bound on how long we keep a handler alive waiting for FCM. */
 const NOTIFY_TIMEOUT_MS = Number(process.env.NOTIFY_TIMEOUT_MS || 8000);
 
 /**
  * Never throws to callers; never used inside Prisma txns. Returns a promise so
- * routes can await delivery before responding.
+ * routes can keep the send tracked instead of leaving it unobserved.
  */
 function notifyAsync(fn) {
   return Promise.resolve()
@@ -27,7 +25,10 @@ function notifyAsync(fn) {
     });
 }
 
-/** Await a notify* call without letting it delay the response indefinitely. */
+/**
+ * Run a notify* call to completion after the response has been sent, so the
+ * send is never left unobserved but never adds latency to the request either.
+ */
 async function flushNotification(pending) {
   if (!pending || typeof pending.then !== "function") return;
   let timer;

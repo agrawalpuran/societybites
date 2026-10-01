@@ -418,9 +418,9 @@ router.post(
       },
     });
 
-    await flushNotification(notifyOrderMessage(order, req.user.id));
-
     res.status(201).json(serializeMessage(created, order));
+
+    await flushNotification(notifyOrderMessage(order, req.user.id));
   })
 );
 
@@ -874,9 +874,9 @@ router.post(
 
     logger.info("order", `Created ${order.orderNumber} by ${req.user.phone}`);
 
-    await flushNotification(notifyOrderCreated(order));
-
     res.status(201).json(serializeOrder(order));
+
+    await flushNotification(notifyOrderCreated(order));
   })
 );
 
@@ -1010,9 +1010,9 @@ router.patch(
       logger.info("order", `${order.orderNumber} → ${status}`);
     }
 
-    await flushNotification(notifyStatusChange(updated, status));
-
     res.json(serializeOrder(updated));
+
+    await flushNotification(notifyStatusChange(updated, status));
   })
 );
 
@@ -1089,9 +1089,9 @@ router.post(
       return result;
     });
 
-    await flushNotification(notifyOrderRejected(updated));
-
     res.json(serializeOrder(updated));
+
+    await flushNotification(notifyOrderRejected(updated));
   })
 );
 
@@ -1141,8 +1141,8 @@ router.patch(
         include: orderInclude,
       });
       logger.info("order", `Cleared Ready by for ${order.orderNumber}`);
-      await flushNotification(notifyReadyBy(updated, true));
-      return res.json(serializeOrder(updated));
+      res.json(serializeOrder(updated));
+      return flushNotification(notifyReadyBy(updated, true));
     }
 
     if (expectedReadyAt !== undefined && readyInMinutes !== undefined) {
@@ -1204,8 +1204,8 @@ router.patch(
       "order",
       `Ready by set for ${order.orderNumber}: ${readyAt.toISOString()}`
     );
-    await flushNotification(notifyReadyBy(updated, false));
     res.json(serializeOrder(updated));
+    await flushNotification(notifyReadyBy(updated, false));
   })
 );
 

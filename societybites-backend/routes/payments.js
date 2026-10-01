@@ -76,9 +76,9 @@ router.post(
       include: orderInclude,
     });
 
-    await flushNotification(notifyBuyerMarkedPaid(updated));
-
     res.json(serializeOrder(updated));
+
+    await flushNotification(notifyBuyerMarkedPaid(updated));
   })
 );
 
@@ -131,14 +131,14 @@ router.post(
 
     console.log(`[PAYMENT] Confirmed for ${order.orderNumber} by seller ${req.user.phone}`);
 
+    res.json(serializeOrder(updated));
+
     await flushNotification(notifyPaymentConfirmed(updated));
     if (Object.prototype.hasOwnProperty.call(readyPatch, "expectedReadyAt")) {
       await flushNotification(
         notifyReadyBy(updated, readyPatch.expectedReadyAt == null)
       );
     }
-
-    res.json(serializeOrder(updated));
   })
 );
 
@@ -211,9 +211,9 @@ router.post(
       `[PAYMENT] Cash confirmed for ${order.orderNumber} by seller ${req.user.phone}`
     );
 
-    await flushNotification(notifyPaymentConfirmed(updated));
-
     res.json(serializeOrder(updated));
+
+    await flushNotification(notifyPaymentConfirmed(updated));
   })
 );
 
