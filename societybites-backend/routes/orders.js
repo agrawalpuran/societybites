@@ -25,6 +25,7 @@ const {
   notifyOrderRejected,
   notifyReadyBy,
   notifyOrderMessage,
+  flushNotification,
 } = require("../utils/notifications");
 const {
   lazyCloseCampaign,
@@ -417,7 +418,7 @@ router.post(
       },
     });
 
-    notifyOrderMessage(order, req.user.id);
+    await flushNotification(notifyOrderMessage(order, req.user.id));
 
     res.status(201).json(serializeMessage(created, order));
   })
@@ -873,7 +874,7 @@ router.post(
 
     logger.info("order", `Created ${order.orderNumber} by ${req.user.phone}`);
 
-    notifyOrderCreated(order);
+    await flushNotification(notifyOrderCreated(order));
 
     res.status(201).json(serializeOrder(order));
   })
@@ -1009,7 +1010,7 @@ router.patch(
       logger.info("order", `${order.orderNumber} → ${status}`);
     }
 
-    notifyStatusChange(updated, status);
+    await flushNotification(notifyStatusChange(updated, status));
 
     res.json(serializeOrder(updated));
   })
@@ -1088,7 +1089,7 @@ router.post(
       return result;
     });
 
-    notifyOrderRejected(updated);
+    await flushNotification(notifyOrderRejected(updated));
 
     res.json(serializeOrder(updated));
   })
@@ -1140,7 +1141,7 @@ router.patch(
         include: orderInclude,
       });
       logger.info("order", `Cleared Ready by for ${order.orderNumber}`);
-      notifyReadyBy(updated, true);
+      await flushNotification(notifyReadyBy(updated, true));
       return res.json(serializeOrder(updated));
     }
 
@@ -1203,7 +1204,7 @@ router.patch(
       "order",
       `Ready by set for ${order.orderNumber}: ${readyAt.toISOString()}`
     );
-    notifyReadyBy(updated, false);
+    await flushNotification(notifyReadyBy(updated, false));
     res.json(serializeOrder(updated));
   })
 );

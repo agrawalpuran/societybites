@@ -10,15 +10,40 @@ const INVALID_TOKEN_CODES = new Set([
 /** Must match Android MainActivity CHANNEL_ID and AndroidManifest default channel. */
 const ANDROID_CHANNEL_ID = "societybites_orders";
 
+/** Hosts can freeze an idle instance once a response is sent, which strands an
+ * in-flight FCM request until the next wake-up. Callers await the send, so this
+ * cap keeps a slow FCM from holding the order response. */
+const NOTIFY_TIMEOUT_MS = Number(process.env.NOTIFY_TIMEOUT_MS || 8000);
+
 /**
- * Fire-and-forget wrapper — never throws to callers; never used inside Prisma txns.
+ * Never throws to callers; never used inside Prisma txns. Returns a promise so
+ * routes can await delivery before responding.
  */
 function notifyAsync(fn) {
-  Promise.resolve()
+  return Promise.resolve()
     .then(fn)
     .catch((err) => {
       logger.error("notify", err.message || String(err));
     });
+}
+
+/** Await a notify* call without letting it delay the response indefinitely. */
+async function flushNotification(pending) {
+  if (!pending || typeof pending.then !== "function") return;
+  let timer;
+  try {
+    await Promise.race([
+      pending,
+      new Promise((resolve) => {
+        timer = setTimeout(() => {
+          logger.warn("notify", `FCM send still pending after ${NOTIFY_TIMEOUT_MS}ms`);
+          resolve();
+        }, NOTIFY_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function sellerIdFromOrder(order) {
@@ -119,7 +144,7 @@ async function sendToUser(userId, { title, body, notificationType, orderId, extr
 function notifyOrderCreated(order) {
   const sellerId = sellerIdFromOrder(order);
   if (!sellerId) return;
-  notifyAsync(() =>
+  return notifyAsync(() =>
     sendToUser(sellerId, {
       title: "New SocietyBites order",
       body: `Order ${order.orderNumber} is waiting for you`,
@@ -163,7 +188,7 @@ function notifyStatusChange(order, status) {
   const cfg = map[status];
   if (!cfg?.userId) return;
 
-  notifyAsync(() =>
+  return notifyAsync(() =>
     sendToUser(cfg.userId, {
       title: cfg.title,
       body: cfg.body,
@@ -174,7 +199,7 @@ function notifyStatusChange(order, status) {
 }
 
 function notifyOrderRejected(order) {
-  notifyAsync(() =>
+  return notifyAsync(() =>
     sendToUser(order.buyerId, {
       title: "Order rejected",
       body: "Unfortunately, the seller could not fulfil your order.",
@@ -189,7 +214,7 @@ function notifyReadyBy(order, cleared) {
   const when = order.expectedReadyAt
     ? new Date(order.expectedReadyAt).toLocaleString()
     : "";
-  notifyAsync(() =>
+  return notifyAsync(() =>
     sendToUser(order.buyerId, {
       title: "Ready by updated",
       body: when
@@ -204,7 +229,7 @@ function notifyReadyBy(order, cleared) {
 function notifyBuyerMarkedPaid(order) {
   const sellerId = sellerIdFromOrder(order);
   if (!sellerId) return;
-  notifyAsync(() =>
+  return notifyAsync(() =>
     sendToUser(sellerId, {
       title: "Buyer marked paid",
       body: `Payment marked for order ${order.orderNumber}`,
@@ -217,7 +242,7 @@ function notifyBuyerMarkedPaid(order) {
 /** Payment confirmation does not change order status. */
 function notifyPaymentConfirmed(order) {
   const isCash = order.paymentMethod === "cash";
-  notifyAsync(() =>
+  return notifyAsync(() =>
     sendToUser(order.buyerId, {
       title: isCash ? "Payment received" : "Payment confirmed",
       body: isCash
@@ -234,7 +259,7 @@ function notifyOrderMessage(order, senderId) {
   const recipientId = senderId === order.buyerId ? sellerId : order.buyerId;
   if (!recipientId || recipientId === senderId) return;
   const fromSeller = senderId === sellerId;
-  notifyAsync(() =>
+  return notifyAsync(() =>
     sendToUser(recipientId, {
       title: fromSeller ? "New message from seller" : "New message from buyer",
       body: `Order ${order.orderNumber} has a new message`,
@@ -248,6 +273,7 @@ function notifyOrderMessage(order, senderId) {
 module.exports = {
   ANDROID_CHANNEL_ID,
   notifyAsync,
+  flushNotification,
   sendToUser,
   buildFcmMessage,
   notifyOrderCreated,

@@ -12,14 +12,17 @@ if (getApps().length === 0) {
     initializeApp({
       credential: cert({ projectId, clientEmail, privateKey }),
     });
+    console.log(
+      `Firebase Admin ready with service account (project ${projectId}). FCM enabled.`
+    );
   } else {
     initializeApp({
       projectId: projectId || "society-bites",
     });
     console.warn(
-      "Firebase Admin initialized without service account credentials. " +
-        "Token verification will fail in production. Set FIREBASE_PROJECT_ID, " +
-        "FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in .env"
+      "Firebase Admin initialized WITHOUT service account credentials. " +
+        "Push notifications (FCM) and token verification will fail. Set " +
+        "FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY."
     );
   }
 }
