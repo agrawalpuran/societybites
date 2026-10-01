@@ -150,7 +150,11 @@ class BuyerOrderVisibility {
     }
   }
 
-  /// Buyer Active/Past only. Seller still uses [Order.isTerminal].
+  static const terminalStatuses = {'completed', 'cancelled', 'rejected'};
+
+  /// Buyer Active/Past only. The seller equivalent is [isSellerRecentOpenOrder].
+  /// An order that just ended stays in Active for [recentTerminalWindow] so the
+  /// outcome is not filed away under Past before anyone has seen it.
   static bool isInBuyerActiveTab({
     required String status,
     DateTime? completedAt,
@@ -158,10 +162,7 @@ class BuyerOrderVisibility {
     DateTime? cancelledAt,
     DateTime? now,
   }) {
-    if (status == 'rejected') return false;
-    if (status != 'completed' && status != 'cancelled') {
-      return true;
-    }
+    if (!terminalStatuses.contains(status)) return true;
     final at = terminalAt(
       status: status,
       completedAt: completedAt,

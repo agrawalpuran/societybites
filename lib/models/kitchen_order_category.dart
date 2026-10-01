@@ -11,8 +11,10 @@ KitchenOrderCategory kitchenCategoryForOrder(Order order) {
   return KitchenOrderCategory.orders;
 }
 
-/// Made to Order tab: active MTO orders only.
-/// Pre-orders tab: active pre-order orders **or** kitchen campaigns (including closed).
+/// Pass every order the screen can show, Active and Past alike. A tab that is
+/// hidden also hides its orders from Past, so narrowing this to active orders
+/// strands finished ones with no tab to reach them from.
+/// Pre-orders tab: pre-order orders **or** kitchen campaigns (including closed).
 List<KitchenOrderCategory> visibleKitchenCategories({
   required List<Order> orders,
   List<PreOrderCampaign> campaigns = const [],

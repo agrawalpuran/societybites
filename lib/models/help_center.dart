@@ -242,7 +242,7 @@ const helpCategories = <HelpCategory>[
         id: 'orders-where',
         question: 'Where do I see my orders?',
         answer:
-            'Open Orders in the bottom bar, or tap My Orders on Profile. Active orders stay on top. Completed ones move to past orders. Pickup and delivery details stay on the order if it came from a nearby seller.',
+            'Open Orders in the bottom bar, or tap My Orders on Profile. Active orders stay on top. An order that has just finished, been cancelled or been declined stays in Active for 24 hours so you do not miss the outcome, then moves to past orders. Pickup and delivery details stay on the order if it came from a nearby seller.',
         keywords: ['my orders', 'history', 'track', 'delivery'],
       ),
       HelpFaq(

@@ -26,10 +26,40 @@ const DEFAULT_OLDER_LIMIT = 20;
 const MAX_OLDER_LIMIT = 50;
 const RECENT_PAST_DAYS = 7;
 
+/**
+ * A finished order holds its place in Active this long. Mirrors
+ * BuyerOrderVisibility.recentTerminalWindow in the app so a seller and a buyer
+ * looking at the same order agree on when it moves to Past.
+ */
+const RECENT_TERMINAL_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 function recentPastCutoff(now = new Date()) {
   const today = formatIstYmd(now);
   const fromYmd = addDaysYmd(today, -(RECENT_PAST_DAYS - 1));
   return startOfIstDay(fromYmd);
+}
+
+function recentTerminalCutoff(now = new Date()) {
+  return new Date(now.getTime() - RECENT_TERMINAL_WINDOW_MS);
+}
+
+/**
+ * Terminal orders that ended within the grace period. createdAt is not a
+ * fallback here: an order with no end timestamp has no moment to count from.
+ *
+ * The `not: null` guards matter because this is also used under NOT. Without
+ * them a null timestamp compares as unknown rather than false, and negating
+ * unknown drops the row instead of keeping it.
+ */
+function justEndedWhere(since) {
+  return {
+    status: { in: [...TERMINAL_STATUSES] },
+    OR: [
+      { completedAt: { not: null, gte: since } },
+      { cancelledAt: { not: null, gte: since } },
+      { rejectedAt: { not: null, gte: since } },
+    ],
+  };
 }
 
 function sellerOrdersBaseWhere(sellerId, status) {
@@ -103,14 +133,23 @@ function parseLimit(value) {
   return Math.min(limit, MAX_OLDER_LIMIT);
 }
 
-function whereForScope({ sellerId, scope, status, cutoff }) {
+function whereForScope({ sellerId, scope, status, cutoff, terminalSince }) {
   const base = sellerOrdersBaseWhere(sellerId, status);
   if (scope === "active") {
     return {
       AND: [
         base,
-        { status: { notIn: [...TERMINAL_STATUSES] } },
-        { createdAt: { gte: cutoff } },
+        {
+          OR: [
+            {
+              AND: [
+                { status: { notIn: [...TERMINAL_STATUSES] } },
+                { createdAt: { gte: cutoff } },
+              ],
+            },
+            justEndedWhere(terminalSince),
+          ],
+        },
       ],
     };
   }
@@ -129,6 +168,8 @@ function whereForScope({ sellerId, scope, status, cutoff }) {
         base,
         { status: { in: [...TERMINAL_STATUSES] } },
         recentPastEventWhere(cutoff),
+        // Still in its Active grace period, so it must not appear in both.
+        { NOT: justEndedWhere(terminalSince) },
       ],
     };
   }
@@ -155,7 +196,8 @@ async function listSellerOrders(
 ) {
   const scope = parseScope(rawScope);
   const cutoff = recentPastCutoff(now);
-  const where = whereForScope({ sellerId, scope, status, cutoff });
+  const terminalSince = recentTerminalCutoff(now);
+  const where = whereForScope({ sellerId, scope, status, cutoff, terminalSince });
   const orderBy = { createdAt: "desc" };
   const paginated = scope === "older" || scope === "older_active";
 
@@ -169,6 +211,7 @@ async function listSellerOrders(
             scope: "older",
             status,
             cutoff,
+            terminalSince,
           }),
           select: { id: true },
         })
@@ -181,6 +224,7 @@ async function listSellerOrders(
             scope: "older_active",
             status,
             cutoff,
+            terminalSince,
           }),
           select: { id: true },
         })

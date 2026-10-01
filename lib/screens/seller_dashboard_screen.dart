@@ -210,9 +210,11 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     }
   }
 
+  /// The tab strip filters Past as well as Active, so a seller whose only
+  /// regular order has ended still needs the Orders tab to reach it.
   List<KitchenOrderCategory> get _visibleKitchenCategories =>
       visibleKitchenCategories(
-        orders: _activeOrders,
+        orders: [..._activeOrders, ..._pastOrders],
         campaigns: _preOrderCampaigns,
       );
 
@@ -431,6 +433,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               (order) => isSellerRecentOpenOrder(
                 isTerminal: order.isTerminal,
                 createdAt: order.createdAt,
+                completedAt: order.completedAt,
+                cancelledAt: order.cancelledAt,
+                rejectedAt: order.rejectedAt,
               ),
             )
             .toList();
@@ -446,15 +451,13 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             )
             .toList();
         hasOlderPast = parsed.any(
-          (order) =>
-              order.isTerminal &&
-              !isSellerRecentPastOrder(
-                isTerminal: order.isTerminal,
-                completedAt: order.completedAt,
-                cancelledAt: order.cancelledAt,
-                rejectedAt: order.rejectedAt,
-                createdAt: order.createdAt,
-              ),
+          (order) => isSellerOlderPastOrder(
+            isTerminal: order.isTerminal,
+            completedAt: order.completedAt,
+            cancelledAt: order.cancelledAt,
+            rejectedAt: order.rejectedAt,
+            createdAt: order.createdAt,
+          ),
         );
         hasOlderActive = parsed.any(
           (order) =>
@@ -462,6 +465,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               !isSellerRecentOpenOrder(
                 isTerminal: order.isTerminal,
                 createdAt: order.createdAt,
+                completedAt: order.completedAt,
+                cancelledAt: order.cancelledAt,
+                rejectedAt: order.rejectedAt,
               ),
         );
         pendingAttention =
@@ -512,7 +518,16 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     if (!mounted) return;
     _ordersLoadGen++;
     setState(() {
-      if (updated.isTerminal) {
+      // A just-finished order keeps its place in Active for the grace period,
+      // so the seller sees the outcome instead of it vanishing into Past.
+      final staysActive = isSellerRecentOpenOrder(
+        isTerminal: updated.isTerminal,
+        createdAt: updated.createdAt,
+        completedAt: updated.completedAt,
+        cancelledAt: updated.cancelledAt,
+        rejectedAt: updated.rejectedAt,
+      );
+      if (updated.isTerminal && !staysActive) {
         _activeOrders =
             _activeOrders.where((order) => order.id != updated.id).toList();
         _pastOrders = [

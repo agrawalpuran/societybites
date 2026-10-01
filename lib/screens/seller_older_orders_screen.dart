@@ -64,9 +64,7 @@ class _SellerOlderOrdersScreenState extends State<SellerOlderOrdersScreen> {
         createdAt: order.createdAt,
       );
 
-  bool _isOlderPast(Order order) =>
-      order.isTerminal &&
-      !isSellerRecentPastOrder(
+  bool _isOlderPast(Order order) => isSellerOlderPastOrder(
         isTerminal: order.isTerminal,
         completedAt: order.completedAt,
         cancelledAt: order.cancelledAt,

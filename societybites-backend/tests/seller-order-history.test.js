@@ -173,10 +173,18 @@ async function main() {
       });
     }
 
+    async function markRejected(orderId, when) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: "rejected", rejectedAt: when, updatedAt: when },
+      });
+    }
+
     const activeOld = await placeCash();
     const recentDone = await placeCash();
     const fiveDay = await placeCash();
     const tenDay = await placeCash();
+    const justRejected = await placeCash();
     const extras = [];
     for (let i = 0; i < 3; i += 1) extras.push(await placeCash());
 
@@ -185,6 +193,7 @@ async function main() {
       where: { id: activeOld.id },
       data: { createdAt: new Date(now - 10 * 24 * 60 * 60 * 1000) },
     });
+    await markRejected(justRejected.id, new Date(now));
     await markCompleted(recentDone.id, new Date(now));
     await markCompleted(fiveDay.id, new Date(now - 5 * 24 * 60 * 60 * 1000));
     await markCompleted(tenDay.id, new Date(now - 10 * 24 * 60 * 60 * 1000));
@@ -231,6 +240,18 @@ async function main() {
       "attention badge still counts older orders needing action"
     );
     assertCond(!activeIds.includes(tenDay.id), "completed is not active");
+    assertCond(
+      activeIds.includes(recentDone.id),
+      "order completed just now stays in Active for the grace period"
+    );
+    assertCond(
+      !activeIds.includes(fiveDay.id),
+      "order completed 5 days ago is past the grace period"
+    );
+    assertCond(
+      activeIds.includes(justRejected.id),
+      "a just-rejected order stays in Active so the seller sees the outcome"
+    );
 
     const olderActive = await jsonRequest(server, {
       method: "GET",
@@ -249,7 +270,14 @@ async function main() {
     });
     assertCond(recent.status === 200, "recent_past ok");
     const recentIds = recent.json.orders.map((o) => o.id);
-    assertCond(recentIds.includes(recentDone.id), "completed today is recent past");
+    assertCond(
+      !recentIds.includes(recentDone.id),
+      "an order still in its Active grace period is not also in Past"
+    );
+    assertCond(
+      !recentIds.includes(justRejected.id),
+      "a just-rejected order is not duplicated into Past"
+    );
     assertCond(recentIds.includes(fiveDay.id), "completed 5 days ago is recent past");
     assertCond(!recentIds.includes(tenDay.id), "completed 10 days ago is not default past");
     assertCond(recent.json.hasOlder === true, "hasOlder when older history exists");

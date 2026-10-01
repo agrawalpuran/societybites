@@ -297,7 +297,7 @@ void main() {
     expect(find.text('Dhokla'), findsWidgets);
   });
 
-  testWidgets('past-only made-to-order does not keep the extra tab', (
+  testWidgets('past-only made-to-order keeps a tab that reaches it', (
     tester,
   ) async {
     await _pumpKitchen(
@@ -312,11 +312,67 @@ void main() {
         ),
       ],
     );
-    expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsNothing);
-    expect(find.byKey(const ValueKey('kitchen-type-orders')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('kitchen-type-madeToOrder')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('kitchen-type-madeToOrder')));
+    await tester.pump();
     await tester.tap(find.textContaining('Past'));
     await tester.pump();
     expect(find.text('Cake'), findsWidgets);
+  });
+
+  testWidgets('a just-rejected order keeps the Orders tab and stays in Active', (
+    tester,
+  ) async {
+    await _pumpKitchen(
+      tester,
+      orders: [
+        {
+          ..._orderJson(id: '1', name: 'Dry Fruits', status: 'rejected'),
+          'rejectedAt': DateTime.now().toUtc().toIso8601String(),
+        },
+        _orderJson(
+          id: '2',
+          name: 'Cake',
+          availabilityMode: listingAvailabilityMadeToOrder,
+        ),
+      ],
+    );
+    expect(find.byKey(const ValueKey('kitchen-type-orders')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('kitchen-type-orders')));
+    await tester.pump();
+    expect(find.text('Dry Fruits'), findsWidgets);
+  });
+
+  testWidgets('a rejection older than the grace period sits in Past', (
+    tester,
+  ) async {
+    await _pumpKitchen(
+      tester,
+      orders: [
+        {
+          ..._orderJson(id: '1', name: 'Dry Fruits', status: 'rejected'),
+          'rejectedAt': DateTime.now()
+              .toUtc()
+              .subtract(const Duration(days: 2))
+              .toIso8601String(),
+        },
+        _orderJson(
+          id: '2',
+          name: 'Cake',
+          availabilityMode: listingAvailabilityMadeToOrder,
+        ),
+      ],
+    );
+    expect(find.byKey(const ValueKey('kitchen-type-orders')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('kitchen-type-orders')));
+    await tester.pump();
+    expect(find.text('Dry Fruits'), findsNothing);
+    await tester.tap(find.textContaining('Past'));
+    await tester.pump();
+    expect(find.text('Dry Fruits'), findsWidgets);
   });
 
   testWidgets('action badges appear on kitchen type and Active tabs', (

@@ -151,7 +151,7 @@ void main() {
     expect(find.text('Idli'), findsWidgets);
   });
 
-  testWidgets('completed order today and 5 days ago appear in Past', (
+  testWidgets('a completed order reaches Past once its grace period ends', (
     tester,
   ) async {
     await _pumpKitchen(tester, orders: [
@@ -168,11 +168,12 @@ void main() {
         at: now.subtract(const Duration(days: 5)),
       ),
     ]);
+    expect(find.text('Dosa'), findsWidgets);
     await tester.tap(find.textContaining('Past'));
     await tester.pump();
     expect(find.text('RECENT ORDERS'), findsOneWidget);
-    expect(find.text('Dosa'), findsWidgets);
     expect(find.text('Thepla'), findsWidgets);
+    expect(find.text('Dosa'), findsNothing);
   });
 
   testWidgets('completed order 10 days ago is not in default Past', (

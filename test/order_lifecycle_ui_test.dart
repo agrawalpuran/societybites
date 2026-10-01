@@ -382,7 +382,7 @@ void main() {
     expect(find.text('Message Seller'), findsOneWidget);
   });
 
-  testWidgets('recent rejected goes to Past with reason', (tester) async {
+  testWidgets('recent rejected stays in Active with reason', (tester) async {
     final rejectedAt = DateTime.now()
         .toUtc()
         .subtract(const Duration(hours: 5))
@@ -395,10 +395,8 @@ void main() {
         rejectReason: 'Ingredients unavailable\nSorry, out of stock',
       ),
     ]);
-    expect(find.text('Active (0)'), findsOneWidget);
-    expect(find.textContaining('Past (1)'), findsOneWidget);
-    await tester.tap(find.textContaining('Past'));
-    await tester.pumpAndSettle();
+    expect(find.text('Active (1)'), findsOneWidget);
+    expect(find.textContaining('Past (0)'), findsOneWidget);
     expect(find.text('ORDER REJECTED'), findsOneWidget);
     expect(find.textContaining('Ingredients unavailable'), findsOneWidget);
     expect(find.textContaining('Sorry, out of stock'), findsOneWidget);
@@ -451,7 +449,7 @@ void main() {
       _orderJson(id: 'c-old', status: 'completed', completedAt: old),
       _orderJson(id: 'x-old', status: 'cancelled', cancelledAt: old),
     ]);
-    expect(find.text('Active (2)'), findsOneWidget);
-    expect(find.text('Past (3)'), findsOneWidget);
+    expect(find.text('Active (3)'), findsOneWidget);
+    expect(find.text('Past (2)'), findsOneWidget);
   });
 }
