@@ -1289,7 +1289,9 @@ class _PastOrderTile extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (order.items.isNotEmpty) ...[
+                    // Multi-item orders list every dish below, so a hero
+                    // thumbnail would just repeat the first one.
+                    if (order.items.length == 1) ...[
                       ListingImage(
                         food: order.items.first.food,
                         width: 52,
