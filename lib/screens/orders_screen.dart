@@ -58,6 +58,7 @@ class OrdersScreen extends StatefulWidget {
 class OrdersScreenState extends State<OrdersScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final ScrollController _activeOrdersScroll = ScrollController();
   final _buyer = _RoleOrders(isLoading: true);
   bool _didNotifyInitialSettle = false;
   bool _ordersSlow = false;
@@ -204,9 +205,20 @@ class OrdersScreenState extends State<OrdersScreen>
     _ordersSlow = false;
   }
 
+  void _showActiveOrdersAtTop() {
+    if (_tabController.index != 0) {
+      _tabController.index = 0;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_activeOrdersScroll.hasClients) return;
+      _activeOrdersScroll.jumpTo(0);
+    });
+  }
+
   @override
   void dispose() {
     _ordersSlowTimer?.cancel();
+    _activeOrdersScroll.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -341,6 +353,8 @@ class OrdersScreenState extends State<OrdersScreen>
           _ActiveTab(
             orders: _buyer.active,
             onRefresh: _loadOrders,
+            onReturnToTop: _showActiveOrdersAtTop,
+            scrollController: _activeOrdersScroll,
             isSellerView: false,
           ),
           _PastTab(
@@ -396,11 +410,15 @@ class _ActiveTab extends StatelessWidget {
   const _ActiveTab({
     required this.orders,
     required this.onRefresh,
+    this.onReturnToTop,
+    this.scrollController,
     this.isSellerView = false,
   });
 
   final List<Order> orders;
   final Future<void> Function() onRefresh;
+  final VoidCallback? onReturnToTop;
+  final ScrollController? scrollController;
   final bool isSellerView;
 
   @override
@@ -418,6 +436,7 @@ class _ActiveTab extends StatelessWidget {
         color: const Color(0xFF0E5A47),
         onRefresh: onRefresh,
         child: ListView(
+          controller: scrollController,
           physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics(),
           ),
@@ -431,6 +450,7 @@ class _ActiveTab extends StatelessWidget {
                       : _ActiveOrderCard(
                           order: order,
                           onRefresh: onRefresh,
+                          onReturnToTop: onReturnToTop,
                           isSellerView: isSellerView,
                         ),
               ],
@@ -443,6 +463,7 @@ class _ActiveTab extends StatelessWidget {
       color: const Color(0xFF0E5A47),
       onRefresh: onRefresh,
       child: ListView(
+        controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
         ),
@@ -454,6 +475,7 @@ class _ActiveTab extends StatelessWidget {
                   : _ActiveOrderCard(
                       order: o,
                       onRefresh: onRefresh,
+                      onReturnToTop: onReturnToTop,
                       isSellerView: isSellerView,
                     ),
             )
@@ -467,12 +489,14 @@ class _ActiveOrderCard extends StatelessWidget {
   const _ActiveOrderCard({
     required this.order,
     required this.onRefresh,
+    this.onReturnToTop,
     this.isSellerView = false,
     this.readOnly = false,
   });
 
   final Order order;
   final Future<void> Function() onRefresh;
+  final VoidCallback? onReturnToTop;
   final bool isSellerView;
   final bool readOnly;
 
@@ -716,13 +740,20 @@ class _ActiveOrderCard extends StatelessWidget {
                 height: 48,
                 child: ElevatedButton.icon(
                   onPressed: () async {
-                    final result = await Navigator.push<bool>(
+                    final result = await Navigator.push<Object?>(
                       context,
                       MaterialPageRoute(
                         builder: (_) => PaymentScreen(order: order),
                       ),
                     );
-                    if (result == true) await onRefresh();
+                    if (!context.mounted) return;
+                    if (result == true ||
+                        result == PaymentScreen.returnToOrdersTop) {
+                      await onRefresh();
+                    }
+                    if (result == PaymentScreen.returnToOrdersTop) {
+                      onReturnToTop?.call();
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE85D04),

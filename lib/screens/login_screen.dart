@@ -592,7 +592,7 @@ class _TrustIndicatorsRow extends StatelessWidget {
         Expanded(
           child: _TrustItem(
             icon: Icons.shield_moon_rounded,
-            label: 'ENCRYPTED',
+            label: 'SAFE & SECURE',
           ),
         ),
         SizedBox(width: 12),

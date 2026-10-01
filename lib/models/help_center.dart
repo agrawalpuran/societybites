@@ -161,6 +161,21 @@ const helpCategories = <HelpCategory>[
         keywords: ['km', 'radius', 'extended', 'city', 'how far'],
       ),
       HelpFaq(
+        id: 'nearby-home-distance',
+        question: 'How do I choose how far Home looks?',
+        answer:
+            'On the phone Home screen, tap the distance chip under search. It may say My Society, Within 1 km, or Extended. Choose how far you want to explore, then tap Apply. My Society keeps your own community. Shorter steps, such as 500 m, 1 km, or 3 km, also keep closer dishes. Extended is the widest range your city allows, and Home opens on that range. Your choice lasts for this visit. Dishes from your own society stay in the list.',
+        keywords: [
+          'distance',
+          'wizard',
+          'how far',
+          'home filter',
+          'within',
+          'my society',
+          'km',
+        ],
+      ),
+      HelpFaq(
         id: 'nearby-opt-in',
         question: 'How do I appear in Explore Nearby as a seller?',
         answer:
@@ -254,6 +269,48 @@ const helpCategories = <HelpCategory>[
     ],
   ),
   HelpCategory(
+    id: 'made-to-order',
+    title: '🍳 Made to Order',
+    icon: Icons.restaurant_outlined,
+    faqs: [
+      HelpFaq(
+        id: 'mto-what',
+        question: 'What is Made to Order?',
+        answer:
+            'The seller prepares this only after you place an order. It is not ready now, and it is not a group pre-order for a fixed date.',
+        keywords: ['made to order', 'mto', 'prepare after', 'not ready now'],
+      ),
+      HelpFaq(
+        id: 'mto-order',
+        question: 'How do I order a Made to Order item?',
+        answer:
+            'Add it from Home or the seller\'s menu and checkout as usual. You can say when you need it. The seller then confirms whether they can make it and the timeline.',
+        keywords: ['need by', 'checkout', 'confirm availability', 'lead time'],
+      ),
+      HelpFaq(
+        id: 'mto-time',
+        question: 'How long does Made to Order take?',
+        answer:
+            'The listing shows the seller\'s usual preparation time. They still confirm availability after you order. If it says currently unavailable, you cannot order it until the seller turns it back on.',
+        keywords: ['preparation time', 'unavailable', 'how long', 'lead'],
+      ),
+      HelpFaq(
+        id: 'mto-seller',
+        question: 'How do I sell a Made to Order item?',
+        answer:
+            'From Add Listing, choose Made to Order and set a preparation time. It appears under My Listings → Made to Order. New orders show in My Kitchen under Made to Order.',
+        keywords: ['add listing', 'my kitchen', 'my listings', 'seller'],
+      ),
+      HelpFaq(
+        id: 'mto-vs-preorder',
+        question: 'How is Made to Order different from a pre-order?',
+        answer:
+            'Made to Order is your own request, cooked after you order. A pre-order collects many orders in a set window and is fulfilled together on a planned date.',
+        keywords: ['difference', 'pre-order', 'campaign', 'batch'],
+      ),
+    ],
+  ),
+  HelpCategory(
     id: 'preorders',
     title: '❤️ Pre-orders',
     icon: Icons.favorite_outline,
@@ -262,35 +319,35 @@ const helpCategories = <HelpCategory>[
         id: 'preorders-what',
         question: 'What is a pre-order?',
         answer:
-            'A pre-order is a planned batch. You book before the seller cooks, so they know how much to make.',
-        keywords: ['campaign', 'preorder', 'batch'],
+            'A pre-order collects orders during a set window. The seller then prepares them together for a planned fulfilment time. It is not ready-now food.',
+        keywords: ['campaign', 'preorder', 'batch', 'future date'],
       ),
       HelpFaq(
         id: 'preorders-join',
         question: 'How do I join a pre-order?',
         answer:
-            'Open a pre-order from Home, choose what you want, and checkout before the cutoff time.',
-        keywords: ['join', 'book', 'home', 'campaign'],
+            'Open the campaign on Home. Before the opening time it shows Coming soon. While it is open, choose products and place the pre-order before the Order by time. A pre-order checks out separately from a regular cart.',
+        keywords: ['join', 'book', 'home', 'campaign', 'coming soon', 'cart'],
       ),
       HelpFaq(
         id: 'preorders-cutoff',
         question: 'When does a pre-order close?',
         answer:
-            'Each campaign has an order cutoff. After that time, new orders stop so the seller can cook.',
-        keywords: ['cutoff', 'close', 'deadline'],
+            'New orders stop at the Order by time. After that, the campaign can still be seen until fulfilment, marked Orders closed. You can cancel your own pre-order from Orders before that cutoff.',
+        keywords: ['cutoff', 'close', 'deadline', 'order by', 'cancel'],
       ),
       HelpFaq(
         id: 'preorders-fulfilment',
         question: 'How is a pre-order fulfilled?',
         answer:
-            'The seller shares a fulfilment time and any pickup notes on the campaign. Collect or receive it as those notes say.',
-        keywords: ['fulfilment', 'pickup notes', 'when ready'],
+            'The campaign shows a fulfilment date and time. You collect it, or the seller delivers it, using the options they offered. That time is scheduled. It is not immediate pickup.',
+        keywords: ['fulfilment', 'pickup notes', 'when ready', 'delivery'],
       ),
       HelpFaq(
         id: 'preorders-change',
         question: 'Can a seller change a pre-order after people have ordered?',
         answer:
-            'Once orders are placed on a campaign product, that product cannot be changed. This keeps what you booked the same.',
+            'After the first order, the opening time, cutoff, fulfilment time, fulfilment options, delivery charge, and existing products stay locked. The seller can still update the description, fulfilment notes, and cover image.',
         keywords: ['edit campaign', 'locked', 'already ordered'],
       ),
     ],

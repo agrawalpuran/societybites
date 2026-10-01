@@ -30,7 +30,12 @@ class PaymentScreen extends StatefulWidget {
     this.launchUpi,
     this.canLaunchUpi,
     this.pollInterval = const Duration(seconds: 8),
+    this.awaitingSellerPause = const Duration(seconds: 2),
   });
+
+  /// Pop result after the buyer has marked a UPI payment and seen the
+  /// awaiting-seller screen. Orders uses this to reload and sit at the top.
+  static const returnToOrdersTop = 'return-to-orders-top';
 
   final Order order;
   final PaymentApiCall? fetchOrder;
@@ -39,6 +44,7 @@ class PaymentScreen extends StatefulWidget {
   final UpiLauncher? launchUpi;
   final UpiAvailabilityChecker? canLaunchUpi;
   final Duration pollInterval;
+  final Duration awaitingSellerPause;
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
@@ -48,6 +54,7 @@ class _PaymentScreenState extends State<PaymentScreen>
     with WidgetsBindingObserver {
   late Order _order;
   Timer? _pollTimer;
+  Timer? _returnToOrdersTimer;
   bool _isMarking = false;
   bool _isLoadingUpi = true;
   bool _isRefreshingOrder = false;
@@ -110,6 +117,7 @@ class _PaymentScreenState extends State<PaymentScreen>
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _returnToOrdersTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -161,8 +169,7 @@ class _PaymentScreenState extends State<PaymentScreen>
       if (!isOpenPaymentStatus(latest.status) ||
           isPaymentFinished(latest.paymentStatus) ||
           isTerminalPaymentLeaveStatus(latest.status)) {
-        _isLeavingForProgress = true;
-        if (mounted) Navigator.pop(context, true);
+        _leavePayment(true);
       }
     } catch (_) {
       // Keep the last server snapshot and retry on the next poll/resume.
@@ -328,12 +335,30 @@ class _PaymentScreenState extends State<PaymentScreen>
       );
   }
 
-  Future<void> _markPaid() async {
+  void _leavePayment(Object? result) {
+    if (!mounted || _isLeavingForProgress) return;
+    _isLeavingForProgress = true;
+    _returnToOrdersTimer?.cancel();
+    Navigator.pop(context, result);
+  }
+
+  void _scheduleReturnToOrders() {
+    _returnToOrdersTimer?.cancel();
+    _returnToOrdersTimer = Timer(widget.awaitingSellerPause, () {
+      _leavePayment(PaymentScreen.returnToOrdersTop);
+    });
+  }
+
+  Future<void> _markPaid({bool returnToOrders = false}) async {
     setState(() => _isMarking = true);
     try {
       final data = await _markOrderPaid(_order.id);
       if (!mounted) return;
       setState(() => _order = Order.fromJson(data));
+      if (returnToOrders && _isAwaitingSeller) {
+        _scheduleReturnToOrders();
+        return;
+      }
       await _refreshOrder();
     } catch (e) {
       if (!mounted) return;
@@ -383,7 +408,10 @@ class _PaymentScreenState extends State<PaymentScreen>
             else if (_hasUpi) ...[
               _buildQrSection(),
               const SizedBox(height: 16),
-              _buildMarkPaidButton(label: "I've Paid via UPI"),
+              _buildMarkPaidButton(
+                label: "I've Paid via UPI",
+                returnToOrders: true,
+              ),
             ] else ...[
               _buildNoUpiMessage(),
               if (_loadError != null) ...[
@@ -503,7 +531,10 @@ class _PaymentScreenState extends State<PaymentScreen>
             else if (_hasUpi) ...[
               _buildQrSection(),
               const SizedBox(height: 16),
-              _buildMarkPaidButton(label: "I've Paid via UPI"),
+              _buildMarkPaidButton(
+                label: "I've Paid via UPI",
+                returnToOrders: true,
+              ),
             ] else ...[
               _buildNoUpiMessage(),
               if (_loadError != null) ...[
@@ -635,7 +666,7 @@ class _PaymentScreenState extends State<PaymentScreen>
           ),
           SizedBox(height: 6),
           Text(
-            'We’ll refresh this order automatically. Once the seller confirms payment, you’ll return to order progress.',
+            'The seller will confirm this payment. Taking you back to Orders.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
@@ -944,12 +975,17 @@ class _PaymentScreenState extends State<PaymentScreen>
     );
   }
 
-  Widget _buildMarkPaidButton({required String label}) {
+  Widget _buildMarkPaidButton({
+    required String label,
+    bool returnToOrders = false,
+  }) {
     return SizedBox(
       width: double.infinity,
       height: 52,
       child: OutlinedButton(
-        onPressed: _isMarking ? null : _markPaid,
+        onPressed: _isMarking
+            ? null
+            : () => _markPaid(returnToOrders: returnToOrders),
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: Color(0xFF0E5A47), width: 1.5),
           shape: RoundedRectangleBorder(

@@ -31,10 +31,10 @@ void main() {
     });
   });
 
-  test('help catalog has nine categories and 40-45 FAQs', () {
-    expect(helpCategories.length, 9);
-    expect(helpFaqCount, greaterThanOrEqualTo(40));
-    expect(helpFaqCount, lessThanOrEqualTo(45));
+  test('help catalog has ten categories and 45-55 FAQs', () {
+    expect(helpCategories.length, 10);
+    expect(helpFaqCount, greaterThanOrEqualTo(45));
+    expect(helpFaqCount, lessThanOrEqualTo(55));
   });
 
   test('search delivery surfaces pickup, orders, selling, and nearby', () {
@@ -78,6 +78,7 @@ void main() {
     expect(find.textContaining('Explore Nearby'), findsOneWidget);
     expect(find.textContaining('Pickup & Delivery'), findsOneWidget);
     expect(find.textContaining('Orders'), findsWidgets);
+    expect(find.textContaining('Made to Order'), findsOneWidget);
     expect(find.textContaining('Pre-orders'), findsOneWidget);
     expect(find.textContaining('Ratings & Feedback'), findsOneWidget);
     expect(find.textContaining('Profile & Payments'), findsOneWidget);

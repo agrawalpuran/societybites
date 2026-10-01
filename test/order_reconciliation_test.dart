@@ -62,7 +62,7 @@ Widget _paymentApp({
           children: [
             const Text('Orders host'),
             ElevatedButton(
-              onPressed: () => Navigator.push<bool>(
+              onPressed: () => Navigator.push<Object?>(
                 context,
                 MaterialPageRoute(
                   builder: (_) => PaymentScreen(
@@ -165,6 +165,36 @@ void main() {
       find.byKey(const ValueKey('awaiting-seller-confirmation')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('UPI mark paid returns to orders after the awaiting pause', (
+    tester,
+  ) async {
+    await _openPayment(
+      tester,
+      _paymentApp(
+        fetchOrder: (_) async => _orderJson(),
+        markPaid: (_) async => _orderJson(paymentStatus: 'buyer_marked_paid'),
+        pollInterval: const Duration(hours: 1),
+      ),
+    );
+
+    final markPaidButton = find.text("I've Paid via UPI");
+    await tester.ensureVisible(markPaidButton);
+    await tester.tap(markPaidButton);
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('awaiting-seller-confirmation')),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+
+    expect(find.byType(PaymentScreen), findsNothing);
+    expect(find.text('Orders host'), findsOneWidget);
   });
 
   testWidgets('polling updates payment status', (tester) async {

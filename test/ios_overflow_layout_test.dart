@@ -60,15 +60,15 @@ void main() {
                         Row(
                           children: const [
                             Expanded(
-                              child: _TrustChip(label: 'ENCRYPTED'),
+                              child: _TrustChip(label: 'SAFE & SECURE'),
                             ),
                             SizedBox(width: 12),
                             Expanded(
-                              child: _TrustChip(label: 'SOCIETY\nONLY'),
+                              child: _TrustChip(label: 'SOCIETY & NEIGHBORHOOD\nONLY'),
                             ),
                             SizedBox(width: 12),
                             Expanded(
-                              child: _TrustChip(label: 'REGULATED'),
+                              child: _TrustChip(label: 'HEALTHY'),
                             ),
                           ],
                         ),
