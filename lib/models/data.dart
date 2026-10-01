@@ -493,6 +493,15 @@ class Order {
   final bool hasReview;
   final String? rejectReason;
   final DateTime? rejectedAt;
+
+  /// Seller owes the buyer this order's money back: UPI was marked paid but the
+  /// order ended without food. The platform never holds funds, so settlement is
+  /// between the two of them.
+  final bool refundDue;
+
+  /// Server decides when Can't fulfil is still open, since auto-accepted orders
+  /// keep it past acceptance.
+  final bool sellerCanDecline;
   final DateTime? completedAt;
   final DateTime? cancelledAt;
   final DateTime? expectedReadyAt;
@@ -530,6 +539,8 @@ class Order {
     this.hasReview = false,
     this.rejectReason,
     this.rejectedAt,
+    this.refundDue = false,
+    this.sellerCanDecline = false,
     this.completedAt,
     this.cancelledAt,
     this.expectedReadyAt,
@@ -545,6 +556,10 @@ class Order {
     this.unreadMessageCount = 0,
   });
 
+  bool get buyerHasPaid =>
+      paymentStatus == 'buyer_marked_paid' ||
+      paymentStatus == 'seller_confirmed' ||
+      paymentStatus == 'paid';
   bool get isRejected => status == 'rejected';
   bool get isCancelled => status == 'cancelled';
   bool get isPreOrder => type == 'pre_order';
@@ -714,6 +729,8 @@ class Order {
       hasReview: hasReview,
       rejectReason: rejectReason,
       rejectedAt: rejectedAt,
+      refundDue: refundDue,
+      sellerCanDecline: sellerCanDecline,
       completedAt: completedAt,
       cancelledAt: cancelledAt,
       expectedReadyAt: expectedReadyAt,
@@ -755,6 +772,8 @@ class Order {
       hasReview: hasReview,
       rejectReason: rejectReason,
       rejectedAt: rejectedAt,
+      refundDue: refundDue,
+      sellerCanDecline: sellerCanDecline,
       completedAt: completedAt,
       cancelledAt: cancelledAt,
       expectedReadyAt: expectedReadyAt,
@@ -830,6 +849,8 @@ class Order {
       hasReview: json['hasReview'] == true,
       rejectReason: json['rejectReason'] as String?,
       rejectedAt: _jsonDate(json, 'rejectedAt'),
+      refundDue: json['refundDue'] == true,
+      sellerCanDecline: json['sellerCanDecline'] == true,
       completedAt: _jsonDate(json, 'completedAt'),
       cancelledAt: _jsonDate(json, 'cancelledAt'),
       expectedReadyAt: _jsonDate(json, 'expectedReadyAt'),

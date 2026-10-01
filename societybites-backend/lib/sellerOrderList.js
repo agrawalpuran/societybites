@@ -10,6 +10,12 @@ const TERMINAL_STATUSES = Object.freeze([
   "rejected",
 ]);
 
+/**
+ * Drives the My Kitchen attention badge. Regular orders are auto-accepted, so
+ * waiting on "pending" alone would miss every order that still needs cooking.
+ */
+const NEEDS_SELLER_ACTION = Object.freeze(["pending", "accepted", "preparing"]);
+
 const SCOPES = Object.freeze([
   "active",
   "older_active",
@@ -183,7 +189,7 @@ async function listSellerOrders(
         prisma.order.count({
           where: {
             ...sellerOrdersBaseWhere(sellerId, status),
-            status: "pending",
+            status: { in: NEEDS_SELLER_ACTION },
           },
         })
       );

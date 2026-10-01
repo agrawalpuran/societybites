@@ -134,7 +134,7 @@ async function main() {
     });
     assert(created.status === 201, `order create failed: ${created.status}`);
     orderIds.push(created.json.id);
-    assert(created.json.status === "pending", "existing order create must stay pending");
+    assert(created.json.status === "accepted", "regular order create must auto-accept");
     assert(
       created.json.unreadMessageCount == null,
       "create order payload must stay unchanged (no unread field required)"
@@ -146,7 +146,7 @@ async function main() {
       token: buyerToken,
     });
     assert(getFresh.status === 200, "GET order without messages must work");
-    assert(getFresh.json.status === "pending", "GET must not change status");
+    assert(getFresh.json.status === "accepted", "GET must not change status");
     assert(
       getFresh.json.unreadMessageCount === 0,
       "orders without messages report zero unread"
@@ -207,7 +207,7 @@ async function main() {
       sellerAfterRead.json.unreadMessageCount === 0,
       "opening conversation marks inbound unread as read"
     );
-    assert(sellerAfterRead.json.status === "pending", "messaging must not change status");
+    assert(sellerAfterRead.json.status === "accepted", "messaging must not change status");
 
     const sellerSend = await jsonRequest(server, {
       method: "POST",

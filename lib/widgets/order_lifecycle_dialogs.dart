@@ -10,7 +10,10 @@ class RejectOrderResult {
   final String? note;
 }
 
-Future<RejectOrderResult?> confirmRejectOrder(BuildContext context) async {
+Future<RejectOrderResult?> confirmRejectOrder(
+  BuildContext context, {
+  Order? order,
+}) async {
   RejectOrderResult? selected;
   await showModalBottomSheet<void>(
     context: context,
@@ -20,6 +23,8 @@ Future<RejectOrderResult?> confirmRejectOrder(BuildContext context) async {
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (sheetContext) => _RejectOrderSheet(
+      alreadyPaid: order != null && order.buyerHasPaid,
+      refundAmount: order?.total ?? 0,
       onCancel: () => Navigator.pop(sheetContext),
       onConfirm: (value) {
         selected = value;
@@ -32,10 +37,14 @@ Future<RejectOrderResult?> confirmRejectOrder(BuildContext context) async {
 
 class _RejectOrderSheet extends StatefulWidget {
   const _RejectOrderSheet({
+    required this.alreadyPaid,
+    required this.refundAmount,
     required this.onCancel,
     required this.onConfirm,
   });
 
+  final bool alreadyPaid;
+  final double refundAmount;
   final VoidCallback onCancel;
   final ValueChanged<RejectOrderResult> onConfirm;
 
@@ -80,6 +89,28 @@ class _RejectOrderSheetState extends State<_RejectOrderSheet> {
               color: Color(0xFF3A4644),
             ),
           ),
+          if (widget.alreadyPaid) ...[
+            const SizedBox(height: 10),
+            Container(
+              key: const Key('reject-refund-warning'),
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF4E5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'The buyer has already paid '
+                '₹${widget.refundAmount.toStringAsFixed(0)}. '
+                'You will need to return it to them directly.',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF8A5A1F),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           for (final reason in BuyerOrderVisibility.rejectReasons)
             ListTile(
@@ -249,6 +280,29 @@ class OrderRejectReasonBlock extends StatelessWidget {
                     ),
                   ],
                 ],
+              ),
+            ),
+          ],
+          if (order.refundDue) ...[
+            const SizedBox(height: 10),
+            Container(
+              key: const Key('order-refund-due'),
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF4E5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFE0B2)),
+              ),
+              child: Text(
+                '₹${order.total.toStringAsFixed(0)} to be returned by the '
+                'seller. SocietyEats does not hold the money, so use Messages '
+                'to settle it.',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF8A5A1F),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],

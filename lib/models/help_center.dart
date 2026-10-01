@@ -122,8 +122,15 @@ const helpCategories = <HelpCategory>[
         id: 'selling-orders',
         question: 'How do I manage seller orders?',
         answer:
-            'Open the Seller Dashboard. You can accept an order, mark it preparing or ready, reject it if needed, and confirm cash when a buyer pays in cash. Nearby delivery orders use the charge you set in Profile.',
-        keywords: ['accept', 'ready', 'dashboard', 'reject', 'delivery'],
+            'Open the Seller Dashboard. Regular orders are confirmed the moment a buyer places them, so you can go straight to marking them ready. Made to order and pre-order requests still wait for you to accept. If you cannot make a dish, use Can\'t fulfil and pick a reason. Confirm cash when a buyer pays in cash. Nearby delivery orders use the charge you set in Profile.',
+        keywords: [
+          'accept',
+          'ready',
+          'dashboard',
+          'reject',
+          'delivery',
+          'cannot fulfil',
+        ],
       ),
     ],
   ),
@@ -242,7 +249,7 @@ const helpCategories = <HelpCategory>[
         id: 'orders-status',
         question: 'What do order statuses mean?',
         answer:
-            'Pending means the seller has not accepted yet. Then the order moves to preparing and ready. After you collect it, it is completed.',
+            'Regular orders are confirmed as soon as you place them, so they start at accepted. Made to order and pre-order requests stay pending until the seller accepts. From there the order moves to ready, and once you collect it, completed.',
         keywords: ['status', 'pending', 'accepted', 'ready', 'completed'],
       ),
       HelpFaq(
@@ -256,8 +263,15 @@ const helpCategories = <HelpCategory>[
         id: 'orders-cancel',
         question: 'Can I cancel an order?',
         answer:
-            'There is no in-app cancel button for buyers. Ask the seller if they can reject it, or write to support@societybites.in if you need help.',
+            'For UPI orders you can cancel until you mark the payment as paid. For cash orders you can cancel until the seller marks it ready. After that, message the seller, or write to support@societybites.in if you need help.',
         keywords: ['cancel', 'reject', 'stop order'],
+      ),
+      HelpFaq(
+        id: 'orders-seller-cannot-fulfil',
+        question: 'What if the seller cannot make my order?',
+        answer:
+            'The seller can mark the order as Can\'t fulfil with a reason, and you will see it on the order. If you had already paid, the order shows the amount the seller owes you. SocietyEats does not hold your money, so use Messages to settle it with the seller directly.',
+        keywords: ['cannot fulfil', 'rejected', 'refund', 'money back'],
       ),
       HelpFaq(
         id: 'orders-cash',

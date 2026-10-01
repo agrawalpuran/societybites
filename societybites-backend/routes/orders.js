@@ -49,6 +49,11 @@ const {
   attachUnreadCounts,
 } = require("../lib/orderMessages");
 const { buyerCancelDeniedReason } = require("../lib/buyerCancel");
+const {
+  skipsSellerAcceptance,
+  orderSkipsSellerAcceptance,
+  sellerCanDecline,
+} = require("../lib/orderAcceptance");
 const { parseRequestedReadyAt } = require("../lib/orderReadyTime");
 const { listSellerOrders } = require("../lib/sellerOrderList");
 
@@ -75,8 +80,6 @@ const REJECT_REASONS = [
   "Unable to fulfil by requested date",
   "Other",
 ];
-
-const REJECTABLE_STATUSES = new Set(["pending"]);
 
 const TRANSITIONS = {
   pending: ["accepted", "cancelled"],
@@ -781,6 +784,11 @@ router.post(
       fulfilmentAt = campaign.fulfilmentAt;
     }
 
+    const autoAccepted = skipsSellerAcceptance({
+      orderType,
+      listings: preparedItems.map(({ listing }) => listing),
+    });
+
     const subtotal = preparedItems.reduce(
       (sum, { listing, quantity }) => sum + listing.price * quantity,
       0
@@ -846,7 +854,8 @@ router.post(
             fulfilmentNotes,
             fulfilmentAt,
             requestedReadyAt,
-            status: "pending",
+            status: autoAccepted ? "accepted" : "pending",
+            acceptedAt: autoAccepted ? new Date() : null,
             paymentMethod,
             subtotal,
             communityFee: platformFee,
@@ -958,7 +967,9 @@ router.patch(
     }
 
     if (status === "cancelled") {
-      const cancelDenied = buyerCancelDeniedReason(order);
+      const cancelDenied = buyerCancelDeniedReason(order, {
+        autoAccepted: orderSkipsSellerAcceptance(order),
+      });
       if (cancelDenied) {
         return res.status(400).json({ error: cancelDenied });
       }
@@ -1047,7 +1058,7 @@ router.post(
       return res.status(404).json({ error: "Order not found" });
     }
 
-    if (!REJECTABLE_STATUSES.has(order.status)) {
+    if (!sellerCanDecline(order)) {
       return res.status(400).json({
         error: `Cannot reject an order with status "${order.status}"`,
       });

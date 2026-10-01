@@ -102,6 +102,20 @@ assert(
   }) === "Order cannot be cancelled after the seller accepts the order.",
   "unit: COD accept blocks cancel"
 );
+assert(
+  buyerCancelDeniedReason(
+    { paymentMethod: "cash", paymentStatus: "pending", status: "accepted" },
+    { autoAccepted: true }
+  ) === null,
+  "unit: auto-accepted COD stays cancellable"
+);
+assert(
+  buyerCancelDeniedReason(
+    { paymentMethod: "cash", paymentStatus: "pending", status: "ready" },
+    { autoAccepted: true }
+  ) === "Order cannot be cancelled once it is ready for pickup.",
+  "unit: auto-accepted COD cancel closes at ready"
+);
 
 async function main() {
   const buyer = await prisma.user.findUnique({ where: { phone: BUYER_PHONE } });
@@ -178,11 +192,6 @@ async function main() {
       paymentMethod: "upi",
     });
     orderIds.push(upiAccepted.id);
-    await patchStatus(server, {
-      token: sellerToken,
-      orderId: upiAccepted.id,
-      status: "accepted",
-    });
     const upiAcceptedCancel = await patchStatus(server, {
       token: buyerToken,
       orderId: upiAccepted.id,
@@ -196,11 +205,6 @@ async function main() {
       paymentMethod: "upi",
     });
     orderIds.push(upiMarked.id);
-    await patchStatus(server, {
-      token: sellerToken,
-      orderId: upiMarked.id,
-      status: "accepted",
-    });
     const marked = await jsonRequest(server, {
       method: "POST",
       path: `/payments/${upiMarked.id}/mark-paid`,
@@ -292,21 +296,14 @@ async function main() {
       paymentMethod: "cash",
     });
     orderIds.push(cashAccepted.id);
-    await patchStatus(server, {
-      token: sellerToken,
-      orderId: cashAccepted.id,
-      status: "accepted",
-    });
     const cashAcceptedCancel = await patchStatus(server, {
       token: buyerToken,
       orderId: cashAccepted.id,
       status: "cancelled",
     });
-    assert(cashAcceptedCancel.status === 400, "COD accepted must not cancel");
     assert(
-      cashAcceptedCancel.json.error ===
-        "Order cannot be cancelled after the seller accepts the order.",
-      `COD accept cancel message: ${cashAcceptedCancel.json.error}`
+      cashAcceptedCancel.status === 200,
+      "auto-accepted COD must stay cancellable until ready"
     );
 
     const cashReadyOrder = await createOrder(server, {
@@ -315,11 +312,6 @@ async function main() {
       paymentMethod: "cash",
     });
     orderIds.push(cashReadyOrder.id);
-    await patchStatus(server, {
-      token: sellerToken,
-      orderId: cashReadyOrder.id,
-      status: "accepted",
-    });
     const cashReady = await patchStatus(server, {
       token: sellerToken,
       orderId: cashReadyOrder.id,

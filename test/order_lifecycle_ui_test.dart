@@ -38,8 +38,8 @@ Map<String, dynamic> _orderJson({
     'cancelledAt': cancelledAt,
     'rejectReason': rejectReason,
     'hasReview': hasReview,
-    if (fulfilmentMethod != null) 'fulfilmentMethod': fulfilmentMethod,
-    if (sellerSocietyName != null) 'sellerSocietyName': sellerSocietyName,
+    ?'fulfilmentMethod': fulfilmentMethod,
+    ?'sellerSocietyName': sellerSocietyName,
     'items': [
       {
         'quantity': 1,
@@ -50,9 +50,9 @@ Map<String, dynamic> _orderJson({
           'sellerId': 'seller-1',
           'sellerName': 'Test Seller',
           'price': 115,
-          if (flatNumber != null) 'flatNumber': flatNumber,
-          if (block != null) 'block': block,
-          if (sellerSocietyName != null) 'sellerSocietyName': sellerSocietyName,
+          ?'flatNumber': flatNumber,
+          ?'block': block,
+          ?'sellerSocietyName': sellerSocietyName,
         },
       },
     ],
@@ -327,9 +327,10 @@ void main() {
     await tester.tap(find.text('View details'));
     await tester.pumpAndSettle();
     expect(find.text('ORDER DETAILS'), findsOneWidget);
-    expect(find.text('Pickup details'), findsOneWidget);
-    expect(find.textContaining('Green Valley Apartments'), findsWidgets);
-    expect(find.textContaining('Flat 12A'), findsWidgets);
+    expect(find.text('Pickup details'), findsNothing);
+    expect(find.textContaining('BUYER PICKUP'), findsOneWidget);
+    expect(find.textContaining('Green Valley Apartments'), findsOneWidget);
+    expect(find.textContaining('Flat 12A'), findsOneWidget);
     expect(find.text('Pay Now'), findsNothing);
     expect(find.text('Cancel Order'), findsNothing);
   });
@@ -355,9 +356,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('View details'));
     await tester.pumpAndSettle();
-    expect(find.text('Pickup details'), findsOneWidget);
-    expect(find.textContaining('Lakeview Residency'), findsWidgets);
-    expect(find.textContaining('Flat 204'), findsWidgets);
+    expect(find.text('Pickup details'), findsNothing);
+    expect(find.textContaining('BUYER PICKUP'), findsOneWidget);
+    expect(find.textContaining('Lakeview Residency'), findsOneWidget);
+    expect(find.textContaining('Flat 204'), findsOneWidget);
     expect(find.text('Pay Now'), findsNothing);
     expect(find.text('Cancel Order'), findsNothing);
   });

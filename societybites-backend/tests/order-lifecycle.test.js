@@ -157,19 +157,17 @@ async function main() {
       paymentMethod: "cash",
     });
     orderIds.push(happy.id);
-    assert(happy.status === "pending", "new orders must start pending");
+    assert(happy.status === "accepted", "regular orders must skip seller acceptance");
     assert(happy.paymentStatus === "pending", "payment status must stay independent at create");
-    assert(happy.statusStep === 0, "pending statusStep must be 0");
+    assert(happy.statusStep === 1, "auto-accepted statusStep must be 1");
+    assert(happy.sellerCanDecline === true, "seller keeps Can't fulfil after auto-accept");
 
-    const accepted = await patchStatus(server, {
+    const reAccept = await patchStatus(server, {
       token: sellerToken,
       orderId: happy.id,
       status: "accepted",
     });
-    assert(accepted.status === 200, "PENDING → ACCEPTED must work");
-    assert(accepted.json.status === "accepted", "accepted status not stored");
-    assert(accepted.json.paymentStatus === "pending", "accept must not change paymentStatus");
-    assert(accepted.json.statusStep === 1, "accepted statusStep must be 1");
+    assert(reAccept.status === 400, "ACCEPTED → ACCEPTED must be rejected");
 
     const ready = await patchStatus(server, {
       token: sellerToken,
@@ -227,7 +225,7 @@ async function main() {
       token: sellerToken,
       body: { reason: "Ingredients unavailable", otherText: "Ran out of filling" },
     });
-    assert(rejected.status === 200, "PENDING → REJECTED must work");
+    assert(rejected.status === 200, "ACCEPTED → REJECTED must work");
     assert(rejected.json.status === "rejected", "rejected status not stored");
     assert(rejected.json.paymentStatus === "failed", "unpaid reject should fail payment");
     assert(
@@ -267,27 +265,6 @@ async function main() {
       paymentMethod: "cash",
     });
     orderIds.push(invalids.id);
-
-    const pendingReady = await patchStatus(server, {
-      token: sellerToken,
-      orderId: invalids.id,
-      status: "ready",
-    });
-    assert(pendingReady.status === 400, "PENDING → READY must be rejected");
-
-    const pendingCompleted = await patchStatus(server, {
-      token: sellerToken,
-      orderId: invalids.id,
-      status: "completed",
-    });
-    assert(pendingCompleted.status === 400, "PENDING → COMPLETED must be rejected");
-
-    const acceptForSkip = await patchStatus(server, {
-      token: sellerToken,
-      orderId: invalids.id,
-      status: "accepted",
-    });
-    assert(acceptForSkip.status === 200, "setup accept for skip-complete failed");
 
     const acceptedCompleted = await patchStatus(server, {
       token: sellerToken,
@@ -344,33 +321,28 @@ async function main() {
       paymentMethod: "cash",
     });
     orderIds.push(dupAcceptOrder.id);
-    const [firstAccept, secondAccept] = await Promise.all([
+    const [firstReady, secondReady] = await Promise.all([
       patchStatus(server, {
         token: sellerToken,
         orderId: dupAcceptOrder.id,
-        status: "accepted",
+        status: "ready",
       }),
       patchStatus(server, {
         token: sellerToken,
         orderId: dupAcceptOrder.id,
-        status: "accepted",
+        status: "ready",
       }),
     ]);
-    const acceptCodes = [firstAccept.status, secondAccept.status].sort();
+    const readyCodes = [firstReady.status, secondReady.status].sort();
     assert(
-      acceptCodes[0] === 200 && acceptCodes[1] !== 200,
-      `duplicate accept must only succeed once, got ${acceptCodes}`
+      readyCodes[0] === 200 && readyCodes[1] !== 200,
+      `duplicate ready must only succeed once, got ${readyCodes}`
     );
-    const afterDupAccept = await prisma.order.findUnique({
+    const afterDupReady = await prisma.order.findUnique({
       where: { id: dupAcceptOrder.id },
     });
-    assert(afterDupAccept.status === "accepted", "duplicate accept left an inconsistent status");
+    assert(afterDupReady.status === "ready", "duplicate ready left an inconsistent status");
 
-    await patchStatus(server, {
-      token: sellerToken,
-      orderId: dupAcceptOrder.id,
-      status: "ready",
-    });
     const cashDup = await jsonRequest(server, {
       method: "POST",
       path: `/payments/${dupAcceptOrder.id}/confirm-cash`,
@@ -401,11 +373,10 @@ async function main() {
       paymentMethod: "upi",
     });
     orderIds.push(upiOrder.id);
-    await patchStatus(server, {
-      token: sellerToken,
-      orderId: upiOrder.id,
-      status: "accepted",
-    });
+    assert(
+      upiOrder.status === "accepted",
+      "regular UPI orders must be payable straight after checkout"
+    );
     const marked = await jsonRequest(server, {
       method: "POST",
       path: `/payments/${upiOrder.id}/mark-paid`,
@@ -449,27 +420,42 @@ async function main() {
       orderId: cancelOrder.id,
       status: "cancelled",
     });
-    assert(cancelled.status === 200, "existing buyer cancel from pending must still work");
+    assert(cancelled.status === 200, "cash buyer cancel before ready must still work");
     assert(cancelled.json.status === "cancelled", "cancel status not stored");
 
-    const rejectAccepted = await createOrder(server, {
+    const cantFulfil = await createOrder(server, {
       token: buyerToken,
       listingId: listing.id,
       paymentMethod: "cash",
     });
-    orderIds.push(rejectAccepted.id);
-    await patchStatus(server, {
-      token: sellerToken,
-      orderId: rejectAccepted.id,
-      status: "accepted",
-    });
-    const lateReject = await jsonRequest(server, {
+    orderIds.push(cantFulfil.id);
+    const declined = await jsonRequest(server, {
       method: "POST",
-      path: `/orders/${rejectAccepted.id}/reject`,
+      path: `/orders/${cantFulfil.id}/reject`,
       token: sellerToken,
       body: { reason: "Too many orders" },
     });
-    assert(lateReject.status === 400, "reject after accept must not be allowed");
+    assert(declined.status === 200, "Can't fulfil must work on an auto-accepted order");
+    assert(declined.json.status === "rejected", "Can't fulfil must store rejected");
+
+    const readyThenDecline = await createOrder(server, {
+      token: buyerToken,
+      listingId: listing.id,
+      paymentMethod: "cash",
+    });
+    orderIds.push(readyThenDecline.id);
+    await patchStatus(server, {
+      token: sellerToken,
+      orderId: readyThenDecline.id,
+      status: "ready",
+    });
+    const tooLateToDecline = await jsonRequest(server, {
+      method: "POST",
+      path: `/orders/${readyThenDecline.id}/reject`,
+      token: sellerToken,
+      body: { reason: "Too many orders" },
+    });
+    assert(tooLateToDecline.status === 400, "Can't fulfil must close once the order is ready");
 
     const leftoverPreparing = await createOrder(server, {
       token: buyerToken,
@@ -477,11 +463,6 @@ async function main() {
       paymentMethod: "cash",
     });
     orderIds.push(leftoverPreparing.id);
-    await patchStatus(server, {
-      token: sellerToken,
-      orderId: leftoverPreparing.id,
-      status: "accepted",
-    });
     await prisma.order.update({
       where: { id: leftoverPreparing.id },
       data: { status: "preparing", preparingAt: new Date() },

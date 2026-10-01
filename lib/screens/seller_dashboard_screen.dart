@@ -679,7 +679,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   Future<void> _rejectOrder(Order order) async {
     if (_isRejecting) return;
-    final result = await confirmRejectOrder(context);
+    final result = await confirmRejectOrder(context, order: order);
     if (result == null || !mounted) return;
 
     _isRejecting = true;
@@ -1948,7 +1948,8 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     final hasSellerAction =
         lifecycle.showAccept || payment.showMarkReady || canComplete;
     final rejectLocked = widget.rejectBusy || order.isRejected;
-    final canReject = lifecycle.showReject || rejectLocked;
+    final canReject =
+        lifecycle.showReject || order.sellerCanDecline || rejectLocked;
     final canSetReadyBy = payment.canSetReadyBy;
     final showUpiConfirm = payment.showConfirmOrderAndChooseTime;
     final showUpiPaymentPending = payment.showPaymentPending;
@@ -2415,9 +2416,12 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                   ),
                 ),
                 icon: const Icon(Icons.cancel_outlined, size: 18),
-                label: const Text(
-                  'Reject',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                label: Text(
+                  lifecycle.showAccept ? 'Reject' : "Can't fulfil",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),

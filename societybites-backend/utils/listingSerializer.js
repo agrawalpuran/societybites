@@ -3,6 +3,19 @@ const { listingCategoriesFromRecord } = require("./listingCategories");
 const { serializePaymentPreference } = require("../lib/sellerPaymentPreference");
 const { serializeFulfilment } = require("../lib/sellerFulfilment");
 const { evaluateRecurringAvailability } = require("../lib/recurringAvailability");
+const { sellerCanDecline } = require("../lib/orderAcceptance");
+
+const ORDER_ENDED_WITHOUT_FOOD = new Set(["rejected", "cancelled"]);
+
+/**
+ * The platform never holds money, so a refund is a transfer the seller owes the
+ * buyer directly. Surfacing it keeps both sides looking at the same number.
+ */
+function isRefundDue(order) {
+  if (!ORDER_ENDED_WITHOUT_FOOD.has(order.status)) return false;
+  if (String(order.paymentMethod || "upi").toLowerCase() !== "upi") return false;
+  return Boolean(order.buyerMarkedPaidAt || order.sellerConfirmedPaidAt);
+}
 
 const ORDER_STATUS_TO_STEP = {
   pending: 0,
@@ -180,6 +193,8 @@ function serializeOrder(order) {
     rejectReason: order.rejectReason || null,
     rejectedAt: order.rejectedAt || null,
     rejectedBy: order.rejectedBy || null,
+    refundDue: isRefundDue(order),
+    sellerCanDecline: sellerCanDecline(order),
     completedAt: order.completedAt || null,
     cancelledAt: order.cancelledAt || null,
     expectedReadyAt: order.expectedReadyAt || null,

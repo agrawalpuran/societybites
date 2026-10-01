@@ -779,7 +779,9 @@ class _ActiveOrderCard extends StatelessWidget {
             const SizedBox(height: 10),
             if (order.isPreOrder)
               _PreOrderFulfilmentCard(order: order)
-            else if (order.fulfilmentMethod != 'seller_delivery')
+            else if (order.fulfilmentMethod == null ||
+                order.fulfilmentMethod!.trim().isEmpty)
+              // The buyer-pickup banner already shows the place and seller.
               _PickupInfoCard(order: order),
             const SizedBox(height: 10),
             OrderMessagesButton(

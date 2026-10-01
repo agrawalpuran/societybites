@@ -133,13 +133,10 @@ async function main() {
     assert(created.status === 201, "test order creation failed");
     orderId = created.json.id;
 
-    const accepted = await jsonRequest(server, {
-      method: "PATCH",
-      path: `/orders/${orderId}/status`,
-      token: sellerToken,
-      body: { status: "accepted" },
-    });
-    assert(accepted.status === 200, "test order acceptance failed");
+    assert(
+      created.json.status === "accepted",
+      "regular order must be auto-accepted before Ready by"
+    );
 
     await assertDuration(server, sellerToken, orderId, 15);
     await assertDuration(server, sellerToken, orderId, 30);

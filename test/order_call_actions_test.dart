@@ -12,12 +12,14 @@ Map<String, dynamic> _orderJson({
   required String status,
   String paymentMethod = 'upi',
   String paymentStatus = 'pending',
+  bool sellerCanDecline = false,
 }) {
   return {
     'id': 'o1',
     'orderNumber': 'SB-o1',
     'status': status,
     'statusStep': BuyerOrderLifecycle.progressStep(status),
+    'sellerCanDecline': sellerCanDecline,
     'paymentStatus': paymentStatus,
     'paymentMethod': paymentMethod,
     'buyerPhone': '+919845154070',
@@ -182,7 +184,7 @@ void main() {
     expect(button.onPressed, isNotNull);
   });
 
-  testWidgets('rejected order greys out Reject so it cannot be pressed again', (
+  testWidgets('rejected order greys out the decline so it cannot be pressed again', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -192,7 +194,22 @@ void main() {
       find.byKey(const Key('seller-reject-button')),
     );
     expect(button.onPressed, isNull);
-    expect(find.text('Reject'), findsOneWidget);
+    expect(find.text("Can't fulfil"), findsOneWidget);
+  });
+
+  testWidgets('accepted order offers Can\'t fulfil to the seller', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _sellerCard(
+        Order.fromJson(_orderJson(status: 'accepted', sellerCanDecline: true)),
+      ),
+    );
+    final button = tester.widget<OutlinedButton>(
+      find.byKey(const Key('seller-reject-button')),
+    );
+    expect(button.onPressed, isNotNull);
+    expect(find.text("Can't fulfil"), findsOneWidget);
   });
 
   testWidgets('Reject is disabled while a rejection is in progress', (
