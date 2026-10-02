@@ -257,7 +257,7 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
                     icon: Icons.delivery_dining_outlined,
                     title: 'Seller delivery',
                     subtitle:
-                        '${formatMoney(widget.campaign.defaultDeliveryCharge)} once per seller order',
+                        '${formatMoney(widget.campaign.defaultDeliveryCharge)} Delivery charge applicable',
                   ),
                 ],
                 const SizedBox(height: 12),

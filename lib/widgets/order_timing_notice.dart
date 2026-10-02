@@ -41,18 +41,10 @@ class OrderTimingNotice extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'This is not a regular ready-now order',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF101617),
-            ),
-          ),
           const SizedBox(height: 8),
           if (madeToOrder.isNotEmpty) ...[
             const Text(
-              'Made to Order',
+              'This is a Made to Order',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
@@ -63,7 +55,7 @@ class OrderTimingNotice extends StatelessWidget {
             Text(
               estimate.isEmpty
                   ? 'The seller prepares this after you order and will confirm the timeline.'
-                  : '$estimate. The seller confirms availability after you order.',
+                  : '$estimate.',
               style: const TextStyle(
                 fontSize: 13,
                 height: 1.35,
@@ -75,7 +67,7 @@ class OrderTimingNotice extends StatelessWidget {
           if (madeToOrder.isNotEmpty && isPreOrder) const SizedBox(height: 10),
           if (isPreOrder) ...[
             const Text(
-              'Pre-order',
+              'This is a Pre-order',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
@@ -85,8 +77,8 @@ class OrderTimingNotice extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               preOrderFulfilmentAt != null
-                  ? '${formatReadyAt(preOrderFulfilmentAt!)}. This is scheduled fulfilment, not immediate pickup.'
-                  : 'This is a scheduled pre-order. The seller will share the fulfilment time.',
+                  ? '${formatReadyAt(preOrderFulfilmentAt!)}. This is scheduled delivery, not immediate pickup.'
+                  : 'This is a scheduled pre-order. The seller will share the delivery time.',
               style: const TextStyle(
                 fontSize: 13,
                 height: 1.35,

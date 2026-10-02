@@ -165,16 +165,11 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
       ),
     );
     if (added == true) {
-      if (widget.promptToAddProduct) {
-        if (!mounted) return;
-        Navigator.pop(context, true);
-        return;
-      }
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Product added to the campaign'),
+            content: Text('Product added. Add another, or save the campaign.'),
             backgroundColor: preorderGreen,
           ),
         );
@@ -229,7 +224,7 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
         title: Text('${verb[0].toUpperCase()}${verb.substring(1)} campaign?'),
         content: Text(
           status == 'closed'
-              ? 'Buyers will no longer be able to place new orders. Existing orders and production quantities remain available.'
+              ? 'Buyers will no longer be able to place new orders.'
               : status == 'cancelled'
               ? 'This draft will be cancelled. This action does not cancel or refund individual orders.'
               : 'Buyers can order once the opening time is reached and until the cutoff.',
@@ -416,7 +411,7 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
                       borderRadius: BorderRadius.circular(13),
                     ),
                     child: const Text(
-                      'Some campaign settings and existing products are locked because buyers have already placed orders.',
+                      'Campaign details can not be edited because buyers have already placed the order.',
                       style: TextStyle(
                         color: Color(0xFF7A5A42),
                         fontSize: 13,
@@ -1022,6 +1017,32 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
   );
 
   Widget _actions(PreOrderCampaign campaign, PreOrderSummary summary) {
+    if (widget.promptToAddProduct) {
+      final ready = campaign.products.isNotEmpty && !_updating;
+      return SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: ElevatedButton.icon(
+          onPressed: ready ? () => Navigator.pop(context, true) : null,
+          icon: const Icon(Icons.check_rounded),
+          label: Text(
+            campaign.products.isEmpty
+                ? 'Add a product before saving'
+                : 'Save campaign',
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: preorderGreen,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: const Color(0xFFE7EEEB),
+            disabledForegroundColor: preorderMuted,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+          ),
+        ),
+      );
+    }
     final status = campaignDisplayStatus(campaign);
     if (status == 'open') {
       return SizedBox(

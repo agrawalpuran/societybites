@@ -7,6 +7,25 @@ const INVALID_TOKEN_CODES = new Set([
   "messaging/registration-token-not-registered",
 ]);
 
+const IST = "Asia/Kolkata";
+
+/** Clock time for push copy. The server process is UTC, so this must not use the host timezone. */
+function formatNotificationTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST,
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hourCycle: "h12",
+  }).formatToParts(date);
+  const part = (type) => parts.find((item) => item.type === type)?.value || "";
+  const dayPeriod = part("dayPeriod").toUpperCase();
+  return `${part("day")} ${part("month")}, ${part("hour")}:${part("minute")} ${dayPeriod}`;
+}
+
 /** Must match Android MainActivity CHANNEL_ID and AndroidManifest default channel. */
 const ANDROID_CHANNEL_ID = "societybites_orders";
 
@@ -213,7 +232,7 @@ function notifyOrderRejected(order) {
 function notifyReadyBy(order, cleared) {
   if (cleared) return; // skip per Phase 1 design (optional)
   const when = order.expectedReadyAt
-    ? new Date(order.expectedReadyAt).toLocaleString()
+    ? formatNotificationTime(order.expectedReadyAt)
     : "";
   return notifyAsync(() =>
     sendToUser(order.buyerId, {
@@ -273,6 +292,7 @@ function notifyOrderMessage(order, senderId) {
 
 module.exports = {
   ANDROID_CHANNEL_ID,
+  formatNotificationTime,
   notifyAsync,
   flushNotification,
   sendToUser,

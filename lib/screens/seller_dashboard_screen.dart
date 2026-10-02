@@ -22,6 +22,7 @@ import '../widgets/simple_time_picker.dart';
 import '../widgets/requested_ready_summary.dart';
 import '../widgets/seller_insights_panel.dart';
 import '../widgets/content_skeleton.dart';
+import '../widgets/pull_refresh_gate.dart';
 import '../widgets/status_banner.dart';
 import 'add_listing_screen.dart';
 import 'add_listing_type_screen.dart';
@@ -85,6 +86,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   Timer? _preOrdersSlowTimer;
   bool _didNotifyInitialSettle = false;
   int _ordersLoadGen = 0;
+  final _pullRefresh = PullRefreshGate();
   bool _ordersRefreshInFlight = false;
 
   /// 0 = Orders, 1 = Dashboard. Orders is the default My Kitchen landing tab.
@@ -811,7 +813,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 children: [
                   RefreshIndicator(
                     color: const Color(0xFF0E5A47),
-                    onRefresh: _refreshDashboard,
+                    onRefresh: () => _pullRefresh.run(_refreshDashboard),
                     child: CustomScrollView(
                       physics: const AlwaysScrollableScrollPhysics(
                         parent: BouncingScrollPhysics(),
@@ -952,7 +954,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                     children: [
                       RefreshIndicator(
                         color: const Color(0xFF0E5A47),
-                        onRefresh: _refreshDashboard,
+                        onRefresh: () => _pullRefresh.run(_refreshDashboard),
                         child: CustomScrollView(
                           physics: const AlwaysScrollableScrollPhysics(
                             parent: BouncingScrollPhysics(),
@@ -1034,7 +1036,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   Widget _buildDashboardPane() {
     return RefreshIndicator(
       color: const Color(0xFF0E5A47),
-      onRefresh: _refreshDashboard,
+      onRefresh: () => _pullRefresh.run(_refreshDashboard),
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
@@ -2008,7 +2010,12 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
         lifecycle.showReject || order.sellerCanDecline || rejectLocked;
     final canSetReadyBy = payment.canSetReadyBy;
     final showUpiConfirm = payment.showConfirmOrderAndChooseTime;
-    final showUpiPaymentPending = payment.showPaymentPending;
+    // Accepted and Buyer paid chips already say this. The extra headline
+    // and "buyer marked paid" banner only repeat those chips.
+    final showStatusCopy =
+        lifecycle.headline != null && !lifecycle.showMarkReady;
+    final showUpiPaymentPending = payment.showPaymentPending &&
+        order.paymentStatus != 'buyer_marked_paid';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -2162,7 +2169,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
               ),
             ],
           ),
-          if (lifecycle.headline != null) ...[
+          if (showStatusCopy) ...[
             const SizedBox(height: 12),
             Text(
               lifecycle.headline!,
@@ -2194,10 +2201,8 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFFFE0A3)),
               ),
-              child: Text(
-                order.paymentStatus == 'buyer_marked_paid'
-                    ? 'Payment Pending — buyer marked paid'
-                    : 'Payment Pending',
+              child: const Text(
+                'Payment Pending',
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,

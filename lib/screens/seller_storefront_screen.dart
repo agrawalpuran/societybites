@@ -6,6 +6,7 @@ import '../models/data.dart';
 import '../models/nearby_seller.dart';
 import '../models/seller_fulfilment.dart';
 import '../services/api_service.dart';
+import '../services/cart_controller.dart';
 import '../services/session_service.dart';
 import '../widgets/guest_order_auth.dart';
 import '../widgets/listing_image.dart';
@@ -291,15 +292,16 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       );
       return;
     }
-    if (_cart.isNotEmpty && _cart.first.food.sellerId != food.sellerId) {
-      final replace = await confirmReplaceSellerCart(
-        context,
-        currentSellerName: _cart.first.food.sellerName,
-      );
-      if (!replace || !mounted) return;
-      setState(_cart.clear);
-    }
     if (delta > 0) {
+      final allowed = await confirmCartSellerAllowed(
+        context,
+        cart: _cart,
+        sellerId: food.sellerId,
+        sellerName: food.sellerName,
+        alsoBlockedBy: CartController.instance.items,
+        onViewCart: () => CartController.instance.openCheckout(context),
+      );
+      if (!allowed || !context.mounted) return;
       final mixConflict = cartAvailabilityConflict(_cart, food);
       if (mixConflict != null) {
         _show(mixConflict);
@@ -333,15 +335,24 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
 
   Future<void> _checkout() async {
     if (_cart.isEmpty) return;
+    final allowed = await confirmCartSellerAllowed(
+      context,
+      cart: _cart,
+      sellerId: _cart.first.food.sellerId,
+      sellerName: _cart.first.food.sellerName,
+      alsoBlockedBy: CartController.instance.items,
+      onViewCart: () => CartController.instance.openCheckout(context),
+    );
+    if (!allowed || !mounted) return;
     if (!await SessionService.isSignedIn()) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       await Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
       return;
     }
-    if (!context.mounted) return;
+    if (!mounted) return;
     final placed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(

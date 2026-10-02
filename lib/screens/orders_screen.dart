@@ -13,6 +13,7 @@ import '../widgets/order_lifecycle_dialogs.dart';
 import '../widgets/order_messages_button.dart';
 import '../widgets/requested_ready_summary.dart';
 import '../widgets/content_skeleton.dart';
+import '../widgets/pull_refresh_gate.dart';
 import '../widgets/status_banner.dart';
 import '../models/data.dart';
 import '../models/order_lifecycle.dart';
@@ -59,6 +60,7 @@ class OrdersScreenState extends State<OrdersScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final ScrollController _activeOrdersScroll = ScrollController();
+  final _pullRefresh = PullRefreshGate();
   final _buyer = _RoleOrders(isLoading: true);
   bool _didNotifyInitialSettle = false;
   bool _ordersSlow = false;
@@ -353,6 +355,7 @@ class OrdersScreenState extends State<OrdersScreen>
           _ActiveTab(
             orders: _buyer.active,
             onRefresh: _loadOrders,
+            onPull: () => _pullRefresh.run(_loadOrders),
             onReturnToTop: _showActiveOrdersAtTop,
             scrollController: _activeOrdersScroll,
             isSellerView: false,
@@ -360,6 +363,7 @@ class OrdersScreenState extends State<OrdersScreen>
           _PastTab(
             orders: _buyer.past,
             onRefresh: _loadOrders,
+            onPull: () => _pullRefresh.run(_loadOrders),
             onExploreHome: widget.onExploreHome,
             isSellerView: false,
           ),
@@ -410,6 +414,7 @@ class _ActiveTab extends StatelessWidget {
   const _ActiveTab({
     required this.orders,
     required this.onRefresh,
+    this.onPull,
     this.onReturnToTop,
     this.scrollController,
     this.isSellerView = false,
@@ -417,6 +422,7 @@ class _ActiveTab extends StatelessWidget {
 
   final List<Order> orders;
   final Future<void> Function() onRefresh;
+  final Future<void> Function()? onPull;
   final VoidCallback? onReturnToTop;
   final ScrollController? scrollController;
   final bool isSellerView;
@@ -434,7 +440,7 @@ class _ActiveTab extends StatelessWidget {
     if (useWebMarketplaceLayout(context)) {
       return RefreshIndicator(
         color: const Color(0xFF0E5A47),
-        onRefresh: onRefresh,
+        onRefresh: onPull ?? onRefresh,
         child: ListView(
           controller: scrollController,
           physics: const AlwaysScrollableScrollPhysics(
@@ -461,7 +467,7 @@ class _ActiveTab extends StatelessWidget {
     }
     return RefreshIndicator(
       color: const Color(0xFF0E5A47),
-      onRefresh: onRefresh,
+      onRefresh: onPull ?? onRefresh,
       child: ListView(
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(
@@ -641,18 +647,33 @@ class _ActiveOrderCard extends StatelessWidget {
           const SizedBox(height: 12),
           OrderTotalRow(order: order),
           const SizedBox(height: 20),
-          if (BuyerOrderLifecycle.progressStep(order.status) >= 0)
+          if (BuyerOrderLifecycle.displayedProgressStep(
+                status: order.status,
+                paymentStatus: order.paymentStatus,
+                paymentMethod: order.paymentMethod,
+              ) >=
+              0)
             Align(
               alignment: Alignment.centerLeft,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: OrderStatusTracker(
-                  currentStep: BuyerOrderLifecycle.progressStep(order.status),
+                  currentStep: BuyerOrderLifecycle.displayedProgressStep(
+                    status: order.status,
+                    paymentStatus: order.paymentStatus,
+                    paymentMethod: order.paymentMethod,
+                  ),
                   steps: _steps,
                 ),
               ),
             ),
-          if (!isSellerView) ...[
+          if (!isSellerView &&
+              !(BuyerOrderLifecycle.awaitingSellerPaymentConfirm(
+                    paymentStatus: order.paymentStatus,
+                    paymentMethod: order.paymentMethod,
+                  ) &&
+                  (order.status == 'accepted' ||
+                      order.status == 'preparing'))) ...[
             const SizedBox(height: 12),
             Text(
               BuyerOrderLifecycle.headline(order.status),
@@ -776,10 +797,6 @@ class _ActiveOrderCard extends StatelessWidget {
               foods: order.items.map((item) => item.food),
               preOrderFulfilmentAt: order.fulfilmentAt,
             ),
-            if (order.isPreOrder) ...[
-              const SizedBox(height: 10),
-              _PreOrderFulfilmentCard(order: order),
-            ],
             const SizedBox(height: 10),
             OrderMessagesButton(
               order: order,
@@ -868,86 +885,18 @@ class _ActiveOrderCard extends StatelessWidget {
   }
 }
 
-class _PreOrderFulfilmentCard extends StatelessWidget {
-  const _PreOrderFulfilmentCard({required this.order});
-
-  final Order order;
-
-  @override
-  Widget build(BuildContext context) {
-    final sellerDelivery = order.fulfilmentMethod == 'seller_delivery';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F7F4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFD4E8DF)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                sellerDelivery
-                    ? Icons.delivery_dining_outlined
-                    : Icons.shopping_bag_outlined,
-                color: const Color(0xFF0E5A47),
-                size: 21,
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  sellerDelivery
-                      ? 'Seller-arranged delivery'
-                      : 'Pickup from seller',
-                  style: const TextStyle(
-                    color: Color(0xFF0E5A47),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (order.fulfilmentAt != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              Order.formatReadyBy(order.fulfilmentAt!),
-              style: const TextStyle(
-                color: Color(0xFF3A4644),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-          if (sellerDelivery) ...[
-            const SizedBox(height: 6),
-            const Text(
-              'SocietyEats does not provide delivery. Coordinate directly with the seller.',
-              style: TextStyle(
-                color: Color(0xFF6A7774),
-                fontSize: 12,
-                height: 1.35,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _PastTab extends StatelessWidget {
   const _PastTab({
     required this.orders,
     required this.onRefresh,
+    this.onPull,
     this.onExploreHome,
     this.isSellerView = false,
   });
 
   final List<Order> orders;
   final Future<void> Function() onRefresh;
+  final Future<void> Function()? onPull;
   final VoidCallback? onExploreHome;
   final bool isSellerView;
 
@@ -956,7 +905,7 @@ class _PastTab extends StatelessWidget {
     if (useWebMarketplaceLayout(context)) return _buildWeb();
     return RefreshIndicator(
       color: const Color(0xFF0E5A47),
-      onRefresh: onRefresh,
+      onRefresh: onPull ?? onRefresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
@@ -999,7 +948,7 @@ class _PastTab extends StatelessWidget {
   Widget _buildWeb() {
     return RefreshIndicator(
       color: const Color(0xFF0E5A47),
-      onRefresh: onRefresh,
+      onRefresh: onPull ?? onRefresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),

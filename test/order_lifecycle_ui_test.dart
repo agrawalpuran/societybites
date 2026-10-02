@@ -251,6 +251,8 @@ void main() {
     ]);
     expect(find.text('Cancel Order'), findsNothing);
     expect(find.text('Awaiting Seller Confirmation'), findsOneWidget);
+    expect(find.text('Order confirmed'), findsNothing);
+    expect(find.text('Your order is being prepared.'), findsNothing);
   });
 
   testWidgets('UPI seller_confirmed hides Cancel Order', (tester) async {

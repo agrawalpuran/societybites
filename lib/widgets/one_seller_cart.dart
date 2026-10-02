@@ -29,30 +29,152 @@ bool cartHasMixedAvailability(List<CartItem> cart) {
   return hasMadeToOrder && hasAvailableNow;
 }
 
-/// One cart = one seller. Returns true if the buyer wants to replace the cart.
-Future<bool> confirmReplaceSellerCart(
+enum OneSellerCartAction { viewCart, continueBrowsing }
+
+/// Empty cart and the same seller are allowed. A different seller is not.
+bool canAddItemFromSeller(List<CartItem> cart, String sellerId) {
+  if (cart.isEmpty) return true;
+  return cart.first.food.sellerId == sellerId;
+}
+
+String cartSellerName(List<CartItem> cart) {
+  if (cart.isEmpty) return 'this seller';
+  final name = cart.first.food.sellerName.trim();
+  return name.isEmpty ? 'this seller' : name;
+}
+
+/// Returns true when [sellerId] may be added or ordered.
+/// A different seller shows the restriction sheet and does not change [cart].
+Future<bool> confirmCartSellerAllowed(
   BuildContext context, {
-  required String currentSellerName,
+  required List<CartItem> cart,
+  required String sellerId,
+  required String sellerName,
+  List<CartItem>? alsoBlockedBy,
+  Future<void> Function()? onViewCart,
 }) async {
-  final result = await showDialog<bool>(
+  final List<CartItem>? blocking;
+  if (!canAddItemFromSeller(cart, sellerId)) {
+    blocking = cart;
+  } else if (alsoBlockedBy != null &&
+      !identical(alsoBlockedBy, cart) &&
+      !canAddItemFromSeller(alsoBlockedBy, sellerId)) {
+    blocking = alsoBlockedBy;
+  } else {
+    blocking = null;
+  }
+  if (blocking == null) return true;
+
+  final currentName = cartSellerName(blocking);
+  final incoming = sellerName.trim().isEmpty ? 'this seller' : sellerName.trim();
+  final action = await showModalBottomSheet<OneSellerCartAction>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Your cart contains items from another seller.'),
-      content: Text(
-        'Start a new cart with this seller? Items from $currentSellerName will be removed.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          style: TextButton.styleFrom(foregroundColor: const Color(0xFF0E5A47)),
-          child: const Text('Start New Cart'),
-        ),
-      ],
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
+    builder: (sheetContext) {
+      return SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4DBD8),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Your cart already has items',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF101617),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'You already have items from $currentName in your cart.\n\n'
+                'You can order from one seller at a time. Please complete or clear your current cart before ordering from $incoming.',
+                style: const TextStyle(
+                  fontSize: 14,
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF3A4644),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'One seller per cart',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF8A9491),
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  key: const Key('one-seller-view-cart'),
+                  onPressed: () => Navigator.pop(
+                    sheetContext,
+                    OneSellerCartAction.viewCart,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0E5A47),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'View Cart',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 48,
+                child: OutlinedButton(
+                  key: const Key('one-seller-continue'),
+                  onPressed: () => Navigator.pop(
+                    sheetContext,
+                    OneSellerCartAction.continueBrowsing,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0E5A47),
+                    side: const BorderSide(color: Color(0xFFD4E8DF)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Continue Browsing',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        ),
+      );
+    },
   );
-  return result == true;
+  if (action == OneSellerCartAction.viewCart) {
+    await onViewCart?.call();
+  }
+  return false;
 }

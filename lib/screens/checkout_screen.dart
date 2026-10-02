@@ -12,12 +12,14 @@ import '../widgets/requested_ready_summary.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/status_banner.dart';
 import '../models/data.dart';
+import '../models/order_lifecycle.dart';
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
 import '../services/api_service.dart';
 import '../services/cart_controller.dart';
 import '../services/session_service.dart';
 import 'login_screen.dart';
+import 'payment_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({
@@ -172,6 +174,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _items.fold<int>(0, (sum, item) => sum + item.quantity);
 
   bool get _showNeedBy => _items.any((item) => item.food.isMadeToOrder);
+
+  /// Ready-now UPI orders are already accepted, so checkout can open the QR.
+  bool get _orderAndPay =>
+      _payment == PaymentMethod.upi && !_showNeedBy;
 
   bool get _canConfirm {
     if (_isSubmitting || _items.isEmpty || _totalQuantity <= 0) return false;
@@ -328,7 +334,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
       }
 
-      await place(
+      final created = await place(
         societyId: societyId,
         paymentMethod: _payment == PaymentMethod.upi ? 'upi' : 'cash',
         items: _items
@@ -343,7 +349,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
 
       if (!mounted) return;
-      CartController.instance.finishPlacedOrder(context);
+      final order = Order.fromJson(created);
+      final payNow = order.paymentMethod == 'upi' &&
+          BuyerOrderLifecycle.canPayNow(
+            status: order.status,
+            paymentStatus: order.paymentStatus,
+            paymentMethod: order.paymentMethod,
+          );
+      if (!payNow) {
+        CartController.instance.finishPlacedOrder(context);
+        return;
+      }
+
+      final navigator = Navigator.of(context);
+      final showOrders = CartController.instance.onShowOrdersAfterPlace;
+      CartController.instance.clear();
+      CartController.instance.onOrderPlaced?.call();
+      await navigator.pushReplacement(
+        MaterialPageRoute(builder: (_) => PaymentScreen(order: order)),
+      );
+      showOrders?.call();
+      navigator.popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
 
@@ -936,41 +962,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ],
               ),
-              const Spacer(),
-              SizedBox(
-                height: 54,
-                child: ElevatedButton(
-                  key: const Key('confirm-order'),
-                  onPressed: _canConfirm ? _confirmOrder : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0E5A47),
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: const Color(0xFFB5C4BF),
-                    disabledForegroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+              const SizedBox(width: 12),
+              Flexible(
+                child: SizedBox(
+                  height: 54,
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    key: const Key('confirm-order'),
+                    onPressed: _canConfirm ? _confirmOrder : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0E5A47),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: const Color(0xFFB5C4BF),
+                      disabledForegroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              _orderAndPay ? 'Order & Pay' : 'Confirm\nOrder',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                              ),
+                            ),
+                          ),
                   ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Confirm\nOrder',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            height: 1.2,
-                          ),
-                        ),
                 ),
               ),
             ],

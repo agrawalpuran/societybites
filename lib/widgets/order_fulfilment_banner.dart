@@ -97,13 +97,14 @@ class OrderFulfilmentBanner extends StatelessWidget {
                 'Seller will deliver your order.',
                 style: TextStyle(color: Color(0xFF3A4644)),
               ),
-            if (delivery) ...[
+            if (!delivery && order.fulfilmentAt != null) ...[
               const SizedBox(height: 4),
               Text(
-                'Delivery charge: ₹$chargeLabel',
+                Order.formatReadyBy(order.fulfilmentAt!),
                 style: const TextStyle(
-                  color: Color(0xFF0E5A47),
-                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF3A4644),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],

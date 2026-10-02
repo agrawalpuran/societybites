@@ -71,6 +71,25 @@ void _ignoreOverflow() {
 }
 
 void main() {
+  test('seller delivery address includes the apartment name', () {
+    final order = Order.fromJson({
+      'id': 'o-delivery',
+      'orderNumber': 'SB-1',
+      'status': 'accepted',
+      'fulfilmentMethod': 'seller_delivery',
+      'buyerName': 'Amita',
+      'buyerSocietyName': 'Prestige Notting Hill',
+      'buyerBlock': 'C',
+      'buyerFlatNumber': '3062',
+      'items': const [],
+    });
+
+    expect(
+      order.buyerLabel,
+      'Amita · Prestige Notting Hill · Block C, Flat 3062',
+    );
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
@@ -123,7 +142,7 @@ void main() {
     tester,
   ) async {
     final first = _food(id: 'a', sellerId: 's1', sellerName: 'Cook A');
-    final second = _food(id: 'b', sellerId: 's2', sellerName: 'Cook B');
+    final cart = [_cartItem(first)];
     await tester.pumpWidget(
       MaterialApp(
         home: SellerStorefrontScreen(
@@ -135,7 +154,7 @@ void main() {
             avatarIcon: Icons.restaurant,
             avatarColor: Color(0xFFE8F5EE),
           ),
-          cartItems: [_cartItem(first)],
+          cartItems: cart,
           fetchListings: () async => [
             {
               'id': 'b',
@@ -155,13 +174,15 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Add'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('Your cart contains items from another seller.'),
-      findsOneWidget,
-    );
-    expect(find.text('Start New Cart'), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
+    expect(find.text('Your cart already has items'), findsOneWidget);
+    expect(find.text('Continue Browsing'), findsOneWidget);
+    expect(find.text('View Cart'), findsOneWidget);
+    expect(find.text('Start New Cart'), findsNothing);
+    await tester.tap(find.text('Continue Browsing'));
     await tester.pumpAndSettle();
+    expect(cart, hasLength(1));
+    expect(cart.first.food.id, 'a');
+    expect(cart.first.food.sellerId, 's1');
   });
 
   testWidgets('pickup-only seller shows pickup at checkout', (tester) async {
@@ -419,7 +440,7 @@ void main() {
     );
     expect(find.text('🛵 SELLER DELIVERY'), findsOneWidget);
     expect(find.text('Seller will deliver your order.'), findsOneWidget);
-    expect(find.text('Delivery charge: ₹30'), findsOneWidget);
+    expect(find.text('Delivery charge: ₹30'), findsNothing);
   });
 
   testWidgets('buyer pickup order shows apartment with distance', (tester) async {
@@ -430,6 +451,7 @@ void main() {
       'total': 80,
       'subtotal': 80,
       'fulfilmentMethod': 'pickup',
+      'fulfilmentAt': '2026-10-09T11:30:00.000Z',
       'sellerSocietyName': 'Palm Grove',
       'distanceKm': 1.2,
       'sellerName': 'Sarika',
@@ -459,6 +481,11 @@ void main() {
     expect(find.text('Palm Grove · Flat 36, Block 36'), findsOneWidget);
     expect(find.text('  ~1.2 km'), findsOneWidget);
     expect(find.text('Sarika'), findsOneWidget);
+    expect(
+      find.text(Order.formatReadyBy(DateTime.parse('2026-10-09T11:30:00.000Z'))),
+      findsOneWidget,
+    );
+    expect(find.text('Pickup from seller'), findsNothing);
     expect(find.text('You will pick up your order from the seller.'), findsNothing);
   });
 

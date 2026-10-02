@@ -455,7 +455,7 @@ class _CreatePreOrderScreenState extends State<CreatePreOrderScreen> {
                           if (_sellerDelivery) ...[
                             const SizedBox(height: 8),
                             _label(
-                              'DEFAULT DELIVERY CHARGE PER SELLER ORDER',
+                              'DELIVERY CHARGE APPLICABLE FOR SELLER ARRANGED DELIVERY',
                               isRequired: true,
                             ),
                             TextFormField(

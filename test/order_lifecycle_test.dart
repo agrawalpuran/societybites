@@ -162,6 +162,29 @@ void main() {
     expect(BuyerOrderLifecycle.progressStep('accepted'), 1);
   });
 
+  test('UPI marked paid stays on Order Placed until the seller confirms', () {
+    expect(
+      BuyerOrderLifecycle.awaitingSellerPaymentConfirm(
+        paymentStatus: 'buyer_marked_paid',
+      ),
+      isTrue,
+    );
+    expect(
+      BuyerOrderLifecycle.displayedProgressStep(
+        status: 'accepted',
+        paymentStatus: 'buyer_marked_paid',
+      ),
+      0,
+    );
+    expect(
+      BuyerOrderLifecycle.displayedProgressStep(
+        status: 'accepted',
+        paymentStatus: 'seller_confirmed',
+      ),
+      1,
+    );
+  });
+
   test('progress step labels wrap only at the last space', () {
     expect(
       BuyerOrderLifecycle.progressStepDisplayLabel('Order Placed'),

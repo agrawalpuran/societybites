@@ -94,7 +94,9 @@ void main() {
         ),
       ),
     );
-    expect(find.textContaining('buyer marked paid'), findsOneWidget);
+    expect(find.text('BUYER PAID'), findsOneWidget);
+    expect(find.text('Order Accepted'), findsNothing);
+    expect(find.textContaining('buyer marked paid'), findsNothing);
     expect(_callActions, findsNothing);
   });
 

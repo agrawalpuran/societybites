@@ -9,8 +9,10 @@ import '../widgets/recurring_availability_hint.dart';
 import '../widgets/temporarily_unavailable_label.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
+import '../services/cart_controller.dart';
 import 'checkout_screen.dart';
 import '../widgets/guest_order_auth.dart';
+import '../widgets/one_seller_cart.dart';
 import '../widgets/screen_loading_note.dart';
 import '../widgets/seller_avatar.dart';
 
@@ -878,6 +880,15 @@ class _BottomCta extends StatelessWidget {
                           return;
                         }
                         if (!context.mounted) return;
+                        final allowed = await confirmCartSellerAllowed(
+                          context,
+                          cart: CartController.instance.items,
+                          sellerId: food.sellerId,
+                          sellerName: food.sellerName,
+                          onViewCart: () =>
+                              CartController.instance.openCheckout(context),
+                        );
+                        if (!allowed || !context.mounted) return;
                         Navigator.push(
                           context,
                           MaterialPageRoute(

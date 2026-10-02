@@ -645,11 +645,14 @@ class Order {
     return requested.isBefore(placedAt.add(Duration(minutes: minutes)));
   }
 
-  /// Seller-facing buyer label: name + flat/block.
+  /// Seller-facing buyer label: name, apartment, then flat and block.
   String get buyerLabel {
     final parts = <String>[];
     final name = buyerName?.trim();
     if (name != null && name.isNotEmpty) parts.add(name);
+
+    final society = buyerSocietyName?.trim();
+    if (society != null && society.isNotEmpty) parts.add(society);
 
     final location = <String>[];
     if (buyerBlock != null && buyerBlock!.trim().isNotEmpty) {

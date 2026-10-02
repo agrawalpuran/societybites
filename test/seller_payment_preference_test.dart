@@ -300,6 +300,42 @@ void main() {
     expect(find.byKey(const Key('payment-cash')), findsNothing);
   });
 
+  testWidgets('ready-now UPI checkout says Order & Pay and opens the QR', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'user_id': 'user-1',
+      'society_id': 'society-a',
+    });
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CheckoutScreen(
+          cartItems: [CartItem(food: _food(), quantity: 1)],
+          placeOrder: ({
+            required societyId,
+            required items,
+            required paymentMethod,
+            fulfilmentMethod,
+            requestedReadyAt,
+          }) async =>
+              _orderJson(status: 'accepted'),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Order & Pay'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('confirm-order')));
+    await tester.tap(find.byKey(const Key('confirm-order')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Payment'), findsOneWidget);
+    expect(find.text('Pay Now'), findsNothing);
+  });
+
   testWidgets('UPI + COD checkout can select COD', (tester) async {
     SharedPreferences.setMockInitialValues({
       'user_id': 'user-1',
@@ -326,6 +362,7 @@ void main() {
     await tester.pump();
     expect(find.text('UPI'), findsOneWidget);
     expect(find.text('Cash on Delivery'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('payment-cash')));
     await tester.tap(find.byKey(const Key('payment-cash')));
     await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('confirm-order')));

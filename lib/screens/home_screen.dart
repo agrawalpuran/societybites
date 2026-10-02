@@ -13,6 +13,7 @@ import '../services/api_service.dart';
 import '../services/cart_controller.dart';
 import '../services/session_service.dart';
 import '../widgets/content_skeleton.dart';
+import '../widgets/pull_refresh_gate.dart';
 import '../widgets/preorder_widgets.dart';
 import 'buyer_preorder_detail_screen.dart';
 import 'buyer_preorders_screen.dart';
@@ -69,6 +70,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class HomeScreenState extends State<HomeScreen> {
+  final _pullRefresh = PullRefreshGate();
   List<CartItem> get _cart => CartController.instance.items;
   final TextEditingController _searchController = TextEditingController();
 
@@ -434,18 +436,15 @@ class HomeScreenState extends State<HomeScreen> {
     if (await _webVisitorNeedsSignIn()) return;
     if (!mounted) return;
 
-    if (_cart.isNotEmpty) {
-      final cartSellerId = _cart.first.food.sellerId;
-      if (food.sellerId != cartSellerId) {
-        final replace = await confirmReplaceSellerCart(
-          context,
-          currentSellerName: _cart.first.food.sellerName,
-        );
-        if (!replace || !mounted) return;
-        setState(_cart.clear);
-        CartController.instance.notify();
-      }
-    }
+    final allowed = await confirmCartSellerAllowed(
+      context,
+      cart: _cart,
+      sellerId: food.sellerId,
+      sellerName: food.sellerName,
+      alsoBlockedBy: CartController.instance.items,
+      onViewCart: () => CartController.instance.openCheckout(context),
+    );
+    if (!allowed || !mounted) return;
 
     final mixConflict = cartAvailabilityConflict(_cart, food);
     if (mixConflict != null) {
@@ -699,7 +698,7 @@ class HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
               child: RefreshIndicator(
                 color: const Color(0xFF0E5A47),
-                onRefresh: _refreshHome,
+                onRefresh: () => _pullRefresh.run(_refreshHome),
                 child: CustomScrollView(
                   physics: const AlwaysScrollableScrollPhysics(
                     parent: BouncingScrollPhysics(),

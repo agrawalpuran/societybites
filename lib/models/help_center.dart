@@ -66,7 +66,7 @@ const helpCategories = <HelpCategory>[
         id: 'buying-one-seller',
         question: 'Can I buy from more than one seller?',
         answer:
-            'Your cart can hold items from one seller at a time. If you add food from someone else, you will be asked to start a new cart.',
+            'Your cart can hold items from one seller at a time. If you try to order from someone else, you will be asked to complete or clear your current cart first.',
         keywords: ['multi seller', 'cart', 'another kitchen', 'two sellers'],
       ),
       HelpFaq(

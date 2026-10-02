@@ -222,6 +222,33 @@ class BuyerOrderLifecycle {
     }
   }
 
+  /// Buyer marked UPI paid, and the seller has not confirmed it yet.
+  static bool awaitingSellerPaymentConfirm({
+    required String paymentStatus,
+    String? paymentMethod,
+  }) {
+    final method = (paymentMethod ?? 'upi').toLowerCase();
+    return method != 'cash' && paymentStatus == 'buyer_marked_paid';
+  }
+
+  /// Confirmed means the seller has confirmed payment and can start cooking.
+  /// Until then a regular UPI order stays on Order Placed.
+  static int displayedProgressStep({
+    required String status,
+    required String paymentStatus,
+    String? paymentMethod,
+  }) {
+    final step = progressStep(status);
+    if (step == 1 &&
+        awaitingSellerPaymentConfirm(
+          paymentStatus: paymentStatus,
+          paymentMethod: paymentMethod,
+        )) {
+      return 0;
+    }
+    return step;
+  }
+
   static String headline(String status) {
     switch (status) {
       case 'pending':
