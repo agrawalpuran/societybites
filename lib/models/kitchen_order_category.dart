@@ -71,7 +71,7 @@ List<Order> ordersForKitchenCategory({
 String kitchenCategoryLabel(KitchenOrderCategory category) {
   switch (category) {
     case KitchenOrderCategory.orders:
-      return 'Orders';
+      return 'Regular';
     case KitchenOrderCategory.madeToOrder:
       return 'Made to Order';
     case KitchenOrderCategory.preorders:

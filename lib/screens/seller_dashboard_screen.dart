@@ -590,7 +590,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         ),
       );
 
-      // Optional Ready-by: COD keeps current accept-time picker. UPI waits for payment confirm.
+      // The button spinner waits on this method. Open Ready-by after it
+      // returns so Accept does not keep spinning behind the sheet.
       if (nextStatus == 'accepted') {
         final payment = SellerPaymentActions.fromOrder(
           status: nextStatus,
@@ -598,7 +599,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           paymentStatus: order.paymentStatus,
         );
         if (payment.promptReadyByOnAccept) {
-          await _promptReadyBy(order.id, order.orderId);
+          unawaited(_promptReadyBy(order.id, order.orderId));
         }
       }
     } catch (e) {

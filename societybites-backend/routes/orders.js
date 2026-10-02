@@ -102,7 +102,10 @@ const TIMESTAMP_FIELDS = {
   rejected: "rejectedAt",
 };
 
-async function updateOrderIfCurrentStatus(client, { id, fromStatus, data }) {
+async function updateOrderIfCurrentStatus(
+  client,
+  { id, fromStatus, data, reload = true }
+) {
   const result = await client.order.updateMany({
     where: { id, status: fromStatus },
     data,
@@ -114,6 +117,7 @@ async function updateOrderIfCurrentStatus(client, { id, fromStatus, data }) {
     err.statusCode = 409;
     throw err;
   }
+  if (!reload) return null;
   return client.order.findUnique({
     where: { id },
     include: orderInclude,
@@ -998,25 +1002,31 @@ router.patch(
 
     let updated;
 
+    // The order graph was already loaded for the permission checks. Writing the
+    // changed fields onto it avoids a second identical query before we answer.
     if (status === "cancelled") {
-      updated = await prisma.$transaction(async (tx) => {
-        const result = await updateOrderIfCurrentStatus(tx, {
+      const written = { ...updateData, paymentStatus: "failed" };
+      await prisma.$transaction(async (tx) => {
+        await updateOrderIfCurrentStatus(tx, {
           id: order.id,
           fromStatus: order.status,
-          data: { ...updateData, paymentStatus: "failed" },
+          data: written,
+          reload: false,
         });
 
         await restoreReservedInventory(tx, order.items);
 
         logger.info("order", `Cancelled ${order.orderNumber} — inventory restored`);
-        return result;
       });
+      updated = { ...order, ...written };
     } else {
-      updated = await updateOrderIfCurrentStatus(prisma, {
+      await updateOrderIfCurrentStatus(prisma, {
         id: order.id,
         fromStatus: order.status,
         data: updateData,
+        reload: false,
       });
+      updated = { ...order, ...updateData };
 
       logger.info("order", `${order.orderNumber} → ${status}`);
     }

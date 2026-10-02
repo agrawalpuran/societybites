@@ -255,6 +255,9 @@ void main() {
     expect(find.byKey(const ValueKey('kitchen-type-orders')), findsOneWidget);
     expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsOneWidget);
     expect(find.byKey(const ValueKey('kitchen-type-preorders')), findsOneWidget);
+    expect(find.text('Regular'), findsOneWidget);
+    expect(find.text('Made to Order'), findsOneWidget);
+    expect(find.text('Pre-orders'), findsOneWidget);
     expect(find.text('Dhokla'), findsWidgets);
     await tester.tap(find.byKey(const ValueKey('kitchen-type-madeToOrder')));
     await tester.pump();

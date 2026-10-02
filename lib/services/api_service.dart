@@ -169,6 +169,33 @@ class ApiService {
     return '$url${separator}v=${Uri.encodeComponent(cacheKey)}';
   }
 
+  static Future<Map<String, String>> captureAuthHeaders() => _authHeaders();
+
+  /// Best-effort logout cleanup. Callers pass credentials captured before
+  /// the local session is cleared, then leave the screen without waiting.
+  static Future<void> endSessionRemotely({
+    Map<String, String>? headers,
+    String? refreshToken,
+  }) async {
+    if (headers != null) {
+      try {
+        await http.delete(
+          Uri.parse('$baseUrl/devices'),
+          headers: headers,
+          body: jsonEncode({}),
+        );
+      } catch (_) {}
+    }
+    if (refreshToken == null || refreshToken.isEmpty) return;
+    try {
+      await http_client.post(
+        Uri.parse('$baseUrl/auth/logout'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': refreshToken}),
+      );
+    } catch (_) {}
+  }
+
   static Future<Map<String, String>> _authHeaders() async {
     final token = await SessionService.getToken();
     return {

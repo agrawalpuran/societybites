@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -231,15 +233,9 @@ class ProfileScreenState extends State<ProfileScreen> {
     if (confirmed != true || !mounted) return;
 
     final authProvider = await SessionService.getAuthProvider();
-    await PushNotificationService.unregister();
-    if (authProvider == '2factor') {
-      await ApiService.logoutTwoFactor();
-    }
+    final refreshToken = await SessionService.getRefreshToken();
+    final headers = await ApiService.captureAuthHeaders();
     await SessionService.clear();
-    if (authProvider == 'firebase') {
-      await FirebaseAuth.instance.signOut();
-    }
-
     if (!mounted) return;
 
     Navigator.pushAndRemoveUntil(
@@ -250,6 +246,22 @@ class ProfileScreenState extends State<ProfileScreen> {
       ),
       (_) => false,
     );
+
+    // Device unregister and Firebase sign-out talk to the network. The screen
+    // has already moved on; a slow response must not hold Log out.
+    unawaited(
+      ApiService.endSessionRemotely(
+        headers: headers,
+        refreshToken: refreshToken,
+      ),
+    );
+    if (authProvider == 'firebase') {
+      unawaited(() async {
+        try {
+          await FirebaseAuth.instance.signOut();
+        } catch (_) {}
+      }());
+    }
   }
 
   Future<void> _confirmDeleteAccount() async {
