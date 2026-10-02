@@ -135,6 +135,62 @@ class KitchenPreOrdersSkeleton extends StatelessWidget {
   }
 }
 
+class KitchenDashboardSkeleton extends StatelessWidget {
+  const KitchenDashboardSkeleton({super.key, this.padded = true});
+
+  final bool padded;
+
+  @override
+  Widget build(BuildContext context) {
+    final body = const Column(
+      key: Key('kitchen-dashboard-skeletons'),
+      children: [
+        SkeletonCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBlock(width: 120, height: 14),
+              SizedBox(height: 12),
+              SkeletonBlock(width: 80, height: 28, radius: 8),
+            ],
+          ),
+        ),
+        SizedBox(height: 12),
+        SkeletonCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBlock(width: 160, height: 16, radius: 8),
+              SizedBox(height: 14),
+              SkeletonBlock(height: 12),
+              SizedBox(height: 8),
+              SkeletonBlock(width: 200, height: 12),
+              SizedBox(height: 8),
+              SkeletonBlock(width: 140, height: 12),
+            ],
+          ),
+        ),
+        SizedBox(height: 12),
+        SkeletonCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBlock(width: 100, height: 16, radius: 8),
+              SizedBox(height: 14),
+              SkeletonBlock(height: 72, radius: 12),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (!padded) return body;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+      child: body,
+    );
+  }
+}
+
 class PreOrderDetailSkeleton extends StatelessWidget {
   const PreOrderDetailSkeleton({super.key});
 

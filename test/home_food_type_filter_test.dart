@@ -361,6 +361,7 @@ void main() {
     expect(nearby.single['sellerSocietyName'], 'Palm Grove');
     final dish = FoodItem.fromJson(nearby.single);
     expect(dish.buyerPlaceLabel, 'Palm Grove · ~0.2 km');
+    expect(dish.homePlaceLabel, '~0.2 km');
     expect(dish.locationLabel, isNot('Palm Grove · ~0.2 km'));
   });
 

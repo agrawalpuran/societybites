@@ -233,12 +233,22 @@ class FoodItem {
   String get buyerPlaceLabel {
     final society = sellerSocietyName?.trim();
     if (society == null || society.isEmpty) return locationLabel;
+    final distance = homeDistanceLabel;
+    if (distance == null) return society;
+    return '$society · $distance';
+  }
+
+  /// Browse cards: nearby / extended show only `~x km`. Detail screens keep
+  /// the apartment name via [buyerPlaceLabel].
+  String get homePlaceLabel => homeDistanceLabel ?? locationLabel;
+
+  String? get homeDistanceLabel {
     final km = distanceKm;
-    if (km == null || km <= 0) return society;
+    if (km == null || km <= 0) return null;
     final text = km == km.roundToDouble()
         ? km.toInt().toString()
         : km.toStringAsFixed(1);
-    return '$society · ~$text km';
+    return '~$text km';
   }
 
   static const _icons = [

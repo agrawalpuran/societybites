@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/models/data.dart';
+import 'package:societybites/models/listing_availability.dart';
 import 'package:societybites/models/order_lifecycle.dart';
 import 'package:societybites/screens/orders_screen.dart';
 
@@ -21,6 +22,7 @@ Map<String, dynamic> _orderJson({
   String? sellerSocietyName,
   String? flatNumber,
   String? block,
+  String? availabilityMode,
 }) {
   return {
     'id': id,
@@ -53,6 +55,7 @@ Map<String, dynamic> _orderJson({
           ?'flatNumber': flatNumber,
           ?'block': block,
           ?'sellerSocietyName': sellerSocietyName,
+          ?'availabilityMode': availabilityMode,
         },
       },
     ],
@@ -104,6 +107,23 @@ void main() {
     expect(find.text('Start Preparing'), findsNothing);
     expect(find.text('Mark Picked Up'), findsNothing);
     expect(find.text('Mark Complete'), findsNothing);
+  });
+
+  testWidgets('made-to-order pickup lists the address once', (tester) async {
+    await pumpOrders(tester, [
+      _orderJson(
+        id: 'mto-pickup',
+        status: 'accepted',
+        fulfilmentMethod: 'pickup',
+        sellerSocietyName: 'Prestige Notting Hill',
+        flatNumber: '3062',
+        block: 'C',
+        availabilityMode: listingAvailabilityMadeToOrder,
+      ),
+    ]);
+    expect(find.textContaining('BUYER PICKUP'), findsOneWidget);
+    expect(find.text('Pickup details'), findsNothing);
+    expect(find.textContaining('Prestige Notting Hill'), findsOneWidget);
   });
 
   testWidgets('buyer sees Ready for Pickup after READY', (tester) async {

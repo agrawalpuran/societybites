@@ -75,7 +75,10 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   String? _error;
   Map<String, dynamic> _stats = {};
   List<PreOrderCampaign> _preOrderCampaigns = [];
-  bool _preOrdersLoading = true;
+  bool _preOrdersLoading = false;
+  bool _preOrdersLoadRequested = false;
+  bool _dashboardVisited = false;
+  bool _statsLoadRequested = false;
   bool _ordersSlow = false;
   bool _preOrdersSlow = false;
   Timer? _ordersSlowTimer;
@@ -90,7 +93,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   /// 0 = Active, 1 = Past
   int _ordersTab = 0;
 
-  KitchenOrderCategory? _kitchenFilter;
+  KitchenOrderCategory _kitchenFilter = KitchenOrderCategory.orders;
   String? _role;
   bool _roleLoaded = false;
 
@@ -101,8 +104,6 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     super.initState();
     _loadRole();
     _loadOrders();
-    _loadStats();
-    _loadPreOrders();
   }
 
   @override
@@ -133,8 +134,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   void refresh() {
     _loadRole();
     _loadOrders();
-    _loadStats();
-    _loadPreOrders();
+    if (_statsLoadRequested) unawaited(_loadStats());
+    if (_preOrdersLoadRequested) unawaited(_loadPreOrders());
   }
 
   /// Lightweight poll: refresh unread badges without a full kitchen reload.
@@ -210,13 +211,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     }
   }
 
-  /// The tab strip filters Past as well as Active, so a seller whose only
-  /// regular order has ended still needs the Orders tab to reach it.
+  /// Always show Regular / MTO / Pre-orders so those panes can load on tap.
   List<KitchenOrderCategory> get _visibleKitchenCategories =>
-      visibleKitchenCategories(
-        orders: [..._activeOrders, ..._pastOrders],
-        campaigns: _preOrderCampaigns,
-      );
+      KitchenOrderCategory.values;
 
   KitchenOrderCategory? get _resolvedKitchenCategory => resolveKitchenCategory(
         visible: _visibleKitchenCategories,
@@ -269,10 +266,12 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         _ordersForCategory(_pastOrders).isNotEmpty) {
       return true;
     }
+    if (_preOrdersLoading) return false;
     return _preOrderCampaigns.isEmpty;
   }
 
   Future<void> _loadPreOrders() async {
+    _preOrdersLoadRequested = true;
     _preOrdersSlow = false;
     _armSlowTimer(
       timer: _preOrdersSlowTimer,
@@ -387,8 +386,46 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     }
   }
 
+  void _selectAreaTab(int index) {
+    setState(() {
+      _areaTab = index;
+      if (index == 1) _dashboardVisited = true;
+    });
+    if (index == 1) unawaited(_ensureStats());
+  }
+
+  void _selectKitchenCategory(KitchenOrderCategory category) {
+    setState(() {
+      _kitchenFilter = category;
+      if (category == KitchenOrderCategory.preorders &&
+          !_preOrdersLoadRequested) {
+        _preOrdersLoading = true;
+      }
+    });
+    if (category == KitchenOrderCategory.preorders) {
+      unawaited(_ensurePreOrders());
+    }
+  }
+
+  Future<void> _ensurePreOrders() async {
+    if (_preOrdersLoadRequested) return;
+    _preOrdersLoadRequested = true;
+    await _loadPreOrders();
+  }
+
+  Future<void> _ensureStats() async {
+    if (_statsLoadRequested) return;
+    _statsLoadRequested = true;
+    await _loadStats();
+  }
+
   Future<void> _refreshDashboard() async {
-    await Future.wait([_loadOrders(), _loadPreOrders(), _loadStats()]);
+    if (_areaTab == 1) {
+      await _loadStats();
+      return;
+    }
+    await _loadOrders();
+    if (_preOrdersLoadRequested) await _loadPreOrders();
   }
 
   Future<void> _loadStats() async {
@@ -499,7 +536,6 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       });
       _ordersSlowTimer?.cancel();
       _publishKitchenAttention();
-      _loadStats();
     } catch (e) {
       if (!mounted || gen != _ordersLoadGen) return;
 
@@ -597,6 +633,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           status: nextStatus,
           paymentMethod: order.paymentMethod,
           paymentStatus: order.paymentStatus,
+          allowReadyBy: kitchenOrderAllowsReadyBy(order),
         );
         if (payment.promptReadyByOnAccept) {
           unawaited(_promptReadyBy(order.id, order.orderId));
@@ -616,15 +653,28 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     }
   }
 
-  Future<void> _promptReadyBy(String orderId, String orderNumber) async {
-    final result = await showModalBottomSheet<Object?>(
+  Future<Object?> _showReadyBySheet({
+    required String orderNumber,
+    bool allowClear = false,
+    DateTime? initial,
+  }) {
+    return showModalBottomSheet<Object?>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => _ReadyBySheet(orderId: orderNumber, allowClear: false),
+      builder: (ctx) => _ReadyBySheet(
+        orderId: orderNumber,
+        allowClear: allowClear,
+        initial: initial,
+      ),
     );
+  }
+
+  Future<void> _promptReadyBy(String orderId, String orderNumber) async {
+    final result = await _showReadyBySheet(orderNumber: orderNumber);
 
     if (!mounted || result == null || result == 'skip') return;
 
@@ -632,17 +682,10 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   Future<void> _editReadyBy(Order order) async {
-    final result = await showModalBottomSheet<Object?>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => _ReadyBySheet(
-        orderId: order.orderId,
-        allowClear: order.expectedReadyAt != null,
-        initial: order.expectedReadyAt,
-      ),
+    final result = await _showReadyBySheet(
+      orderNumber: order.orderId,
+      allowClear: order.expectedReadyAt != null,
+      initial: order.expectedReadyAt,
     );
 
     if (!mounted || result == null || result == 'skip') return;
@@ -814,26 +857,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                       ],
                     ),
                   ),
-                  RefreshIndicator(
-                    color: const Color(0xFF0E5A47),
-                    onRefresh: _refreshDashboard,
-                    child: CustomScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(
-                        parent: BouncingScrollPhysics(),
-                      ),
-                      slivers: [
-                        SliverToBoxAdapter(child: _buildDashboardHeader()),
-                        SliverToBoxAdapter(child: _buildSatisfactionRow()),
-                        SliverToBoxAdapter(
-                          child: SellerInsightsPanel(
-                            showHeading: false,
-                            onSeeAllOrders: () => setState(() => _areaTab = 0),
-                          ),
-                        ),
-                        const SliverToBoxAdapter(child: SizedBox(height: 30)),
-                      ],
-                    ),
-                  ),
+                  _dashboardVisited
+                      ? _buildDashboardPane()
+                      : const SizedBox.shrink(),
                 ],
               ),
             ),
@@ -991,29 +1017,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                           ],
                         ),
                       ),
-                      RefreshIndicator(
-                        color: const Color(0xFF0E5A47),
-                        onRefresh: _refreshDashboard,
-                        child: CustomScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(
-                            parent: BouncingScrollPhysics(),
-                          ),
-                          slivers: [
-                            SliverToBoxAdapter(child: _buildDashboardHeader()),
-                            SliverToBoxAdapter(child: _buildSatisfactionRow()),
-                            SliverToBoxAdapter(
-                              child: SellerInsightsPanel(
-                                showHeading: false,
-                                onSeeAllOrders: () =>
-                                    setState(() => _areaTab = 0),
-                              ),
-                            ),
-                            const SliverToBoxAdapter(
-                              child: SizedBox(height: 30),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _dashboardVisited
+                          ? _buildDashboardPane()
+                          : const SizedBox.shrink(),
                     ],
                   ),
                 ),
@@ -1021,6 +1027,29 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardPane() {
+    return RefreshIndicator(
+      color: const Color(0xFF0E5A47),
+      onRefresh: _refreshDashboard,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        slivers: [
+          SliverToBoxAdapter(child: _buildDashboardHeader()),
+          SliverToBoxAdapter(child: _buildSatisfactionRow()),
+          SliverToBoxAdapter(
+            child: SellerInsightsPanel(
+              showHeading: false,
+              onSeeAllOrders: () => _selectAreaTab(0),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 30)),
+        ],
       ),
     );
   }
@@ -1043,7 +1072,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 selected: _areaTab == 0,
                 badgeCount: _pendingAttentionCount,
                 badgeKey: const Key('seller-area-orders-badge'),
-                onTap: () => setState(() => _areaTab = 0),
+                onTap: () => _selectAreaTab(0),
               ),
             ),
             Expanded(
@@ -1051,7 +1080,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 key: const Key('seller-area-dashboard-tab'),
                 label: 'Dashboard',
                 selected: _areaTab == 1,
-                onTap: () => setState(() => _areaTab = 1),
+                onTap: () => _selectAreaTab(1),
               ),
             ),
           ],
@@ -1183,7 +1212,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                         badgeCount: _actionCountForCategory(category),
                         badgeKey:
                             ValueKey('kitchen-type-badge-${category.name}'),
-                        onTap: () => setState(() => _kitchenFilter = category),
+                        onTap: () => _selectKitchenCategory(category),
                       ),
                     ),
                 ],
@@ -1395,7 +1424,11 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     final active = _ordersForCategory(_activeOrders);
     final past = _ordersForCategory(_pastOrders);
     final orders = showingPast ? past : active;
-    final typedEmpty = _visibleKitchenCategories.length > 1;
+    final occupiedTypes = visibleKitchenCategories(
+      orders: [..._activeOrders, ..._pastOrders],
+      campaigns: _preOrderCampaigns,
+    );
+    final typedEmpty = occupiedTypes.length > 1;
     final orderTabs = Container(
       height: 44,
       decoration: BoxDecoration(
@@ -1847,19 +1880,24 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
   }
 
   Future<void> _confirmPayment() async {
-    final result = await showModalBottomSheet<Object?>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => _ReadyBySheet(
-        orderId: widget.order.orderId,
-        allowClear: false,
-        initial: widget.order.expectedReadyAt,
-      ),
-    );
-    if (!mounted || result == null) return;
+    final allowReadyBy = kitchenOrderAllowsReadyBy(widget.order);
+    Object? result = 'skip';
+    if (allowReadyBy) {
+      result = await showModalBottomSheet<Object?>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (ctx) => _ReadyBySheet(
+          orderId: widget.order.orderId,
+          allowClear: false,
+          initial: widget.order.expectedReadyAt,
+        ),
+      );
+      if (!mounted || result == null) return;
+    }
 
     setState(() => _isConfirmingPayment = true);
     try {
@@ -1949,10 +1987,12 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
   Widget build(BuildContext context) {
     final order = widget.order;
     final lifecycle = SellerOrderLifecycle.forStatus(order.status);
+    final allowReadyBy = kitchenOrderAllowsReadyBy(order);
     final payment = SellerPaymentActions.fromOrder(
       status: order.status,
       paymentMethod: order.paymentMethod,
       paymentStatus: order.paymentStatus,
+      allowReadyBy: allowReadyBy,
     );
     final isCash = payment.isCash;
     final cashPaid = order.paymentStatus == 'paid';
@@ -2194,7 +2234,9 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                 label: Text(
                   _isConfirmingPayment
                       ? 'Confirming...'
-                      : 'Confirm Order & Choose Time',
+                      : allowReadyBy
+                          ? 'Confirm Order & Choose Time'
+                          : 'Confirm Order',
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
@@ -2816,9 +2858,12 @@ class _ReadyBySheetState extends State<_ReadyBySheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    // Modal routes often zero MediaQuery.padding; read the view inset so
+    // Skip/Choose time sit above the Android navigation bar.
+    final navBottom = MediaQueryData.fromView(View.of(context)).padding.bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 16 + keyboard + navBottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

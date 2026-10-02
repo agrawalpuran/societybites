@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../web/web_breakpoints.dart';
-import '../widgets/screen_loading_note.dart';
+import '../widgets/content_skeleton.dart';
 
 String _humanizeStatus(String status) {
   if (status.isEmpty) return status;
@@ -214,7 +214,7 @@ class _SellerInsightsPanelState extends State<SellerInsightsPanel> {
           ),
           const SizedBox(height: 14),
           if (_loading)
-            const ScreenLoadingNote(message: 'Loading insights…')
+            const KitchenDashboardSkeleton(padded: false)
           else if (_error != null)
             _ErrorCard(message: _error!, onRetry: _load)
           else

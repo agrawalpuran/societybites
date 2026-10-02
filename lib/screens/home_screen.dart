@@ -1888,7 +1888,7 @@ class _SpecialCard extends StatelessWidget {
                   ),
                   Flexible(
                     child: Text(
-                      ' • ${food.buyerPlaceLabel}',
+                      ' • ${food.homePlaceLabel}',
                       softWrap: true,
                       style: TextStyle(
                         fontSize: 12,
@@ -2189,7 +2189,7 @@ class _AvailableItemTile extends StatelessWidget {
                       ),
                       Flexible(
                         child: Text(
-                          ', ${food.buyerPlaceLabel}',
+                          ', ${food.homePlaceLabel}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(

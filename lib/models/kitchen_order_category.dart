@@ -11,6 +11,12 @@ KitchenOrderCategory kitchenCategoryForOrder(Order order) {
   return KitchenOrderCategory.orders;
 }
 
+/// Ready-by chips are for same-day regular orders. Pre-orders and MTO
+/// already have a fulfilment date / requested time, so sellers skip that sheet.
+bool kitchenOrderAllowsReadyBy(Order order) {
+  return kitchenCategoryForOrder(order) == KitchenOrderCategory.orders;
+}
+
 /// Pass every order the screen can show, Active and Past alike. A tab that is
 /// hidden also hides its orders from Past, so narrowing this to active orders
 /// strands finished ones with no tab to reach them from.

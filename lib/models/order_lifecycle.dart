@@ -102,6 +102,7 @@ class SellerPaymentActions {
     required String status,
     String? paymentMethod,
     required String paymentStatus,
+    bool allowReadyBy = true,
   }) {
     final lifecycle = SellerOrderLifecycle.forStatus(status);
     final cash = (paymentMethod ?? 'upi').toLowerCase() == 'cash';
@@ -114,8 +115,9 @@ class SellerPaymentActions {
       showConfirmOrderAndChooseTime:
           !cash && paymentStatus == 'buyer_marked_paid',
       showMarkReady: lifecycle.showMarkReady && (cash || confirmed),
-      canSetReadyBy: lifecycle.showMarkReady && (cash || confirmed),
-      promptReadyByOnAccept: cash,
+      canSetReadyBy:
+          allowReadyBy && lifecycle.showMarkReady && (cash || confirmed),
+      promptReadyByOnAccept: allowReadyBy && cash,
     );
   }
 }

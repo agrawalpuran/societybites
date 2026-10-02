@@ -158,6 +158,45 @@ void main() {
     expect(cash.showConfirmOrderAndChooseTime, isFalse);
   });
 
+  test('pre-order and MTO skip Ready by after confirm', () {
+    final markedRegular = SellerPaymentActions.fromOrder(
+      status: 'accepted',
+      paymentMethod: 'upi',
+      paymentStatus: 'buyer_marked_paid',
+    );
+    expect(markedRegular.showConfirmOrderAndChooseTime, isTrue);
+    expect(markedRegular.canSetReadyBy, isFalse);
+
+    final markedScheduled = SellerPaymentActions.fromOrder(
+      status: 'accepted',
+      paymentMethod: 'upi',
+      paymentStatus: 'buyer_marked_paid',
+      allowReadyBy: false,
+    );
+    expect(markedScheduled.showConfirmOrderAndChooseTime, isTrue);
+    expect(markedScheduled.canSetReadyBy, isFalse);
+    expect(markedScheduled.promptReadyByOnAccept, isFalse);
+
+    final cashScheduled = SellerPaymentActions.fromOrder(
+      status: 'accepted',
+      paymentMethod: 'cash',
+      paymentStatus: 'pending',
+      allowReadyBy: false,
+    );
+    expect(cashScheduled.promptReadyByOnAccept, isFalse);
+    expect(cashScheduled.canSetReadyBy, isFalse);
+    expect(cashScheduled.showMarkReady, isTrue);
+
+    final confirmedScheduled = SellerPaymentActions.fromOrder(
+      status: 'accepted',
+      paymentMethod: 'upi',
+      paymentStatus: 'seller_confirmed',
+      allowReadyBy: false,
+    );
+    expect(confirmedScheduled.canSetReadyBy, isFalse);
+    expect(confirmedScheduled.showMarkReady, isTrue);
+  });
+
   testWidgets('seller profile can change payment preference', (tester) async {
     SharedPreferences.setMockInitialValues({
       'user_id': 'seller-1',

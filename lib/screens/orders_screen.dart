@@ -776,13 +776,10 @@ class _ActiveOrderCard extends StatelessWidget {
               foods: order.items.map((item) => item.food),
               preOrderFulfilmentAt: order.fulfilmentAt,
             ),
-            const SizedBox(height: 10),
-            if (order.isPreOrder)
-              _PreOrderFulfilmentCard(order: order)
-            else if (order.fulfilmentMethod == null ||
-                order.fulfilmentMethod!.trim().isEmpty)
-              // The buyer-pickup banner already shows the place and seller.
-              _PickupInfoCard(order: order),
+            if (order.isPreOrder) ...[
+              const SizedBox(height: 10),
+              _PreOrderFulfilmentCard(order: order),
+            ],
             const SizedBox(height: 10),
             OrderMessagesButton(
               order: order,
@@ -865,91 +862,6 @@ class _ActiveOrderCard extends StatelessWidget {
               ),
             ],
           ],
-        ],
-      ),
-    );
-  }
-}
-
-String _pickupWhereLabel(Order order, String location) {
-  final parts = <String>[];
-  final society = (order.sellerSocietyName ?? order.food.sellerSocietyName)
-      ?.trim();
-  if (society != null && society.isNotEmpty) parts.add(society);
-  final door = location.trim();
-  if (door.isNotEmpty && door != 'Pickup at seller home') {
-    parts.add(door);
-  } else if (parts.isEmpty) {
-    parts.add(door.isEmpty ? 'Pickup at seller home' : door);
-  }
-  return parts.join(' · ');
-}
-
-class _PickupInfoCard extends StatelessWidget {
-  const _PickupInfoCard({required this.order});
-
-  final Order order;
-
-  @override
-  Widget build(BuildContext context) {
-    final food = order.food;
-    final location = food.locationLabel;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F7F6),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEAEFED)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.place_outlined,
-                size: 16,
-                color: Color(0xFF0E5A47),
-              ),
-              const SizedBox(width: 5),
-              const Text(
-                'Pickup details',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF101617),
-                ),
-              ),
-              const Spacer(),
-              Flexible(
-                child: Text(
-                  order.sellerLabel,
-                  textAlign: TextAlign.right,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF3A4644),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _pickupWhereLabel(order, location),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13,
-              height: 1.35,
-              color: Color(0xFF3A4644),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
         ],
       ),
     );

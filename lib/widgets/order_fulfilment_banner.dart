@@ -14,9 +14,12 @@ class OrderFulfilmentBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final method = order.fulfilmentMethod;
-    if (method == null || method.isEmpty) return const SizedBox.shrink();
+    final method = order.fulfilmentMethod?.trim() ?? '';
     final delivery = method == 'seller_delivery';
+    // Buyer pickup is the default. Cross-society orders snapshot "pickup";
+    // same-society orders often omit the field. Either way the banner is the
+    // single place we list where to collect.
+    if (isSellerView && method.isEmpty) return const SizedBox.shrink();
     final charge = order.deliveryCharge;
     final chargeLabel = charge == charge.roundToDouble()
         ? charge.toInt().toString()

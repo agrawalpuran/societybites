@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -156,21 +158,28 @@ void main() {
     expect(kitchenCategoryForOrder(mto), KitchenOrderCategory.madeToOrder);
     expect(kitchenCategoryForOrder(preorder), KitchenOrderCategory.preorders);
     expect(kitchenCategoryForOrder(mixed), KitchenOrderCategory.orders);
+    expect(kitchenOrderAllowsReadyBy(regular), isTrue);
+    expect(kitchenOrderAllowsReadyBy(mixed), isTrue);
+    expect(kitchenOrderAllowsReadyBy(mto), isFalse);
+    expect(kitchenOrderAllowsReadyBy(preorder), isFalse);
   });
 
-  testWidgets('only regular orders hide the category selector', (tester) async {
+  testWidgets('regular orders land on Regular and hide other type lists', (
+    tester,
+  ) async {
     await _pumpKitchen(
       tester,
       orders: [_orderJson(id: '1', name: 'Dhokla')],
     );
-    expect(find.byKey(const ValueKey('kitchen-type-orders')), findsNothing);
-    expect(find.byKey(const ValueKey('kitchen-type-preorders')), findsNothing);
+    expect(find.byKey(const ValueKey('kitchen-type-orders')), findsOneWidget);
+    expect(find.byKey(const ValueKey('kitchen-type-preorders')), findsOneWidget);
+    expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsOneWidget);
     expect(find.text('Dhokla'), findsWidgets);
     expect(find.text('Accept Order'), findsOneWidget);
     expect(find.text('No pre-order campaigns yet.'), findsNothing);
   });
 
-  testWidgets('only made-to-order orders hide the category selector', (
+  testWidgets('made-to-order orders wait behind the Made to Order tab', (
     tester,
   ) async {
     await _pumpKitchen(
@@ -183,16 +192,50 @@ void main() {
         ),
       ],
     );
-    expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsNothing);
+    expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsOneWidget);
+    expect(find.text('Cake'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('kitchen-type-madeToOrder')));
+    await tester.pump();
     expect(find.text('Cake'), findsWidgets);
     expect(find.text('Accept Order'), findsOneWidget);
   });
 
-  testWidgets('only pre-orders hide the category selector', (tester) async {
-    await _pumpKitchen(tester, campaigns: [_campaignJson()]);
-    expect(find.byKey(const ValueKey('kitchen-type-preorders')), findsNothing);
+  testWidgets('campaigns load only after Pre-orders is opened', (tester) async {
+    var campaignLoads = 0;
+    final campaigns = Completer<List<Map<String, dynamic>>>();
+    SharedPreferences.setMockInitialValues({
+      'user_id': 'seller-1',
+      'user_role': 'seller',
+      'user_name': 'Anita',
+      'society_id': 'soc-1',
+    });
+    await tester.binding.setSurfaceSize(const Size(800, 2200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SellerDashboardScreen(
+          fetchOrders: () async => const [],
+          fetchCampaigns: () {
+            campaignLoads += 1;
+            return campaigns.future;
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(campaignLoads, 0);
+    expect(find.text('Friday Specials'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('kitchen-type-preorders')));
+    await tester.pump();
+    expect(campaignLoads, 1);
+    expect(find.byKey(const Key('kitchen-preorder-skeletons')), findsOneWidget);
+    expect(find.text('Loading'), findsNothing);
+    expect(find.textContaining('No pre-order campaigns yet.'), findsNothing);
+    campaigns.complete([_campaignJson()]);
+    await tester.pump();
+    await tester.pump();
     expect(find.text('Friday Specials'), findsOneWidget);
-    expect(find.text('No active orders yet.'), findsNothing);
   });
 
   testWidgets('regular + closed campaigns shows the Pre-orders tab', (
@@ -210,10 +253,11 @@ void main() {
     );
     expect(find.byKey(const ValueKey('kitchen-type-orders')), findsOneWidget);
     expect(find.byKey(const ValueKey('kitchen-type-preorders')), findsOneWidget);
-    expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsNothing);
+    expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsOneWidget);
     expect(find.text('Dhokla'), findsWidgets);
     expect(find.text('Friday Specials'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('kitchen-type-preorders')));
+    await tester.pump();
     await tester.pump();
     expect(find.text('Friday Specials'), findsOneWidget);
     expect(find.text('Dhokla'), findsNothing);
@@ -229,8 +273,9 @@ void main() {
     );
     expect(find.byKey(const ValueKey('kitchen-type-orders')), findsOneWidget);
     expect(find.byKey(const ValueKey('kitchen-type-preorders')), findsOneWidget);
-    expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsNothing);
+    expect(find.byKey(const ValueKey('kitchen-type-madeToOrder')), findsOneWidget);
     expect(find.text('Dhokla'), findsWidgets);
+    expect(find.text('Box'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('kitchen-type-preorders')));
     await tester.pump();
     expect(find.text('Box'), findsWidgets);
@@ -266,11 +311,11 @@ void main() {
     expect(find.text('Accept Order'), findsOneWidget);
   });
 
-  testWidgets('no orders shows a clean empty state without type tabs', (
+  testWidgets('empty kitchen still shows type tabs and Regular empty copy', (
     tester,
   ) async {
     await _pumpKitchen(tester);
-    expect(find.byKey(const ValueKey('kitchen-type-orders')), findsNothing);
+    expect(find.byKey(const ValueKey('kitchen-type-orders')), findsOneWidget);
     expect(find.textContaining('No active orders yet.'), findsOneWidget);
     expect(find.text('No pre-order campaigns yet.'), findsNothing);
     expect(find.byKey(const Key('my-kitchen-add-listing')), findsOneWidget);
