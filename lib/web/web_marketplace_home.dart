@@ -246,10 +246,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           _listingSections(),
         ] else ...[
           const SizedBox(height: 28),
-          WebSectionHeader(
-            eyebrow: 'Search',
-            title: _searchTitle(),
-          ),
+          WebSectionHeader(eyebrow: 'Search', title: _searchTitle()),
           const SizedBox(height: 14),
           if (widget.allFiltered.isEmpty)
             _emptyCopy(_emptyMessage())
@@ -286,12 +283,11 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
         ),
       if (widget.highlightSellers.isNotEmpty)
         _sellerSection(
-          eyebrow: 'Cooks nearby',
+          eyebrow: 'In your society',
           title: 'Top resident kitchens',
           sellers: widget.highlightSellers,
         ),
-      if (widget.readyNow.isNotEmpty)
-        _readySection(),
+      if (widget.readyNow.isNotEmpty) _readySection(),
       if (widget.madeToOrder.isNotEmpty)
         _foodSection(
           key: _madeKey,
@@ -391,67 +387,57 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
             color: Color(0xFF3E514B),
           ),
         ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (widget.readyNow.isNotEmpty)
-                  _JumpChip(
-                    label: 'Available now',
-                    onTap: () => _reveal(_readyKey),
-                  ),
-                if (widget.madeToOrder.isNotEmpty)
-                  _JumpChip(
-                    label: 'Made to order',
-                    onTap: () => _reveal(_madeKey),
-                  ),
-                if (widget.inSocietyPreorders.isNotEmpty)
-                  _JumpChip(
-                    label: 'Pre-orders',
-                    onTap: () => _reveal(_preorderKey),
-                  ),
-                if (widget.nearbyListings.isNotEmpty ||
-                    widget.nearbySellers.isNotEmpty)
-                  _JumpChip(
-                    label: 'Nearby',
-                    onTap: () => _reveal(_nearbyKey),
-                  ),
-              ],
-            ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (widget.readyNow.isNotEmpty)
+              _JumpChip(
+                label: 'Available now',
+                onTap: () => _reveal(_readyKey),
+              ),
+            if (widget.madeToOrder.isNotEmpty)
+              _JumpChip(label: 'Made to order', onTap: () => _reveal(_madeKey)),
+            if (widget.inSocietyPreorders.isNotEmpty)
+              _JumpChip(
+                label: 'Pre-orders',
+                onTap: () => _reveal(_preorderKey),
+              ),
+            if (widget.nearbyListings.isNotEmpty ||
+                widget.nearbySellers.isNotEmpty)
+              _JumpChip(label: 'Nearby', onTap: () => _reveal(_nearbyKey)),
           ],
-        );
-        final visual = _HeroVisual(foods: widget.heroFoods);
-        return Container(
-          width: double.infinity,
-          padding: EdgeInsets.fromLTRB(
-            desktop ? 36 : 22,
-            desktop ? 32 : 22,
-            desktop ? 28 : 22,
-            desktop ? 28 : 22,
-          ),
-          decoration: BoxDecoration(
-            color: webHeroWash,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: desktop
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(flex: 6, child: copy),
-                    const SizedBox(width: 24),
-                    Expanded(flex: 5, child: visual),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    copy,
-                    const SizedBox(height: 18),
-                    visual,
-                  ],
-                ),
-        );
+        ),
+      ],
+    );
+    final visual = _HeroVisual(foods: widget.heroFoods);
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        desktop ? 36 : 22,
+        desktop ? 32 : 22,
+        desktop ? 28 : 22,
+        desktop ? 28 : 22,
+      ),
+      decoration: BoxDecoration(
+        color: webHeroWash,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: desktop
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(flex: 6, child: copy),
+                const SizedBox(width: 24),
+                Expanded(flex: 5, child: visual),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [copy, const SizedBox(height: 18), visual],
+            ),
+    );
   }
 
   Widget _readySection() {
@@ -487,9 +473,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
     HomeListingReach? reach,
   }) {
     final expanded = reach != null && widget.expandedReach == reach;
-    final preview = webIsDesktopWidth(MediaQuery.sizeOf(context).width)
-        ? 8
-        : 6;
+    final preview = webIsDesktopWidth(MediaQuery.sizeOf(context).width) ? 8 : 6;
     final visible = expanded || items.length <= preview
         ? items
         : items.take(preview).toList();
@@ -530,7 +514,6 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
     required String title,
     required List<Seller> sellers,
   }) {
-    final visible = sellers.take(8).toList();
     return Padding(
       padding: const EdgeInsets.only(top: 32),
       child: Column(
@@ -539,7 +522,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           WebSectionHeader(eyebrow: eyebrow, title: title),
           const SizedBox(height: 14),
           WebSellerGrid(
-            sellers: visible,
+            sellers: sellers,
             detailFor: (seller) =>
                 webSellerDetail(seller, widget.sellerListings),
             onTap: widget.onOpenSeller,
@@ -619,10 +602,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           ),
           const SizedBox(height: 14),
           if (widget.preordersLoading && campaigns.isEmpty)
-            const SizedBox(
-              height: 120,
-              child: _BlockLine(),
-            )
+            const SizedBox(height: 120, child: _BlockLine())
           else
             SizedBox(
               height: 168,
@@ -905,11 +885,7 @@ class _HeroVisual extends StatelessWidget {
           color: const Color(0xFFD7EBDF),
           borderRadius: BorderRadius.circular(18),
         ),
-        child: const Icon(
-          Icons.restaurant_rounded,
-          color: webGreen,
-          size: 42,
-        ),
+        child: const Icon(Icons.restaurant_rounded, color: webGreen, size: 42),
       );
     }
     final primary = foods.first;

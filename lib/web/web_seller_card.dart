@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../models/data.dart';
@@ -38,16 +40,7 @@ class WebSellerCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  SellerAvatar(
-                    radius: 22,
-                    backgroundColor: seller.avatarColor,
-                    photoUrl: seller.profilePhotoUrl,
-                    fallback: Icon(
-                      seller.avatarIcon,
-                      color: webGreen,
-                      size: 20,
-                    ),
-                  ),
+                  _avatar(),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -98,7 +91,7 @@ class WebSellerCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (detail.isNotEmpty) ...[
+              if (seller.hasOrderableItems && detail.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Text(
                   detail,
@@ -113,17 +106,35 @@ class WebSellerCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 10),
-              const Text(
-                'View menu',
+              Text(
+                seller.hasOrderableItems
+                    ? 'View menu'
+                    : sellerNotAvailableLabel,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
-                  color: webGreen,
+                  color: seller.hasOrderableItems ? webGreen : webMuted,
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _avatar() {
+    final avatar = SellerAvatar(
+      radius: 22,
+      backgroundColor: seller.avatarColor,
+      photoUrl: seller.profilePhotoUrl,
+      fallback: Icon(seller.avatarIcon, color: webGreen, size: 20),
+    );
+    if (seller.hasOrderableItems) return avatar;
+    return ClipOval(
+      child: ImageFiltered(
+        imageFilter: ImageFilter.blur(sigmaX: 2.4, sigmaY: 2.4),
+        child: avatar,
       ),
     );
   }
@@ -166,10 +177,7 @@ class WebSellerGrid extends StatelessWidget {
             );
           }
           rows.add(
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: cells,
-            ),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: cells),
           );
           if (i + columns < sellers.length) {
             rows.add(const SizedBox(height: gap));

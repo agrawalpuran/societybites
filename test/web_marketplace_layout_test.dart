@@ -5,6 +5,7 @@ import 'package:societybites/models/data.dart';
 import 'package:societybites/web/web_breakpoints.dart';
 import 'package:societybites/web/web_marketplace_home.dart';
 import 'package:societybites/web/web_marketplace_states.dart';
+import 'package:societybites/web/web_seller_card.dart';
 import 'package:societybites/web/web_shell_header.dart';
 
 void main() {
@@ -18,18 +19,9 @@ void main() {
   });
 
   test('web layout stays off unless the browser is wide enough', () {
-    expect(
-      webMarketplaceLayoutEnabled(isWeb: false, width: 1440),
-      isFalse,
-    );
-    expect(
-      webMarketplaceLayoutEnabled(isWeb: true, width: 767),
-      isFalse,
-    );
-    expect(
-      webMarketplaceLayoutEnabled(isWeb: true, width: 768),
-      isTrue,
-    );
+    expect(webMarketplaceLayoutEnabled(isWeb: false, width: 1440), isFalse);
+    expect(webMarketplaceLayoutEnabled(isWeb: true, width: 767), isFalse);
+    expect(webMarketplaceLayoutEnabled(isWeb: true, width: 768), isTrue);
     expect(webFoodColumnCount(1400), 4);
     expect(webFoodColumnCount(1000), 3);
     expect(webFoodColumnCount(800), 2);
@@ -37,10 +29,10 @@ void main() {
     expect(webSellerColumnCount(800), 2);
   });
 
-  testWidgets('startup frame does not show a plain loading line', (tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(home: WebStartupFrame()),
-    );
+  testWidgets('startup frame does not show a plain loading line', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: WebStartupFrame()));
     expect(find.text('SocietyEats'), findsOneWidget);
     expect(find.textContaining('Loading'), findsNothing);
   });
@@ -49,9 +41,7 @@ void main() {
     await _setWindow(tester, 1440, 1200);
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(
-      MaterialApp(home: _sampleHome()),
-    );
+    await tester.pumpWidget(MaterialApp(home: _sampleHome()));
     await tester.pump();
 
     expect(find.byKey(const Key('web-marketplace-home')), findsOneWidget);
@@ -63,6 +53,8 @@ void main() {
     expect(find.text('Lemon rice'), findsWidgets);
     expect(find.text('Mina'), findsWidgets);
     expect(find.text('Add'), findsWidgets);
+    expect(find.text('IN YOUR SOCIETY'), findsWidgets);
+    expect(find.text('COOKS NEARBY'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -72,9 +64,7 @@ void main() {
     await _setWindow(tester, 900, 1400);
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(
-      MaterialApp(home: _sampleHome()),
-    );
+    await tester.pumpWidget(MaterialApp(home: _sampleHome()));
     await tester.pump();
 
     expect(find.text('Lemon rice'), findsWidgets);
@@ -102,14 +92,50 @@ void main() {
       await tester.pump();
       expect(find.byKey(const Key('web-shell-header')), findsOneWidget);
       expect(find.text('Home'), width >= 1080 ? findsOneWidget : findsNothing);
-      expect(find.text('Explore'), width >= 1080 ? findsOneWidget : findsNothing);
+      expect(
+        find.text('Explore'),
+        width >= 1080 ? findsOneWidget : findsNothing,
+      );
       expect(tester.takeException(), isNull);
     }
     await tester.binding.setSurfaceSize(null);
   });
+
+  testWidgets('kitchen card blurs a cook who is not selling', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: WebSellerCard(
+            seller: const Seller(
+              id: 'sirisha',
+              name: 'Sirisha',
+              block: 'Block C',
+              rating: 4.2,
+              reviewCount: 3,
+              avatarIcon: Icons.person,
+              avatarColor: Color(0xFFE7F2EA),
+              hasOrderableItems: false,
+            ),
+            detail: 'Breakfast · Block C · 9 listings',
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Sirisha'), findsOneWidget);
+    expect(find.text(sellerNotAvailableLabel), findsOneWidget);
+    expect(find.text('View menu'), findsNothing);
+    expect(find.textContaining('9 listings'), findsNothing);
+    expect(find.byType(ImageFiltered), findsOneWidget);
+  });
 }
 
-Future<void> _setWindow(WidgetTester tester, double width, double height) async {
+Future<void> _setWindow(
+  WidgetTester tester,
+  double width,
+  double height,
+) async {
   tester.view.devicePixelRatio = 1;
   await tester.binding.setSurfaceSize(Size(width, height));
 }

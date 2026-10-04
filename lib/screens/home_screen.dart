@@ -742,7 +742,8 @@ class HomeScreenState extends State<HomeScreen> {
       onAdd: _addToCart,
       onRemove: _removeFromCart,
       onOpenFood: _openDetail,
-      onOpenSeller: _openSeller,
+      onOpenSeller: (seller) =>
+          _openSeller(seller, hideUnavailableDishes: !seller.hasOrderableItems),
       onOpenCampaign: _openBuyerPreOrderDetail,
       onSeePreorders: _openBuyerPreOrders,
       onCategorySelected: _selectHomeFilter,
@@ -1320,13 +1321,13 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   List<Seller> get _societySellers =>
-      sellersFromListings(_listingsForReach(HomeListingReach.inSociety));
+      sellersFromListings(_sellerPresenceForReach(HomeListingReach.inSociety));
 
   List<Seller> get _nearbySellers =>
-      sellersFromListings(_listingsForReach(HomeListingReach.nearby));
+      sellersFromListings(_sellerPresenceForReach(HomeListingReach.nearby));
 
   List<Seller> get _extendedSellers =>
-      sellersFromListings(_listingsForReach(HomeListingReach.extended));
+      sellersFromListings(_sellerPresenceForReach(HomeListingReach.extended));
 
   Widget _buildHomeDiscoverySections() {
     return Column(
