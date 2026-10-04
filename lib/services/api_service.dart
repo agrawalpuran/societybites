@@ -432,6 +432,9 @@ class ApiService {
     double? deliveryChargeNearby,
     double? deliveryChargeExtended,
     String? paymentPreference,
+    String? kitchenOpensAt,
+    String? kitchenClosesAt,
+    bool clearKitchenHours = false,
     String? fssaiNumber,
     String? fssaiExpiry,
     String? fssaiRegisteredName,
@@ -458,6 +461,13 @@ class ApiService {
         if (deliveryChargeExtended != null)
           'deliveryChargeExtended': deliveryChargeExtended,
         if (paymentPreference != null) 'paymentPreference': paymentPreference,
+        if (clearKitchenHours) ...{
+          'kitchenOpensAt': null,
+          'kitchenClosesAt': null,
+        } else ...{
+          if (kitchenOpensAt != null) 'kitchenOpensAt': kitchenOpensAt,
+          if (kitchenClosesAt != null) 'kitchenClosesAt': kitchenClosesAt,
+        },
         if (!identical(profilePhotoUrl, _omitProfilePhoto))
           'profilePhotoUrl': profilePhotoUrl,
         if (fssaiNumber != null ||

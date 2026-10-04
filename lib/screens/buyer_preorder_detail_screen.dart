@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/data.dart';
+import '../models/kitchen_hours.dart';
 import '../services/api_service.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/screen_loading_note.dart';
@@ -124,6 +125,10 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
   Future<void> _continue() async {
     final campaign = _campaign;
     if (campaign == null || _totalItems == 0 || !_acceptingOrders) return;
+    if (campaign.isKitchenClosed) {
+      showKitchenClosedMessage(context);
+      return;
+    }
     final selected = {
       for (final product in campaign.products)
         if (_quantity(product) > 0) product: _quantity(product),
@@ -632,7 +637,9 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
             SizedBox(
               height: 50,
               child: ElevatedButton(
-                onPressed: _totalItems > 0 && _acceptingOrders
+                onPressed: _campaign?.isKitchenClosed == true
+                    ? () => showKitchenClosedMessage(context)
+                    : _totalItems > 0 && _acceptingOrders
                     ? _continue
                     : null,
                 style: ElevatedButton.styleFrom(
@@ -642,9 +649,11 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                     borderRadius: BorderRadius.circular(15),
                   ),
                 ),
-                child: const Text(
-                  'Continue Pre-order',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                child: Text(
+                  _campaign?.isKitchenClosed == true
+                      ? kitchenClosedMessage
+                      : 'Continue Pre-order',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
             ),

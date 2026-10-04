@@ -7,7 +7,9 @@ import '../widgets/app_header.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/recurring_availability_hint.dart';
 import '../models/data.dart';
+import '../models/kitchen_hours.dart';
 import '../models/guest_kitchen.dart';
+import '../models/food_type.dart';
 import '../models/listing_categories.dart';
 import '../services/api_service.dart';
 import '../services/cart_controller.dart';
@@ -33,6 +35,7 @@ import '../widgets/carousel_page_dots.dart';
 import '../widgets/home_distance_chip.dart';
 import '../widgets/guest_order_auth.dart';
 import '../widgets/status_banner.dart';
+import '../widgets/listing_rating_mark.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/seller_avatar.dart';
 import '../web/web_breakpoints.dart';
@@ -93,6 +96,7 @@ class HomeScreenState extends State<HomeScreen> {
   HomeListingReach? _expandedReach;
   SellingReach _cityReach = const SellingReach();
   BuyerDistanceChoice? _distanceChoice;
+  HomeListingType _listingType = HomeListingType.all;
   final _reachSectionKeys = <HomeListingReach, GlobalKey>{
     HomeListingReach.inSociety: GlobalKey(),
     HomeListingReach.nearby: GlobalKey(),
@@ -222,6 +226,8 @@ class HomeScreenState extends State<HomeScreen> {
       category: _selectedCategory,
       searchQuery: _searchQuery,
       foodType: _selectedFoodType,
+      listingType: _listingType,
+      buyerSocietyId: _buyerSocietyId,
     );
   }
 
@@ -345,7 +351,8 @@ class HomeScreenState extends State<HomeScreen> {
       _searchQuery.isEmpty &&
       _selectedCategory == null &&
       _selectedFoodType == null &&
-      _distanceChoice == null;
+      _distanceChoice == null &&
+      _listingType == HomeListingType.all;
 
   bool get _shouldPreviewAllItems =>
       !_showAllItems &&
@@ -405,6 +412,10 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _addToCart(FoodItem food) async {
+    if (food.isKitchenClosed) {
+      showKitchenClosedMessage(context);
+      return;
+    }
     if (!food.canAddToCart) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -564,25 +575,79 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Map<String, int> _webCategoryCounts() {
-    final base = applyHomeListingFilters(
-      _listings,
-      searchQuery: _searchQuery,
-      foodType: _selectedFoodType,
+    final base = listingsMatchingBuyerDistance(
+      applyHomeListingFilters(
+        _listings,
+        searchQuery: _searchQuery,
+        foodType: _selectedFoodType,
+        buyerSocietyId: _buyerSocietyId,
+      ),
+      choice: _effectiveDistance,
+      buyerSocietyId: _buyerSocietyId,
+      nearbyRadiusKm: _cityReach.nearbyRadiusKm,
     );
-    final counts = <String, int>{'All': base.length};
-    for (final category in _categories) {
-      if (category == 'All') continue;
-      counts[category] = base
-          .where(
-            (food) => listingMatchesHomeCategory(
-              food.listingCategories,
-              selectedCategory: category,
-              legacyCategory: food.category,
-            ),
-          )
-          .length;
+    final inCategory = _selectedCategory == null
+        ? base
+        : base
+              .where(
+                (food) => listingMatchesHomeCategory(
+                  food.listingCategories,
+                  selectedCategory: _selectedCategory,
+                  legacyCategory: food.category,
+                ),
+              )
+              .toList();
+    final counts = <String, int>{};
+    for (final category in _homeFilterChips) {
+      if (category == 'Made to Order') {
+        counts[category] = inCategory.where((food) => food.isMadeToOrder).length;
+      } else if (category == 'Pre-order') {
+        counts[category] = _preorderResultCount;
+      } else {
+        counts[category] = base
+            .where(
+              (food) => listingMatchesHomeCategory(
+                food.listingCategories,
+                selectedCategory: category,
+                legacyCategory: food.category,
+              ),
+            )
+            .length;
+      }
     }
     return counts;
+  }
+
+  Set<String> get _webActiveFilters => {
+    ?_selectedCategory,
+    if (_listingType == HomeListingType.madeToOrder) 'Made to Order',
+    if (_listingType == HomeListingType.preOrder) 'Pre-order',
+  };
+
+  int get _homeDishCount =>
+      (_listingType == HomeListingType.preOrder
+          ? 0
+          : _distanceFiltered.length) +
+      (_showPreorderSections ? _preorderResultCount : 0);
+
+  void _selectHomeFilter(String? label) {
+    if (label == null) {
+      setState(() => _selectedCategory = null);
+      return;
+    }
+    setState(() {
+      if (label == 'Made to Order') {
+        _listingType = _listingType == HomeListingType.madeToOrder
+            ? HomeListingType.all
+            : HomeListingType.madeToOrder;
+      } else if (label == 'Pre-order') {
+        _listingType = _listingType == HomeListingType.preOrder
+            ? HomeListingType.all
+            : HomeListingType.preOrder;
+      } else {
+        _selectedCategory = _selectedCategory == label ? null : label;
+      }
+    });
   }
 
   List<FoodItem> _webRegularFor(HomeListingReach reach) {
@@ -590,7 +655,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   List<FoodItem> get _webReadyNow {
-    return _filteredListings.where((food) {
+    return _distanceFiltered.where((food) {
       return !food.isMadeToOrder &&
           !food.isPreOrder &&
           !food.isPreOrderCatalog &&
@@ -599,11 +664,11 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   List<FoodItem> get _webMadeToOrder {
-    return _filteredListings.where((food) => food.isMadeToOrder).toList();
+    return _distanceFiltered.where((food) => food.isMadeToOrder).toList();
   }
 
   List<FoodItem> _webUnscopedRegular() {
-    return _filteredListings.where((food) {
+    return _distanceFiltered.where((food) {
       if (food.isMadeToOrder) return false;
       return homeListingReachFor(
             food,
@@ -615,12 +680,12 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   List<FoodItem> _webHeroFoods() {
-    final withImages = _filteredListings.where((food) {
+    final withImages = _distanceFiltered.where((food) {
       final url = food.imageUrl?.trim();
       return url != null && url.isNotEmpty && url != 'null';
     }).take(2).toList();
     if (withImages.isNotEmpty) return withImages;
-    return _filteredListings.take(1).toList();
+    return _distanceFiltered.take(1).toList();
   }
 
   String? _webNearbySubtitle() {
@@ -644,10 +709,10 @@ class HomeScreenState extends State<HomeScreen> {
       searching: _searchQuery.isNotEmpty,
       searchQuery: _searchQuery,
       selectedCategory: _selectedCategory,
-      categories: _categories,
+      categories: _homeFilterChips,
       categoryCounts: _webCategoryCounts(),
       heroFoods: _webHeroFoods(),
-      allFiltered: _filteredListings,
+      allFiltered: _distanceFiltered,
       highlights: _webRegularFor(HomeListingReach.inSociety),
       highlightSellers: _societySellers,
       sellerListings: _listings,
@@ -660,9 +725,9 @@ class HomeScreenState extends State<HomeScreen> {
       extendedSellers: _extendedSellers,
       extendedSubtitle: _webExtendedSubtitle(),
       otherListings: _webUnscopedRegular(),
-      inSocietyPreorders: _campaignsForReach(HomeListingReach.inSociety),
-      nearbyPreorders: _campaignsForReach(HomeListingReach.nearby),
-      extendedPreorders: _campaignsForReach(HomeListingReach.extended),
+      inSocietyPreorders: _webCampaignsFor(HomeListingReach.inSociety),
+      nearbyPreorders: _webCampaignsFor(HomeListingReach.nearby),
+      extendedPreorders: _webCampaignsFor(HomeListingReach.extended),
       preordersLoading: _preOrdersLoading,
       viewerUserId: _viewerUserId,
       expandedReach: _expandedReach,
@@ -673,9 +738,14 @@ class HomeScreenState extends State<HomeScreen> {
       onOpenSeller: _openSeller,
       onOpenCampaign: _openBuyerPreOrderDetail,
       onSeePreorders: _openBuyerPreOrders,
-      onCategorySelected: (category) {
-        setState(() => _selectedCategory = category);
-      },
+      onCategorySelected: _selectHomeFilter,
+      listingType: _listingType,
+      distanceReach: _cityReach,
+      distanceChoice: _distanceChoice,
+      dishCount: _homeDishCount,
+      onDistanceSelected: (choice) => setState(() => _distanceChoice = choice),
+      onListingTypeSelected: (type) => setState(() => _listingType = type),
+      activeFilterLabels: _webActiveFilters,
       onExpandReach: _expandReach,
       onCollapseReach: _collapseReach,
       onRetry: _loadListings,
@@ -769,11 +839,18 @@ class HomeScreenState extends State<HomeScreen> {
                     if (_searchQuery.isEmpty) ...[
                       SliverToBoxAdapter(child: _buildCategoryChips()),
                       SliverToBoxAdapter(child: _buildHomeDiscoverySections()),
+                    ] else if (_listingType == HomeListingType.preOrder) ...[
+                      SliverToBoxAdapter(child: _buildPreorderSearchResults()),
                     ],
-                    SliverToBoxAdapter(child: _buildAvailableHeader()),
-                    _buildAvailableList(),
-                    if (_shouldPreviewAllItems)
-                      SliverToBoxAdapter(child: _buildSeeAllItemsButton()),
+                    if (_listingType == HomeListingType.preOrder) ...[
+                      if (_preorderResultCount == 0)
+                        SliverToBoxAdapter(child: _buildPreorderEmpty()),
+                    ] else ...[
+                      SliverToBoxAdapter(child: _buildAvailableHeader()),
+                      _buildAvailableList(),
+                      if (_shouldPreviewAllItems)
+                        SliverToBoxAdapter(child: _buildSeeAllItemsButton()),
+                    ],
                     SliverToBoxAdapter(
                       child: SizedBox(
                         height: _cart.isEmpty ? 24 : 88,
@@ -791,8 +868,46 @@ class HomeScreenState extends State<HomeScreen> {
     return HomeDistanceChip(
       reach: _cityReach,
       selected: _distanceChoice,
-      itemCount: _distanceFiltered.length,
+      itemCount: _homeDishCount,
+      listingType: _listingType,
+      onListingTypeSelected: (type) => setState(() => _listingType = type),
       onSelected: (choice) => setState(() => _distanceChoice = choice),
+    );
+  }
+
+  bool get _showPreorderSections =>
+      _listingType == HomeListingType.all ||
+      _listingType == HomeListingType.preOrder;
+
+  int get _preorderResultCount => HomeListingReach.values.fold<int>(
+    0,
+    (sum, reach) => sum + _mobileCampaignsForReach(reach).length,
+  );
+
+  Widget _buildPreorderSearchResults() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildPreOrdersSection(),
+        _buildPreOrderReachCarousel(
+          title: 'Pre-orders Nearby',
+          campaigns: _mobileCampaignsForReach(HomeListingReach.nearby),
+        ),
+        _buildPreOrderReachCarousel(
+          title: 'Pre-orders Around You',
+          campaigns: _mobileCampaignsForReach(HomeListingReach.extended),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreorderEmpty() {
+    return StatusBanner(
+      message: _searchQuery.isNotEmpty
+          ? 'No listings match "$_searchQuery".'
+          : _selectedCategory != null
+          ? 'No listings in $_selectedCategory yet.'
+          : 'No listings yet. Be the first to add food from the seller dashboard.',
     );
   }
 
@@ -806,14 +921,27 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   List<PreOrderCampaign> _mobileCampaignsForReach(HomeListingReach reach) {
+    final distanceMatched = campaignsMatchingBuyerDistance(
+      _preOrderCampaigns,
+      choice: _effectiveDistance,
+      buyerSocietyId: _buyerSocietyId,
+      viewerUserId: _viewerUserId,
+      nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+    );
+    final narrow = _listingType == HomeListingType.preOrder ||
+        _selectedFoodType != null ||
+        _searchQuery.isNotEmpty ||
+        (_selectedCategory != null && _selectedCategory != 'All');
+    final visible = narrow
+        ? campaignsMatchingHomeTypeFilters(
+            distanceMatched,
+            foodType: _selectedFoodType,
+            searchQuery: _searchQuery,
+            category: _selectedCategory,
+          )
+        : distanceMatched;
     return campaignsForHomeReach(
-      campaignsMatchingBuyerDistance(
-        _preOrderCampaigns,
-        choice: _effectiveDistance,
-        buyerSocietyId: _buyerSocietyId,
-        viewerUserId: _viewerUserId,
-        nearbyRadiusKm: _cityReach.nearbyRadiusKm,
-      ),
+      visible,
       reach: reach,
       buyerSocietyId: _buyerSocietyId,
       viewerUserId: _viewerUserId,
@@ -834,14 +962,9 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  List<PreOrderCampaign> _campaignsForReach(HomeListingReach reach) {
-    return campaignsForHomeReach(
-      _preOrderCampaigns,
-      reach: reach,
-      buyerSocietyId: _buyerSocietyId,
-      viewerUserId: _viewerUserId,
-      nearbyRadiusKm: _cityReach.nearbyRadiusKm,
-    );
+  List<PreOrderCampaign> _webCampaignsFor(HomeListingReach reach) {
+    if (!_showPreorderSections) return const [];
+    return _mobileCampaignsForReach(reach);
   }
 
   Widget _buildPreOrderReachCarousel({
@@ -1051,7 +1174,7 @@ class HomeScreenState extends State<HomeScreen> {
                       key: const Key('home-search-field'),
                       controller: _searchController,
                       decoration: const InputDecoration(
-                        hintText: 'Search meals…',
+                        hintText: 'Search dishes, kitchens...',
                         hintStyle: TextStyle(
                           color: Color(0xFFADB5B2),
                           fontSize: 13,
@@ -1092,10 +1215,12 @@ class HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          FoodTypeFilterChips(
-            selectedFoodType: _selectedFoodType,
-            onChanged: (value) {
-              setState(() => _selectedFoodType = value);
+          VegFilterToggle(
+            selected: _selectedFoodType == foodTypeVeg,
+            onChanged: (vegOnly) {
+              setState(() {
+                _selectedFoodType = vegOnly ? foodTypeVeg : null;
+              });
             },
           ),
         ],
@@ -1103,18 +1228,14 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  static const _categories = [
-    'All',
+  static const _homeFilterChips = [
     'Breakfast',
     'Lunch',
     'Dinner',
+    'Made to Order',
+    'Pre-order',
     'Snacks',
     'Desserts',
-    'Beverages',
-    'Healthy',
-    'Jain',
-    'Kids',
-    'Homemade Specials',
   ];
 
   Widget _buildCategoryChips() {
@@ -1125,19 +1246,20 @@ class HomeScreenState extends State<HomeScreen> {
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          itemCount: _categories.length,
+          itemCount: _homeFilterChips.length,
           separatorBuilder: (_, _) => const SizedBox(width: 8),
           itemBuilder: (_, i) {
-            final cat = _categories[i];
-            final isSelected =
-                (_selectedCategory == null && cat == 'All') ||
-                _selectedCategory == cat;
+            final cat = _homeFilterChips[i];
+            final isOrderType = cat == 'Made to Order' || cat == 'Pre-order';
+            final isSelected = isOrderType
+                ? _listingType ==
+                    (cat == 'Made to Order'
+                        ? HomeListingType.madeToOrder
+                        : HomeListingType.preOrder)
+                : _selectedCategory == cat;
             return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedCategory = cat == 'All' ? null : cat;
-                });
-              },
+              key: Key('home-filter-chip-$cat'),
+              onTap: () => _selectHomeFilter(cat),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
@@ -1191,7 +1313,7 @@ class HomeScreenState extends State<HomeScreen> {
           ),
         ),
         _buildSpecialsSection(),
-        _buildPreOrdersSection(),
+        if (_showPreorderSections) _buildPreOrdersSection(),
         _buildSellerReachCarousel(
           key: const Key('home-sellers-nearby'),
           title: 'Nearby Societies',
@@ -1206,10 +1328,11 @@ class HomeScreenState extends State<HomeScreen> {
           reach: HomeListingReach.nearby,
           listings: _mobileListingsForReach(HomeListingReach.nearby),
         ),
-        _buildPreOrderReachCarousel(
-          title: 'Pre-orders Nearby',
-          campaigns: _mobileCampaignsForReach(HomeListingReach.nearby),
-        ),
+        if (_showPreorderSections)
+          _buildPreOrderReachCarousel(
+            title: 'Pre-orders Nearby',
+            campaigns: _mobileCampaignsForReach(HomeListingReach.nearby),
+          ),
         _buildSellerReachCarousel(
           key: const Key('home-sellers-extended'),
           title: 'More Around You',
@@ -1224,10 +1347,11 @@ class HomeScreenState extends State<HomeScreen> {
           reach: HomeListingReach.extended,
           listings: _mobileListingsForReach(HomeListingReach.extended),
         ),
-        _buildPreOrderReachCarousel(
-          title: 'Pre-orders Around You',
-          campaigns: _mobileCampaignsForReach(HomeListingReach.extended),
-        ),
+        if (_showPreorderSections)
+          _buildPreOrderReachCarousel(
+            title: 'Pre-orders Around You',
+            campaigns: _mobileCampaignsForReach(HomeListingReach.extended),
+          ),
       ],
     );
   }
@@ -1796,32 +1920,7 @@ class _SpecialCard extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(isDark ? 50 : 220),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.star_rounded,
-                          size: 14,
-                          color: isDark ? Colors.amber : Colors.amber.shade700,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          food.rating > 0 ? food.rating.toString() : 'New',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.white : const Color(0xFF3A4644),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  ListingRatingMark(food: food),
                   ListingTypeBadge(food: food, compact: true),
                 ],
               ),
@@ -2199,20 +2298,7 @@ class _AvailableItemTile extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Icon(
-                        Icons.star_rounded,
-                        size: 14,
-                        color: Colors.amber,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        food.rating > 0 ? food.rating.toString() : 'New',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF3A4644),
-                        ),
-                      ),
+                      Flexible(child: ListingRatingMark(food: food)),
                     ],
                   ),
                   const SizedBox(height: 8),

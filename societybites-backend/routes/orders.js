@@ -38,6 +38,7 @@ const {
   DELIVERY_REACH,
 } = require("../lib/crossSocietyOrder");
 const { offersSellerDelivery } = require("../lib/sellerFulfilment");
+const { assertSellerKitchenOpen } = require("../lib/kitchenHours");
 const {
   assertPaymentMethodAllowed,
   upiBlocksPreparation,
@@ -493,6 +494,7 @@ router.post(
     }
 
     const preparedItems = [];
+    const kitchenChecked = new Set();
 
     for (const item of items) {
       if (!item.listingId) {
@@ -513,6 +515,18 @@ router.post(
         return res.status(400).json({
           error: "You cannot order your own listing",
         });
+      }
+
+      if (!kitchenChecked.has(listing.sellerId)) {
+        try {
+          await assertSellerKitchenOpen(prisma, listing.sellerId);
+        } catch (err) {
+          return res.status(err.statusCode || 400).json({
+            error: err.message,
+            code: err.code,
+          });
+        }
+        kitchenChecked.add(listing.sellerId);
       }
 
       let listingAccess;

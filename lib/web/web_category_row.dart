@@ -9,12 +9,17 @@ class WebCategoryRow extends StatelessWidget {
     required this.selectedCategory,
     required this.counts,
     required this.onSelected,
+    this.activeLabels,
   });
 
   final List<String> categories;
   final String? selectedCategory;
   final Map<String, int> counts;
   final ValueChanged<String?> onSelected;
+
+  /// When set, these labels are the highlighted filters.
+  /// Food categories and order-type chips can both be active.
+  final Set<String>? activeLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -27,8 +32,10 @@ class WebCategoryRow extends StatelessWidget {
         itemBuilder: (context, index) {
           final label = categories[index];
           final value = label == 'All' ? null : label;
-          final selected = selectedCategory == value ||
-              (selectedCategory == null && label == 'All');
+          final selected = activeLabels != null
+              ? activeLabels!.contains(label)
+              : selectedCategory == value ||
+                  (selectedCategory == null && label == 'All');
           final count = counts[label];
           return _CategoryCard(
             label: label,
@@ -51,6 +58,10 @@ IconData _iconFor(String label) {
       return Icons.lunch_dining_outlined;
     case 'Dinner':
       return Icons.dinner_dining_outlined;
+    case 'Made to Order':
+      return Icons.soup_kitchen_outlined;
+    case 'Pre-order':
+      return Icons.event_available_outlined;
     case 'Snacks':
       return Icons.cookie_outlined;
     case 'Desserts':

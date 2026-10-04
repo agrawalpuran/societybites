@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../models/kitchen_hours.dart';
 import '../models/legal_documents.dart';
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
@@ -19,6 +20,7 @@ import '../services/push_notification_service.dart';
 import '../web/web_breakpoints.dart';
 import '../widgets/app_header.dart';
 import '../widgets/confirm_upi_id_dialog.dart';
+import '../widgets/kitchen_hours_sheet.dart';
 import '../widgets/photo_source_sheet.dart';
 import '../widgets/profile_menu_tile.dart';
 import '../widgets/seller_avatar.dart';
@@ -115,6 +117,8 @@ class ProfileScreenState extends State<ProfileScreen> {
   SellingReachLevel _sellingReachLevel = SellingReachLevel.mySociety;
   SellingReach _sellingReach = const SellingReach();
   SellerFulfilment _fulfilment = const SellerFulfilment();
+  String? _kitchenOpensAt;
+  String? _kitchenClosesAt;
   SellerPaymentPreference _paymentPreference = defaultSellerPaymentPreference;
   String? _fssaiNumber;
   String? _profilePhotoUrl;
@@ -176,6 +180,12 @@ class ProfileScreenState extends State<ProfileScreen> {
         _sellingReachLevel = parseSellingReachLevel(profile['sellingReachLevel']);
         _sellingReach = SellingReach.fromAuthMe(profile);
         _fulfilment = SellerFulfilment.fromAuthMe(profile);
+        if (profile.containsKey('kitchenOpensAt')) {
+          _kitchenOpensAt = profile['kitchenOpensAt'] as String?;
+        }
+        if (profile.containsKey('kitchenClosesAt')) {
+          _kitchenClosesAt = profile['kitchenClosesAt'] as String?;
+        }
         _paymentPreference = paymentPreferenceFromAuthMe(profile);
         _applyFssaiFromProfile(profile);
         _profilePhotoUrl = profile['profilePhotoUrl'] as String? ?? _profilePhotoUrl;
@@ -382,11 +392,16 @@ class ProfileScreenState extends State<ProfileScreen> {
                   _sellingReach.subtitleFor(_sellingReachLevel),
               fulfilmentTitle: _fulfilment.mode.title,
               fulfilmentSubtitle: _fulfilment.subtitle,
+              kitchenHoursSubtitle: kitchenHoursSubtitle(
+                _kitchenOpensAt,
+                _kitchenClosesAt,
+              ),
               fssaiSubtitle: _fssaiSubtitle,
               onEditUpi: () => _editUpi(),
               onChangePaymentPreference: _changePaymentPreference,
               onChangeSellingReach: _changeSellingReach,
               onChangeFulfilment: _changeFulfilment,
+              onChangeKitchenHours: _changeKitchenHours,
               onEditFssai: _editFssai,
               onSaveAndEnable: holdingSetup ? _saveAndEnableSelling : null,
             );
@@ -1460,6 +1475,76 @@ class ProfileScreenState extends State<ProfileScreen> {
       _refreshSellerSettings();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update fulfilment: $e')),
+      );
+    }
+  }
+
+  Future<void> _changeKitchenHours() async {
+    if (!_isSeller) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Save and enable selling before setting kitchen hours'),
+        ),
+      );
+      return;
+    }
+    final saved = await showModalBottomSheet<KitchenHoursDraft>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: KitchenHoursSheet(
+          opensAt: _kitchenOpensAt,
+          closesAt: _kitchenClosesAt,
+        ),
+      ),
+    );
+    if (saved == null || !mounted) return;
+
+    final previousOpen = _kitchenOpensAt;
+    final previousClose = _kitchenClosesAt;
+    setState(() {
+      if (saved.clear) {
+        _kitchenOpensAt = null;
+        _kitchenClosesAt = null;
+      } else {
+        _kitchenOpensAt = saved.opensAt;
+        _kitchenClosesAt = saved.closesAt;
+      }
+    });
+    _refreshSellerSettings();
+
+    try {
+      final updated = await ApiService.updateMyProfile(
+        kitchenOpensAt: saved.opensAt,
+        kitchenClosesAt: saved.closesAt,
+        clearKitchenHours: saved.clear,
+      );
+      if (!mounted) return;
+      setState(() {
+        _kitchenOpensAt = updated['kitchenOpensAt'] as String?;
+        _kitchenClosesAt = updated['kitchenClosesAt'] as String?;
+      });
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(saved.clear ? 'Kitchen is always open' : 'Kitchen hours updated'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _kitchenOpensAt = previousOpen;
+        _kitchenClosesAt = previousClose;
+      });
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update kitchen hours: $e')),
       );
     }
   }

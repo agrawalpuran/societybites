@@ -15,11 +15,13 @@ class SellerSettingsScreen extends StatelessWidget {
     required this.sellingReachSubtitle,
     required this.fulfilmentTitle,
     required this.fulfilmentSubtitle,
+    required this.kitchenHoursSubtitle,
     required this.fssaiSubtitle,
     required this.onEditUpi,
     required this.onChangePaymentPreference,
     required this.onChangeSellingReach,
     required this.onChangeFulfilment,
+    required this.onChangeKitchenHours,
     required this.onEditFssai,
     this.onSaveAndEnable,
     this.isFirstTimeSetup = false,
@@ -30,11 +32,13 @@ class SellerSettingsScreen extends StatelessWidget {
   final String sellingReachSubtitle;
   final String fulfilmentTitle;
   final String fulfilmentSubtitle;
+  final String kitchenHoursSubtitle;
   final String fssaiSubtitle;
   final VoidCallback onEditUpi;
   final VoidCallback onChangePaymentPreference;
   final VoidCallback onChangeSellingReach;
   final VoidCallback onChangeFulfilment;
+  final VoidCallback onChangeKitchenHours;
   final VoidCallback onEditFssai;
   final VoidCallback? onSaveAndEnable;
   final bool isFirstTimeSetup;
@@ -68,7 +72,7 @@ class SellerSettingsScreen extends StatelessWidget {
                   Text(
                     isFirstTimeSetup
                         ? 'Fill in payment methods, UPI, selling reach, fulfilment, and FSSAI so you can start listing.'
-                        : 'Manage payments, fulfilment & FSSAI',
+                        : 'Manage payments, kitchen hours, fulfilment & FSSAI',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -116,6 +120,13 @@ class SellerSettingsScreen extends StatelessWidget {
                     subtitle: fulfilmentSubtitle,
                     trailingLabel: 'Change',
                     onTap: onChangeFulfilment,
+                  ),
+                  ProfileMenuTile(
+                    icon: Icons.schedule_rounded,
+                    title: 'Kitchen hours',
+                    subtitle: kitchenHoursSubtitle,
+                    trailingLabel: 'Change',
+                    onTap: onChangeKitchenHours,
                   ),
                   const SizedBox(height: 10),
                   const _SectionLabel('FOOD & COMPLIANCE'),

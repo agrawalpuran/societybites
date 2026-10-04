@@ -74,6 +74,8 @@ function serializeGuestListing(listing, seller) {
     })(),
     sellerId: listing.sellerId,
     sellerName: (seller && seller.name) || "Neighbor",
+    kitchenOpensAt: (seller && seller.kitchenOpensAt) || null,
+    kitchenClosesAt: (seller && seller.kitchenClosesAt) || null,
     sellerProfilePhotoUrl: (seller && seller.profilePhotoUrl) || null,
     avgRating: Math.round(avgRating * 10) / 10,
     reviewCount,

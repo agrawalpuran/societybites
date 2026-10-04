@@ -92,6 +92,8 @@ function serializeListing(listing) {
     sellerUpiId: seller.upiId || null,
     sellerUpiDisplayName: seller.upiDisplayName || null,
     sellerPaymentPreference: serializePaymentPreference(seller),
+    kitchenOpensAt: seller.kitchenOpensAt || null,
+    kitchenClosesAt: seller.kitchenClosesAt || null,
     fulfilment,
     fulfilmentMode: fulfilment.mode,
     deliveryCharge: fulfilment.deliveryCharge,

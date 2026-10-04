@@ -4,6 +4,7 @@ const LISTING_FOOD_CATEGORIES = Object.freeze([
   "Dinner",
   "Snacks",
   "Desserts",
+  "Beverages",
 ]);
 
 const CATEGORY_BY_KEY = Object.freeze(
@@ -76,7 +77,7 @@ function parseListingCategories(input, { required = false } = {}) {
     const mapped = normalizeListingCategory(item);
     if (!mapped) {
       throw _badRequest(
-        "categories must be Breakfast, Lunch, Dinner, Snacks, or Desserts"
+        `categories must be ${LISTING_FOOD_CATEGORIES.join(", ")}`
       );
     }
     if (!unique.includes(mapped)) unique.push(mapped);

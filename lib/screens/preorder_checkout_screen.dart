@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/data.dart';
+import '../models/kitchen_hours.dart';
 import '../models/seller_payment_preference.dart';
 import '../services/api_service.dart';
 import '../services/cart_controller.dart';
@@ -93,6 +94,10 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
 
   Future<void> _placeOrder() async {
     if (_submitting) return;
+    if (widget.campaign.isKitchenClosed) {
+      showKitchenClosedMessage(context);
+      return;
+    }
     setState(() => _submitting = true);
     try {
       final societyId = await SessionService.getSocietyId();
@@ -145,6 +150,7 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
   String _buyerOrderError(Object error) {
     final message = cleanApiError(error);
     final lower = error.toString().toLowerCase();
+    if (lower.contains('kitchen closed')) return kitchenClosedMessage;
     if (lower.contains('cutoff') ||
         lower.contains('closed') ||
         lower.contains('not open')) {

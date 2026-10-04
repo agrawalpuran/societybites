@@ -29,6 +29,9 @@ model User {
   deliveryChargeExtended  Float @default(0)
   /// UPI_ONLY | UPI_AND_COD | COD_IN_SOCIETY_UPI_OUTSIDE. Controls NEW checkout options only; orders snapshot paymentMethod.
   paymentPreference String   @default("COD_IN_SOCIETY_UPI_OUTSIDE")
+  /// Daily kitchen window in IST, "HH:mm". Both null means always open.
+  kitchenOpensAt      String?
+  kitchenClosesAt     String?
   /// Capture-only FSSAI licence. No approval or enforcement.
   fssaiNumber         String?
   fssaiExpiry         DateTime?

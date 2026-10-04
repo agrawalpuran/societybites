@@ -439,7 +439,8 @@ void main() {
       ),
     );
     expect(find.text('🛵 SELLER DELIVERY'), findsOneWidget);
-    expect(find.text('Seller will deliver your order.'), findsOneWidget);
+    expect(find.text('Seller Society: Prestige Shantiniketan'), findsOneWidget);
+    expect(find.text('Seller will deliver your order.'), findsNothing);
     expect(find.text('Delivery charge: ₹30'), findsNothing);
   });
 

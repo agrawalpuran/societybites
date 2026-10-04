@@ -83,6 +83,59 @@ class _FoodTypeChoice extends StatelessWidget {
   }
 }
 
+/// Compact Home veg switch. Off keeps every food type. On keeps veg only.
+class VegFilterToggle extends StatelessWidget {
+  const VegFilterToggle({
+    super.key,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final bool selected;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = selected ? Colors.white : const Color(0xFF14804A);
+    return Material(
+      color: selected ? const Color(0xFF0E5A47) : const Color(0xFFF5F7F6),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: selected ? const Color(0xFF0E5A47) : const Color(0xFFE6EBE9),
+        ),
+      ),
+      child: InkWell(
+        key: const Key('home-veg-toggle'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => onChanged(!selected),
+        child: SizedBox(
+          height: 40,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _FoodMark(color: foreground),
+                const SizedBox(width: 4),
+                Text(
+                  'Veg',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1,
+                    fontWeight: FontWeight.w700,
+                    color: foreground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class FoodTypeFilterChips extends StatelessWidget {
   const FoodTypeFilterChips({
     super.key,

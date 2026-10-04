@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../models/selling_reach.dart';
 import '../screens/home_listing_filter.dart';
 
-/// Compact Home distance pill. Opens a sheet; does not fetch.
+/// Compact Home distance pill. Opens a small menu; does not fetch.
 class HomeDistanceChip extends StatelessWidget {
   const HomeDistanceChip({
     super.key,
@@ -11,25 +11,27 @@ class HomeDistanceChip extends StatelessWidget {
     required this.selected,
     required this.itemCount,
     required this.onSelected,
+    this.listingType = HomeListingType.all,
+    this.onListingTypeSelected,
+    this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 0),
   });
 
   final SellingReach reach;
   final BuyerDistanceChoice? selected;
   final int itemCount;
   final ValueChanged<BuyerDistanceChoice> onSelected;
+  final HomeListingType listingType;
+  final ValueChanged<HomeListingType>? onListingTypeSelected;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     final choice = effectiveBuyerDistance(selected, reach);
-    final label = buyerDistanceLabel(choice, reach);
-    final countLabel = itemCount == 1
-        ? (choice.societyOnly ? '1 item' : '1 item nearby')
-        : (choice.societyOnly
-              ? '$itemCount items'
-              : '$itemCount items nearby');
+    final label = homeDistanceMenuLabel(choice, reach);
+    final countLabel = homeDishCountLabel(itemCount, choice, reach);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      padding: padding,
       child: Row(
         children: [
           Material(
@@ -41,18 +43,16 @@ class HomeDistanceChip extends StatelessWidget {
             child: InkWell(
               key: const Key('home-distance-chip'),
               borderRadius: BorderRadius.circular(20),
-              onTap: () => _openSheet(context, choice),
+              onTap: () => _openMenu(context, choice),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      choice.isExtended
-                          ? Icons.apartment_outlined
-                          : Icons.place_outlined,
+                    const Icon(
+                      Icons.place_outlined,
                       size: 14,
-                      color: const Color(0xFF0E5A47),
+                      color: Color(0xFF0E5A47),
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -74,6 +74,13 @@ class HomeDistanceChip extends StatelessWidget {
               ),
             ),
           ),
+          if (onListingTypeSelected != null) ...[
+            const SizedBox(width: 8),
+            _HomeTypeChip(
+              listingType: listingType,
+              onSelected: onListingTypeSelected!,
+            ),
+          ],
           const SizedBox(width: 10),
           Flexible(
             child: Text(
@@ -92,11 +99,11 @@ class HomeDistanceChip extends StatelessWidget {
     );
   }
 
-  Future<void> _openSheet(
+  Future<void> _openMenu(
     BuildContext context,
     BuyerDistanceChoice current,
   ) async {
-    final picked = await showHomeDistanceSheet(
+    final picked = await showHomeDistanceMenu(
       context,
       reach: reach,
       current: current,
@@ -105,168 +112,184 @@ class HomeDistanceChip extends StatelessWidget {
   }
 }
 
+Future<BuyerDistanceChoice?> showHomeDistanceMenu(
+  BuildContext context, {
+  required SellingReach reach,
+  required BuyerDistanceChoice current,
+}) {
+  final choices = homeDistanceMenuChoices(reach);
+  return _showAnchoredMenu<BuyerDistanceChoice>(
+    context,
+    options: [
+      for (final choice in choices)
+        _AnchoredMenuOption(
+          value: choice,
+          label: homeDistanceMenuLabel(choice, reach),
+          selected: choice == current,
+          key: Key('home-distance-option-${choice.optionKey}'),
+        ),
+    ],
+  );
+}
+
 Future<BuyerDistanceChoice?> showHomeDistanceSheet(
   BuildContext context, {
   required SellingReach reach,
   required BuyerDistanceChoice current,
 }) {
-  return showModalBottomSheet<BuyerDistanceChoice>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.white,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (context) => _DistanceSheet(reach: reach, current: current),
+  return showHomeDistanceMenu(
+    context,
+    reach: reach,
+    current: current,
   );
 }
 
-class _DistanceSheet extends StatefulWidget {
-  const _DistanceSheet({required this.reach, required this.current});
-
-  final SellingReach reach;
-  final BuyerDistanceChoice current;
-
-  @override
-  State<_DistanceSheet> createState() => _DistanceSheetState();
+Future<HomeListingType?> showHomeListingTypeMenu(
+  BuildContext context, {
+  required HomeListingType current,
+}) {
+  return _showAnchoredMenu<HomeListingType>(
+    context,
+    options: [
+      for (final type in HomeListingType.values)
+        _AnchoredMenuOption(
+          value: type,
+          label: homeListingTypeLabel(type),
+          selected: type == current,
+          key: Key('home-listing-type-${type.name}'),
+        ),
+    ],
+  );
 }
 
-class _DistanceSheetState extends State<_DistanceSheet> {
-  late BuyerDistanceChoice _pending = widget.current;
+class _AnchoredMenuOption<T> {
+  const _AnchoredMenuOption({
+    required this.value,
+    required this.label,
+    required this.selected,
+    required this.key,
+  });
+
+  final T value;
+  final String label;
+  final bool selected;
+  final Key key;
+}
+
+Future<T?> _showAnchoredMenu<T>(
+  BuildContext context, {
+  required List<_AnchoredMenuOption<T>> options,
+}) {
+  final box = context.findRenderObject() as RenderBox;
+  final overlay = Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
+  final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
+  final below = Rect.fromLTWH(
+    origin.dx,
+    origin.dy + box.size.height + 4,
+    box.size.width,
+    1,
+  );
+  final position = RelativeRect.fromRect(below, Offset.zero & overlay.size);
+  return showMenu<T>(
+    context: context,
+    position: position,
+    elevation: 8,
+    color: Colors.white,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    constraints: const BoxConstraints(minWidth: 176, maxWidth: 230),
+    items: [
+      for (final option in options)
+        PopupMenuItem<T>(
+          key: option.key,
+          value: option.value,
+          height: 42,
+          child: Row(
+            children: [
+              Icon(
+                Icons.check_rounded,
+                size: 18,
+                color: option.selected
+                    ? const Color(0xFF0E5A47)
+                    : Colors.transparent,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  option.label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: option.selected ? FontWeight.w700 : FontWeight.w500,
+                    color: const Color(0xFF101617),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+    ],
+  );
+}
+
+class _HomeTypeChip extends StatelessWidget {
+  const _HomeTypeChip({
+    required this.listingType,
+    required this.onSelected,
+  });
+
+  final HomeListingType listingType;
+  final ValueChanged<HomeListingType> onSelected;
+
+  bool get _active => listingType != HomeListingType.all;
 
   @override
   Widget build(BuildContext context) {
-    final choices = buyerDistanceChoices(widget.reach);
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0E5E3),
-                  borderRadius: BorderRadius.circular(4),
+    final background = _active
+        ? const Color(0xFF0E5A47)
+        : const Color(0xFFF3F7F5);
+    final foreground = _active ? Colors.white : const Color(0xFF0E5A47);
+    return Material(
+      color: background,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: _active ? const Color(0xFF0E5A47) : const Color(0xFFD4E8DF),
+        ),
+      ),
+      child: InkWell(
+        key: const Key('home-listing-type-chip'),
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => _openMenu(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                homeListingTypeLabel(listingType),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: foreground,
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'How far do you want to explore?',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF101617),
+              const SizedBox(width: 2),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 16,
+                color: foreground,
               ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Show me food from my society and nearby communities',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF6A7774),
-              ),
-            ),
-            const SizedBox(height: 14),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.sizeOf(context).height * 0.5,
-              ),
-              child: ListView(
-                shrinkWrap: true,
-                children: [for (final choice in choices) _option(choice)],
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                key: const Key('home-distance-apply'),
-                onPressed: () => Navigator.pop(context, _pending),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0E5A47),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: const Text(
-                  'Apply',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _option(BuyerDistanceChoice choice) {
-    final selected = _pending == choice;
-    final subtitle = buyerDistanceSubtitle(choice, widget.reach);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: selected ? const Color(0xFFF3F7F5) : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(
-            color: selected
-                ? const Color(0xFF0E5A47)
-                : const Color(0xFFE6EBE9),
-          ),
-        ),
-        child: InkWell(
-          key: Key('home-distance-option-${choice.optionKey}'),
-          borderRadius: BorderRadius.circular(14),
-          onTap: () => setState(() => _pending = choice),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        buyerDistanceLabel(choice, widget.reach),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF101617),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF6A7774),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (selected)
-                  const Icon(
-                    Icons.check_rounded,
-                    color: Color(0xFF0E5A47),
-                    size: 18,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
+  Future<void> _openMenu(BuildContext context) async {
+    final picked = await showHomeListingTypeMenu(
+      context,
+      current: listingType,
     );
+    if (picked != null) onSelected(picked);
   }
 }

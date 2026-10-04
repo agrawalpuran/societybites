@@ -719,7 +719,7 @@ class _FooterLinks extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const Text(
-            '© 2024 SOCIETYBITES. ALL RIGHTS RESERVED.',
+            '© 2026 SOCIETYEATS. ALL RIGHTS RESERVED.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFFA4AEAB),

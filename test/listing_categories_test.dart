@@ -67,7 +67,7 @@ void main() {
     expect(selected.contains('Breakfast'), isTrue);
   });
 
-  test('selecting all five individually checks All Categories', () {
+  test('selecting every category individually checks All Categories', () {
     var selected = <String>{};
     for (final category in listingFoodCategories) {
       selected = toggleListingCategory(

@@ -1,0 +1,9 @@
+{
+  "framework": null,
+  "installCommand": "echo Flutter dependencies are installed during the web build",
+  "buildCommand": "bash scripts/vercel_build.sh",
+  "outputDirectory": "build/web",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

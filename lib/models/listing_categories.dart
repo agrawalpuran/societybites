@@ -4,6 +4,7 @@ const listingFoodCategories = [
   'Dinner',
   'Snacks',
   'Desserts',
+  'Beverages',
 ];
 
 const allListingCategoriesLabel = 'All Categories';

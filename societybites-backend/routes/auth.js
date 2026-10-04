@@ -20,6 +20,7 @@ const {
   assertSellerPaymentPreferenceUpdate,
 } = require("../lib/sellerPaymentPreference");
 const { assertSellerFssaiUpdate } = require("../lib/fssai");
+const { assertKitchenHoursUpdate } = require("../lib/kitchenHours");
 const { acceptSellerTermsAndEnable } = require("../lib/sellerTerms");
 const { deleteAuthenticatedAccount } = require("../lib/accountDeletion");
 const { uploadPublicImage } = require("../lib/objectStorage");
@@ -337,6 +338,8 @@ router.patch(
       deliveryChargeNearby,
       deliveryChargeExtended,
       paymentPreference,
+      kitchenOpensAt,
+      kitchenClosesAt,
     } = req.body;
     const fssaiBody = req.body && req.body.fssai;
 
@@ -434,6 +437,17 @@ router.patch(
         requested: paymentPreference,
         role: nextRole,
       });
+    }
+    if (kitchenOpensAt !== undefined || kitchenClosesAt !== undefined) {
+      const nextRole = data.role || req.user.role;
+      Object.assign(
+        data,
+        assertKitchenHoursUpdate({
+          opensAt: kitchenOpensAt,
+          closesAt: kitchenClosesAt,
+          role: nextRole,
+        })
+      );
     }
     if (
       fssaiBody !== undefined ||

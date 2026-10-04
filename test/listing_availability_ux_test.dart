@@ -53,7 +53,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('expired listings are discoverable in client filters but not orderable', () {
+  test('expired listings stay unorderable and leave the home feed', () {
     final expired = FoodItem.fromJson(_listingJson(
       name: 'Chicken Biryani',
       status: 'expired',
@@ -82,8 +82,7 @@ void main() {
       [expired, vegActive],
       foodType: foodTypeNonVeg,
     );
-    expect(nonVeg.single.name, 'Chicken Biryani');
-    expect(nonVeg.single.isExpired, isTrue);
+    expect(nonVeg, isEmpty);
   });
 
   test('available listings appear before unavailable listings', () {
@@ -95,10 +94,21 @@ void main() {
     );
     final active = FoodItem.fromJson(_listingJson(name: 'Dal'));
 
-    final ordered = applyHomeListingFilters([expired, soldOut, active]);
+    final paused = FoodItem.fromJson(
+      _listingJson(name: 'Paused', status: 'paused'),
+    );
+    final statusSoldOut = FoodItem.fromJson(
+      _listingJson(name: 'Gone', status: 'sold_out'),
+    );
+    final ordered = applyHomeListingFilters([
+      expired,
+      soldOut,
+      paused,
+      statusSoldOut,
+      active,
+    ]);
     expect(ordered.map((item) => item.name), [
       'Dal',
-      'Chicken Biryani',
       'Sold Dosa',
     ]);
   });
@@ -260,6 +270,8 @@ void main() {
           fetchListings: () async => [_listingJson(name: 'Notting Hill Dal')],
           fetchNearbySellers: () async => {
             'available': true,
+            'nearbyRadiusKm': 10,
+            'extendedRadiusKm': 15,
             'sellers': [
               {
                 'seller': {
@@ -539,7 +551,7 @@ void main() {
     expect(find.text('Rupal Amin'), findsWidgets);
   });
 
-  testWidgets('Non-Veg filter hides veg specials and does not rename remaining cards', (
+  testWidgets('Veg toggle keeps vegetarian dishes and hides the rest', (
     tester,
   ) async {
     _ignoreOverflow();
@@ -564,7 +576,6 @@ void main() {
             _listingJson(
               name: 'Hyderabadi Chicken Biryani',
               foodType: 'NON_VEG',
-              status: 'expired',
             )
               ..['id'] = 'seed-listing-biryani'
               ..['societyId'] = 'mine'
@@ -582,18 +593,18 @@ void main() {
     expect(find.text('Dry fruit dessert'), findsWidgets);
     expect(find.text('Hyderabadi Chicken Biryani'), findsWidgets);
 
-    await tester.tap(find.byKey(const ValueKey('home-food-type-Non-veg')));
+    await tester.tap(find.byKey(const Key('home-veg-toggle')));
     await tester.pump();
 
-    expect(find.text('Non-veg'), findsOneWidget);
-    expect(find.text('goungura pickle'), findsNothing);
-    expect(find.text('Dry fruit dessert'), findsNothing);
-    expect(find.text('Hyderabadi Chicken Biryani'), findsWidgets);
-    expect(find.textContaining('Sirisha'), findsNothing);
+    expect(find.text('Veg'), findsOneWidget);
+    expect(find.text('goungura pickle'), findsWidgets);
+    expect(find.text('Dry fruit dessert'), findsWidgets);
+    expect(find.text('Hyderabadi Chicken Biryani'), findsNothing);
+    expect(find.textContaining('Sirisha'), findsWidgets);
     expect(find.textContaining('Amita Agarwal'), findsWidgets);
   });
 
-  testWidgets('expired listing shows unavailable label and no Add button', (
+  testWidgets('expired listing is absent from the home feed', (
     tester,
   ) async {
     _ignoreOverflow();
@@ -612,12 +623,10 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Chicken Biryani'), findsWidgets);
-    expect(find.text('Out of stock'), findsWidgets);
+    expect(find.text('Chicken Biryani'), findsNothing);
+    expect(find.text('Out of stock'), findsNothing);
     expect(find.text('All Items'), findsOneWidget);
-    expect(find.text('Available Now'), findsNothing);
     expect(find.text('Add'), findsNothing);
-    expect(find.byType(MarketplacePurchaseSlot), findsWidgets);
   });
 
   testWidgets('food detail disables order for expired listings', (tester) async {

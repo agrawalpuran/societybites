@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'food_type.dart';
+import 'kitchen_hours.dart';
 import 'listing_availability.dart';
 import 'listing_categories.dart';
 import 'order_lifecycle.dart';
@@ -71,6 +72,7 @@ class FoodItem {
   final List<String> categories;
   final String status;
   final DateTime? availableAt;
+  final DateTime? createdAt;
   final int reviewCount;
   final int quantitySold;
   final IconData icon;
@@ -103,6 +105,8 @@ class FoodItem {
   /// Apartment name for a nearby or extended seller. Absent for same-society dishes.
   final String? sellerSocietyName;
   final String? sellerProfilePhotoUrl;
+  final String? kitchenOpensAt;
+  final String? kitchenClosesAt;
 
   const FoodItem({
     required this.id,
@@ -127,6 +131,7 @@ class FoodItem {
     this.categories = const [],
     this.status = 'active',
     this.availableAt,
+    this.createdAt,
     this.reviewCount = 0,
     this.quantitySold = 0,
     required this.icon,
@@ -156,6 +161,8 @@ class FoodItem {
     this.distanceKm,
     this.sellerSocietyName,
     this.sellerProfilePhotoUrl,
+    this.kitchenOpensAt,
+    this.kitchenClosesAt,
   });
 
   List<String> get listingCategories {
@@ -180,6 +187,20 @@ class FoodItem {
   bool get isPaused => status == 'paused';
   bool get isActive => status == 'active';
   bool get isExpired => status == 'expired';
+  bool get isSoldOut => status == 'sold_out';
+
+  /// Normal Home feed. Seller management still shows paused, sold-out, and expired.
+  bool get isEligibleForHomeFeed => isActive;
+
+  static const newListingWindow = Duration(hours: 48);
+
+  /// Listed within the last 48 hours. Review count does not affect this.
+  bool isNewListing([DateTime? now]) {
+    final created = createdAt;
+    if (created == null) return false;
+    final cutoff = (now ?? DateTime.now()).subtract(newListingWindow);
+    return !created.isBefore(cutoff);
+  }
 
   bool get isRecurringReadyNow =>
       !isPreOrderCatalog &&
@@ -202,6 +223,11 @@ class FoodItem {
         endMinute: recurringEndMinute,
         scheduleSummary: recurringScheduleSummary,
         hoursSummary: recurringHoursSummary,
+      );
+
+  bool get isKitchenClosed => !isKitchenOpen(
+        opensAt: kitchenOpensAt,
+        closesAt: kitchenClosesAt,
       );
 
   bool get canAddToCart {
@@ -316,6 +342,7 @@ class FoodItem {
       categories: parsedCategories,
       status: json['status']?.toString() ?? 'active',
       availableAt: availableAt,
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? ''),
       reviewCount: _asInt(json['reviewCount'], 0),
       quantitySold: _asInt(json['quantitySold'], 0),
       icon: _icons[hash % _icons.length],
@@ -365,7 +392,15 @@ class FoodItem {
       sellerProfilePhotoUrl: _photoUrl(
         json['sellerProfilePhotoUrl'] ?? json['profilePhotoUrl'],
       ),
+      kitchenOpensAt: _clock(json['kitchenOpensAt']),
+      kitchenClosesAt: _clock(json['kitchenClosesAt']),
     );
+  }
+
+  static String? _clock(dynamic value) {
+    final raw = value?.toString().trim();
+    if (raw == null || raw.isEmpty || raw == 'null') return null;
+    return raw;
   }
 
   static String? _photoUrl(dynamic value) {
@@ -1015,6 +1050,8 @@ class PreOrderProduct {
   final String? description;
   final String? imageUrl;
   final String? foodType;
+  final String? kitchenOpensAt;
+  final String? kitchenClosesAt;
 
   const PreOrderProduct({
     required this.listingId,
@@ -1031,6 +1068,8 @@ class PreOrderProduct {
     this.description,
     this.imageUrl,
     this.foodType,
+    this.kitchenOpensAt,
+    this.kitchenClosesAt,
   });
 
   factory PreOrderProduct.fromJson(Map<String, dynamic> json) {
@@ -1049,6 +1088,8 @@ class PreOrderProduct {
       description: json['description'] as String?,
       imageUrl: json['imageUrl'] as String?,
       foodType: parseFoodType(json['foodType']),
+      kitchenOpensAt: FoodItem._clock(json['kitchenOpensAt']),
+      kitchenClosesAt: FoodItem._clock(json['kitchenClosesAt']),
     );
   }
 }
@@ -1077,6 +1118,8 @@ class PreOrderCampaign {
   /// `inSociety` | `nearby` | `extended` from seller reach + distance.
   final String? discoveryReach;
   final String? sellerProfilePhotoUrl;
+  final String? kitchenOpensAt;
+  final String? kitchenClosesAt;
 
   const PreOrderCampaign({
     required this.id,
@@ -1101,7 +1144,21 @@ class PreOrderCampaign {
     this.distanceKm,
     this.discoveryReach,
     this.sellerProfilePhotoUrl,
+    this.kitchenOpensAt,
+    this.kitchenClosesAt,
   });
+
+  bool get isKitchenClosed {
+    if (!isKitchenOpen(opensAt: kitchenOpensAt, closesAt: kitchenClosesAt)) {
+      return true;
+    }
+    return products.any(
+      (product) => !isKitchenOpen(
+        opensAt: product.kitchenOpensAt,
+        closesAt: product.kitchenClosesAt,
+      ),
+    );
+  }
 
   bool get isOpen => acceptsNewOrders();
 
@@ -1184,6 +1241,8 @@ class PreOrderCampaign {
         if (raw == null || raw.isEmpty || raw == 'null') return null;
         return raw;
       }(),
+      kitchenOpensAt: FoodItem._clock(json['kitchenOpensAt']),
+      kitchenClosesAt: FoodItem._clock(json['kitchenClosesAt']),
     );
   }
 }

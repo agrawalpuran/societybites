@@ -31,6 +31,12 @@ function main() {
   );
   assert(many.length === 2 && many[1] === "Lunch", "multi categories");
 
+  const drink = parseListingCategories(
+    { category: "beverages" },
+    { required: true }
+  );
+  assert(drink[0] === "Beverages", "Beverages accepted");
+
   expectThrow(
     () => parseListingCategories({ categories: [] }, { required: true }),
     "at least one category"

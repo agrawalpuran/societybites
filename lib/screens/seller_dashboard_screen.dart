@@ -2029,6 +2029,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Multi-item orders list every dish below, so a hero thumbnail
               // would just repeat the first one.

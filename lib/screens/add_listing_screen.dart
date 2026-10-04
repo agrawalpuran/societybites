@@ -57,6 +57,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   int _prepPresetMinutes = 60;
   final _customPrepDaysController = TextEditingController();
   bool _repeatSchedule = false;
+  bool _untilStockLasts = false;
   final Set<int> _recurringDays = {};
   TimeOfDay _recurringStart = const TimeOfDay(hour: 7, minute: 0);
   TimeOfDay _recurringEnd = const TimeOfDay(hour: 11, minute: 0);
@@ -74,10 +75,12 @@ class _AddListingScreenState extends State<AddListingScreen> {
   /// Type is chosen on Add listing (Available Now vs Made to Order vs Pre-order),
   /// not switched again on edit.
   bool get _showFulfilmentSection => !_isPreorderCatalog && _isMadeToOrder;
+  bool get _isJustToday => !_repeatSchedule && !_untilStockLasts;
   bool get _showStockAndExpiryFields =>
       !_isMadeToOrder && !_isPreorderCatalog && !_repeatSchedule;
   bool get _showRecurringSection => !_isMadeToOrder && !_isPreorderCatalog;
-  bool get _showUntilField => _showStockAndExpiryFields && _todayFullDay;
+  /// Just today already ends today, so an extra stop date is not offered.
+  bool get _showUntilField => false;
 
   String get _orderTypeTitle {
     if (_isPreorderCatalog) return 'Pre-order';
@@ -104,12 +107,15 @@ class _AddListingScreenState extends State<AddListingScreen> {
         children: [
           _FulfilmentOption(
             key: const Key('listing-availability-today'),
-            selected: !_repeatSchedule,
+            selected: _isJustToday,
             title: 'Just today',
             subtitle:
                 'Neighbors can order it today. List it again tomorrow if you cook again.',
-            onTap: () => setState(() => _repeatSchedule = false),
-            child: !_repeatSchedule ? _buildJustTodayHours() : null,
+            onTap: () => setState(() {
+              _repeatSchedule = false;
+              _untilStockLasts = false;
+            }),
+            child: _isJustToday ? _buildJustTodayHours() : null,
           ),
           const SizedBox(height: 8),
           _FulfilmentOption(
@@ -118,8 +124,22 @@ class _AddListingScreenState extends State<AddListingScreen> {
             title: 'Same days every week',
             subtitle:
                 'For regular items like idli or thepla. We will show it on the days you choose.',
-            onTap: () => setState(() => _repeatSchedule = true),
+            onTap: () => setState(() {
+              _repeatSchedule = true;
+              _untilStockLasts = false;
+            }),
             child: _repeatSchedule ? _buildWeeklySchedule() : null,
+          ),
+          const SizedBox(height: 8),
+          _FulfilmentOption(
+            key: const Key('listing-availability-until-stock'),
+            selected: _untilStockLasts,
+            title: 'Till stock lasts',
+            subtitle: 'Neighbors can order until this quantity runs out.',
+            onTap: () => setState(() {
+              _repeatSchedule = false;
+              _untilStockLasts = true;
+            }),
           ),
         ],
       ),
@@ -127,34 +147,51 @@ class _AddListingScreenState extends State<AddListingScreen> {
   }
 
   Widget _buildJustTodayHours() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _FulfilmentOption(
-          key: const Key('listing-today-full-day'),
-          selected: _todayFullDay,
-          nested: true,
-          title: 'Full day',
-          subtitle: 'Neighbors can order anytime today.',
-          onTap: () => setState(() => _todayFullDay = true),
-        ),
-        const SizedBox(height: 8),
-        _FulfilmentOption(
-          key: const Key('listing-today-hours'),
-          selected: !_todayFullDay,
-          nested: true,
-          title: 'Specific hours',
-          subtitle: 'Only take orders between the times you choose.',
-          onTap: () => setState(() => _todayFullDay = false),
-        ),
-        if (!_todayFullDay) ...[
-          const SizedBox(height: 8),
-          _buildHoursPickers(
-            startKey: 'listing-today-start',
-            endKey: 'listing-today-end',
+    return Padding(
+      padding: const EdgeInsets.only(left: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _TodayWindowChoice(
+                  key: const Key('listing-today-full-day'),
+                  selected: _todayFullDay,
+                  title: 'Full day',
+                  onTap: () => setState(() => _todayFullDay = true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _TodayWindowChoice(
+                  key: const Key('listing-today-hours'),
+                  selected: !_todayFullDay,
+                  title: 'Specific hours',
+                  onTap: () => setState(() => _todayFullDay = false),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 6),
+          Text(
+            _todayFullDay
+                ? 'Neighbors can order anytime today.'
+                : 'Only take orders between the times you choose.',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF6A7774),
+            ),
+          ),
+          if (!_todayFullDay) ...[
+            const SizedBox(height: 8),
+            _buildHoursPickers(
+              startKey: 'listing-today-start',
+              endKey: 'listing-today-end',
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -239,22 +276,44 @@ class _AddListingScreenState extends State<AddListingScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        _FulfilmentOption(
-          key: const Key('listing-daily-unlimited'),
-          selected: !_dailyLimitEnabled,
-          nested: true,
-          title: 'No limit',
-          subtitle: 'Keep taking orders during these hours.',
-          onTap: () => setState(() => _dailyLimitEnabled = false),
-        ),
-        const SizedBox(height: 8),
-        _FulfilmentOption(
-          key: const Key('listing-daily-limit'),
-          selected: _dailyLimitEnabled,
-          nested: true,
-          title: 'I have a limit',
-          subtitle: 'Stop orders after this many portions.',
-          onTap: () => setState(() => _dailyLimitEnabled = true),
+        Padding(
+          padding: const EdgeInsets.only(left: 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _TodayWindowChoice(
+                      key: const Key('listing-daily-unlimited'),
+                      selected: !_dailyLimitEnabled,
+                      title: 'No limit',
+                      onTap: () => setState(() => _dailyLimitEnabled = false),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _TodayWindowChoice(
+                      key: const Key('listing-daily-limit'),
+                      selected: _dailyLimitEnabled,
+                      title: 'I have a limit',
+                      onTap: () => setState(() => _dailyLimitEnabled = true),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _dailyLimitEnabled
+                    ? 'Stop orders after this many portions.'
+                    : 'Keep taking orders during these hours.',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF6A7774),
+                ),
+              ),
+            ],
+          ),
         ),
         if (_dailyLimitEnabled) ...[
           const SizedBox(height: 8),
@@ -501,6 +560,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
       }
       if (listing.recurringEnabled && !listing.isMadeToOrder) {
         _repeatSchedule = true;
+        _untilStockLasts = false;
         _recurringDays.addAll(listing.recurringWeekdays);
         if (listing.recurringStartMinute != null) {
           _recurringStart = TimeOfDay(
@@ -522,6 +582,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
           listing.recurringStartMinute != null &&
           listing.recurringEndMinute != null) {
         _todayFullDay = false;
+        _untilStockLasts = false;
         _recurringStart = TimeOfDay(
           hour: listing.recurringStartMinute! ~/ 60,
           minute: listing.recurringStartMinute! % 60,
@@ -530,6 +591,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
           hour: listing.recurringEndMinute! ~/ 60,
           minute: listing.recurringEndMinute! % 60,
         );
+      } else if (!listing.isMadeToOrder &&
+          !listing.recurringEnabled &&
+          listing.availableAt == null) {
+        _untilStockLasts = true;
       }
     } else {
       _availabilityMode = parseListingAvailabilityMode(
@@ -548,6 +613,13 @@ class _AddListingScreenState extends State<AddListingScreen> {
     _customPrepDaysController.dispose();
     _dailyLimitController.dispose();
     super.dispose();
+  }
+
+  DateTime _endOfToday() {
+    final now = DateTime.now();
+    final end = DateTime(now.year, now.month, now.day, 23, 59);
+    if (end.isAfter(now)) return end;
+    return now.add(const Duration(minutes: 1));
   }
 
   Future<void> _pickDateTime() async {
@@ -661,8 +733,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
     }
 
     final useRecurring = _showRecurringSection && _repeatSchedule;
-    final sameDayHours =
-        _showRecurringSection && !_repeatSchedule && !_todayFullDay;
+    final justToday = _showRecurringSection && _isJustToday;
+    final sameDayHours = justToday && !_todayFullDay;
     if (useRecurring || sameDayHours) {
       if (useRecurring && _recurringDays.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -739,7 +811,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
           : null;
       final availableAt = sameDayHours
           ? sameDayEnd
-          : (_showUntilField ? _dateTime : null);
+          : (justToday ? _endOfToday() : null);
 
       if (_isEditing) {
         await ApiService.updateListing(
@@ -968,78 +1040,113 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         ),
                       ],
                       const SizedBox(height: 18),
-                      _buildField(
-                        label: 'WEIGHT PER PORTION',
-                        child: TextFormField(
-                          controller: _weightPerUnitController,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                                RegExp(r'[\d.]')),
-                          ],
-                          decoration: _inputDeco('e.g. 250'),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      _buildField(
-                        label: 'UNIT / WEIGHT TYPE',
-                        child: Container(
-                          height: 52,
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border:
-                                Border.all(color: const Color(0xFFE0E5E3)),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _weightUnit,
-                              isExpanded: true,
-                              icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                                  color: Color(0xFF8A9491)),
-                              style: const TextStyle(
-                                fontSize: 15,
-                                color: Color(0xFF3A4644),
-                                fontWeight: FontWeight.w500,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: _buildField(
+                              label: 'WEIGHT PER PORTION',
+                              child: TextFormField(
+                                controller: _weightPerUnitController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                      RegExp(r'[\d.]')),
+                                ],
+                                decoration: _inputDeco('e.g. 250'),
                               ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'portions',
-                                  child: Text('Portions / Servings'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'grams',
-                                  child: Text('Grams (g)'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'kg',
-                                  child: Text('Kilograms (kg)'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'ml',
-                                  child: Text('Millilitres (ml)'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'litres',
-                                  child: Text('Litres (L)'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'pieces',
-                                  child: Text('Pieces'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'packs',
-                                  child: Text('Packs'),
-                                ),
-                              ],
-                              onChanged: (v) {
-                                if (v != null) setState(() => _weightUnit = v);
-                              },
                             ),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 3,
+                            child: _buildField(
+                              label: 'UNIT / WEIGHT TYPE',
+                              child: Container(
+                                height: 52,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                      color: const Color(0xFFE0E5E3)),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: _weightUnit,
+                                    isExpanded: true,
+                                    icon: const Icon(
+                                        Icons.keyboard_arrow_down_rounded,
+                                        color: Color(0xFF8A9491)),
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      color: Color(0xFF3A4644),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: 'portions',
+                                        child: Text(
+                                          'Portions / Servings',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'grams',
+                                        child: Text(
+                                          'Grams (g)',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'kg',
+                                        child: Text(
+                                          'Kilograms (kg)',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'ml',
+                                        child: Text(
+                                          'Millilitres (ml)',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'litres',
+                                        child: Text(
+                                          'Litres (L)',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'pieces',
+                                        child: Text(
+                                          'Pieces',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'packs',
+                                        child: Text(
+                                          'Packs',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: (v) {
+                                      if (v != null) {
+                                        setState(() => _weightUnit = v);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       if (_showUntilField) ...[
                         const SizedBox(height: 18),
@@ -1491,6 +1598,70 @@ class _AddListingScreenState extends State<AddListingScreen> {
   }
 }
 
+class _TodayWindowChoice extends StatelessWidget {
+  const _TodayWindowChoice({
+    super.key,
+    required this.selected,
+    required this.title,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? const Color(0xFFE8F5EE) : const Color(0xFFF7F9F8),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected
+                  ? const Color(0xFF0E5A47)
+                  : const Color(0xFFE0E5E3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                size: 18,
+                color: selected
+                    ? const Color(0xFF0E5A47)
+                    : const Color(0xFF8A9491),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: selected
+                        ? const Color(0xFF0E5A47)
+                        : const Color(0xFF101617),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _FulfilmentOption extends StatelessWidget {
   const _FulfilmentOption({
     super.key,
@@ -1499,7 +1670,6 @@ class _FulfilmentOption extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.child,
-    this.nested = false,
   });
 
   final bool selected;
@@ -1507,14 +1677,11 @@ class _FulfilmentOption extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
   final Widget? child;
-  final bool nested;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected && !nested
-          ? const Color(0xFFE8F5EE)
-          : Colors.white,
+      color: selected ? const Color(0xFFE8F5EE) : Colors.white,
       borderRadius: BorderRadius.circular(14),
       child: Container(
         width: double.infinity,

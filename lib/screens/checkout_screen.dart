@@ -12,6 +12,7 @@ import '../widgets/requested_ready_summary.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/status_banner.dart';
 import '../models/data.dart';
+import '../models/kitchen_hours.dart';
 import '../models/order_lifecycle.dart';
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
@@ -280,6 +281,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _confirmOrder() async {
+    if (_items.any((item) => item.food.isKitchenClosed)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(kitchenClosedMessage),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Color(0xFFD94F4F),
+        ),
+      );
+      return;
+    }
     if (cartHasMixedAvailability(_items)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

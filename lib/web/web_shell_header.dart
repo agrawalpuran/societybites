@@ -95,9 +95,13 @@ class _WebShellHeaderState extends State<WebShellHeader> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _FoodTypeControl(
-                        selected: widget.selectedFoodType,
-                        onChanged: widget.onFoodTypeChanged,
+                      _VegToggle(
+                        selected: widget.selectedFoodType == foodTypeVeg,
+                        onChanged: (vegOnly) {
+                          widget.onFoodTypeChanged(
+                            vegOnly ? foodTypeVeg : null,
+                          );
+                        },
                       ),
                       const SizedBox(width: 4),
                       _NavLink(
@@ -251,7 +255,7 @@ class _SearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 420),
+      constraints: const BoxConstraints(maxWidth: 520),
       child: SizedBox(
         height: 38,
         child: TextField(
@@ -264,7 +268,7 @@ class _SearchField extends StatelessWidget {
             color: webInk,
           ),
           decoration: InputDecoration(
-            hintText: 'Search meals…',
+            hintText: 'Search dishes, kitchens...',
             hintStyle: const TextStyle(
               color: Color(0xFF9AA5A1),
               fontSize: 13,
@@ -298,94 +302,49 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-class _FoodTypeControl extends StatelessWidget {
-  const _FoodTypeControl({
+class _VegToggle extends StatelessWidget {
+  const _VegToggle({
     required this.selected,
     required this.onChanged,
   });
 
-  final String? selected;
-  final ValueChanged<String?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4F7F5),
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: webLine),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _Choice(
-            label: 'All',
-            selected: selected == null,
-            onTap: () => onChanged(null),
-          ),
-          _Choice(
-            label: 'Veg',
-            mark: const Color(0xFF14804A),
-            selected: selected == foodTypeVeg,
-            onTap: () => onChanged(foodTypeVeg),
-          ),
-          _Choice(
-            label: 'Non-veg',
-            mark: const Color(0xFFC0392B),
-            selected: selected == foodTypeNonVeg,
-            onTap: () => onChanged(foodTypeNonVeg),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Choice extends StatelessWidget {
-  const _Choice({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.mark,
-  });
-
-  final String label;
   final bool selected;
-  final VoidCallback onTap;
-  final Color? mark;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? webGreen : Colors.transparent,
-      borderRadius: BorderRadius.circular(8),
+      color: selected ? webGreen : const Color(0xFFF4F7F5),
+      borderRadius: BorderRadius.circular(11),
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+        key: const Key('web-veg-toggle'),
+        onTap: () => onChanged(!selected),
+        borderRadius: BorderRadius.circular(11),
+        child: Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: selected ? webGreen : webLine),
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (mark != null) ...[
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: selected ? Colors.white : mark,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: selected ? Colors.white : const Color(0xFF14804A),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                const SizedBox(width: 4),
-              ],
+              ),
+              const SizedBox(width: 5),
               Text(
-                label,
+                'Veg',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: selected ? Colors.white : webMuted,
+                  color: selected ? Colors.white : webGreen,
                 ),
               ),
             ],

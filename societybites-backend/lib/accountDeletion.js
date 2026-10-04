@@ -67,6 +67,8 @@ async function deleteAuthenticatedAccount(userId) {
         deliveryChargeInSociety: 0,
         deliveryChargeNearby: 0,
         deliveryChargeExtended: 0,
+        kitchenOpensAt: null,
+        kitchenClosesAt: null,
         societyId: null,
         flatId: null,
         suspended: true,

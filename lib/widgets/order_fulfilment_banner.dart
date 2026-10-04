@@ -44,28 +44,29 @@ class OrderFulfilmentBanner extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 6),
           if (isSellerView) ...[
-            if (delivery)
+            if (delivery) ...[
+              const SizedBox(height: 6),
               _placeLine(
                 _buyerDeliveryAddress(order),
                 order.approxDistanceLabel,
-              )
-            else if (order.buyerSocietyName != null &&
-                order.buyerSocietyName!.isNotEmpty)
+              ),
+              Text(
+                'Delivery charge: ₹$chargeLabel',
+                style: const TextStyle(color: Color(0xFF3A4644)),
+              ),
+            ] else if (order.buyerSocietyName != null &&
+                order.buyerSocietyName!.isNotEmpty) ...[
+              const SizedBox(height: 6),
               Text(
                 'Buyer Society: ${order.buyerSocietyName}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Color(0xFF3A4644)),
               ),
-            Text(
-              delivery
-                  ? 'Delivery charge: ₹$chargeLabel'
-                  : 'Buyer will collect the order.',
-              style: const TextStyle(color: Color(0xFF3A4644)),
-            ),
+            ],
           ] else ...[
+            const SizedBox(height: 6),
             if (!delivery) ...[
               _placeLine(
                 _buyerPickupPlace(order),
@@ -91,11 +92,6 @@ class OrderFulfilmentBanner extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Color(0xFF3A4644)),
-              ),
-            if (delivery)
-              const Text(
-                'Seller will deliver your order.',
-                style: TextStyle(color: Color(0xFF3A4644)),
               ),
             if (!delivery && order.fulfilmentAt != null) ...[
               const SizedBox(height: 4),

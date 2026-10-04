@@ -29,9 +29,9 @@ class WebFoodCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ratingLabel = food.rating > 0
+    final ratingLabel = food.reviewCount > 0
         ? food.rating.toStringAsFixed(1)
-        : 'New';
+        : 'No reviews yet';
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -71,7 +71,19 @@ class WebFoodCard extends StatelessWidget {
                     Positioned(
                       right: 10,
                       top: 10,
-                      child: _RatingPill(label: ratingLabel),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (food.isNewListing()) ...[
+                            const _RatingPill(label: 'NEW', showStar: false),
+                            const SizedBox(width: 6),
+                          ],
+                          _RatingPill(
+                            label: ratingLabel,
+                            showStar: food.reviewCount > 0,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -431,9 +443,10 @@ class _DietMark extends StatelessWidget {
 }
 
 class _RatingPill extends StatelessWidget {
-  const _RatingPill({required this.label});
+  const _RatingPill({required this.label, this.showStar = true});
 
   final String label;
+  final bool showStar;
 
   @override
   Widget build(BuildContext context) {
@@ -446,8 +459,10 @@ class _RatingPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.star_rounded, size: 13, color: Color(0xFFC48A12)),
-          const SizedBox(width: 2),
+          if (showStar) ...[
+            const Icon(Icons.star_rounded, size: 13, color: Color(0xFFC48A12)),
+            const SizedBox(width: 2),
+          ],
           Text(
             label,
             style: const TextStyle(

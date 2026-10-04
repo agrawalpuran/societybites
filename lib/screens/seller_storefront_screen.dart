@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../web/web_page_frame.dart';
 
 import '../models/data.dart';
+import '../models/kitchen_hours.dart';
 import '../models/nearby_seller.dart';
 import '../models/seller_fulfilment.dart';
 import '../services/api_service.dart';
@@ -276,6 +277,10 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
   Future<void> _changeCart(FoodItem food, int delta) async {
     if (widget.guestBrowse && delta > 0) {
       await showGuestOrderAuthDialog(context);
+      return;
+    }
+    if (delta > 0 && food.isKitchenClosed) {
+      showKitchenClosedMessage(context);
       return;
     }
     if (delta > 0 && !food.canAddToCart) {

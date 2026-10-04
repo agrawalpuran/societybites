@@ -29,7 +29,8 @@ void main() {
     );
 
     expect(find.byType(AppHeader), findsOneWidget);
-    expect(find.text('Loading…'), findsOneWidget);
+    expect(find.byKey(const Key('home-feed-skeletons')), findsOneWidget);
+    expect(find.text('Loading…'), findsNothing);
 
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('startup-resolved')), findsOneWidget);
@@ -58,7 +59,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 20));
     await tester.pump(const Duration(milliseconds: 20));
     expect(calls, 1);
-    expect(find.text('Loading…'), findsOneWidget);
+    expect(find.byKey(const Key('home-feed-skeletons')), findsOneWidget);
 
     await tester.pumpAndSettle();
     expect(find.text('ready'), findsOneWidget);

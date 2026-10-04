@@ -156,6 +156,8 @@ function serializeCampaign(campaign) {
     offeredFulfilmentMethods: campaign.offeredFulfilmentMethods || ["pickup"],
     defaultDeliveryCharge: campaign.defaultDeliveryCharge || 0,
     sellerPaymentPreference: serializePaymentPreference(sellerPrefSource),
+    kitchenOpensAt: (sellerPrefSource && sellerPrefSource.kitchenOpensAt) || null,
+    kitchenClosesAt: (sellerPrefSource && sellerPrefSource.kitchenClosesAt) || null,
     createdAt: campaign.createdAt,
     updatedAt: campaign.updatedAt,
     products: Array.isArray(campaign.products) ? campaign.products : undefined,

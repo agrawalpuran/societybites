@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/data.dart';
 import '../models/legal_documents.dart';
 import '../screens/help_center_screen.dart';
+import '../models/selling_reach.dart';
 import '../screens/home_listing_filter.dart';
+import '../widgets/home_distance_chip.dart';
 import '../screens/legal_screen.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/preorder_widgets.dart';
@@ -62,6 +64,13 @@ class WebMarketplaceHome extends StatefulWidget {
     required this.onStartSelling,
     required this.onExploreNearby,
     required this.onSelectTab,
+    this.listingType = HomeListingType.all,
+    this.distanceReach,
+    this.distanceChoice,
+    this.dishCount = 0,
+    this.onDistanceSelected,
+    this.onListingTypeSelected,
+    this.activeFilterLabels,
   });
 
   final bool isInitialLoading;
@@ -108,6 +117,13 @@ class WebMarketplaceHome extends StatefulWidget {
   final VoidCallback onStartSelling;
   final VoidCallback onExploreNearby;
   final ValueChanged<int> onSelectTab;
+  final HomeListingType listingType;
+  final SellingReach? distanceReach;
+  final BuyerDistanceChoice? distanceChoice;
+  final int dishCount;
+  final ValueChanged<BuyerDistanceChoice>? onDistanceSelected;
+  final ValueChanged<HomeListingType>? onListingTypeSelected;
+  final Set<String>? activeFilterLabels;
 
   @override
   State<WebMarketplaceHome> createState() => _WebMarketplaceHomeState();
@@ -201,6 +217,18 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           const SizedBox(height: 18),
         ],
         _hero(width),
+        if (_hasDistanceControl) ...[
+          const SizedBox(height: 16),
+          HomeDistanceChip(
+            padding: EdgeInsets.zero,
+            reach: widget.distanceReach!,
+            selected: widget.distanceChoice,
+            itemCount: widget.dishCount,
+            listingType: widget.listingType,
+            onSelected: widget.onDistanceSelected!,
+            onListingTypeSelected: widget.onListingTypeSelected,
+          ),
+        ],
         if (!widget.searching) ...[
           const SizedBox(height: 28),
           const WebSectionHeader(
@@ -213,6 +241,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
             selectedCategory: widget.selectedCategory,
             counts: widget.categoryCounts,
             onSelected: widget.onCategorySelected,
+            activeLabels: widget.activeFilterLabels,
           ),
           _listingSections(),
         ] else ...[
@@ -240,6 +269,11 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
       ],
     );
   }
+
+  bool get _hasDistanceControl =>
+      widget.distanceReach != null &&
+      widget.onDistanceSelected != null &&
+      widget.onListingTypeSelected != null;
 
   Widget _listingSections() {
     final sections = <Widget>[

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../web/web_breakpoints.dart';
 import '../widgets/listing_image.dart';
+import '../widgets/listing_rating_mark.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/app_header.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/recurring_availability_hint.dart';
 import '../widgets/temporarily_unavailable_label.dart';
 import '../models/data.dart';
+import '../models/kitchen_hours.dart';
 import '../services/api_service.dart';
 import '../services/cart_controller.dart';
 import 'checkout_screen.dart';
@@ -212,35 +214,7 @@ class _HeroSection extends StatelessWidget {
                         ),
                       ),
                     ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(220),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          size: 15,
-                          color: Colors.amber,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          food.rating > 0 ? '${food.rating}' : 'New',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF3A4644),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  ListingRatingMark(food: food),
                 ],
               ),
               const SizedBox(height: 12),
@@ -872,7 +846,9 @@ class _BottomCta extends StatelessWidget {
                 height: 54,
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                onPressed: !food.canAddToCart
+                onPressed: food.isKitchenClosed
+                    ? () => showKitchenClosedMessage(context)
+                    : !food.canAddToCart
                     ? null
                     : () async {
                         if (requireAuthToOrder) {
@@ -910,13 +886,15 @@ class _BottomCta extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
                 icon: Icon(
-                  !food.canAddToCart
+                  food.isKitchenClosed || !food.canAddToCart
                       ? Icons.block_rounded
                       : Icons.shopping_cart_rounded,
                   size: 20,
                 ),
                 label: Text(
-                  food.isExpired
+                  food.isKitchenClosed
+                      ? kitchenClosedMessage
+                      : food.isExpired
                       ? 'Out of stock'
                       : food.quantity <= 0
                       ? 'Sold out'
