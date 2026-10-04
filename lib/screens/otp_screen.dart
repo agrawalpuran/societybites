@@ -358,7 +358,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (useWebMarketplaceLayout(context)) return _buildWebOtp();
+    if (kIsWeb) return _buildWebOtp();
     final size = MediaQuery.of(context).size;
     final horizontalPadding = size.width * 0.08;
     final contentWidth = size.width - horizontalPadding * 2;

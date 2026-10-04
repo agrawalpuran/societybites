@@ -253,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (useWebMarketplaceLayout(context)) {
+    if (kIsWeb) {
       return _buildWebLogin();
     }
 

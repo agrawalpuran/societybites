@@ -86,13 +86,7 @@ class _MainShellScreenState extends State<MainShellScreen>
     );
   }
 
-  void _onWebTab(int index) {
-    if (kIsWeb && _signedIn == false && index != 0) {
-      _openSignIn();
-      return;
-    }
-    _selectTab(index);
-  }
+  void _onWebTab(int index) => _selectTab(index);
 
   void _onHomeReady() {
     unawaited(() async {
@@ -185,6 +179,24 @@ class _MainShellScreenState extends State<MainShellScreen>
   }
 
   void _selectTab(int index) {
+    if (kIsWeb && index != 0 && _signedIn != true) {
+      unawaited(_openProtectedWebTab(index));
+      return;
+    }
+    _showTab(index);
+  }
+
+  Future<void> _openProtectedWebTab(int index) async {
+    await _sessionCheck;
+    if (!mounted) return;
+    if (_signedIn != true) {
+      _openSignIn();
+      return;
+    }
+    _showTab(index);
+  }
+
+  void _showTab(int index) {
     final wasOrdersMounted = _ordersMounted;
     final wasDashboardMounted = _dashboardMounted;
 
