@@ -1,11 +1,11 @@
 {
-    "name": "societybites",
-    "short_name": "societybites",
+    "name": "SocietyEats",
+    "short_name": "SocietyEats",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0E5A47",
+    "theme_color": "#0E5A47",
+    "description": "Homemade food from neighbours cooking nearby.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
