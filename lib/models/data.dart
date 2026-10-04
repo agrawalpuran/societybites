@@ -99,6 +99,7 @@ class FoodItem {
   final String sellerPaymentPreference;
   final SellerFulfilment sellerFulfilment;
   final SellingReachLevel? sellerSellingReachLevel;
+
   /// Great-circle km from the buyer's society. Set from nearby-sellers cards.
   final double? distanceKm;
 
@@ -203,10 +204,7 @@ class FoodItem {
   }
 
   bool get isRecurringReadyNow =>
-      !isPreOrderCatalog &&
-      !isPreOrder &&
-      !isMadeToOrder &&
-      recurringEnabled;
+      !isPreOrderCatalog && !isPreOrder && !isMadeToOrder && recurringEnabled;
 
   bool get showsBuyerAvailabilityHint {
     if (isPreOrderCatalog || isPreOrder || isMadeToOrder) return false;
@@ -218,17 +216,15 @@ class FoodItem {
   }
 
   String get recurringWindowLabel => formatRecurringWindowLabel(
-        weekdays: recurringWeekdays,
-        startMinute: recurringStartMinute,
-        endMinute: recurringEndMinute,
-        scheduleSummary: recurringScheduleSummary,
-        hoursSummary: recurringHoursSummary,
-      );
+    weekdays: recurringWeekdays,
+    startMinute: recurringStartMinute,
+    endMinute: recurringEndMinute,
+    scheduleSummary: recurringScheduleSummary,
+    hoursSummary: recurringHoursSummary,
+  );
 
-  bool get isKitchenClosed => !isKitchenOpen(
-        opensAt: kitchenOpensAt,
-        closesAt: kitchenClosesAt,
-      );
+  bool get isKitchenClosed =>
+      !isKitchenOpen(opensAt: kitchenOpensAt, closesAt: kitchenClosesAt);
 
   bool get canAddToCart {
     if (!isActive || madeToOrderUnavailableToday || recurringUnavailable) {
@@ -359,8 +355,7 @@ class FoodItem {
         json['preparationTimeMinutes'],
       ),
       maxDailyOrders: parsePreparationTimeMinutes(json['maxDailyOrders']),
-      madeToOrderUnavailableToday:
-          json['madeToOrderUnavailableToday'] == true,
+      madeToOrderUnavailableToday: json['madeToOrderUnavailableToday'] == true,
       recurringEnabled: parseRecurringEnabled(json['recurringEnabled']),
       recurringWeekdays: parseRecurringWeekdays(json['recurringWeekdays']),
       recurringStartMinute: parseOptionalInt(json['recurringStartMinute']),
@@ -627,6 +622,7 @@ class Order {
       paymentMethod: paymentMethod,
     );
   }
+
   bool get isTerminal =>
       status == 'completed' || status == 'cancelled' || status == 'rejected';
 
@@ -667,8 +663,7 @@ class Order {
     return mins.reduce((a, b) => a > b ? a : b);
   }
 
-  String get usualLeadTimeLabel =>
-      formatUsualLeadTime(usualPreparationMinutes);
+  String get usualLeadTimeLabel => formatUsualLeadTime(usualPreparationMinutes);
 
   bool get requestedEarlierThanUsualLead {
     final requested = requestedReadyAt;
@@ -730,17 +725,19 @@ class Order {
 
   String get cancelItemsLabel {
     if (items.isEmpty) return '';
-    return items.map((item) {
-      final name = item.food.name.trim().isEmpty ? 'Item' : item.food.name.trim();
-      return item.quantity > 1 ? '$name ×${item.quantity}' : name;
-    }).join(', ');
+    return items
+        .map((item) {
+          final name = item.food.name.trim().isEmpty
+              ? 'Item'
+              : item.food.name.trim();
+          return item.quantity > 1 ? '$name ×${item.quantity}' : name;
+        })
+        .join(', ');
   }
 
   String get buyerCancelConfirmMessage {
     final itemsLabel = cancelItemsLabel;
-    final heading = itemsLabel.isEmpty
-        ? orderId
-        : '$orderId · $itemsLabel';
+    final heading = itemsLabel.isEmpty ? orderId : '$orderId · $itemsLabel';
     final reason = isPreOrder
         ? 'Pre-orders can only be cancelled before the campaign cutoff. The seller will be notified.'
         : 'The seller will be notified and inventory will be restored.';
@@ -871,11 +868,13 @@ class Order {
     );
 
     return Order(
-      id: json['id']?.toString() ??
+      id:
+          json['id']?.toString() ??
           json['orderId']?.toString() ??
           json['orderNumber']?.toString() ??
           '',
-      orderId: (json['orderId'] as String?) ??
+      orderId:
+          (json['orderId'] as String?) ??
           (json['orderNumber'] as String?) ??
           json['id']?.toString() ??
           '',
@@ -923,9 +922,9 @@ class Order {
         ? local.hour - 12
         : (local.hour == 0 ? 12 : local.hour);
     final ampm = local.hour >= 12 ? 'PM' : 'AM';
-    final time =
-        '$hour:${local.minute.toString().padLeft(2, '0')} $ampm';
-    final sameDay = local.year == current.year &&
+    final time = '$hour:${local.minute.toString().padLeft(2, '0')} $ampm';
+    final sameDay =
+        local.year == current.year &&
         local.month == current.month &&
         local.day == current.day;
     if (sameDay) return 'Today, $time';
@@ -997,8 +996,7 @@ class Order {
         ? local.hour - 12
         : (local.hour == 0 ? 12 : local.hour);
     final ampm = local.hour >= 12 ? 'PM' : 'AM';
-    final time =
-        '$hour:${local.minute.toString().padLeft(2, '0')} $ampm';
+    final time = '$hour:${local.minute.toString().padLeft(2, '0')} $ampm';
     return '${local.day} ${months[local.month - 1]} · $time';
   }
 
@@ -1115,6 +1113,7 @@ class PreOrderCampaign {
   final String? societyId;
   final SellingReachLevel? sellingReachLevel;
   final double? distanceKm;
+
   /// `inSociety` | `nearby` | `extended` from seller reach + distance.
   final String? discoveryReach;
   final String? sellerProfilePhotoUrl;
@@ -1226,8 +1225,9 @@ class PreOrderCampaign {
       sellerPaymentPreference:
           json['sellerPaymentPreference']?.toString() ??
           (rawProducts.isNotEmpty
-              ? Map<String, dynamic>.from(rawProducts.first as Map)['sellerPaymentPreference']
-                    ?.toString()
+              ? Map<String, dynamic>.from(
+                  rawProducts.first as Map,
+                )['sellerPaymentPreference']?.toString()
               : null) ??
           defaultSellerPaymentPreference.apiValue,
       societyId: json['societyId']?.toString(),
@@ -1387,6 +1387,7 @@ Seller sellerFromListing(
 
 const sellerSellingRingColor = Color(0xFF0E5A47);
 const sellerOutOfStockRingColor = Color(0xFFD94F4F);
+const sellerNotAvailableLabel = 'Not available';
 
 Color sellerPresenceRingColor(bool hasOrderableItems) {
   return hasOrderableItems ? sellerSellingRingColor : sellerOutOfStockRingColor;

@@ -70,80 +70,85 @@ void main() {
     expect(sellers.single.hasOrderableItems, isTrue);
   });
 
-  test('top sellers put kitchens selling today first and out of stock last', () {
-    FoodItem listing({
-      required String sellerId,
-      required String sellerName,
-      required double rating,
-      required int reviews,
-      int quantity = 1,
-      String status = 'active',
-    }) {
-      return FoodItem(
-        id: '$sellerId-$quantity-$status',
-        name: 'Dish',
-        sellerId: sellerId,
-        sellerName: sellerName,
-        block: 'Block A',
-        price: 80,
-        rating: rating,
-        pickupTime: '5:00 PM',
-        description: '',
-        quantity: quantity,
-        status: status,
-        reviewCount: reviews,
-        icon: Icons.restaurant,
-        bgColor: const Color(0xFFE8F5EE),
-      );
-    }
+  test(
+    'top sellers put kitchens selling today first and out of stock last',
+    () {
+      FoodItem listing({
+        required String sellerId,
+        required String sellerName,
+        required double rating,
+        required int reviews,
+        int quantity = 1,
+        String status = 'active',
+      }) {
+        return FoodItem(
+          id: '$sellerId-$quantity-$status',
+          name: 'Dish',
+          sellerId: sellerId,
+          sellerName: sellerName,
+          block: 'Block A',
+          price: 80,
+          rating: rating,
+          pickupTime: '5:00 PM',
+          description: '',
+          quantity: quantity,
+          status: status,
+          reviewCount: reviews,
+          icon: Icons.restaurant,
+          bgColor: const Color(0xFFE8F5EE),
+        );
+      }
 
-    final sellers = sellersFromListings([
-      listing(
-        sellerId: 'rated-oos',
-        sellerName: 'Top Rated Empty',
-        rating: 5,
-        reviews: 20,
-        quantity: 0,
-      ),
-      listing(
-        sellerId: 'selling',
-        sellerName: 'Selling Today',
-        rating: 3,
-        reviews: 2,
-      ),
-      listing(
-        sellerId: 'expired',
-        sellerName: 'Expired Kitchen',
-        rating: 4.8,
-        reviews: 10,
-        status: 'expired',
-      ),
-      listing(
-        sellerId: 'mixed',
-        sellerName: 'Mixed Kitchen',
-        rating: 4,
-        reviews: 4,
-        quantity: 0,
-      ),
-      listing(
-        sellerId: 'mixed',
-        sellerName: 'Mixed Kitchen',
-        rating: 4,
-        reviews: 1,
-      ),
-    ]);
+      final sellers = sellersFromListings([
+        listing(
+          sellerId: 'rated-oos',
+          sellerName: 'Top Rated Empty',
+          rating: 5,
+          reviews: 20,
+          quantity: 0,
+        ),
+        listing(
+          sellerId: 'selling',
+          sellerName: 'Selling Today',
+          rating: 3,
+          reviews: 2,
+        ),
+        listing(
+          sellerId: 'expired',
+          sellerName: 'Expired Kitchen',
+          rating: 4.8,
+          reviews: 10,
+          status: 'expired',
+        ),
+        listing(
+          sellerId: 'mixed',
+          sellerName: 'Mixed Kitchen',
+          rating: 4,
+          reviews: 4,
+          quantity: 0,
+        ),
+        listing(
+          sellerId: 'mixed',
+          sellerName: 'Mixed Kitchen',
+          rating: 4,
+          reviews: 1,
+        ),
+      ]);
 
-    expect(
-      sellers.map((seller) => seller.id).toList(),
-      ['mixed', 'selling', 'rated-oos', 'expired'],
-    );
-    expect(sellers[0].hasOrderableItems, isTrue);
-    expect(sellers[1].hasOrderableItems, isTrue);
-    expect(sellers[2].hasOrderableItems, isFalse);
-    expect(sellers[3].hasOrderableItems, isFalse);
-    expect(sellerPresenceRingColor(true), sellerSellingRingColor);
-    expect(sellerPresenceRingColor(false), sellerOutOfStockRingColor);
-  });
+      expect(sellers.map((seller) => seller.id).toList(), [
+        'mixed',
+        'selling',
+        'rated-oos',
+        'expired',
+      ]);
+      expect(sellers[0].hasOrderableItems, isTrue);
+      expect(sellers[1].hasOrderableItems, isTrue);
+      expect(sellers[2].hasOrderableItems, isFalse);
+      expect(sellers[3].hasOrderableItems, isFalse);
+      expect(sellerPresenceRingColor(true), sellerSellingRingColor);
+      expect(sellerPresenceRingColor(false), sellerOutOfStockRingColor);
+    },
+  );
 
   test('campaign provides seller metadata for storefront navigation', () {
     final seller = sellerFromPreOrderCampaign(_campaign());
@@ -158,9 +163,7 @@ void main() {
     tester,
   ) async {
     Seller? selected;
-    final seller = sellerFromListing(
-      _food(id: 'one', rating: 4.8, reviews: 5),
-    );
+    final seller = sellerFromListing(_food(id: 'one', rating: 4.8, reviews: 5));
     await tester.pumpWidget(
       MaterialApp(
         home: SellerListScreen(
@@ -176,47 +179,49 @@ void main() {
     expect(selected?.id, 'seller-1');
   });
 
-  testWidgets('seller list avatar ring is green when selling and red when out of stock', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: SellerListScreen(
-          title: 'Top Sellers in Your Society',
-          sellers: [
-            sellerFromListing(
-              _food(id: 'live', rating: 4, reviews: 2),
-              hasOrderableItems: true,
-            ),
-            sellerFromListing(
-              FoodItem(
-                id: 'empty',
-                name: 'Empty',
-                sellerId: 'oos',
-                sellerName: 'Out of Stock Kitchen',
-                block: 'Block B',
-                price: 10,
-                rating: 5,
-                pickupTime: '5:00 PM',
-                description: '',
-                quantity: 0,
-                icon: Icons.restaurant,
-                bgColor: const Color(0xFFE8F5EE),
+  testWidgets(
+    'seller list avatar ring is green when selling and red when out of stock',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SellerListScreen(
+            title: 'Top Sellers in Your Society',
+            sellers: [
+              sellerFromListing(
+                _food(id: 'live', rating: 4, reviews: 2),
+                hasOrderableItems: true,
               ),
-              hasOrderableItems: false,
-            ),
-          ],
-          onSellerTap: (_) {},
+              sellerFromListing(
+                FoodItem(
+                  id: 'empty',
+                  name: 'Empty',
+                  sellerId: 'oos',
+                  sellerName: 'Out of Stock Kitchen',
+                  block: 'Block B',
+                  price: 10,
+                  rating: 5,
+                  pickupTime: '5:00 PM',
+                  description: '',
+                  quantity: 0,
+                  icon: Icons.restaurant,
+                  bgColor: const Color(0xFFE8F5EE),
+                ),
+                hasOrderableItems: false,
+              ),
+            ],
+            onSellerTap: (_) {},
+          ),
         ),
-      ),
-    );
+      );
 
-    expect(find.text('Puran Agrawal'), findsOneWidget);
-    expect(find.text('Out of Stock Kitchen'), findsOneWidget);
-    final puranDy = tester.getTopLeft(find.text('Puran Agrawal')).dy;
-    final oosDy = tester.getTopLeft(find.text('Out of Stock Kitchen')).dy;
-    expect(puranDy, lessThan(oosDy));
-  });
+      expect(find.text('Puran Agrawal'), findsOneWidget);
+      expect(find.text('Out of Stock Kitchen'), findsOneWidget);
+      expect(find.text(sellerNotAvailableLabel), findsOneWidget);
+      final puranDy = tester.getTopLeft(find.text('Puran Agrawal')).dy;
+      final oosDy = tester.getTopLeft(find.text('Out of Stock Kitchen')).dy;
+      expect(puranDy, lessThan(oosDy));
+    },
+  );
 
   testWidgets('campaign seller name has a separate seller action', (
     tester,
@@ -242,50 +247,58 @@ void main() {
     expect(campaignOpened, isFalse);
   });
 
-  testWidgets('first storefront open shows structure and skeletons, not a spinner', (
-    tester,
-  ) async {
-    final pending = Completer<List<Map<String, dynamic>>>();
-    await _openStorefront(
-      tester,
-      seller: _seller('seller-a', 'Seller A'),
-      fetchListings: () => pending.future,
-    );
-    await tester.pump();
+  testWidgets(
+    'first storefront open shows structure and skeletons, not a spinner',
+    (tester) async {
+      final pending = Completer<List<Map<String, dynamic>>>();
+      await _openStorefront(
+        tester,
+        seller: _seller('seller-a', 'Seller A'),
+        fetchListings: () => pending.future,
+      );
+      await tester.pump();
 
-    expect(find.text('Seller Storefront'), findsOneWidget);
-    expect(find.text('Seller A'), findsOneWidget);
-    expect(find.byKey(const Key('storefront-product-skeletons')), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Seller Storefront'), findsOneWidget);
+      expect(find.text('Seller A'), findsOneWidget);
+      expect(
+        find.byKey(const Key('storefront-product-skeletons')),
+        findsOneWidget,
+      );
+      expect(find.byType(CircularProgressIndicator), findsNothing);
 
-    pending.complete([
-      _listingJson(id: 'a1', name: 'A Idli', sellerId: 'seller-a'),
-    ]);
-    await tester.pump();
-    await tester.pump();
+      pending.complete([
+        _listingJson(id: 'a1', name: 'A Idli', sellerId: 'seller-a'),
+      ]);
+      await tester.pump();
+      await tester.pump();
 
-    expect(find.text('A Idli'), findsOneWidget);
-    expect(find.byKey(const Key('storefront-product-skeletons')), findsNothing);
-  });
+      expect(find.text('A Idli'), findsOneWidget);
+      expect(
+        find.byKey(const Key('storefront-product-skeletons')),
+        findsNothing,
+      );
+    },
+  );
 
-  testWidgets('first-load failure shows an inline error inside the storefront', (
-    tester,
-  ) async {
-    await _openStorefront(
-      tester,
-      seller: _seller('seller-a', 'Seller A'),
-      fetchListings: () async {
-        throw Exception('storefront unavailable');
-      },
-    );
-    await tester.pump();
-    await tester.pump();
+  testWidgets(
+    'first-load failure shows an inline error inside the storefront',
+    (tester) async {
+      await _openStorefront(
+        tester,
+        seller: _seller('seller-a', 'Seller A'),
+        fetchListings: () async {
+          throw Exception('storefront unavailable');
+        },
+      );
+      await tester.pump();
+      await tester.pump();
 
-    expect(find.text('Seller A'), findsOneWidget);
-    expect(find.text('Unable to load this store'), findsOneWidget);
-    expect(find.text('Try again'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-  });
+      expect(find.text('Seller A'), findsOneWidget);
+      expect(find.text('Unable to load this store'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    },
+  );
 
   testWidgets('reopening the same seller shows cached storefront immediately', (
     tester,
@@ -352,7 +365,9 @@ void main() {
     expect(find.text('A Idli'), findsNothing);
   });
 
-  testWidgets('failed storefront refresh keeps cached products', (tester) async {
+  testWidgets('failed storefront refresh keeps cached products', (
+    tester,
+  ) async {
     final seller = _seller('seller-a', 'Seller A');
     await _openStorefront(
       tester,
@@ -390,11 +405,7 @@ void main() {
             fetchCampaigns: () async => [],
             initialProducts: [
               FoodItem.fromJson(
-                _listingJson(
-                  id: 'sushi',
-                  name: 'veg Sushi',
-                  sellerId: 'aarav',
-                ),
+                _listingJson(id: 'sushi', name: 'veg Sushi', sellerId: 'aarav'),
               ),
             ],
           ),
@@ -430,7 +441,10 @@ void main() {
 
     expect(find.text('A Idli'), findsNothing);
     expect(find.text('Seller B'), findsOneWidget);
-    expect(find.byKey(const Key('storefront-product-skeletons')), findsOneWidget);
+    expect(
+      find.byKey(const Key('storefront-product-skeletons')),
+      findsOneWidget,
+    );
     expect(find.byType(CircularProgressIndicator), findsNothing);
 
     pendingB.complete([
@@ -443,7 +457,9 @@ void main() {
     expect(find.text('A Idli'), findsNothing);
   });
 
-  testWidgets('storefront add-to-cart still increments quantity', (tester) async {
+  testWidgets('storefront add-to-cart still increments quantity', (
+    tester,
+  ) async {
     await _openStorefront(
       tester,
       seller: _seller('seller-a', 'Seller A'),
@@ -462,7 +478,9 @@ void main() {
     expect(find.text('Add'), findsNothing);
   });
 
-  testWidgets('storefront with Veg filter hides non-veg products', (tester) async {
+  testWidgets('storefront with Veg filter hides non-veg products', (
+    tester,
+  ) async {
     await _openStorefront(
       tester,
       seller: _seller('puran', 'Puran Agrawal'),
@@ -516,6 +534,46 @@ void main() {
     expect(find.text("Dadi's Dhokla"), findsOneWidget);
     expect(find.text('Chicken Biryani home made'), findsOneWidget);
   });
+
+  testWidgets('not selling storefront hides expired and sold-out dishes', (
+    tester,
+  ) async {
+    await _openStorefront(
+      tester,
+      seller: _seller('quiet', 'Quiet Kitchen'),
+      showOnlyOrderable: true,
+      fetchListings: () async => [
+        {
+          'id': 'old',
+          'name': 'Yesterday Biryani',
+          'sellerId': 'quiet',
+          'sellerName': 'Quiet Kitchen',
+          'price': 100,
+          'status': 'expired',
+          'quantity': 2,
+        },
+        {
+          'id': 'empty',
+          'name': 'Empty Dosa',
+          'sellerId': 'quiet',
+          'sellerName': 'Quiet Kitchen',
+          'price': 40,
+          'status': 'active',
+          'quantity': 0,
+        },
+      ],
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Yesterday Biryani'), findsNothing);
+    expect(find.text('Empty Dosa'), findsNothing);
+    expect(find.text('Not selling right now'), findsOneWidget);
+    expect(
+      find.text('Quiet Kitchen is not selling right now.'),
+      findsOneWidget,
+    );
+  });
 }
 
 Map<String, dynamic> _listingJson({
@@ -551,6 +609,7 @@ Future<void> _openStorefront(
   required Seller seller,
   required Future<List<Map<String, dynamic>>> Function() fetchListings,
   String? foodTypeFilter,
+  bool showOnlyOrderable = false,
 }) {
   return tester.pumpWidget(
     MaterialApp(
@@ -560,6 +619,7 @@ Future<void> _openStorefront(
         fetchListings: fetchListings,
         fetchCampaigns: () async => [],
         foodTypeFilter: foodTypeFilter,
+        showOnlyOrderable: showOnlyOrderable,
       ),
     ),
   );

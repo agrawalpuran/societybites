@@ -22,11 +22,13 @@ List<FoodItem> applyHomeListingFilters(
   String? foodType,
   HomeListingType listingType = HomeListingType.all,
   String? buyerSocietyId,
+  bool includeNotSelling = false,
 }) {
   var results = listings
       .where(
         (food) =>
-            food.isEligibleForHomeFeed &&
+            (food.isEligibleForHomeFeed ||
+                (includeNotSelling && (food.isExpired || food.isSoldOut))) &&
             !food.isPreOrder &&
             !food.isPreOrderCatalog,
       )
@@ -34,9 +36,7 @@ List<FoodItem> applyHomeListingFilters(
   results = listingsMatchingFoodType(results, foodType: foodType);
   results = listingsMatchingHomeType(results, listingType);
 
-  if (category != null &&
-      category != 'All' &&
-      searchQuery.trim().isEmpty) {
+  if (category != null && category != 'All' && searchQuery.trim().isEmpty) {
     results = results
         .where(
           (food) => listingMatchesHomeCategory(
@@ -67,9 +67,10 @@ List<FoodItem> applyHomeListingFilters(
     );
     if (rank != 0) return rank;
     if (searchQuery.isNotEmpty) {
-      final search = homeSearchMatchScore(a.value, searchQuery).compareTo(
-        homeSearchMatchScore(b.value, searchQuery),
-      );
+      final search = homeSearchMatchScore(
+        a.value,
+        searchQuery,
+      ).compareTo(homeSearchMatchScore(b.value, searchQuery));
       if (search != 0) return search;
     }
     return a.key.compareTo(b.key);
@@ -139,11 +140,7 @@ List<PreOrderCampaign> campaignsMatchingHomeTypeFilters(
 
 /// Orderable now, then own society, then closer, then review-weighted
 /// rating, then newer. Search relevance only breaks remaining ties.
-int compareHomeFeedListings(
-  FoodItem a,
-  FoodItem b, {
-  String? buyerSocietyId,
-}) {
+int compareHomeFeedListings(FoodItem a, FoodItem b, {String? buyerSocietyId}) {
   final orderable = (b.canAddToCart ? 1 : 0).compareTo(a.canAddToCart ? 1 : 0);
   if (orderable != 0) return orderable;
 
@@ -152,9 +149,10 @@ int compareHomeFeedListings(
   );
   if (society != 0) return society;
 
-  final distance = _homeDistanceRank(a, buyerSocietyId).compareTo(
-    _homeDistanceRank(b, buyerSocietyId),
-  );
+  final distance = _homeDistanceRank(
+    a,
+    buyerSocietyId,
+  ).compareTo(_homeDistanceRank(b, buyerSocietyId));
   if (distance != 0) return distance;
 
   final rating = _homeRatingRank(b).compareTo(_homeRatingRank(a));
@@ -187,8 +185,8 @@ double _homeRatingRank(FoodItem food) {
   final weight = food.reviewCount <= 2
       ? 0.3
       : food.reviewCount < 10
-          ? 0.65
-          : 1.0;
+      ? 0.65
+      : 1.0;
   return food.rating * weight;
 }
 
@@ -263,10 +261,7 @@ List<BuyerDistanceChoice> homeDistanceMenuChoices(SellingReach reach) {
   final widest = reach.extendedAvailable
       ? const BuyerDistanceChoice.extended()
       : BuyerDistanceChoice.within(cap);
-  return [
-    widest,
-    for (final km in narrower) BuyerDistanceChoice.within(km),
-  ];
+  return [widest, for (final km in narrower) BuyerDistanceChoice.within(km)];
 }
 
 String homeDistanceMenuLabel(BuyerDistanceChoice choice, SellingReach reach) {
@@ -570,8 +565,8 @@ List<Map<String, dynamic>> listingMapsFromNearbyPayload(
         : const <String, dynamic>{};
     final reach = sellerInfo['sellingReachLevel'];
     final distanceKm = sellerInfo['distanceKm'] ?? seller['distanceKm'];
-    final societyName =
-        (sellerInfo['societyName'] ?? seller['societyName'])?.toString();
+    final societyName = (sellerInfo['societyName'] ?? seller['societyName'])
+        ?.toString();
     final items = seller['listings'];
     if (items is! List) continue;
     for (final item in items) {

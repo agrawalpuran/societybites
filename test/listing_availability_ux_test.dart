@@ -54,13 +54,17 @@ void main() {
   });
 
   test('expired listings stay unorderable and leave the home feed', () {
-    final expired = FoodItem.fromJson(_listingJson(
-      name: 'Chicken Biryani',
-      status: 'expired',
-      foodType: 'NON_VEG',
-    ));
+    final expired = FoodItem.fromJson(
+      _listingJson(
+        name: 'Chicken Biryani',
+        status: 'expired',
+        foodType: 'NON_VEG',
+      ),
+    );
     final vegActive = FoodItem.fromJson(_listingJson(name: 'Dal'));
-    final paused = FoodItem.fromJson(_listingJson(name: 'Hidden', status: 'paused'));
+    final paused = FoodItem.fromJson(
+      _listingJson(name: 'Hidden', status: 'paused'),
+    );
     final preorder = FoodItem.fromJson(
       _listingJson(name: 'Sunday Thali', catalogType: listingCatalogPreorder),
     );
@@ -78,11 +82,22 @@ void main() {
     expect(paused.isPaused, isTrue);
     expect(paused.canAddToCart, isFalse);
 
-    final nonVeg = applyHomeListingFilters(
-      [expired, vegActive],
-      foodType: foodTypeNonVeg,
-    );
+    final nonVeg = applyHomeListingFilters([
+      expired,
+      vegActive,
+    ], foodType: foodTypeNonVeg);
     expect(nonVeg, isEmpty);
+
+    final presence = applyHomeListingFilters([
+      expired,
+      vegActive,
+      paused,
+    ], includeNotSelling: true);
+    expect(
+      presence.map((item) => item.name),
+      containsAll(['Dal', 'Chicken Biryani']),
+    );
+    expect(presence.map((item) => item.name), isNot(contains('Hidden')));
   });
 
   test('available listings appear before unavailable listings', () {
@@ -107,10 +122,7 @@ void main() {
       statusSoldOut,
       active,
     ]);
-    expect(ordered.map((item) => item.name), [
-      'Dal',
-      'Sold Dosa',
-    ]);
+    expect(ordered.map((item) => item.name), ['Dal', 'Sold Dosa']);
   });
 
   testWidgets('home All Items previews 12 rows then See all expands', (
@@ -120,15 +132,10 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(400, 2400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    final listings = List.generate(
-      16,
-      (i) => _listingJson(name: 'Dish $i'),
-    );
+    final listings = List.generate(16, (i) => _listingJson(name: 'Dish $i'));
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: HomeScreen(fetchListings: () async => listings),
-      ),
+      MaterialApp(home: HomeScreen(fetchListings: () async => listings)),
     );
     await tester.pump();
     await tester.pump();
@@ -257,136 +264,138 @@ void main() {
     expect(find.text('1 match'), findsOneWidget);
   });
 
-  testWidgets('Home All Items includes nearby-eligible dishes from other societies', (
-    tester,
-  ) async {
-    _ignoreOverflow();
-    await tester.binding.setSurfaceSize(const Size(400, 1600));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'Home All Items includes nearby-eligible dishes from other societies',
+    (tester) async {
+      _ignoreOverflow();
+      await tester.binding.setSurfaceSize(const Size(400, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: HomeScreen(
-          fetchListings: () async => [_listingJson(name: 'Notting Hill Dal')],
-          fetchNearbySellers: () async => {
-            'available': true,
-            'nearbyRadiusKm': 10,
-            'extendedRadiusKm': 15,
-            'sellers': [
-              {
-                'seller': {
-                  'id': 'aarav',
-                  'name': 'Aarav',
-                  'societyName': 'Prestige Ferns Residency',
-                  'distanceKm': 8.2,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HomeScreen(
+            fetchListings: () async => [_listingJson(name: 'Notting Hill Dal')],
+            fetchNearbySellers: () async => {
+              'available': true,
+              'nearbyRadiusKm': 10,
+              'extendedRadiusKm': 15,
+              'sellers': [
+                {
+                  'seller': {
+                    'id': 'aarav',
+                    'name': 'Aarav',
+                    'societyName': 'Prestige Ferns Residency',
+                    'distanceKm': 8.2,
+                  },
+                  'listings': [
+                    _listingJson(name: 'veg Sushi')
+                      ..['id'] = 'aarav-sushi'
+                      ..['sellerId'] = 'aarav'
+                      ..['sellerName'] = 'Aarav',
+                  ],
                 },
-                'listings': [
-                  _listingJson(name: 'veg Sushi')
-                    ..['id'] = 'aarav-sushi'
-                    ..['sellerId'] = 'aarav'
-                    ..['sellerName'] = 'Aarav',
-                ],
-              },
-            ],
-          },
+              ],
+            },
+          ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+      );
+      await tester.pump();
+      await tester.pump();
 
-    expect(find.text('Notting Hill Dal'), findsWidgets);
-    expect(find.text('veg Sushi'), findsWidgets);
-  });
+      expect(find.text('Notting Hill Dal'), findsWidgets);
+      expect(find.text('veg Sushi'), findsWidgets);
+    },
+  );
 
-  testWidgets('Home splits society, nearby and extended into labelled sections', (
-    tester,
-  ) async {
-    _ignoreOverflow();
-    SharedPreferences.setMockInitialValues({'society_id': 'mine'});
-    await tester.binding.setSurfaceSize(const Size(400, 2400));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'Home splits society, nearby and extended into labelled sections',
+    (tester) async {
+      _ignoreOverflow();
+      SharedPreferences.setMockInitialValues({'society_id': 'mine'});
+      await tester.binding.setSurfaceSize(const Size(400, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: HomeScreen(
-          fetchListings: () async => [
-            _listingJson(name: 'Society Dal')..['societyId'] = 'mine',
-          ],
-          fetchNearbySellers: () async => {
-            'available': true,
-            'nearbyRadiusKm': 8,
-            'extendedRadiusKm': 15,
-            'sellers': [
-              {
-                'seller': {
-                  'id': 'near-cook',
-                  'name': 'Nearby Cook',
-                  'sellingReachLevel': 'NEARBY',
-                },
-                'listings': [
-                  _listingJson(name: 'Nearby Idli')
-                    ..['id'] = 'near-idli'
-                    ..['societyId'] = 'near-soc'
-                    ..['sellerId'] = 'near-cook'
-                    ..['sellerName'] = 'Nearby Cook',
-                ],
-              },
-              {
-                'seller': {
-                  'id': 'ext-cook',
-                  'name': 'Extended Cook',
-                  'sellingReachLevel': 'EXTENDED',
-                },
-                'listings': [
-                  _listingJson(name: 'Extended Dosa')
-                    ..['id'] = 'ext-dosa'
-                    ..['societyId'] = 'ext-soc'
-                    ..['sellerId'] = 'ext-cook'
-                    ..['sellerName'] = 'Extended Cook',
-                ],
-              },
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HomeScreen(
+            fetchListings: () async => [
+              _listingJson(name: 'Society Dal')..['societyId'] = 'mine',
             ],
-          },
+            fetchNearbySellers: () async => {
+              'available': true,
+              'nearbyRadiusKm': 8,
+              'extendedRadiusKm': 15,
+              'sellers': [
+                {
+                  'seller': {
+                    'id': 'near-cook',
+                    'name': 'Nearby Cook',
+                    'sellingReachLevel': 'NEARBY',
+                  },
+                  'listings': [
+                    _listingJson(name: 'Nearby Idli')
+                      ..['id'] = 'near-idli'
+                      ..['societyId'] = 'near-soc'
+                      ..['sellerId'] = 'near-cook'
+                      ..['sellerName'] = 'Nearby Cook',
+                  ],
+                },
+                {
+                  'seller': {
+                    'id': 'ext-cook',
+                    'name': 'Extended Cook',
+                    'sellingReachLevel': 'EXTENDED',
+                  },
+                  'listings': [
+                    _listingJson(name: 'Extended Dosa')
+                      ..['id'] = 'ext-dosa'
+                      ..['societyId'] = 'ext-soc'
+                      ..['sellerId'] = 'ext-cook'
+                      ..['sellerName'] = 'Extended Cook',
+                  ],
+                },
+              ],
+            },
+          ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+      );
+      await tester.pump();
+      await tester.pump();
 
-    expect(find.text('Top Sellers in Your Society'), findsOneWidget);
-    expect(find.text("Today's Specials in Your Society"), findsOneWidget);
-    expect(find.text('Nearby Societies'), findsOneWidget);
-    expect(find.text('Sellers within ~8 km'), findsOneWidget);
-    expect(find.text('More Around You'), findsOneWidget);
-    expect(find.text('From other societies (within ~15 km)'), findsOneWidget);
-    expect(find.text('Top Rated Sellers'), findsNothing);
-    expect(find.text('In Your Society'), findsNothing);
-    expect(find.text("Today's Specials"), findsNothing);
-    expect(find.text('Nearby'), findsNothing);
-    expect(find.text('Extended Reach'), findsNothing);
-    expect(find.text('Society Dal'), findsWidgets);
-    expect(find.text('Nearby Idli'), findsWidgets);
-    expect(find.text('Extended Dosa'), findsWidgets);
-    expect(find.text('All Items'), findsOneWidget);
+      expect(find.text('Top Sellers in Your Society'), findsOneWidget);
+      expect(find.text("Today's Specials in Your Society"), findsOneWidget);
+      expect(find.text('Nearby Societies'), findsOneWidget);
+      expect(find.text('Sellers within ~8 km'), findsOneWidget);
+      expect(find.text('More Around You'), findsOneWidget);
+      expect(find.text('From other societies (within ~15 km)'), findsOneWidget);
+      expect(find.text('Top Rated Sellers'), findsNothing);
+      expect(find.text('In Your Society'), findsNothing);
+      expect(find.text("Today's Specials"), findsNothing);
+      expect(find.text('Nearby'), findsNothing);
+      expect(find.text('Extended Reach'), findsNothing);
+      expect(find.text('Society Dal'), findsWidgets);
+      expect(find.text('Nearby Idli'), findsWidgets);
+      expect(find.text('Extended Dosa'), findsWidgets);
+      expect(find.text('All Items'), findsOneWidget);
 
-    double dy(String title) => tester.getTopLeft(find.text(title).first).dy;
-    expect(
-      dy('Top Sellers in Your Society'),
-      lessThan(dy("Today's Specials in Your Society")),
-    );
-    expect(
-      dy("Today's Specials in Your Society"),
-      lessThan(dy('Nearby Societies')),
-    );
-    expect(dy('Nearby Societies'), lessThan(dy('Nearby Idli')));
-    expect(dy('Nearby Idli'), lessThan(dy('More Around You')));
-    expect(dy('More Around You'), lessThan(dy('Extended Dosa')));
-    expect(
-      dy('Top Sellers in Your Society'),
-      lessThan(dy('Nearby Societies')),
-    );
-  });
+      double dy(String title) => tester.getTopLeft(find.text(title).first).dy;
+      expect(
+        dy('Top Sellers in Your Society'),
+        lessThan(dy("Today's Specials in Your Society")),
+      );
+      expect(
+        dy("Today's Specials in Your Society"),
+        lessThan(dy('Nearby Societies')),
+      );
+      expect(dy('Nearby Societies'), lessThan(dy('Nearby Idli')));
+      expect(dy('Nearby Idli'), lessThan(dy('More Around You')));
+      expect(dy('More Around You'), lessThan(dy('Extended Dosa')));
+      expect(
+        dy('Top Sellers in Your Society'),
+        lessThan(dy('Nearby Societies')),
+      );
+    },
+  );
 
   testWidgets(
     'Home groups next-door EXTENDED sellers as Nearby using distance not opt-in',
@@ -451,7 +460,10 @@ void main() {
       final nearbySellers = find.byKey(const Key('home-sellers-nearby'));
       final extendedSellers = find.byKey(const Key('home-sellers-extended'));
       expect(
-        find.descendant(of: nearbySellers, matching: find.text('Puran Agrawal')),
+        find.descendant(
+          of: nearbySellers,
+          matching: find.text('Puran Agrawal'),
+        ),
         findsOneWidget,
       );
       expect(
@@ -463,46 +475,50 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: extendedSellers, matching: find.text('Puran Agrawal')),
+        find.descendant(
+          of: extendedSellers,
+          matching: find.text('Puran Agrawal'),
+        ),
         findsNothing,
       );
     },
   );
 
-  testWidgets('Home omits Nearby and Extended headings when those buckets are empty', (
-    tester,
-  ) async {
-    _ignoreOverflow();
-    SharedPreferences.setMockInitialValues({'society_id': 'mine'});
-    await tester.binding.setSurfaceSize(const Size(400, 1600));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'Home omits Nearby and Extended headings when those buckets are empty',
+    (tester) async {
+      _ignoreOverflow();
+      SharedPreferences.setMockInitialValues({'society_id': 'mine'});
+      await tester.binding.setSurfaceSize(const Size(400, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: HomeScreen(
-          fetchListings: () async => [
-            _listingJson(name: 'Society Dal')..['societyId'] = 'mine',
-          ],
-          fetchNearbySellers: () async => {
-            'available': true,
-            'sellers': <Map<String, dynamic>>[],
-          },
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HomeScreen(
+            fetchListings: () async => [
+              _listingJson(name: 'Society Dal')..['societyId'] = 'mine',
+            ],
+            fetchNearbySellers: () async => {
+              'available': true,
+              'sellers': <Map<String, dynamic>>[],
+            },
+          ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+      );
+      await tester.pump();
+      await tester.pump();
 
-    expect(find.text("Today's Specials in Your Society"), findsOneWidget);
-    expect(find.text('Top Sellers in Your Society'), findsOneWidget);
-    expect(find.text('In Your Society'), findsNothing);
-    expect(find.text('Nearby Societies'), findsNothing);
-    expect(find.text('More Around You'), findsNothing);
-    expect(find.text('Nearby'), findsNothing);
-    expect(find.text('Extended Reach'), findsNothing);
-    expect(find.byKey(const Key('home-see-all-nearby')), findsNothing);
-    expect(find.byKey(const Key('home-see-all-extended')), findsNothing);
-  });
+      expect(find.text("Today's Specials in Your Society"), findsOneWidget);
+      expect(find.text('Top Sellers in Your Society'), findsOneWidget);
+      expect(find.text('In Your Society'), findsNothing);
+      expect(find.text('Nearby Societies'), findsNothing);
+      expect(find.text('More Around You'), findsNothing);
+      expect(find.text('Nearby'), findsNothing);
+      expect(find.text('Extended Reach'), findsNothing);
+      expect(find.byKey(const Key('home-see-all-nearby')), findsNothing);
+      expect(find.byKey(const Key('home-see-all-extended')), findsNothing);
+    },
+  );
 
   testWidgets('More Around You seller chips fit without a bottom overflow', (
     tester,
@@ -574,9 +590,9 @@ void main() {
               ..['sellerId'] = 'amita'
               ..['price'] = 150,
             _listingJson(
-              name: 'Hyderabadi Chicken Biryani',
-              foodType: 'NON_VEG',
-            )
+                name: 'Hyderabadi Chicken Biryani',
+                foodType: 'NON_VEG',
+              )
               ..['id'] = 'seed-listing-biryani'
               ..['societyId'] = 'mine'
               ..['sellerName'] = 'Amita Agarwal'
@@ -604,10 +620,9 @@ void main() {
     expect(find.textContaining('Amita Agarwal'), findsWidgets);
   });
 
-  testWidgets('expired listing is absent from the home feed', (
-    tester,
-  ) async {
+  testWidgets('expired listing is absent from the home feed', (tester) async {
     _ignoreOverflow();
+    SharedPreferences.setMockInitialValues({'society_id': 'mine'});
     await tester.binding.setSurfaceSize(const Size(400, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -615,7 +630,8 @@ void main() {
       MaterialApp(
         home: HomeScreen(
           fetchListings: () async => [
-            _listingJson(name: 'Chicken Biryani', status: 'expired'),
+            _listingJson(name: 'Chicken Biryani', status: 'expired')
+              ..['societyId'] = 'mine',
           ],
         ),
       ),
@@ -627,9 +643,13 @@ void main() {
     expect(find.text('Out of stock'), findsNothing);
     expect(find.text('All Items'), findsOneWidget);
     expect(find.text('Add'), findsNothing);
+    expect(find.text('Puran Agrawal'), findsOneWidget);
+    expect(find.text(sellerNotAvailableLabel), findsOneWidget);
   });
 
-  testWidgets('food detail disables order for expired listings', (tester) async {
+  testWidgets('food detail disables order for expired listings', (
+    tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(400, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
@@ -747,36 +767,37 @@ void main() {
     );
   });
 
-  testWidgets('compact listing card keeps Add horizontal when sold count shows', (
-    tester,
-  ) async {
-    _ignoreOverflow();
-    SharedPreferences.setMockInitialValues({'society_id': 'mine'});
-    await tester.binding.setSurfaceSize(const Size(400, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'compact listing card keeps Add horizontal when sold count shows',
+    (tester) async {
+      _ignoreOverflow();
+      SharedPreferences.setMockInitialValues({'society_id': 'mine'});
+      await tester.binding.setSurfaceSize(const Size(400, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: HomeScreen(
-          fetchListings: () async => [
-            _listingJson(name: 'veg Sushi', quantity: 38)
-              ..['societyId'] = 'mine'
-              ..['price'] = 90
-              ..['quantitySold'] = 2,
-          ],
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HomeScreen(
+            fetchListings: () async => [
+              _listingJson(name: 'veg Sushi', quantity: 38)
+                ..['societyId'] = 'mine'
+                ..['price'] = 90
+                ..['quantitySold'] = 2,
+            ],
+          ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+      );
+      await tester.pump();
+      await tester.pump();
 
-    expect(find.text('2 sold'), findsWidgets);
-    expect(find.text('REGULAR'), findsWidgets);
-    final price = tester.getRect(find.text('₹90').first);
-    final sold = tester.getRect(find.text('2 sold').first);
-    expect(sold.top, greaterThan(price.bottom - 1));
+      expect(find.text('2 sold'), findsWidgets);
+      expect(find.text('REGULAR'), findsWidgets);
+      final price = tester.getRect(find.text('₹90').first);
+      final sold = tester.getRect(find.text('2 sold').first);
+      expect(sold.top, greaterThan(price.bottom - 1));
 
-    final addSize = tester.getSize(find.text('Add').first);
-    expect(addSize.width, greaterThan(addSize.height));
-  });
+      final addSize = tester.getSize(find.text('Add').first);
+      expect(addSize.width, greaterThan(addSize.height));
+    },
+  );
 }

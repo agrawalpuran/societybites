@@ -24,10 +24,7 @@ import 'home_listing_filter.dart';
 import 'login_screen.dart';
 
 class _CachedStorefront {
-  const _CachedStorefront({
-    required this.products,
-    required this.campaigns,
-  });
+  const _CachedStorefront({required this.products, required this.campaigns});
 
   final List<FoodItem> products;
   final List<PreOrderCampaign> campaigns;
@@ -77,6 +74,7 @@ class SellerStorefrontScreen extends StatefulWidget {
     this.browseOnly = false,
     this.initialProducts,
     this.foodTypeFilter,
+    this.showOnlyOrderable = false,
   });
 
   final Seller seller;
@@ -99,6 +97,9 @@ class SellerStorefrontScreen extends StatefulWidget {
   /// Optional VEG / NON_VEG filter inherited from Home. Null keeps all items.
   final String? foodTypeFilter;
 
+  /// Hides expired and sold-out dishes. Used when a seller is not selling now.
+  final bool showOnlyOrderable;
+
   @override
   SellerStorefrontScreenState createState() => SellerStorefrontScreenState();
 }
@@ -113,10 +114,14 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
 
   List<CartItem> get _cart => widget.cartItems ?? _localCart;
 
-  List<FoodItem> get _visibleProducts => listingsMatchingFoodType(
-        _products,
-        foodType: widget.foodTypeFilter,
-      );
+  List<FoodItem> get _visibleProducts {
+    final matched = listingsMatchingFoodType(
+      _products,
+      foodType: widget.foodTypeFilter,
+    );
+    if (!widget.showOnlyOrderable) return matched;
+    return matched.where((item) => item.canAddToCart).toList();
+  }
 
   @override
   void initState() {
@@ -159,7 +164,9 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
         listingRaw = responses[0];
         campaignRaw = responses[1];
       } else if (widget.guestBrowse) {
-        final raw = await ApiService.getGuestKitchenStorefront(widget.seller.id);
+        final raw = await ApiService.getGuestKitchenStorefront(
+          widget.seller.id,
+        );
         final listings = raw['listings'];
         listingRaw = listings is List
             ? listings
@@ -223,13 +230,17 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       }
       var products = listingRaw
           .map(FoodItem.fromJson)
-          .where((item) => (item.isActive || item.isExpired) && !item.isPreOrder)
+          .where(
+            (item) => (item.isActive || item.isExpired) && !item.isPreOrder,
+          )
           .toList();
       if (products.isEmpty) {
         final seeded = widget.initialProducts;
         if (seeded != null && seeded.isNotEmpty) {
           products = seeded
-              .where((item) => (item.isActive || item.isExpired) && !item.isPreOrder)
+              .where(
+                (item) => (item.isActive || item.isExpired) && !item.isPreOrder,
+              )
               .toList();
         }
       }
@@ -289,8 +300,8 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
             ? '${food.name} is out of stock.'
             : food.recurringUnavailable
             ? (food.recurringWindowLabel.isNotEmpty
-                ? '${food.name} is not available now. Available ${food.recurringWindowLabel}.'
-                : '${food.name} is not available now.')
+                  ? '${food.name} is not available now. Available ${food.recurringWindowLabel}.'
+                  : '${food.name} is not available now.')
             : food.madeToOrderUnavailableToday
             ? '${food.name} is currently unavailable.'
             : '${food.name} is sold out.',
@@ -428,35 +439,35 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
     return centerOnWeb(
       context,
       Scaffold(
-      backgroundColor: preorderBackground,
-      appBar: AppBar(
         backgroundColor: preorderBackground,
-        foregroundColor: preorderText,
-        elevation: 0,
-        title: const Text(
-          'Seller Storefront',
-          style: TextStyle(fontWeight: FontWeight.w800),
+        appBar: AppBar(
+          backgroundColor: preorderBackground,
+          foregroundColor: preorderText,
+          elevation: 0,
+          title: const Text(
+            'Seller Storefront',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
         ),
-      ),
-      body: RefreshIndicator(
-        color: preorderGreen,
-        onRefresh: _load,
-        child: _content(),
-      ),
-      floatingActionButton: widget.browseOnly || _cart.isEmpty
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _checkout,
-              backgroundColor: preorderGreen,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.shopping_bag_rounded),
-              label: Text(
-                '$_cartCount items  •  ${formatMoney(_cartTotal)}',
-                style: const TextStyle(fontWeight: FontWeight.w800),
+        body: RefreshIndicator(
+          color: preorderGreen,
+          onRefresh: _load,
+          child: _content(),
+        ),
+        floatingActionButton: widget.browseOnly || _cart.isEmpty
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: _checkout,
+                backgroundColor: preorderGreen,
+                foregroundColor: Colors.white,
+                icon: const Icon(Icons.shopping_bag_rounded),
+                label: Text(
+                  '$_cartCount items  •  ${formatMoney(_cartTotal)}',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
               ),
-            ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-    ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      ),
     );
   }
 
@@ -491,9 +502,13 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                   _productSkeletonGrid(),
                 ] else if (_visibleProducts.isEmpty && _campaigns.isEmpty) ...[
                   const SizedBox(height: 24),
-                  const PreOrderEmptyState(
-                    title: 'Nothing available right now',
-                    message: 'This seller has no items available right now.',
+                  PreOrderEmptyState(
+                    title: widget.showOnlyOrderable
+                        ? 'Not selling right now'
+                        : 'Nothing available right now',
+                    message: widget.showOnlyOrderable
+                        ? '${widget.seller.name} is not selling right now.'
+                        : 'This seller has no items available right now.',
                   ),
                 ] else ...[
                   if (_visibleProducts.isNotEmpty) ...[
@@ -529,7 +544,8 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
   Widget _header() {
     final location = _location;
     final reviews = _reviewCount > 0 ? _reviewCount : widget.seller.reviewCount;
-    final photoUrl = widget.seller.profilePhotoUrl ??
+    final photoUrl =
+        widget.seller.profilePhotoUrl ??
         _products
             .map((item) => item.sellerProfilePhotoUrl)
             .firstWhere(
@@ -707,7 +723,8 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
             mainAxisSpacing: 12,
             childAspectRatio: constraints.maxWidth >= 720 ? .78 : .72,
           ),
-          itemBuilder: (context, index) => _productCard(_visibleProducts[index]),
+          itemBuilder: (context, index) =>
+              _productCard(_visibleProducts[index]),
         );
       },
     );
@@ -790,50 +807,52 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: MarketplacePurchaseSlot(
-                      food: food,
-                      cartQty: quantity,
-                      compact: true,
-                      soldOut: const Text(
-                        'Sold out',
-                        style: TextStyle(
-                          color: Color(0xFFD94F4F),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      addButton: _smallButton(
-                        label: 'Add',
-                        onTap: () => _changeCart(food, 1),
-                      ),
-                      qtyStepper: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _quantityButton(
-                            Icons.remove,
-                            () => _changeCart(food, -1),
-                          ),
-                          SizedBox(
-                            width: 28,
-                            child: Text(
-                              '$quantity',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontWeight: FontWeight.w800),
+                          food: food,
+                          cartQty: quantity,
+                          compact: true,
+                          soldOut: const Text(
+                            'Sold out',
+                            style: TextStyle(
+                              color: Color(0xFFD94F4F),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          _quantityButton(
-                            Icons.add,
-                            () => _changeCart(food, 1),
-                            filled: true,
+                          addButton: _smallButton(
+                            label: 'Add',
+                            onTap: () => _changeCart(food, 1),
                           ),
-                        ],
-                      ),
+                          qtyStepper: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _quantityButton(
+                                  Icons.remove,
+                                  () => _changeCart(food, -1),
+                                ),
+                                SizedBox(
+                                  width: 28,
+                                  child: Text(
+                                    '$quantity',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                _quantityButton(
+                                  Icons.add,
+                                  () => _changeCart(food, 1),
+                                  filled: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                      ),
-                      ),
                 ],
               ),
               if (food.quantity > 0 && !food.isExpired) ...[

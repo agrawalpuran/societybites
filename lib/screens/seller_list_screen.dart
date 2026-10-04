@@ -24,10 +24,7 @@ class SellerListScreen extends StatelessWidget {
         backgroundColor: preorderBackground,
         foregroundColor: preorderText,
         elevation: 0,
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
@@ -49,20 +46,27 @@ class SellerListScreen extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    SellerAvatar(
-                      radius: 27,
-                      backgroundColor: seller.avatarColor,
-                      photoUrl: seller.profilePhotoUrl,
-                      ringColor: sellerPresenceRingColor(
-                        seller.hasOrderableItems,
+                    if (seller.hasOrderableItems)
+                      SellerAvatar(
+                        radius: 27,
+                        backgroundColor: seller.avatarColor,
+                        photoUrl: seller.profilePhotoUrl,
+                        ringColor: sellerSellingRingColor,
+                        ringWidth: 2.4,
+                        fallback: Icon(
+                          seller.avatarIcon,
+                          color: preorderGreen,
+                          size: 27,
+                        ),
+                      )
+                    else
+                      const SellerAvatar(
+                        radius: 27,
+                        backgroundColor: Colors.white,
+                        ringColor: Color(0xFFD5DCDA),
+                        ringWidth: 1.5,
+                        fallback: SizedBox.shrink(),
                       ),
-                      ringWidth: 2.4,
-                      fallback: Icon(
-                        seller.avatarIcon,
-                        color: preorderGreen,
-                        size: 27,
-                      ),
-                    ),
                     const SizedBox(width: 13),
                     Expanded(
                       child: Column(
@@ -87,7 +91,17 @@ class SellerListScreen extends StatelessWidget {
                               ),
                             ),
                           ],
-                          if (seller.rating > 0) ...[
+                          if (!seller.hasOrderableItems) ...[
+                            const SizedBox(height: 3),
+                            const Text(
+                              sellerNotAvailableLabel,
+                              style: TextStyle(
+                                color: Color(0xFF8A9491),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ] else if (seller.rating > 0) ...[
                             const SizedBox(height: 3),
                             Text(
                               '⭐ ${seller.rating.toStringAsFixed(1)}'

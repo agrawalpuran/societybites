@@ -154,9 +154,7 @@ class HomeScreenState extends State<HomeScreen> {
         return;
       }
       final userId = await SessionService.getUserId();
-      final raw = await ApiService.getPreOrderCampaigns(
-        societyId: societyId,
-      );
+      final raw = await ApiService.getPreOrderCampaigns(societyId: societyId);
       final parsed = <PreOrderCampaign>[];
       for (final item in raw) {
         try {
@@ -339,11 +337,11 @@ class HomeScreenState extends State<HomeScreen> {
       effectiveBuyerDistance(_distanceChoice, _cityReach);
 
   List<FoodItem> get _distanceFiltered => listingsMatchingBuyerDistance(
-        _filteredListings,
-        choice: _effectiveDistance,
-        buyerSocietyId: _buyerSocietyId,
-        nearbyRadiusKm: _cityReach.nearbyRadiusKm,
-      );
+    _filteredListings,
+    choice: _effectiveDistance,
+    buyerSocietyId: _buyerSocietyId,
+    nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+  );
 
   List<FoodItem> get _available => _distanceFiltered;
 
@@ -404,7 +402,8 @@ class HomeScreenState extends State<HomeScreen> {
     if (!kIsWeb) return false;
     final token = await SessionService.getToken();
     final refresh = await SessionService.getRefreshToken();
-    final signedIn = (token != null && token.isNotEmpty) ||
+    final signedIn =
+        (token != null && token.isNotEmpty) ||
         (refresh != null && refresh.isNotEmpty);
     if (signedIn || !mounted) return false;
     await showGuestOrderAuthDialog(context);
@@ -425,10 +424,10 @@ class HomeScreenState extends State<HomeScreen> {
                 ? '${food.name} is out of stock'
                 : food.recurringUnavailable
                 ? (food.recurringWindowLabel.isNotEmpty
-                    ? '${food.name} is not available now. Available ${food.recurringWindowLabel}'
-                    : food.recurringNextLabel.isNotEmpty
-                    ? '${food.name} is not available now. ${food.recurringNextLabel}'
-                    : '${food.name} is not available now')
+                      ? '${food.name} is not available now. Available ${food.recurringWindowLabel}'
+                      : food.recurringNextLabel.isNotEmpty
+                      ? '${food.name} is not available now. ${food.recurringNextLabel}'
+                      : '${food.name} is not available now')
                 : food.madeToOrderUnavailableToday
                 ? '${food.name} is currently unavailable'
                 : '${food.name} is sold out',
@@ -550,9 +549,10 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openSeller(Seller seller) {
-    final sellerListings =
-        _listings.where((food) => food.sellerId == seller.id).toList();
+  void _openSeller(Seller seller, {bool hideUnavailableDishes = false}) {
+    final sellerListings = _listings
+        .where((food) => food.sellerId == seller.id)
+        .toList();
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -565,8 +565,8 @@ class HomeScreenState extends State<HomeScreen> {
             if (mounted) setState(() {});
           },
           foodTypeFilter: _selectedFoodType,
-          initialProducts:
-              sellerListings.isEmpty ? null : sellerListings,
+          showOnlyOrderable: hideUnavailableDishes,
+          initialProducts: sellerListings.isEmpty ? null : sellerListings,
         ),
       ),
     ).then((_) {
@@ -600,7 +600,9 @@ class HomeScreenState extends State<HomeScreen> {
     final counts = <String, int>{};
     for (final category in _homeFilterChips) {
       if (category == 'Made to Order') {
-        counts[category] = inCategory.where((food) => food.isMadeToOrder).length;
+        counts[category] = inCategory
+            .where((food) => food.isMadeToOrder)
+            .length;
       } else if (category == 'Pre-order') {
         counts[category] = _preorderResultCount;
       } else {
@@ -651,7 +653,9 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   List<FoodItem> _webRegularFor(HomeListingReach reach) {
-    return _listingsForReach(reach).where((food) => !food.isMadeToOrder).toList();
+    return _listingsForReach(
+      reach,
+    ).where((food) => !food.isMadeToOrder).toList();
   }
 
   List<FoodItem> get _webReadyNow {
@@ -680,10 +684,13 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   List<FoodItem> _webHeroFoods() {
-    final withImages = _distanceFiltered.where((food) {
-      final url = food.imageUrl?.trim();
-      return url != null && url.isNotEmpty && url != 'null';
-    }).take(2).toList();
+    final withImages = _distanceFiltered
+        .where((food) {
+          final url = food.imageUrl?.trim();
+          return url != null && url.isNotEmpty && url != 'null';
+        })
+        .take(2)
+        .toList();
     if (withImages.isNotEmpty) return withImages;
     return _distanceFiltered.take(1).toList();
   }
@@ -766,101 +773,97 @@ class HomeScreenState extends State<HomeScreen> {
       floatingActionButton: const FloatingCartBar(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: SafeArea(
-              child: RefreshIndicator(
-                color: const Color(0xFF0E5A47),
-                onRefresh: () => _pullRefresh.run(_refreshHome),
-                child: CustomScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
+        child: RefreshIndicator(
+          color: const Color(0xFF0E5A47),
+          onRefresh: () => _pullRefresh.run(_refreshHome),
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            slivers: [
+              SliverToBoxAdapter(child: _buildHeader()),
+              if (_isLoading && !_hasSuccessfullyLoaded) ...[
+                SliverToBoxAdapter(child: _buildSearchBar()),
+                if (_searchQuery.isEmpty)
+                  SliverToBoxAdapter(child: _buildCategoryChips()),
+                const SliverToBoxAdapter(child: HomeFeedSkeleton()),
+                if (_homeSlow)
+                  SliverToBoxAdapter(
+                    child: InlineLoadStatus.slow(
+                      id: 'home-feed',
+                      onRetry: _loadListings,
+                    ),
                   ),
-                  slivers: [
-                    SliverToBoxAdapter(child: _buildHeader()),
-                    if (_isLoading && !_hasSuccessfullyLoaded) ...[
-                      SliverToBoxAdapter(child: _buildSearchBar()),
-                      if (_searchQuery.isEmpty)
-                        SliverToBoxAdapter(child: _buildCategoryChips()),
-                      const SliverToBoxAdapter(child: HomeFeedSkeleton()),
-                      if (_homeSlow)
-                        SliverToBoxAdapter(
-                          child: InlineLoadStatus.slow(
-                            id: 'home-feed',
-                            onRetry: _loadListings,
-                          ),
+              ] else if (_showEmptySocietyState) ...[
+                SliverToBoxAdapter(child: _buildEmptySocietyState()),
+              ] else ...[
+                if (_error != null)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF0F0),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE8B4B4)),
                         ),
-                    ] else if (_showEmptySocietyState) ...[
-                      SliverToBoxAdapter(child: _buildEmptySocietyState()),
-                    ] else ...[
-                    if (_error != null)
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF0F0),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: const Color(0xFFE8B4B4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Live data unavailable',
+                              style: TextStyle(
+                                color: Color(0xFFB42318),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
                               ),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Live data unavailable',
-                                  style: TextStyle(
-                                    color: Color(0xFFB42318),
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _error!,
-                                  style: const TextStyle(
-                                    color: Color(0xFF7A271A),
-                                    height: 1.4,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                TextButton.icon(
-                                  onPressed: _loadListings,
-                                  icon: const Icon(Icons.refresh_rounded),
-                                  label: const Text('Retry'),
-                                ),
-                              ],
+                            const SizedBox(height: 8),
+                            Text(
+                              _error!,
+                              style: const TextStyle(
+                                color: Color(0xFF7A271A),
+                                height: 1.4,
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 12),
+                            TextButton.icon(
+                              onPressed: _loadListings,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('Retry'),
+                            ),
+                          ],
                         ),
                       ),
-                    SliverToBoxAdapter(child: _buildSearchBar()),
-                    SliverToBoxAdapter(child: _buildDistanceChip()),
-                    if (_searchQuery.isEmpty) ...[
-                      SliverToBoxAdapter(child: _buildCategoryChips()),
-                      SliverToBoxAdapter(child: _buildHomeDiscoverySections()),
-                    ] else if (_listingType == HomeListingType.preOrder) ...[
-                      SliverToBoxAdapter(child: _buildPreorderSearchResults()),
-                    ],
-                    if (_listingType == HomeListingType.preOrder) ...[
-                      if (_preorderResultCount == 0)
-                        SliverToBoxAdapter(child: _buildPreorderEmpty()),
-                    ] else ...[
-                      SliverToBoxAdapter(child: _buildAvailableHeader()),
-                      _buildAvailableList(),
-                      if (_shouldPreviewAllItems)
-                        SliverToBoxAdapter(child: _buildSeeAllItemsButton()),
-                    ],
-                    SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: _cart.isEmpty ? 24 : 88,
-                      ),
                     ),
-                    ],
-                  ],
+                  ),
+                SliverToBoxAdapter(child: _buildSearchBar()),
+                SliverToBoxAdapter(child: _buildDistanceChip()),
+                if (_searchQuery.isEmpty) ...[
+                  SliverToBoxAdapter(child: _buildCategoryChips()),
+                  SliverToBoxAdapter(child: _buildHomeDiscoverySections()),
+                ] else if (_listingType == HomeListingType.preOrder) ...[
+                  SliverToBoxAdapter(child: _buildPreorderSearchResults()),
+                ],
+                if (_listingType == HomeListingType.preOrder) ...[
+                  if (_preorderResultCount == 0)
+                    SliverToBoxAdapter(child: _buildPreorderEmpty()),
+                ] else ...[
+                  SliverToBoxAdapter(child: _buildAvailableHeader()),
+                  _buildAvailableList(),
+                  if (_shouldPreviewAllItems)
+                    SliverToBoxAdapter(child: _buildSeeAllItemsButton()),
+                ],
+                SliverToBoxAdapter(
+                  child: SizedBox(height: _cart.isEmpty ? 24 : 88),
                 ),
-              ),
-            ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -920,6 +923,32 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Seller circles include cooks whose dishes are expired or sold out.
+  /// Dish rows stay on [_mobileListingsForReach], which keeps those dishes out.
+  List<FoodItem> _sellerPresenceForReach(HomeListingReach reach) {
+    final presence = applyHomeListingFilters(
+      _listings,
+      category: _selectedCategory,
+      searchQuery: _searchQuery,
+      foodType: _selectedFoodType,
+      listingType: _listingType,
+      buyerSocietyId: _buyerSocietyId,
+      includeNotSelling: true,
+    );
+    final distanceMatched = listingsMatchingBuyerDistance(
+      presence,
+      choice: _effectiveDistance,
+      buyerSocietyId: _buyerSocietyId,
+      nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+    );
+    return listingsForHomeReach(
+      distanceMatched,
+      reach: reach,
+      buyerSocietyId: _buyerSocietyId,
+      nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+    );
+  }
+
   List<PreOrderCampaign> _mobileCampaignsForReach(HomeListingReach reach) {
     final distanceMatched = campaignsMatchingBuyerDistance(
       _preOrderCampaigns,
@@ -928,7 +957,8 @@ class HomeScreenState extends State<HomeScreen> {
       viewerUserId: _viewerUserId,
       nearbyRadiusKm: _cityReach.nearbyRadiusKm,
     );
-    final narrow = _listingType == HomeListingType.preOrder ||
+    final narrow =
+        _listingType == HomeListingType.preOrder ||
         _selectedFoodType != null ||
         _searchQuery.isNotEmpty ||
         (_selectedCategory != null && _selectedCategory != 'All');
@@ -1084,9 +1114,7 @@ class HomeScreenState extends State<HomeScreen> {
       if (!enabled || !mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Complete Seller Settings before selling is turned on',
-          ),
+          content: Text('Complete Seller Settings before selling is turned on'),
           backgroundColor: Color(0xFF0E5A47),
         ),
       );
@@ -1106,9 +1134,8 @@ class HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ExploreNearbyScreen(
-          onStartSelling: _startSellingFromHome,
-        ),
+        builder: (_) =>
+            ExploreNearbyScreen(onStartSelling: _startSellingFromHome),
       ),
     );
   }
@@ -1253,9 +1280,9 @@ class HomeScreenState extends State<HomeScreen> {
             final isOrderType = cat == 'Made to Order' || cat == 'Pre-order';
             final isSelected = isOrderType
                 ? _listingType ==
-                    (cat == 'Made to Order'
-                        ? HomeListingType.madeToOrder
-                        : HomeListingType.preOrder)
+                      (cat == 'Made to Order'
+                          ? HomeListingType.madeToOrder
+                          : HomeListingType.preOrder)
                 : _selectedCategory == cat;
             return GestureDetector(
               key: Key('home-filter-chip-$cat'),
@@ -1309,7 +1336,7 @@ class HomeScreenState extends State<HomeScreen> {
           key: const Key('home-sellers-in-society'),
           title: 'Top Sellers in Your Society',
           sellers: sellersFromListings(
-            _mobileListingsForReach(HomeListingReach.inSociety),
+            _sellerPresenceForReach(HomeListingReach.inSociety),
           ),
         ),
         _buildSpecialsSection(),
@@ -1321,7 +1348,7 @@ class HomeScreenState extends State<HomeScreen> {
               ? null
               : 'Sellers within ~${formatReachRadiusKm(_cityReach.nearbyRadiusKm!)} km',
           sellers: sellersFromListings(
-            _mobileListingsForReach(HomeListingReach.nearby),
+            _sellerPresenceForReach(HomeListingReach.nearby),
           ),
         ),
         _buildReachSection(
@@ -1340,7 +1367,7 @@ class HomeScreenState extends State<HomeScreen> {
               ? null
               : 'From other societies (within ~${formatReachRadiusKm(_cityReach.extendedRadiusKm!)} km)',
           sellers: sellersFromListings(
-            _mobileListingsForReach(HomeListingReach.extended),
+            _sellerPresenceForReach(HomeListingReach.extended),
           ),
         ),
         _buildReachSection(
@@ -1406,7 +1433,10 @@ class HomeScreenState extends State<HomeScreen> {
                       builder: (_) => SellerListScreen(
                         title: title,
                         sellers: sellers,
-                        onSellerTap: _openSeller,
+                        onSellerTap: (seller) => _openSeller(
+                          seller,
+                          hideUnavailableDishes: !seller.hasOrderableItems,
+                        ),
                       ),
                     ),
                   );
@@ -1425,12 +1455,15 @@ class HomeScreenState extends State<HomeScreen> {
           ),
         ),
         PagedHorizontalList(
-          height: 100,
+          height: 108,
           itemCount: sellers.length,
           separatorBuilder: (context, index) => const SizedBox(width: 16),
           itemBuilder: (_, i) => _SellerChip(
             seller: sellers[i],
-            onTap: () => _openSeller(sellers[i]),
+            onTap: () => _openSeller(
+              sellers[i],
+              hideUnavailableDishes: !sellers[i].hasOrderableItems,
+            ),
           ),
         ),
       ],
@@ -1541,9 +1574,8 @@ class HomeScreenState extends State<HomeScreen> {
                 if (canToggle)
                   TextButton(
                     key: expanded ? showLessKey : seeAllKey,
-                    onPressed: () => expanded
-                        ? _collapseReach(reach)
-                        : _expandReach(reach),
+                    onPressed: () =>
+                        expanded ? _collapseReach(reach) : _expandReach(reach),
                     child: expanded
                         ? const Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1601,22 +1633,22 @@ class HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.fromLTRB(20, 24, 8, 14),
       child: Row(
         children: [
-              Expanded(
-                child: Text(
-                  _searchQuery.isEmpty
-                      ? 'All Items'
-                      : _available.isEmpty
-                      ? 'No matches'
-                      : _available.length == 1
-                      ? '1 match'
-                      : '${_available.length} matches',
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF101617),
-                  ),
-                ),
+          Expanded(
+            child: Text(
+              _searchQuery.isEmpty
+                  ? 'All Items'
+                  : _available.isEmpty
+                  ? 'No matches'
+                  : _available.length == 1
+                  ? '1 match'
+                  : '${_available.length} matches',
+              style: const TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF101617),
               ),
+            ),
+          ),
           if (_shouldPreviewAllItems)
             TextButton(
               key: const Key('home-see-all-items'),
@@ -1742,7 +1774,8 @@ class HomeScreenState extends State<HomeScreen> {
           onAdd: () => _addToCart(_visibleAvailable[i]),
           onRemove: () => _removeFromCart(_visibleAvailable[i]),
           onTap: () => _openDetail(_visibleAvailable[i]),
-          onSellerTap: () => _openSeller(sellerFromListing(_visibleAvailable[i])),
+          onSellerTap: () =>
+              _openSeller(sellerFromListing(_visibleAvailable[i])),
         ),
         childCount: _visibleAvailable.length,
       ),
@@ -1762,38 +1795,80 @@ class _SellerChip extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: SizedBox(
         width: 72,
-        height: 100,
+        height: 108,
         child: Column(
           children: [
-            SellerAvatar(
-              radius: 32,
-              backgroundColor: seller.avatarColor,
-              photoUrl: seller.profilePhotoUrl,
-              ringColor: sellerPresenceRingColor(seller.hasOrderableItems),
-              ringWidth: 2.4,
-              fallback: Icon(
-                seller.avatarIcon,
-                color: const Color(0xFF3A4644),
-                size: 28,
+            if (seller.hasOrderableItems)
+              SellerAvatar(
+                radius: 32,
+                backgroundColor: seller.avatarColor,
+                photoUrl: seller.profilePhotoUrl,
+                ringColor: sellerSellingRingColor,
+                ringWidth: 2.4,
+                fallback: Icon(
+                  seller.avatarIcon,
+                  color: const Color(0xFF3A4644),
+                  size: 28,
+                ),
+              )
+            else
+              const SellerAvatar(
+                radius: 32,
+                backgroundColor: Colors.white,
+                ringColor: Color(0xFFD5DCDA),
+                ringWidth: 1.5,
+                fallback: SizedBox.shrink(),
               ),
-            ),
             const SizedBox(height: 4),
-            SizedBox(
-              width: 72,
-              height: 32,
-              child: Text(
-                seller.name,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF3A4644),
-                  height: 1.1,
+            if (seller.hasOrderableItems)
+              SizedBox(
+                width: 72,
+                height: 32,
+                child: Text(
+                  seller.name,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3A4644),
+                    height: 1.1,
+                  ),
+                ),
+              )
+            else ...[
+              SizedBox(
+                width: 72,
+                child: Text(
+                  seller.name,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3A4644),
+                    height: 1.1,
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(
+                width: 72,
+                child: Text(
+                  sellerNotAvailableLabel,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF8A9491),
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1974,7 +2049,9 @@ class _SpecialCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           height: 1.25,
-                          color: isDark ? Colors.white : const Color(0xFF0E5A47),
+                          color: isDark
+                              ? Colors.white
+                              : const Color(0xFF0E5A47),
                           decoration: TextDecoration.underline,
                           decorationColor: isDark
                               ? Colors.white
@@ -2059,9 +2136,9 @@ class _SpecialCard extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.centerRight,
                       child: MarketplacePurchaseSlot(
-                    food: food,
-                    cartQty: cartQty,
-                    soldOut: Container(
+                        food: food,
+                        cartQty: cartQty,
+                        soldOut: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 7,
@@ -2080,7 +2157,7 @@ class _SpecialCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                    addButton: GestureDetector(
+                        addButton: GestureDetector(
                           onTap: onAdd,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -2102,7 +2179,7 @@ class _SpecialCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                    qtyStepper: Container(
+                        qtyStepper: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 6,
                             vertical: 4,
@@ -2191,12 +2268,7 @@ class _AvailableItemTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            ListingImage(
-              food: food,
-              width: 72,
-              height: 72,
-              iconSize: 36,
-            ),
+            ListingImage(food: food, width: 72, height: 72, iconSize: 36),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -2248,7 +2320,9 @@ class _AvailableItemTile extends StatelessWidget {
                               ),
                             ),
                           ],
-                          if (listingSoldCaption(food.quantitySold).isNotEmpty) ...[
+                          if (listingSoldCaption(
+                            food.quantitySold,
+                          ).isNotEmpty) ...[
                             const SizedBox(height: 2),
                             Text(
                               listingSoldCaption(food.quantitySold),
@@ -2306,46 +2380,46 @@ class _AvailableItemTile extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5EE),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.schedule_rounded,
-                              size: 13,
-                              color: Color(0xFF0E5A47),
-                            ),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                '${food.pickupTime} pickup',
-                                softWrap: true,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  height: 1.25,
-                                  color: Color(0xFF0E5A47),
-                                  fontWeight: FontWeight.w600,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5EE),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.schedule_rounded,
+                                size: 13,
+                                color: Color(0xFF0E5A47),
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  '${food.pickupTime} pickup',
+                                  softWrap: true,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    height: 1.25,
+                                    color: Color(0xFF0E5A47),
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
                       ),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: MarketplacePurchaseSlot(
-                        food: food,
-                        cartQty: cartQty,
-                        soldOut: Container(
+                            food: food,
+                            cartQty: cartQty,
+                            soldOut: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
                                 vertical: 6,
@@ -2364,7 +2438,7 @@ class _AvailableItemTile extends StatelessWidget {
                                 ),
                               ),
                             ),
-                        addButton: GestureDetector(
+                            addButton: GestureDetector(
                               onTap: onAdd,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -2385,7 +2459,7 @@ class _AvailableItemTile extends StatelessWidget {
                                 ),
                               ),
                             ),
-                        qtyStepper: Container(
+                            qtyStepper: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 6,
                                 vertical: 4,
@@ -2429,8 +2503,8 @@ class _AvailableItemTile extends StatelessWidget {
                                 ],
                               ),
                             ),
-                      ),
-                      ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
