@@ -8,6 +8,14 @@ const {
   getAdminIssue,
   updateAdminIssue,
 } = require("../lib/issueReports");
+const {
+  createCoupon,
+  listCoupons,
+  getCoupon,
+  updateCoupon,
+  setCouponStatus,
+  assignEligibleUsers,
+} = require("../lib/coupons");
 const { canonicalCityKey } = require("../lib/launchCity");
 const { validateCityReachRadii } = require("../lib/sellingReach");
 const { serializeFssai } = require("../lib/fssai");
@@ -726,6 +734,62 @@ router.patch(
   asyncHandler(async (req, res) => {
     const issue = await updateAdminIssue(req.params.id, req.body, req.user);
     res.json(issue);
+  })
+);
+
+router.post(
+  "/coupons",
+  asyncHandler(async (req, res) => {
+    const coupon = await createCoupon(req.body);
+    res.status(201).json(coupon);
+  })
+);
+
+router.get(
+  "/coupons",
+  asyncHandler(async (req, res) => {
+    const coupons = await listCoupons();
+    res.json({ coupons });
+  })
+);
+
+router.get(
+  "/coupons/:id",
+  asyncHandler(async (req, res) => {
+    const coupon = await getCoupon(req.params.id);
+    res.json(coupon);
+  })
+);
+
+router.patch(
+  "/coupons/:id",
+  asyncHandler(async (req, res) => {
+    const coupon = await updateCoupon(req.params.id, req.body);
+    res.json(coupon);
+  })
+);
+
+router.post(
+  "/coupons/:id/pause",
+  asyncHandler(async (req, res) => {
+    const coupon = await setCouponStatus(req.params.id, "PAUSED");
+    res.json(coupon);
+  })
+);
+
+router.post(
+  "/coupons/:id/activate",
+  asyncHandler(async (req, res) => {
+    const coupon = await setCouponStatus(req.params.id, "ACTIVE");
+    res.json(coupon);
+  })
+);
+
+router.put(
+  "/coupons/:id/eligible-users",
+  asyncHandler(async (req, res) => {
+    const coupon = await assignEligibleUsers(req.params.id, req.body && req.body.userIds);
+    res.json(coupon);
   })
 );
 

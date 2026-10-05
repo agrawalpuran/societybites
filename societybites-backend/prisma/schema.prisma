@@ -9,50 +9,52 @@ datasource db {
 }
 
 model User {
-  id              String     @id @default(uuid())
-  phone           String     @unique
-  name            String?
-  role            String     @default("buyer")
-  profilePhotoUrl String?
-  upiId           String?
-  upiDisplayName  String?
-  paymentEnabled  Boolean    @default(false)
+  id                      String                  @id @default(uuid())
+  phone                   String                  @unique
+  name                    String?
+  role                    String                  @default("buyer")
+  profilePhotoUrl         String?
+  upiId                   String?
+  upiDisplayName          String?
+  paymentEnabled          Boolean                 @default(false)
   /// MY_SOCIETY | NEARBY | EXTENDED. Radius km lives on CityReachConfig, not here.
-  sellingReachLevel String   @default("MY_SOCIETY")
+  sellingReachLevel       String                  @default("MY_SOCIETY")
   /// BUYER_PICKUP | SELLER_DELIVERY | BOTH. Independent of sellingReachLevel.
-  fulfilmentMode    String   @default("BUYER_PICKUP")
+  fulfilmentMode          String                  @default("BUYER_PICKUP")
   /// Legacy / nearby alias. Prefer the per-reach fields below.
-  deliveryCharge    Float    @default(0)
+  deliveryCharge          Float                   @default(0)
   /// Seller-stated delivery charges by buyer reach. In-society defaults to 0.
-  deliveryChargeInSociety Float @default(0)
-  deliveryChargeNearby    Float @default(0)
-  deliveryChargeExtended  Float @default(0)
+  deliveryChargeInSociety Float                   @default(0)
+  deliveryChargeNearby    Float                   @default(0)
+  deliveryChargeExtended  Float                   @default(0)
   /// UPI_ONLY | UPI_AND_COD | COD_IN_SOCIETY_UPI_OUTSIDE. Controls NEW checkout options only; orders snapshot paymentMethod.
-  paymentPreference String   @default("COD_IN_SOCIETY_UPI_OUTSIDE")
+  paymentPreference       String                  @default("COD_IN_SOCIETY_UPI_OUTSIDE")
   /// Daily kitchen window in IST, "HH:mm". Both null means always open.
-  kitchenOpensAt      String?
-  kitchenClosesAt     String?
+  kitchenOpensAt          String?
+  kitchenClosesAt         String?
   /// Capture-only FSSAI licence. No approval or enforcement.
-  fssaiNumber         String?
-  fssaiExpiry         DateTime?
-  fssaiRegisteredName String?
-  suspended       Boolean    @default(false)
-  createdAt       DateTime   @default(now())
-  societyId       String?
-  flatId          String?
-  auditLogs       AuditLog[]    @relation("AdminLogs")
-  deviceTokens    DeviceToken[]
-  refreshTokens   RefreshToken[]
-  listings             Listing[]
-  preOrderCampaigns    PreOrderCampaign[]
-  orders               Order[]            @relation("BuyerOrders")
-  reviews              Review[]
-  sentMessages         Message[]
-  sellerTermsAcceptances SellerTermsAcceptance[]
-  issueReports         IssueReport[]
-  issueMessages        IssueMessage[]
-  flat                 Flat?              @relation(fields: [flatId], references: [id])
-  society              Society?           @relation(fields: [societyId], references: [id])
+  fssaiNumber             String?
+  fssaiExpiry             DateTime?
+  fssaiRegisteredName     String?
+  suspended               Boolean                 @default(false)
+  createdAt               DateTime                @default(now())
+  societyId               String?
+  flatId                  String?
+  auditLogs               AuditLog[]              @relation("AdminLogs")
+  deviceTokens            DeviceToken[]
+  refreshTokens           RefreshToken[]
+  listings                Listing[]
+  preOrderCampaigns       PreOrderCampaign[]
+  orders                  Order[]                 @relation("BuyerOrders")
+  reviews                 Review[]
+  sentMessages            Message[]
+  sellerTermsAcceptances  SellerTermsAcceptance[]
+  issueReports            IssueReport[]
+  issueMessages           IssueMessage[]
+  couponRedemptions       CouponRedemption[]
+  couponEligibilities     CouponEligibleUser[]
+  flat                    Flat?                   @relation(fields: [flatId], references: [id])
+  society                 Society?                @relation(fields: [societyId], references: [id])
 }
 
 /// Record that a user accepted a seller-terms version. Existing sellers are not required to have a row.
@@ -69,28 +71,28 @@ model SellerTermsAcceptance {
 }
 
 model Society {
-  id         String    @id @default(uuid())
-  name       String
-  city       String
-  inviteCode String    @unique
-  address    String?
-  state      String?
-  pincode    String?
-  logoUrl    String?
-  status     String    @default("active")
+  id                String             @id @default(uuid())
+  name              String
+  city              String
+  inviteCode        String             @unique
+  address           String?
+  state             String?
+  pincode           String?
+  logoUrl           String?
+  status            String             @default("active")
   /// UI label for building subdivision: "Block" or "Wing"
-  unitLabel  String    @default("Block")
+  unitLabel         String             @default("Block")
   /// Google Place ID of the real-world society. Discovery only — SocietyBites id remains source of truth.
-  googlePlaceId String? @unique
+  googlePlaceId     String?            @unique
   /// Society location (not the user's live GPS).
-  latitude      Float?
-  longitude     Float?
-  blocks     Block[]
-  flats      Flat[]
-  listings            Listing[]
-  preOrderCampaigns   PreOrderCampaign[]
-  orders              Order[]
-  users               User[]
+  latitude          Float?
+  longitude         Float?
+  blocks            Block[]
+  flats             Flat[]
+  listings          Listing[]
+  preOrderCampaigns PreOrderCampaign[]
+  orders            Order[]
+  users             User[]
 }
 
 model Block {
@@ -114,60 +116,60 @@ model Flat {
 }
 
 model Listing {
-  id             String      @id @default(uuid())
-  sellerId       String
-  societyId      String
-  name           String
-  description    String?
-  price          Float
-  quantity       Int         @default(1)
-  weightUnit     String?
-  weightValue    String?
-  tags           String[]    @default([])
+  id                     String            @id @default(uuid())
+  sellerId               String
+  societyId              String
+  name                   String
+  description            String?
+  price                  Float
+  quantity               Int               @default(1)
+  weightUnit             String?
+  weightValue            String?
+  tags                   String[]          @default([])
   /// VEG | NON_VEG. Nullable for listings created before this field existed.
-  foodType       String?
-  category       String?
+  foodType               String?
+  category               String?
   /// Multi-select food occasions. Display labels: Breakfast, Lunch, Dinner, Snacks, Desserts.
-  categories     String[]    @default([])
-  availableAt    DateTime?
-  pickupLocation String      @default("My Home (Verified)")
-  imageUrl       String?
+  categories             String[]          @default([])
+  availableAt            DateTime?
+  pickupLocation         String            @default("My Home (Verified)")
+  imageUrl               String?
   /// active | paused | expired | sold_out | inactive
-  status         String      @default("active")
-  featured       Boolean     @default(false)
+  status                 String            @default("active")
+  featured               Boolean           @default(false)
   /// REGULAR | PREORDER. Marketplace vs seller pre-order catalog. Independent of campaignId.
-  catalogType    String      @default("REGULAR")
+  catalogType            String            @default("REGULAR")
   /// READY_NOW | MADE_TO_ORDER. Only meaningful for REGULAR catalog listings.
-  availabilityMode String    @default("READY_NOW")
+  availabilityMode       String            @default("READY_NOW")
   /// Estimate in minutes for MADE_TO_ORDER. Seller still confirms the actual ready time.
   preparationTimeMinutes Int?
   /// Optional cap on accepted MADE_TO_ORDER orders per UTC day. Null = no cap.
-  maxDailyOrders Int?
+  maxDailyOrders         Int?
   /// REGULAR + READY_NOW only. Existing listings stay false.
-  recurringEnabled Boolean @default(false)
+  recurringEnabled       Boolean           @default(false)
   /// ISO weekdays 1=Mon … 7=Sun. Empty unless recurringEnabled.
-  recurringWeekdays Int[] @default([])
+  recurringWeekdays      Int[]             @default([])
   /// Minutes from IST midnight. Inclusive start of selling window.
-  recurringStartMinute Int?
+  recurringStartMinute   Int?
   /// Minutes from IST midnight. Exclusive end of selling window (start < end).
-  recurringEndMinute Int?
+  recurringEndMinute     Int?
   /// Optional portions per IST selling day. Null = no daily cap.
-  recurringDailyLimit Int?
+  recurringDailyLimit    Int?
   /// When set, this listing is a pre-order campaign product, not a regular listing.
-  campaignId     String?
+  campaignId             String?
   /// Catalog listing this campaign product was copied from. Null for ad-hoc / historical copies.
-  sourceListingId String?
+  sourceListingId        String?
   /// demand | limited — only for campaign products. Regular listings ignore this.
-  inventoryMode  String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  seller         User        @relation(fields: [sellerId], references: [id])
-  society        Society     @relation(fields: [societyId], references: [id])
-  campaign       PreOrderCampaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  sourceListing  Listing?    @relation("ListingCampaignSource", fields: [sourceListingId], references: [id], onDelete: SetNull)
-  campaignCopies Listing[]   @relation("ListingCampaignSource")
-  orderItems     OrderItem[]
-  reviews        Review[]
+  inventoryMode          String?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  seller                 User              @relation(fields: [sellerId], references: [id])
+  society                Society           @relation(fields: [societyId], references: [id])
+  campaign               PreOrderCampaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sourceListing          Listing?          @relation("ListingCampaignSource", fields: [sourceListingId], references: [id], onDelete: SetNull)
+  campaignCopies         Listing[]         @relation("ListingCampaignSource")
+  orderItems             OrderItem[]
+  reviews                Review[]
 
   @@index([societyId, status])
   @@index([sellerId])
@@ -205,28 +207,28 @@ model PreOrderCampaign {
 }
 
 model Order {
-  id                    String      @id @default(uuid())
-  orderNumber           String      @unique
+  id                    String             @id @default(uuid())
+  orderNumber           String             @unique
   buyerId               String
   societyId             String
   /// regular | pre_order
-  type                  String      @default("regular")
+  type                  String             @default("regular")
   campaignId            String?
   /// pickup | seller_delivery — buyer choice; null for regular orders.
   fulfilmentMethod      String?
   /// Historical charge for this order. 0 for pickup / regular.
-  deliveryCharge        Float       @default(0)
+  deliveryCharge        Float              @default(0)
   fulfilmentNotes       String?
   /// Snapshot of campaign.fulfilmentAt at place-order time.
   fulfilmentAt          DateTime?
-  status                String      @default("pending")
-  paymentMethod         String      @default("upi")
+  status                String             @default("pending")
+  paymentMethod         String             @default("upi")
   subtotal              Float
   /// Stored fee amount charged on this order (platform fee).
-  communityFee          Float       @default(0)
+  communityFee          Float              @default(0)
   total                 Float
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
   acceptedAt            DateTime?
   preparingAt           DateTime?
   readyAt               DateTime?
@@ -237,19 +239,20 @@ model Order {
   pickedUpAt            DateTime?
   completedAt           DateTime?
   cancelledAt           DateTime?
-  paymentStatus         String      @default("pending")
+  paymentStatus         String             @default("pending")
   buyerMarkedPaidAt     DateTime?
   sellerConfirmedPaidAt DateTime?
   upiTransactionRef     String?
   rejectReason          String?
   rejectedAt            DateTime?
   rejectedBy            String?
-  buyer                 User        @relation("BuyerOrders", fields: [buyerId], references: [id])
-  society               Society     @relation(fields: [societyId], references: [id])
-  campaign              PreOrderCampaign? @relation(fields: [campaignId], references: [id])
+  buyer                 User               @relation("BuyerOrders", fields: [buyerId], references: [id])
+  society               Society            @relation(fields: [societyId], references: [id])
+  campaign              PreOrderCampaign?  @relation(fields: [campaignId], references: [id])
   items                 OrderItem[]
   reviews               Review[]
   messages              Message[]
+  couponRedemptions     CouponRedemption[]
 
   @@index([buyerId, createdAt])
   @@index([societyId, status])
@@ -348,32 +351,32 @@ model DeviceToken {
 
 /// In-app issue and feedback reports. Isolated from orders, listings, and payments.
 model IssueReport {
-  id            String    @id @default(uuid())
-  issueNumber   Int       @unique @default(autoincrement())
-  reference     String    @unique
-  userId        String
+  id               String         @id @default(uuid())
+  issueNumber      Int            @unique @default(autoincrement())
+  reference        String         @unique
+  userId           String
   /// Role captured from the authenticated user at submission time.
-  userRole      String
-  category      String
-  description   String
-  orderId       String?
-  listingId     String?
-  sellerId      String?
+  userRole         String
+  category         String
+  description      String
+  orderId          String?
+  listingId        String?
+  sellerId         String?
   /// OPEN | UNDER_REVIEW | RESOLVED | CLOSED
-  status        String    @default("OPEN")
-  adminResponse String?
+  status           String         @default("OPEN")
+  adminResponse    String?
   /// When SocietyEats last wrote a reply. Null until the first reply.
   adminRespondedAt DateTime?
   /// Optional photo attached to the original report.
-  imageUrl      String?
+  imageUrl         String?
   /// ANDROID | IOS | WEB
-  platform      String?
-  appVersion    String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  resolvedAt    DateTime?
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages      IssueMessage[]
+  platform         String?
+  appVersion       String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  resolvedAt       DateTime?
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages         IssueMessage[]
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
@@ -406,4 +409,98 @@ model RefreshToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+enum CouponDiscountType {
+  FIXED
+  PERCENTAGE
+}
+
+enum CouponAudienceType {
+  ALL
+  SELECTED_USERS
+}
+
+enum CouponStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  EXPIRED
+  EXHAUSTED
+}
+
+enum CouponFundedBy {
+  SOCIETYEATS
+}
+
+enum CouponUsageFrequency {
+  ONCE
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum CouponRedemptionStatus {
+  APPLIED
+  REDEEMED
+  REVERSED
+}
+
+/// SocietyEats-funded promotion. Seller entitlement is not reduced by the discount.
+model Coupon {
+  id                 String                @id @default(uuid())
+  code               String                @unique
+  name               String
+  description        String?
+  discountType       CouponDiscountType
+  discountValue      Float
+  maximumDiscount    Float?
+  minimumOrderValue  Float                 @default(0)
+  validFrom          DateTime
+  validUntil         DateTime
+  totalUsageLimit    Int?
+  usagePerBuyerLimit Int?
+  usageFrequency     CouponUsageFrequency?
+  campaignBudget     Float?
+  audienceType       CouponAudienceType    @default(ALL)
+  status             CouponStatus          @default(DRAFT)
+  fundedBy           CouponFundedBy        @default(SOCIETYEATS)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  redemptions        CouponRedemption[]
+  eligibleUsers      CouponEligibleUser[]
+
+  @@index([status, validUntil])
+}
+
+model CouponEligibleUser {
+  couponId String
+  userId   String
+  coupon   Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, userId])
+  @@index([userId])
+}
+
+model CouponRedemption {
+  id             String                 @id @default(uuid())
+  couponId       String
+  userId         String
+  orderId        String?
+  discountAmount Float
+  status         CouponRedemptionStatus @default(APPLIED)
+  appliedAt      DateTime               @default(now())
+  redeemedAt     DateTime?
+  reversedAt     DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  coupon         Coupon                 @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order          Order?                 @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([couponId, userId, status])
+  @@index([couponId, status])
+  @@index([orderId])
 }

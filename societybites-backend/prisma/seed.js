@@ -290,6 +290,29 @@ async function main() {
   console.log(`  Buyer:  ${buyer.name} (${BUYER_PHONE}) — Flat 3062 (Prestige)`);
   console.log(`  Listings: ${listings.length} active items`);
   console.log(`  Past order: ${completedOrder.orderNumber} (completed + review)`);
+
+  const welcomeUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  await prisma.coupon.upsert({
+    where: { code: "WELCOME100" },
+    update: {},
+    create: {
+      code: "WELCOME100",
+      name: "Welcome offer",
+      description: "₹100 off an order of ₹300 or more. Funded by SocietyEats.",
+      discountType: "FIXED",
+      discountValue: 100,
+      minimumOrderValue: 300,
+      validFrom: new Date(),
+      validUntil: welcomeUntil,
+      totalUsageLimit: 100,
+      usagePerBuyerLimit: 1,
+      usageFrequency: "ONCE",
+      audienceType: "ALL",
+      status: "ACTIVE",
+      fundedBy: "SOCIETYEATS",
+    },
+  });
+  console.log("  Coupon: WELCOME100");
 }
 
 main()
