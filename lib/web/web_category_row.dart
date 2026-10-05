@@ -35,7 +35,7 @@ class WebCategoryRow extends StatelessWidget {
           final selected = activeLabels != null
               ? activeLabels!.contains(label)
               : selectedCategory == value ||
-                  (selectedCategory == null && label == 'All');
+                    (selectedCategory == null && label == 'All');
           final count = counts[label];
           return _CategoryCard(
             label: label,
@@ -52,6 +52,8 @@ class WebCategoryRow extends StatelessWidget {
 
 IconData _iconFor(String label) {
   switch (label) {
+    case 'Just Added':
+      return Icons.auto_awesome_outlined;
     case 'Breakfast':
       return Icons.free_breakfast_outlined;
     case 'Lunch':
@@ -108,9 +110,7 @@ class _CategoryCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? webGreen : webLine,
-            ),
+            border: Border.all(color: selected ? webGreen : webLine),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

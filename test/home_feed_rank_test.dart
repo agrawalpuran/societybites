@@ -19,17 +19,19 @@ FoodItem _food(
   String? foodType = foodTypeVeg,
   String availabilityMode = listingAvailabilityReadyNow,
   bool recurringUnavailable = false,
+  String? sellerId,
+  String category = 'Snacks',
 }) {
   return FoodItem.fromJson({
     'id': 'listing-$name',
     'name': name,
-    'sellerId': 'seller-$name',
+    'sellerId': sellerId ?? 'seller-$name',
     'sellerName': 'Anita',
     'price': 80,
     'status': status,
     'quantity': quantity,
     'foodType': foodType,
-    'category': 'Snacks',
+    'category': category,
     'catalogType': listingCatalogRegular,
     'availabilityMode': availabilityMode,
     'avgRating': rating,
@@ -87,12 +89,17 @@ void main() {
   testWidgets('badge shows New with rating or no reviews', (tester) async {
     Future<void> pump(FoodItem food) async {
       await tester.pumpWidget(
-        MaterialApp(home: Scaffold(body: ListingRatingMark(food: food))),
+        MaterialApp(
+          home: Scaffold(body: ListingRatingMark(food: food)),
+        ),
       );
     }
 
     await pump(
-      _food('Fresh', createdAt: DateTime.now().subtract(const Duration(hours: 2))),
+      _food(
+        'Fresh',
+        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+      ),
     );
     expect(find.text('NEW'), findsOneWidget);
     expect(find.text('No reviews yet'), findsOneWidget);
@@ -126,61 +133,65 @@ void main() {
     expect(names, ['Live']);
   });
 
-  test('orderable, same society, then closer, then confident rating, then newer', () {
-    final unavailable = _food(
-      'Later',
-      societyId: 'mine',
-      distanceKm: 0,
-      rating: 5,
-      reviewCount: 20,
-      recurringUnavailable: true,
-    );
-    final far = _food('Far', societyId: 'other', distanceKm: 8);
-    final near = _food('Near', societyId: 'other', distanceKm: 1.2);
-    final own = _food('Own', societyId: 'mine', distanceKm: 0);
-    final oneReview = _food(
-      'One',
-      societyId: 'other',
-      distanceKm: 4,
-      rating: 5,
-      reviewCount: 1,
-    );
-    final manyReviews = _food(
-      'Many',
-      societyId: 'other',
-      distanceKm: 4,
-      rating: 4.2,
-      reviewCount: 12,
-    );
-    final newer = _food(
-      'Newer',
-      societyId: 'other',
-      distanceKm: 4,
-      createdAt: DateTime(2026, 10, 4),
-    );
-    final older = _food(
-      'Older',
-      societyId: 'other',
-      distanceKm: 4,
-      createdAt: DateTime(2026, 9, 1),
-    );
+  test(
+    'orderable, same society, then closer, then confident rating, then newer',
+    () {
+      final unavailable = _food(
+        'Later',
+        societyId: 'mine',
+        distanceKm: 0,
+        rating: 5,
+        reviewCount: 20,
+        recurringUnavailable: true,
+      );
+      final far = _food('Far', societyId: 'other', distanceKm: 8);
+      final near = _food('Near', societyId: 'other', distanceKm: 1.2);
+      final own = _food('Own', societyId: 'mine', distanceKm: 0);
+      final oneReview = _food(
+        'One',
+        societyId: 'other',
+        distanceKm: 4,
+        rating: 5,
+        reviewCount: 1,
+      );
+      final manyReviews = _food(
+        'Many',
+        societyId: 'other',
+        distanceKm: 4,
+        rating: 4.2,
+        reviewCount: 12,
+      );
+      final newer = _food(
+        'Newer',
+        societyId: 'other',
+        distanceKm: 4,
+        createdAt: DateTime(2026, 10, 4),
+      );
+      final older = _food(
+        'Older',
+        societyId: 'other',
+        distanceKm: 4,
+        createdAt: DateTime(2026, 9, 1),
+      );
 
-    final ranked = applyHomeListingFilters(
-      [far, oneReview, unavailable, older, near, manyReviews, newer, own],
-      buyerSocietyId: 'mine',
-    ).map((item) => item.name);
+      final ranked = applyHomeListingFilters(
+        [far, oneReview, unavailable, older, near, manyReviews, newer, own],
+        buyerSocietyId: 'mine',
+        now: DateTime(2026, 12, 1),
+      ).map((item) => item.name);
 
-    expect(ranked, [
-      'Own',
-      'Near',
-      'Many',
-      'One',
-      'Newer',
-      'Older',
-      'Far',
-      'Later',
-    ]);
-  });
+      expect(ranked, [
+        'Own',
+        'Near',
+        'Many',
+        'One',
+        'Newer',
+        'Older',
+        'Far',
+        'Later',
+      ]);
+    },
+  );
 
   test('veg, made to order, and distance still filter before rank', () {
     final match = _food(
@@ -217,10 +228,7 @@ void main() {
     expect(within.map((item) => item.name), ['Cake']);
 
     expect(
-      applyHomeListingFilters(
-        [ready],
-        listingType: HomeListingType.preOrder,
-      ),
+      applyHomeListingFilters([ready], listingType: HomeListingType.preOrder),
       isEmpty,
     );
   });
@@ -244,9 +252,9 @@ void main() {
       'extendedRadiusKm': 10,
     });
     expect(
-      homeDistanceMenuChoices(wider).map(
-        (choice) => homeDistanceMenuLabel(choice, wider),
-      ),
+      homeDistanceMenuChoices(
+        wider,
+      ).map((choice) => homeDistanceMenuLabel(choice, wider)),
       containsAll(['Up to 10 km', 'Up to 7 km']),
     );
 
@@ -258,5 +266,237 @@ void main() {
       ),
       isTrue,
     );
+  });
+
+  test('just added is the last 48 hours, newest first', () {
+    final now = DateTime(2026, 10, 5, 12);
+    final hourAgo = _food(
+      'Hour',
+      createdAt: now.subtract(const Duration(hours: 1)),
+      rating: 3.5,
+      reviewCount: 2,
+    );
+    final twoHours = _food(
+      'Two',
+      createdAt: now.subtract(const Duration(hours: 2)),
+      rating: 5,
+      reviewCount: 30,
+    );
+    final fortySeven = _food(
+      'Edge',
+      createdAt: now.subtract(const Duration(hours: 47)),
+    );
+    final tooOld = _food(
+      'Old',
+      createdAt: now.subtract(const Duration(hours: 48, seconds: 1)),
+      rating: 5,
+      reviewCount: 40,
+    );
+
+    final names = applyHomeListingFilters(
+      [tooOld, twoHours, fortySeven, hourAgo],
+      justAdded: true,
+      now: now,
+    ).map((item) => item.name);
+
+    expect(names, ['Hour', 'Two', 'Edge']);
+  });
+
+  test('default home keeps made to order beside ready-now dishes', () {
+    final names = applyHomeListingFilters([
+      _food('Samosa'),
+      _food('Cake', availabilityMode: listingAvailabilityMadeToOrder),
+    ], now: DateTime(2026, 12, 1)).map((item) => item.name);
+
+    expect(names, containsAll(['Samosa', 'Cake']));
+  });
+
+  test('made to order and pre-order filters stay exclusive', () {
+    final ready = _food('Samosa');
+    final made = _food(
+      'Cake',
+      availabilityMode: listingAvailabilityMadeToOrder,
+    );
+    expect(
+      applyHomeListingFilters([
+        ready,
+        made,
+      ], listingType: HomeListingType.madeToOrder).map((item) => item.name),
+      ['Cake'],
+    );
+    expect(
+      applyHomeListingFilters([
+        ready,
+        made,
+      ], listingType: HomeListingType.preOrder),
+      isEmpty,
+    );
+  });
+
+  test(
+    'just added still honors veg, category, distance, and made to order',
+    () {
+      final now = DateTime(2026, 10, 5, 12);
+      final match = _food(
+        'Idli',
+        category: 'Breakfast',
+        availabilityMode: listingAvailabilityMadeToOrder,
+        createdAt: now.subtract(const Duration(hours: 3)),
+        distanceKm: 1,
+        societyId: 'other',
+      );
+      final newerMatch = _food(
+        'Dosa',
+        category: 'Breakfast',
+        availabilityMode: listingAvailabilityMadeToOrder,
+        createdAt: now.subtract(const Duration(minutes: 10)),
+        distanceKm: 2,
+        societyId: 'other',
+      );
+      final chicken = _food(
+        'Chicken',
+        foodType: foodTypeNonVeg,
+        category: 'Breakfast',
+        availabilityMode: listingAvailabilityMadeToOrder,
+        createdAt: now.subtract(const Duration(minutes: 1)),
+        distanceKm: 1,
+        societyId: 'other',
+      );
+      final lunch = _food(
+        'Rice',
+        category: 'Lunch',
+        availabilityMode: listingAvailabilityMadeToOrder,
+        createdAt: now.subtract(const Duration(minutes: 1)),
+        distanceKm: 1,
+        societyId: 'other',
+      );
+      final far = _food(
+        'Far',
+        category: 'Breakfast',
+        availabilityMode: listingAvailabilityMadeToOrder,
+        createdAt: now.subtract(const Duration(minutes: 1)),
+        distanceKm: 9,
+        societyId: 'other',
+      );
+      final old = _food(
+        'Old',
+        category: 'Breakfast',
+        availabilityMode: listingAvailabilityMadeToOrder,
+        createdAt: now.subtract(const Duration(days: 4)),
+        distanceKm: 1,
+        societyId: 'other',
+      );
+
+      final filtered = applyHomeListingFilters(
+        [far, old, chicken, lunch, match, newerMatch],
+        justAdded: true,
+        now: now,
+        foodType: foodTypeVeg,
+        category: 'Breakfast',
+        listingType: HomeListingType.madeToOrder,
+      );
+      final within = listingsMatchingBuyerDistance(
+        filtered,
+        choice: const BuyerDistanceChoice.within(3),
+        buyerSocietyId: 'mine',
+      );
+
+      expect(within.map((item) => item.name), ['Dosa', 'Idli']);
+    },
+  );
+
+  test('one five-star review does not outrank a well reviewed listing', () {
+    final now = DateTime(2026, 12, 1);
+    final thin = _food(
+      'Thin',
+      rating: 5,
+      reviewCount: 1,
+      societyId: 'mine',
+      distanceKm: 0,
+      createdAt: now.subtract(const Duration(days: 20)),
+    );
+    final trusted = _food(
+      'Trusted',
+      rating: 4.7,
+      reviewCount: 25,
+      societyId: 'mine',
+      distanceKm: 0,
+      createdAt: now.subtract(const Duration(days: 30)),
+    );
+
+    expect(homeConfidenceRating(thin), lessThan(homeConfidenceRating(trusted)));
+    expect(
+      applyHomeListingFilters(
+        [thin, trusted],
+        buyerSocietyId: 'mine',
+        now: now,
+      ).map((item) => item.name),
+      ['Trusted', 'Thin'],
+    );
+  });
+
+  test('a new listing outranks a one-review listing in the same place', () {
+    final now = DateTime(2026, 10, 5, 12);
+    final fresh = _food(
+      'Fresh',
+      societyId: 'mine',
+      distanceKm: 0,
+      createdAt: now.subtract(const Duration(hours: 1)),
+    );
+    final thin = _food(
+      'Thin',
+      rating: 5,
+      reviewCount: 1,
+      societyId: 'mine',
+      distanceKm: 0,
+      createdAt: now.subtract(const Duration(days: 10)),
+    );
+    final trusted = _food(
+      'Trusted',
+      rating: 4.7,
+      reviewCount: 25,
+      societyId: 'mine',
+      distanceKm: 0,
+      createdAt: now.subtract(const Duration(days: 40)),
+    );
+
+    expect(
+      applyHomeListingFilters(
+        [thin, trusted, fresh],
+        buyerSocietyId: 'mine',
+        now: now,
+      ).map((item) => item.name),
+      ['Trusted', 'Fresh', 'Thin'],
+    );
+  });
+
+  test('one seller cannot fill the preview with only new listings', () {
+    final now = DateTime(2026, 10, 5, 12);
+    final crowded = List.generate(
+      4,
+      (index) => _food(
+        'A$index',
+        sellerId: 'seller-a',
+        societyId: 'mine',
+        distanceKm: 0,
+        createdAt: now.subtract(Duration(minutes: index)),
+      ),
+    );
+    final other = _food(
+      'Other',
+      sellerId: 'seller-b',
+      societyId: 'mine',
+      distanceKm: 0,
+      createdAt: now.subtract(const Duration(hours: 5)),
+    );
+
+    final names = applyHomeListingFilters(
+      [...crowded, other],
+      buyerSocietyId: 'mine',
+      now: now,
+    ).map((item) => item.name).toList();
+
+    expect(names.take(3), ['A0', 'A1', 'Other']);
+    expect(homeAllItemsPreviewCount, 12);
   });
 }

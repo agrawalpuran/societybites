@@ -23,7 +23,10 @@ List<FoodItem> applyHomeListingFilters(
   HomeListingType listingType = HomeListingType.all,
   String? buyerSocietyId,
   bool includeNotSelling = false,
+  bool justAdded = false,
+  DateTime? now,
 }) {
+  final clock = now ?? DateTime.now();
   var results = listings
       .where(
         (food) =>
@@ -35,6 +38,9 @@ List<FoodItem> applyHomeListingFilters(
       .toList();
   results = listingsMatchingFoodType(results, foodType: foodType);
   results = listingsMatchingHomeType(results, listingType);
+  if (justAdded) {
+    results = results.where((food) => food.isNewListing(clock)).toList();
+  }
 
   if (category != null && category != 'All' && searchQuery.trim().isEmpty) {
     results = results
@@ -60,10 +66,18 @@ List<FoodItem> applyHomeListingFilters(
 
   final indexed = results.asMap().entries.toList();
   indexed.sort((a, b) {
+    if (justAdded) {
+      final byCreated = _homeCreatedAt(
+        b.value,
+      ).compareTo(_homeCreatedAt(a.value));
+      if (byCreated != 0) return byCreated;
+      return a.key.compareTo(b.key);
+    }
     final rank = compareHomeFeedListings(
       a.value,
       b.value,
       buyerSocietyId: buyerSocietyId,
+      now: clock,
     );
     if (rank != 0) return rank;
     if (searchQuery.isNotEmpty) {
@@ -76,6 +90,9 @@ List<FoodItem> applyHomeListingFilters(
     return a.key.compareTo(b.key);
   });
   results = indexed.map((entry) => entry.value).toList();
+  if (!justAdded) {
+    results = _limitNewListingsPerSeller(results, now: clock);
+  }
 
   return results;
 }
@@ -138,9 +155,14 @@ List<PreOrderCampaign> campaignsMatchingHomeTypeFilters(
   }).toList();
 }
 
-/// Orderable now, then own society, then closer, then review-weighted
-/// rating, then newer. Search relevance only breaks remaining ties.
-int compareHomeFeedListings(FoodItem a, FoodItem b, {String? buyerSocietyId}) {
+/// Orderable now, then own society, then closer, then discovery score,
+/// then newer. Search relevance only breaks remaining ties.
+int compareHomeFeedListings(
+  FoodItem a,
+  FoodItem b, {
+  String? buyerSocietyId,
+  DateTime? now,
+}) {
   final orderable = (b.canAddToCart ? 1 : 0).compareTo(a.canAddToCart ? 1 : 0);
   if (orderable != 0) return orderable;
 
@@ -155,12 +177,42 @@ int compareHomeFeedListings(FoodItem a, FoodItem b, {String? buyerSocietyId}) {
   ).compareTo(_homeDistanceRank(b, buyerSocietyId));
   if (distance != 0) return distance;
 
-  final rating = _homeRatingRank(b).compareTo(_homeRatingRank(a));
-  if (rating != 0) return rating;
+  final clock = now ?? DateTime.now();
+  final discovery = homeDiscoveryScore(
+    b,
+    clock,
+  ).compareTo(homeDiscoveryScore(a, clock));
+  if (discovery != 0) return discovery;
 
-  final createdA = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-  final createdB = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-  return createdB.compareTo(createdA);
+  return _homeCreatedAt(b).compareTo(_homeCreatedAt(a));
+}
+
+DateTime _homeCreatedAt(FoodItem food) {
+  return food.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+}
+
+/// Home chip for listings created within [FoodItem.newListingWindow].
+const homeJustAddedFilter = 'Just Added';
+
+/// Added to a new listing's discovery score. Large enough to pass a
+/// one-review 5-star score, and smaller than a full rating from 10+ reviews.
+const homeFreshnessBoost = 2.0;
+
+/// At most this many new listings from one seller in the first Home preview.
+const homeMaxNewListingsPerSeller = 2;
+
+/// Review-confidence score plus a temporary boost for listings under 48 hours.
+double homeDiscoveryScore(FoodItem food, DateTime now) {
+  final fresh = food.isNewListing(now) ? homeFreshnessBoost : 0.0;
+  return homeConfidenceRating(food) + fresh;
+}
+
+/// Full rating once a listing has 10 reviews. Fewer reviews count less,
+/// so one 5-star review stays weak evidence.
+double homeConfidenceRating(FoodItem food) {
+  if (food.reviewCount <= 0 || food.rating <= 0) return 0;
+  final trust = food.reviewCount >= 10 ? 1.0 : food.reviewCount / 10;
+  return food.rating * trust;
 }
 
 bool _homeSameSociety(FoodItem food, String? buyerSocietyId) {
@@ -179,15 +231,47 @@ double _homeDistanceRank(FoodItem food, String? buyerSocietyId) {
   return km;
 }
 
-/// 0 reviews add nothing. A few reviews move the score only a little.
-double _homeRatingRank(FoodItem food) {
-  if (food.reviewCount <= 0) return 0;
-  final weight = food.reviewCount <= 2
-      ? 0.3
-      : food.reviewCount < 10
-      ? 0.65
-      : 1.0;
-  return food.rating * weight;
+/// Keeps one seller's brand-new dishes from filling the whole preview when
+/// another listing can take that slot. Does nothing when no alternative exists.
+List<FoodItem> _limitNewListingsPerSeller(
+  List<FoodItem> ranked, {
+  required DateTime now,
+}) {
+  if (ranked.length <= 1) return ranked;
+  final head = <FoodItem>[];
+  final deferred = <FoodItem>[];
+  final newCounts = <String, int>{};
+  for (var i = 0; i < ranked.length; i++) {
+    final food = ranked[i];
+    if (head.length >= homeAllItemsPreviewCount) {
+      deferred.add(food);
+      continue;
+    }
+    final isNew = food.isNewListing(now);
+    final used = newCounts[food.sellerId] ?? 0;
+    if (isNew &&
+        used >= homeMaxNewListingsPerSeller &&
+        _laterListingCanFillPreview(ranked, i, food.sellerId, now)) {
+      deferred.add(food);
+      continue;
+    }
+    head.add(food);
+    if (isNew) newCounts[food.sellerId] = used + 1;
+  }
+  return [...head, ...deferred];
+}
+
+bool _laterListingCanFillPreview(
+  List<FoodItem> ranked,
+  int index,
+  String sellerId,
+  DateTime now,
+) {
+  for (var j = index + 1; j < ranked.length; j++) {
+    final other = ranked[j];
+    if (!other.isNewListing(now) || other.sellerId != sellerId) return true;
+  }
+  return false;
 }
 
 int homeSearchMatchScore(FoodItem food, String searchQuery) {

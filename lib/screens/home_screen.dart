@@ -97,6 +97,7 @@ class HomeScreenState extends State<HomeScreen> {
   SellingReach _cityReach = const SellingReach();
   BuyerDistanceChoice? _distanceChoice;
   HomeListingType _listingType = HomeListingType.all;
+  bool _justAdded = false;
   final _reachSectionKeys = <HomeListingReach, GlobalKey>{
     HomeListingReach.inSociety: GlobalKey(),
     HomeListingReach.nearby: GlobalKey(),
@@ -226,6 +227,7 @@ class HomeScreenState extends State<HomeScreen> {
       foodType: _selectedFoodType,
       listingType: _listingType,
       buyerSocietyId: _buyerSocietyId,
+      justAdded: _justAdded,
     );
   }
 
@@ -350,7 +352,8 @@ class HomeScreenState extends State<HomeScreen> {
       _selectedCategory == null &&
       _selectedFoodType == null &&
       _distanceChoice == null &&
-      _listingType == HomeListingType.all;
+      _listingType == HomeListingType.all &&
+      !_justAdded;
 
   bool get _shouldPreviewAllItems =>
       !_showAllItems &&
@@ -581,6 +584,7 @@ class HomeScreenState extends State<HomeScreen> {
         searchQuery: _searchQuery,
         foodType: _selectedFoodType,
         buyerSocietyId: _buyerSocietyId,
+        justAdded: _justAdded,
       ),
       choice: _effectiveDistance,
       buyerSocietyId: _buyerSocietyId,
@@ -599,7 +603,9 @@ class HomeScreenState extends State<HomeScreen> {
               .toList();
     final counts = <String, int>{};
     for (final category in _homeFilterChips) {
-      if (category == 'Made to Order') {
+      if (category == homeJustAddedFilter) {
+        counts[category] = base.where((food) => food.isNewListing()).length;
+      } else if (category == 'Made to Order') {
         counts[category] = inCategory
             .where((food) => food.isMadeToOrder)
             .length;
@@ -622,6 +628,7 @@ class HomeScreenState extends State<HomeScreen> {
 
   Set<String> get _webActiveFilters => {
     ?_selectedCategory,
+    if (_justAdded) homeJustAddedFilter,
     if (_listingType == HomeListingType.madeToOrder) 'Made to Order',
     if (_listingType == HomeListingType.preOrder) 'Pre-order',
   };
@@ -638,7 +645,9 @@ class HomeScreenState extends State<HomeScreen> {
       return;
     }
     setState(() {
-      if (label == 'Made to Order') {
+      if (label == homeJustAddedFilter) {
+        _justAdded = !_justAdded;
+      } else if (label == 'Made to Order') {
         _listingType = _listingType == HomeListingType.madeToOrder
             ? HomeListingType.all
             : HomeListingType.madeToOrder;
@@ -935,6 +944,7 @@ class HomeScreenState extends State<HomeScreen> {
       listingType: _listingType,
       buyerSocietyId: _buyerSocietyId,
       includeNotSelling: true,
+      justAdded: _justAdded,
     );
     final distanceMatched = listingsMatchingBuyerDistance(
       presence,
@@ -1257,6 +1267,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   static const _homeFilterChips = [
+    homeJustAddedFilter,
     'Breakfast',
     'Lunch',
     'Dinner',
@@ -1279,7 +1290,9 @@ class HomeScreenState extends State<HomeScreen> {
           itemBuilder: (_, i) {
             final cat = _homeFilterChips[i];
             final isOrderType = cat == 'Made to Order' || cat == 'Pre-order';
-            final isSelected = isOrderType
+            final isSelected = cat == homeJustAddedFilter
+                ? _justAdded
+                : isOrderType
                 ? _listingType ==
                       (cat == 'Made to Order'
                           ? HomeListingType.madeToOrder
@@ -1305,7 +1318,7 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 child: Text(
-                  cat,
+                  cat == homeJustAddedFilter ? '✨ Just Added' : cat,
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
