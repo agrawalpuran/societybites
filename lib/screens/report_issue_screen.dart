@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models/issue_report.dart';
 import '../services/api_service.dart';
 import '../web/web_page_frame.dart';
+import 'issue_detail_screen.dart';
 import 'my_reports_screen.dart';
 
 class ReportIssueScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class ReportIssueScreen extends StatefulWidget {
     this.listingId,
     this.listingLabel,
     this.sellerId,
+    this.loadReports,
   });
 
   final String? orderId;
@@ -21,6 +23,7 @@ class ReportIssueScreen extends StatefulWidget {
   final String? listingId;
   final String? listingLabel;
   final String? sellerId;
+  final Future<List<IssueReport>> Function()? loadReports;
 
   @override
   State<ReportIssueScreen> createState() => _ReportIssueScreenState();
@@ -32,11 +35,40 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
   String? _error;
   bool _submitting = false;
   IssueReport? _submitted;
+  List<IssueReport> _reports = const [];
+  bool _loadingReports = true;
+  String? _reportsError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReports();
+  }
 
   @override
   void dispose() {
     _description.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadReports() async {
+    try {
+      final reports = widget.loadReports != null
+          ? await widget.loadReports!()
+          : await ApiService.getMyIssues();
+      if (!mounted) return;
+      setState(() {
+        _reports = reports;
+        _reportsError = null;
+        _loadingReports = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _reportsError = ApiService.userFacingError(error);
+        _loadingReports = false;
+      });
+    }
   }
 
   String? get _platform {
@@ -75,7 +107,15 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
         platform: _platform,
       );
       if (!mounted) return;
-      setState(() => _submitted = issue);
+      _description.clear();
+      setState(() {
+        _submitted = issue;
+        _category = null;
+        _reports = [issue, ..._reports.where((row) => row.id != issue.id)];
+        _reportsError = null;
+        _loadingReports = false;
+      });
+      _loadReports();
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = ApiService.userFacingError(error));
@@ -86,7 +126,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return centerOnWeb(
+    return panelOnWeb(
       context,
       Scaffold(
         backgroundColor: const Color(0xFFF8FAF9),
@@ -94,15 +134,15 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
           backgroundColor: Colors.white,
           elevation: 0,
           foregroundColor: const Color(0xFF101617),
-          title: Text(
-            _submitted == null ? 'How can we help?' : 'Issue submitted',
-            style: const TextStyle(
+          title: const Text(
+            'Report an Issue',
+            style: TextStyle(
               color: Color(0xFF101617),
               fontWeight: FontWeight.w700,
             ),
           ),
         ),
-        body: _submitted == null ? _form() : _confirmation(),
+        body: _form(),
       ),
     );
   }
@@ -111,6 +151,36 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       children: [
+        if (_submitted != null) ...[
+          const Icon(Icons.check_circle_rounded, color: Color(0xFF0E5A47), size: 36),
+          const SizedBox(height: 8),
+          const Text(
+            'Issue submitted successfully',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Reference: ${_submitted!.reference}',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0E5A47),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Your issue has been submitted. It is listed below.',
+            style: TextStyle(color: Color(0xFF6A7774)),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Done'),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         const Text(
           'How can we help?',
           style: TextStyle(
@@ -203,8 +273,65 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
           ),
           child: Text(_submitting ? 'Submitting...' : 'Submit Report'),
         ),
+        const SizedBox(height: 28),
+        const Text(
+          'Your reports',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Status and replies for issues you submit show up here.',
+          style: TextStyle(color: Color(0xFF6A7774)),
+        ),
+        const SizedBox(height: 12),
+        ..._reportSection(),
       ],
     );
+  }
+
+  List<Widget> _reportSection() {
+    if (_loadingReports) {
+      return const [
+        Text(
+          'Loading your reports…',
+          style: TextStyle(color: Color(0xFF8A9491), fontWeight: FontWeight.w600),
+        ),
+      ];
+    }
+    if (_reportsError != null) {
+      return [
+        Text(_reportsError!, style: const TextStyle(color: Color(0xFFD94F4F))),
+        TextButton(onPressed: _loadReports, child: const Text('Try again')),
+      ];
+    }
+    if (_reports.isEmpty) {
+      return const [
+        Text(
+          'No reports yet',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        SizedBox(height: 4),
+        Text(
+          'Any issues or feedback you submit will appear here.',
+          style: TextStyle(color: Color(0xFF6A7774)),
+        ),
+      ];
+    }
+    return [
+      for (final report in _reports)
+        IssueReportCard(
+          report: report,
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => IssueDetailScreen(issueId: report.id),
+              ),
+            );
+            if (mounted) _loadReports();
+          },
+        ),
+    ];
   }
 
   Widget _contextLine(String label, String value) {
@@ -214,54 +341,4 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     );
   }
 
-  Widget _confirmation() {
-    final issue = _submitted!;
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.check_circle_rounded, color: Color(0xFF0E5A47), size: 42),
-          const SizedBox(height: 12),
-          const Text(
-            'Issue submitted successfully',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Your issue has been submitted.',
-            style: TextStyle(color: Color(0xFF6A7774)),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Reference: ${issue.reference}',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF0E5A47),
-            ),
-          ),
-          const Spacer(),
-          FilledButton(
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const MyReportsScreen()),
-              );
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF0E5A47),
-              minimumSize: const Size.fromHeight(48),
-            ),
-            child: const Text('View My Reports'),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    );
-  }
 }

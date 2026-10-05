@@ -19,7 +19,12 @@ void main() {
   });
 
   testWidgets('report form asks for a category before submitting', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: ReportIssueScreen()));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReportIssueScreen(loadReports: () async => const []),
+      ),
+    );
+    await tester.pumpAndSettle();
 
     expect(find.text('How can we help?'), findsWidgets);
     expect(find.text('Payment / UPI'), findsOneWidget);

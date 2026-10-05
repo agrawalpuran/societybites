@@ -47,7 +47,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return centerOnWeb(
+    return panelOnWeb(
       context,
       Scaffold(
         backgroundColor: const Color(0xFFF8FAF9),
@@ -74,7 +74,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                           itemCount: _reports.length,
                           itemBuilder: (context, index) {
                             final report = _reports[index];
-                            return _ReportCard(
+                            return IssueReportCard(
                               report: report,
                               onTap: () async {
                                 await Navigator.push(
@@ -144,8 +144,8 @@ class IssueReportsEmptyState extends StatelessWidget {
   }
 }
 
-class _ReportCard extends StatelessWidget {
-  const _ReportCard({required this.report, required this.onTap});
+class IssueReportCard extends StatelessWidget {
+  const IssueReportCard({super.key, required this.report, required this.onTap});
 
   final IssueReport report;
   final VoidCallback onTap;

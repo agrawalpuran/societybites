@@ -47,7 +47,7 @@ class _IssueDetailScreenState extends State<IssueDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final issue = _issue;
-    return centerOnWeb(
+    return panelOnWeb(
       context,
       Scaffold(
         backgroundColor: const Color(0xFFF8FAF9),

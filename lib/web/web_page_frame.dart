@@ -2,6 +2,46 @@ import 'package:flutter/material.dart';
 
 import 'web_breakpoints.dart';
 
+/// Centers a form or detail page in a card on wide web.
+/// Android, iOS, and narrow Chrome keep [page] full screen.
+Widget panelOnWeb(
+  BuildContext context,
+  Widget page, {
+  double maxWidth = 760,
+}) {
+  if (!useWebMarketplaceLayout(context)) return page;
+  return ColoredBox(
+    color: webPageBackground,
+    child: Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: webLine),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x140E5A47),
+                  blurRadius: 24,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: page,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 /// Centers a page on wide web. On Android, iOS, and narrow Chrome this
 /// returns [page] unchanged.
 Widget centerOnWeb(

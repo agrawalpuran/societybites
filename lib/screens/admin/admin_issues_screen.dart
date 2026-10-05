@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/issue_report.dart';
 import '../../services/api_service.dart';
+import '../../web/web_page_frame.dart';
 import '../../widgets/screen_loading_note.dart';
 
 class AdminIssuesScreen extends StatefulWidget {
@@ -202,7 +203,9 @@ class _AdminIssueDetailScreenState extends State<AdminIssueDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final issue = _issue;
-    return Scaffold(
+    return panelOnWeb(
+      context,
+      Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0E5A47),
@@ -268,6 +271,7 @@ class _AdminIssueDetailScreenState extends State<AdminIssueDetailScreen> {
                     ),
                   ],
                 ),
+      ),
     );
   }
 }
