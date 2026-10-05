@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:http/http.dart' as http_client;
 
+import '../models/coupon.dart';
 import '../models/issue_report.dart';
 import '../models/order_lifecycle.dart';
 import '../models/seller_order_history.dart';
@@ -2064,6 +2065,108 @@ class ApiService {
     );
     if (response.statusCode == 200) {
       return IssueReport.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<AdminCoupon>> getAdminCoupons() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/coupons'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      final coupons = data is Map ? data['coupons'] : data;
+      return (coupons as List)
+          .map((row) => AdminCoupon.fromJson(Map<String, dynamic>.from(row as Map)))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<AdminCoupon> getAdminCoupon(String id) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/coupons/$id'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return AdminCoupon.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<AdminCoupon> createAdminCoupon(Map<String, dynamic> body) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/coupons'),
+      headers: await _authHeaders(),
+      body: jsonEncode(body),
+    );
+    if (response.statusCode == 201) {
+      return AdminCoupon.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<AdminCoupon> updateAdminCoupon(
+    String id,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/coupons/$id'),
+      headers: await _authHeaders(),
+      body: jsonEncode(body),
+    );
+    if (response.statusCode == 200) {
+      return AdminCoupon.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<AdminCoupon> pauseAdminCoupon(String id) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/coupons/$id/pause'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return AdminCoupon.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<AdminCoupon> activateAdminCoupon(String id) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/coupons/$id/activate'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return AdminCoupon.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<AdminCoupon> setAdminCouponEligibleUsers(
+    String id,
+    List<String> userIds,
+  ) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/admin/coupons/$id/eligible-users'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'userIds': userIds}),
+    );
+    if (response.statusCode == 200) {
+      return AdminCoupon.fromJson(
         Map<String, dynamic>.from(_decodeResponse(response) as Map),
       );
     }
