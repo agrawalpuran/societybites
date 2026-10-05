@@ -31,7 +31,7 @@ void main() {
     expect(otpVerifyHeadingFontSize, closeTo(38, 0.01));
     expect(otpVerifyHeadingFontSize, lessThan(52 * 0.8));
     expect(otpVerifyHeadingFontSize, greaterThan(52 * 0.65));
-    expect(otpVerifyButtonHeight, 46);
+    expect(otpVerifyButtonHeight, 48);
     expect(otpVerifyButtonHeight, lessThan(64 * 0.8));
     expect(otpVerifyButtonHeight, greaterThanOrEqualTo(44));
   });

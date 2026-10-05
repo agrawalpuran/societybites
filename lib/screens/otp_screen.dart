@@ -361,7 +361,6 @@ class _OtpScreenState extends State<OtpScreen> {
     if (kIsWeb) return _buildWebOtp();
     final size = MediaQuery.of(context).size;
     final horizontalPadding = size.width * 0.08;
-    final contentWidth = size.width - horizontalPadding * 2;
 
     return OtpKeyboardSafeScaffold(
       gradientHeight: size.height * 0.23,
@@ -386,27 +385,12 @@ class _OtpScreenState extends State<OtpScreen> {
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 42),
-          AutofillGroup(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(
-                _OtpScreenState._otpLength,
-                (index) => SizedBox(
-                  width:
-                      (contentWidth -
-                          (_OtpScreenState._otpLength - 1) * 8) /
-                      _OtpScreenState._otpLength,
-                  child: _OtpInputBox(
-                    controller: _controllers[index],
-                    focusNode: _focusNodes[index],
-                    autoFocus: index == 0,
-                    enableOtpAutofill: index == 0,
-                    onChanged: (value) => _onOtpChanged(index, value),
-                    isPrimary: index == 0,
-                  ),
-                ),
-              ),
+          const SizedBox(height: 32),
+          Center(
+            child: _OtpDigitRow(
+              controllers: _controllers,
+              focusNodes: _focusNodes,
+              onChanged: _onOtpChanged,
             ),
           ),
           const SizedBox(height: 28),
@@ -430,12 +414,11 @@ class _OtpScreenState extends State<OtpScreen> {
                   : _resendOtp,
             ),
           ),
-          const SizedBox(height: 64),
+          const SizedBox(height: 40),
           const _SecurityInfoCard(),
         ],
       ),
       bottomBar: _PrimaryActionButton(
-        text: 'Verify & Continue  →',
         isLoading: _isVerifying,
         onTap: _isVerifying ? null : _verifyOtp,
       ),
@@ -484,33 +467,12 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  const gap = 8.0;
-                  final boxWidth =
-                      (constraints.maxWidth - gap * (kOtpLength - 1)) /
-                      kOtpLength;
-                  return AutofillGroup(
-                    child: Row(
-                      children: [
-                        for (var index = 0; index < kOtpLength; index++) ...[
-                          if (index > 0) const SizedBox(width: gap),
-                          SizedBox(
-                            width: boxWidth,
-                            child: _OtpInputBox(
-                              controller: _controllers[index],
-                              focusNode: _focusNodes[index],
-                              autoFocus: index == 0,
-                              enableOtpAutofill: index == 0,
-                              onChanged: (value) => _onOtpChanged(index, value),
-                              isPrimary: index == 0,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                },
+              Center(
+                child: _OtpDigitRow(
+                  controllers: _controllers,
+                  focusNodes: _focusNodes,
+                  onChanged: _onOtpChanged,
+                ),
               ),
               const SizedBox(height: 22),
               const Center(
@@ -535,7 +497,6 @@ class _OtpScreenState extends State<OtpScreen> {
               ),
               const SizedBox(height: 22),
               _PrimaryActionButton(
-                text: 'Verify & Continue  →',
                 isLoading: _isVerifying,
                 onTap: _isVerifying ? null : _verifyOtp,
               ),
@@ -639,6 +600,41 @@ class _SecurityBadge extends StatelessWidget {
   }
 }
 
+class _OtpDigitRow extends StatelessWidget {
+  const _OtpDigitRow({
+    required this.controllers,
+    required this.focusNodes,
+    required this.onChanged,
+  });
+
+  final List<TextEditingController> controllers;
+  final List<FocusNode> focusNodes;
+  final void Function(int index, String value) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return AutofillGroup(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (var index = 0; index < kOtpLength; index++) ...[
+            if (index > 0) const SizedBox(width: otpBoxGap),
+            _OtpInputBox(
+              controller: controllers[index],
+              focusNode: focusNodes[index],
+              autoFocus: index == 0,
+              enableOtpAutofill: index == 0,
+              onChanged: (value) => onChanged(index, value),
+              isPrimary: index == 0,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _OtpInputBox extends StatelessWidget {
   const _OtpInputBox({
     required this.controller,
@@ -658,47 +654,54 @@ class _OtpInputBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      focusNode: focusNode,
-      autofocus: autoFocus,
-      keyboardType: TextInputType.number,
-      textInputAction: enableOtpAutofill
-          ? TextInputAction.done
-          : TextInputAction.next,
-      textAlign: TextAlign.center,
-      // Allow the full 6-digit SMS code so OS autofill is not truncated to 1.
-      maxLength: kOtpLength,
-      autofillHints: enableOtpAutofill
-          ? const [AutofillHints.oneTimeCode]
-          : null,
-      autocorrect: false,
-      // iOS shows the SMS OTP chip on the QuickType bar only if suggestions stay on.
-      enableSuggestions: enableOtpAutofill,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      onChanged: onChanged,
-      style: const TextStyle(
-        fontSize: 26,
-        fontWeight: FontWeight.w700,
-        color: Color(0xFF1D2E2B),
-      ),
-      decoration: InputDecoration(
-        counterText: '',
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.78),
-        contentPadding: const EdgeInsets.symmetric(vertical: 18),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
-          borderSide: BorderSide(
-            color: isPrimary
-                ? const Color(0xFF2D7BFF)
-                : const Color(0xFFE8ECEA),
-            width: isPrimary ? 1.4 : 1,
-          ),
+    final radius = BorderRadius.circular(otpBoxBorderRadius);
+    return SizedBox(
+      width: otpBoxSize,
+      height: otpBoxSize,
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        autofocus: autoFocus,
+        keyboardType: TextInputType.number,
+        textInputAction: enableOtpAutofill
+            ? TextInputAction.done
+            : TextInputAction.next,
+        textAlign: TextAlign.center,
+        // Allow the full 6-digit SMS code so OS autofill is not truncated to 1.
+        maxLength: kOtpLength,
+        autofillHints: enableOtpAutofill
+            ? const [AutofillHints.oneTimeCode]
+            : null,
+        autocorrect: false,
+        // iOS shows the SMS OTP chip on the QuickType bar only if suggestions stay on.
+        enableSuggestions: enableOtpAutofill,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        onChanged: onChanged,
+        style: const TextStyle(
+          fontSize: otpBoxFontSize,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF1D2E2B),
+          height: 1,
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
-          borderSide: const BorderSide(color: Color(0xFF2D7BFF), width: 1.6),
+        decoration: InputDecoration(
+          counterText: '',
+          isDense: true,
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.78),
+          contentPadding: EdgeInsets.zero,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: radius,
+            borderSide: BorderSide(
+              color: isPrimary
+                  ? const Color(0xFF2D7BFF)
+                  : const Color(0xFFE8ECEA),
+              width: isPrimary ? 1.4 : 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: radius,
+            borderSide: const BorderSide(color: Color(0xFF2D7BFF), width: 1.6),
+          ),
         ),
       ),
     );
@@ -707,12 +710,10 @@ class _OtpInputBox extends StatelessWidget {
 
 class _PrimaryActionButton extends StatelessWidget {
   const _PrimaryActionButton({
-    required this.text,
     required this.onTap,
     required this.isLoading,
   });
 
-  final String text;
   final VoidCallback? onTap;
   final bool isLoading;
 
@@ -728,8 +729,10 @@ class _PrimaryActionButton extends StatelessWidget {
           backgroundColor: const Color(0xFF0E5A47),
           foregroundColor: Colors.white,
           elevation: 0,
-          shape: const StadiumBorder(),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
         ),
         child: isLoading
             ? const SizedBox(
@@ -740,16 +743,22 @@ class _PrimaryActionButton extends StatelessWidget {
                   color: Colors.white,
                 ),
               )
-            : Text(
-                text,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  height: 1.1,
-                ),
+            : const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Verify & continue',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.15,
+                      height: 1.2,
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  Icon(Icons.arrow_forward_rounded, size: 18),
+                ],
               ),
       ),
     );

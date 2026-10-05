@@ -4,7 +4,13 @@ import 'package:flutter/material.dart';
 const otpVerifyHeadingFontSize = 38.0;
 
 /// Reduced primary CTA height; still above a 44pt touch target.
-const otpVerifyButtonHeight = 46.0;
+const otpVerifyButtonHeight = 48.0;
+
+/// Compact square OTP cells (centered row, not full-width pills).
+const otpBoxSize = 44.0;
+const otpBoxGap = 8.0;
+const otpBoxBorderRadius = 10.0;
+const otpBoxFontSize = 18.0;
 
 /// Extra space above the iOS keyboard so the SMS OTP autofill chip stays tappable.
 const otpIosAutofillBarGap = 52.0;
