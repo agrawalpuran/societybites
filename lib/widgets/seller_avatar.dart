@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
@@ -13,6 +15,7 @@ class SellerAvatar extends StatelessWidget {
     this.photoUrl,
     this.ringColor,
     this.ringWidth = 0,
+    this.muted = false,
   });
 
   final double radius;
@@ -21,6 +24,9 @@ class SellerAvatar extends StatelessWidget {
   final String? photoUrl;
   final Color? ringColor;
   final double ringWidth;
+
+  /// Greyscale and soft blur for a profile photo. The fallback icon stays sharp.
+  final bool muted;
 
   @override
   Widget build(BuildContext context) {
@@ -36,17 +42,7 @@ class SellerAvatar extends StatelessWidget {
         color: backgroundColor,
         alignment: Alignment.center,
         child: hasUrl
-            ? Image.network(
-                ApiService.imageUrl(url),
-                webHtmlElementStrategy: WebHtmlElementStrategy.never,
-                width: innerSize,
-                height: innerSize,
-                fit: BoxFit.cover,
-                cacheWidth: (innerSize * MediaQuery.devicePixelRatioOf(context))
-                    .round()
-                    .clamp(48, 512),
-                errorBuilder: (_, _, _) => fallback,
-              )
+            ? _photo(ApiService.imageUrl(url!), innerSize, context)
             : fallback,
       ),
     );
@@ -62,6 +58,50 @@ class SellerAvatar extends StatelessWidget {
         border: Border.all(color: ringColor!, width: ringWidth),
       ),
       child: avatar,
+    );
+  }
+
+  Widget _photo(String url, double size, BuildContext context) {
+    final image = Image.network(
+      url,
+      webHtmlElementStrategy: WebHtmlElementStrategy.never,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round().clamp(
+        48,
+        512,
+      ),
+      errorBuilder: (_, _, _) => fallback,
+    );
+    if (!muted) return image;
+    return ColorFiltered(
+      colorFilter: const ColorFilter.matrix(<double>[
+        0.2126,
+        0.7152,
+        0.0722,
+        0,
+        0,
+        0.2126,
+        0.7152,
+        0.0722,
+        0,
+        0,
+        0.2126,
+        0.7152,
+        0.0722,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+      ]),
+      child: ImageFiltered(
+        imageFilter: ImageFilter.blur(sigmaX: 2.2, sigmaY: 2.2),
+        child: image,
+      ),
     );
   }
 }

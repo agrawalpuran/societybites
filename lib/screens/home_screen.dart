@@ -1813,12 +1813,18 @@ class _SellerChip extends StatelessWidget {
                 ),
               )
             else
-              const SellerAvatar(
+              SellerAvatar(
                 radius: 32,
-                backgroundColor: Colors.white,
-                ringColor: Color(0xFFD5DCDA),
+                backgroundColor: seller.avatarColor,
+                photoUrl: seller.profilePhotoUrl,
+                ringColor: const Color(0xFFD5DCDA),
                 ringWidth: 1.5,
-                fallback: SizedBox.shrink(),
+                muted: true,
+                fallback: Icon(
+                  seller.avatarIcon,
+                  color: const Color(0xFF6A7774),
+                  size: 28,
+                ),
               ),
             const SizedBox(height: 4),
             if (seller.hasOrderableItems)
