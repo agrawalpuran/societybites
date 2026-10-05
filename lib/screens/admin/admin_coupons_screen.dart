@@ -5,6 +5,7 @@ import '../../models/coupon.dart';
 import '../../services/api_service.dart';
 import '../../web/web_page_frame.dart';
 import '../../widgets/screen_loading_note.dart';
+import 'admin_coupon_seller_payouts_screen.dart';
 
 const _green = Color(0xFF0E5A47);
 
@@ -17,7 +18,8 @@ class AdminCouponsScreen extends StatefulWidget {
   State<AdminCouponsScreen> createState() => _AdminCouponsScreenState();
 }
 
-class _AdminCouponsScreenState extends State<AdminCouponsScreen> {
+class _AdminCouponsScreenState extends State<AdminCouponsScreen>
+    with SingleTickerProviderStateMixin {
   static const _filters = [
     'ALL',
     'ACTIVE',
@@ -31,11 +33,19 @@ class _AdminCouponsScreenState extends State<AdminCouponsScreen> {
   String _filter = 'ALL';
   bool _loading = true;
   String? _error;
+  late final TabController _tabs;
 
   @override
   void initState() {
     super.initState();
+    _tabs = TabController(length: 2, vsync: this);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -77,18 +87,52 @@ class _AdminCouponsScreenState extends State<AdminCouponsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Text(
+            'Coupons',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          ),
+        ),
+        TabBar(
+          controller: _tabs,
+          labelColor: _green,
+          unselectedLabelColor: const Color(0xFF5C6B66),
+          indicatorColor: _green,
+          tabs: const [
+            Tab(text: 'Campaigns'),
+            Tab(text: 'Seller payouts'),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabs,
+            children: [
+              _buildCampaignsTab(),
+              const AdminCouponSellerPayoutsScreen(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCampaignsTab() {
     final visible = _visible;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Row(
             children: [
               const Expanded(
                 child: Text(
-                  'Coupons',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                  'SocietyEats pays the discount. The seller still receives the full order amount.',
+                  style: TextStyle(color: Color(0xFF5C6B66), height: 1.35),
                 ),
               ),
               FilledButton.icon(
@@ -98,13 +142,6 @@ class _AdminCouponsScreenState extends State<AdminCouponsScreen> {
                 label: const Text('New coupon'),
               ),
             ],
-          ),
-        ),
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Text(
-            'SocietyEats pays the discount. The seller still receives the full order amount.',
-            style: TextStyle(color: Color(0xFF5C6B66), height: 1.35),
           ),
         ),
         SizedBox(

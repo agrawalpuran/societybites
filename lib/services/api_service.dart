@@ -2204,4 +2204,30 @@ class ApiService {
     }
     _throwFromResponse(response);
   }
+
+  static Future<AdminCouponSellerPayoutReport> getAdminCouponSellerPayouts({
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String? sellerId,
+  }) async {
+    final query = <String, String>{};
+    if (dateFrom != null) {
+      query['dateFrom'] = dateFrom.toUtc().toIso8601String();
+    }
+    if (dateTo != null) {
+      query['dateTo'] = dateTo.toUtc().toIso8601String();
+    }
+    if (sellerId != null && sellerId.trim().isNotEmpty) {
+      query['sellerId'] = sellerId.trim();
+    }
+    final uri = Uri.parse('$baseUrl/admin/reports/coupon-seller-payouts')
+        .replace(queryParameters: query.isEmpty ? null : query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return AdminCouponSellerPayoutReport.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
 }

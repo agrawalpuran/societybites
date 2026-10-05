@@ -168,6 +168,119 @@ class AdminCoupon {
   }
 }
 
+class AdminCouponPayoutRow {
+  const AdminCouponPayoutRow({
+    required this.orderId,
+    required this.orderNumber,
+    required this.createdAt,
+    this.redeemedAt,
+    this.sellerId,
+    this.sellerName,
+    this.sellerPhone,
+    required this.couponCode,
+    required this.foodSubtotal,
+    required this.buyerPaid,
+    required this.subsidyAmount,
+    required this.orderStatus,
+    required this.paymentStatus,
+  });
+
+  final String orderId;
+  final String orderNumber;
+  final DateTime createdAt;
+  final DateTime? redeemedAt;
+  final String? sellerId;
+  final String? sellerName;
+  final String? sellerPhone;
+  final String couponCode;
+  final double foodSubtotal;
+  final double buyerPaid;
+  final double subsidyAmount;
+  final String orderStatus;
+  final String paymentStatus;
+
+  factory AdminCouponPayoutRow.fromJson(Map<String, dynamic> json) {
+    return AdminCouponPayoutRow(
+      orderId: json['orderId'].toString(),
+      orderNumber: json['orderNumber'].toString(),
+      createdAt: DateTime.parse(json['createdAt'].toString()),
+      redeemedAt: json['redeemedAt'] == null
+          ? null
+          : DateTime.tryParse(json['redeemedAt'].toString()),
+      sellerId: json['sellerId']?.toString(),
+      sellerName: json['sellerName']?.toString(),
+      sellerPhone: json['sellerPhone']?.toString(),
+      couponCode: json['couponCode']?.toString() ?? '',
+      foodSubtotal: _asDouble(json['foodSubtotal']),
+      buyerPaid: _asDouble(json['buyerPaid']),
+      subsidyAmount: _asDouble(json['subsidyAmount']),
+      orderStatus: json['orderStatus']?.toString() ?? '',
+      paymentStatus: json['paymentStatus']?.toString() ?? '',
+    );
+  }
+}
+
+class AdminCouponPayoutSellerSummary {
+  const AdminCouponPayoutSellerSummary({
+    this.sellerId,
+    this.sellerName,
+    this.sellerPhone,
+    required this.subsidyTotal,
+    required this.orderCount,
+  });
+
+  final String? sellerId;
+  final String? sellerName;
+  final String? sellerPhone;
+  final double subsidyTotal;
+  final int orderCount;
+
+  factory AdminCouponPayoutSellerSummary.fromJson(Map<String, dynamic> json) {
+    return AdminCouponPayoutSellerSummary(
+      sellerId: json['sellerId']?.toString(),
+      sellerName: json['sellerName']?.toString(),
+      sellerPhone: json['sellerPhone']?.toString(),
+      subsidyTotal: _asDouble(json['subsidyTotal']),
+      orderCount: _asInt(json['orderCount']) ?? 0,
+    );
+  }
+}
+
+class AdminCouponSellerPayoutReport {
+  const AdminCouponSellerPayoutReport({
+    required this.totalSubsidy,
+    required this.rowCount,
+    required this.rows,
+    required this.bySeller,
+  });
+
+  final double totalSubsidy;
+  final int rowCount;
+  final List<AdminCouponPayoutRow> rows;
+  final List<AdminCouponPayoutSellerSummary> bySeller;
+
+  factory AdminCouponSellerPayoutReport.fromJson(Map<String, dynamic> json) {
+    return AdminCouponSellerPayoutReport(
+      totalSubsidy: _asDouble(json['totalSubsidy']),
+      rowCount: _asInt(json['rowCount']) ?? 0,
+      rows: (json['rows'] as List? ?? const [])
+          .map(
+            (row) => AdminCouponPayoutRow.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          )
+          .toList(),
+      bySeller: (json['bySeller'] as List? ?? const [])
+          .map(
+            (row) => AdminCouponPayoutSellerSummary.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
 String formatRupee(num value) {
   final rounded = (value * 100).round() / 100;
   if (rounded == rounded.roundToDouble()) return '₹${rounded.toInt()}';

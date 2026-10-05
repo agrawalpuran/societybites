@@ -19,6 +19,7 @@ const {
 const { canonicalCityKey } = require("../lib/launchCity");
 const { validateCityReachRadii } = require("../lib/sellingReach");
 const { serializeFssai } = require("../lib/fssai");
+const { listCouponSellerPayouts } = require("../lib/couponRecon");
 
 const router = express.Router();
 
@@ -734,6 +735,18 @@ router.patch(
   asyncHandler(async (req, res) => {
     const issue = await updateAdminIssue(req.params.id, req.body, req.user);
     res.json(issue);
+  })
+);
+
+router.get(
+  "/reports/coupon-seller-payouts",
+  asyncHandler(async (req, res) => {
+    const report = await listCouponSellerPayouts({
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+      sellerId: req.query.sellerId,
+    });
+    res.json(report);
   })
 );
 
