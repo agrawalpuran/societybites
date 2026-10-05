@@ -918,7 +918,7 @@ router.post(
           status: "REDEEMED",
         });
         if (!couponResult.valid) {
-          const err = new Error(couponErrorMessage(couponResult.reason));
+          const err = new Error(couponErrorMessage(couponResult.reason, couponResult));
           err.statusCode = 400;
           err.couponReason = couponResult.reason;
           throw err;

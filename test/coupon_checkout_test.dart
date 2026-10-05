@@ -5,8 +5,18 @@ import 'package:societybites/models/coupon.dart';
 void main() {
   test('coupon reason messages are buyer friendly', () {
     expect(couponReasonMessage('COUPON_EXPIRED'), 'This coupon has expired');
-    expect(couponReasonMessage('MINIMUM_ORDER_NOT_MET'),
-        'Your order does not meet the minimum for this coupon');
+    expect(
+      couponReasonMessage('MINIMUM_ORDER_NOT_MET'),
+      'Your order does not meet the minimum for this coupon',
+    );
+    expect(
+      couponReasonMessage(
+        'MINIMUM_ORDER_NOT_MET',
+        minimumOrderValue: 300,
+        orderSubtotal: 150,
+      ),
+      'Minimum food order ₹300. Add ₹150 more to use this coupon',
+    );
   });
 
   test('coupon quote parses validation payload', () {

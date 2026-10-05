@@ -117,6 +117,8 @@ async function main() {
 
     const low = await validateCoupon({ code: fixed.code, userId: buyer.id, orderSubtotal: 299 });
     assert(low.reason === REASONS.MINIMUM_ORDER_NOT_MET, "minimum order");
+    assert(low.minimumOrderValue === 300, "minimum order value returned");
+    assert(low.orderSubtotal === 299, "order subtotal echoed");
 
     const expired = await makeCoupon(`EXP${stamp}`, {
       validFrom: new Date(Date.now() - 5 * 86400000),

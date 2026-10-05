@@ -26,6 +26,12 @@ function money(value) {
   return Math.round(Number(value) * 100) / 100;
 }
 
+function formatRupee(value) {
+  const amount = money(value);
+  if (amount === Math.floor(amount)) return `₹${amount}`;
+  return `₹${amount.toFixed(2)}`;
+}
+
 function normalizeCode(code) {
   return String(code || "").trim().toUpperCase();
 }
@@ -38,8 +44,8 @@ function normalizeSubtotal(orderSubtotal) {
   return money(amount);
 }
 
-function invalid(reason) {
-  return { valid: false, reason };
+function invalid(reason, extra = {}) {
+  return { valid: false, reason, ...extra };
 }
 
 function istParts(date) {
@@ -139,7 +145,11 @@ async function validateCoupon({ code, userId, orderSubtotal, now = new Date(), d
   if (now < new Date(coupon.validFrom)) return invalid(REASONS.COUPON_NOT_STARTED);
   if (now > new Date(coupon.validUntil)) return invalid(REASONS.COUPON_EXPIRED);
   if (subtotal < Number(coupon.minimumOrderValue || 0)) {
-    return invalid(REASONS.MINIMUM_ORDER_NOT_MET);
+    const minimumOrderValue = money(Number(coupon.minimumOrderValue || 0));
+    return invalid(REASONS.MINIMUM_ORDER_NOT_MET, {
+      minimumOrderValue,
+      orderSubtotal: subtotal,
+    });
   }
 
   if (coupon.audienceType === "SELECTED_USERS") {
@@ -171,7 +181,16 @@ async function validateCoupon({ code, userId, orderSubtotal, now = new Date(), d
   return quoteFromDiscount(coupon, subtotal, discountAmount);
 }
 
-function couponErrorMessage(reason) {
+function couponErrorMessage(reason, context = {}) {
+  if (reason === REASONS.MINIMUM_ORDER_NOT_MET && context.minimumOrderValue != null) {
+    const minimum = money(context.minimumOrderValue);
+    const current = context.orderSubtotal != null ? money(context.orderSubtotal) : null;
+    if (current != null && current < minimum) {
+      const shortfall = money(minimum - current);
+      return `Minimum food order ${formatRupee(minimum)}. Add ${formatRupee(shortfall)} more to use this coupon`;
+    }
+    return `Minimum food order ${formatRupee(minimum)} required for this coupon`;
+  }
   return (
     {
       INVALID_COUPON: "This coupon code is not valid",

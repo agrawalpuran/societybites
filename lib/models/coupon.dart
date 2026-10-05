@@ -27,7 +27,23 @@ class CouponQuote {
   }
 }
 
-String couponReasonMessage(String? reason) {
+String couponReasonMessage(
+  String? reason, {
+  double? minimumOrderValue,
+  double? orderSubtotal,
+}) {
+  if (reason == 'MINIMUM_ORDER_NOT_MET' &&
+      minimumOrderValue != null &&
+      minimumOrderValue > 0) {
+    final minimum = minimumOrderValue;
+    final current = orderSubtotal;
+    if (current != null && current < minimum) {
+      final shortfall = moneyRound(minimum - current);
+      return 'Minimum food order ${formatRupee(minimum)}. '
+          'Add ${formatRupee(shortfall)} more to use this coupon';
+    }
+    return 'Minimum food order ${formatRupee(minimum)} required for this coupon';
+  }
   return switch (reason) {
     'INVALID_COUPON' => 'This coupon code is not valid',
     'COUPON_EXPIRED' => 'This coupon has expired',
@@ -180,6 +196,16 @@ String formatCouponDate(DateTime value) {
 double _asDouble(Object? value) {
   if (value is num) return value.toDouble();
   return double.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+double moneyRound(double value) {
+  return (value * 100).round() / 100;
+}
+
+double? optionalCouponAmount(Object? value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString());
 }
 
 int? _asInt(Object? value) {

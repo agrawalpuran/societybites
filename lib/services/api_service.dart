@@ -845,7 +845,14 @@ class ApiService {
       if (data['valid'] == true) {
         return CouponQuote.fromJson(data);
       }
-      throw Exception(couponReasonMessage(data['reason']?.toString()));
+      throw Exception(
+        couponReasonMessage(
+          data['reason']?.toString(),
+          minimumOrderValue: optionalCouponAmount(data['minimumOrderValue']),
+          orderSubtotal:
+              optionalCouponAmount(data['orderSubtotal']) ?? orderSubtotal,
+        ),
+      );
     }
     _throwFromResponse(response);
   }
