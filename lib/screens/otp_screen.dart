@@ -845,7 +845,7 @@ class _SecurityInfoCard extends StatelessWidget {
                 SizedBox(height: 4),
                 Text(
                   'Your data is safe and secure and never shared. '
-                  'We take community safety seriously at SocietyBites.',
+                  'We take community safety seriously at SocietyEats.',
                   style: TextStyle(
                     fontSize: 14,
                     height: 1.4,
