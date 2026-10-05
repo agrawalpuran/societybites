@@ -6,6 +6,7 @@ import 'admin_fssai_screen.dart';
 import 'admin_listings_screen.dart';
 import 'admin_orders_screen.dart';
 import 'admin_reviews_screen.dart';
+import 'admin_issues_screen.dart';
 import 'admin_audit_screen.dart';
 
 class AdminShellScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     _NavItem(icon: Icons.fastfood_rounded, label: 'Listings'),
     _NavItem(icon: Icons.shopping_bag_rounded, label: 'Orders'),
     _NavItem(icon: Icons.star_rounded, label: 'Reviews'),
+    _NavItem(icon: Icons.flag_outlined, label: 'Issues'),
     _NavItem(icon: Icons.history_rounded, label: 'Audit Log'),
   ];
 
@@ -43,6 +45,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       case 5:
         return const AdminReviewsScreen();
       case 6:
+        return const AdminIssuesScreen();
+      case 7:
         return const AdminAuditScreen();
       default:
         return const AdminDashboardScreen();
@@ -87,20 +91,47 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
             ),
           ),
           body: _buildBody(),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            onTap: (i) => setState(() => _selectedIndex = i),
-            type: BottomNavigationBarType.fixed,
-            selectedItemColor: const Color(0xFF0E5A47),
-            unselectedItemColor: const Color(0xFF8A9491),
-            selectedFontSize: 11,
-            unselectedFontSize: 11,
-            items: _navItems
-                .map((item) => BottomNavigationBarItem(
-                      icon: Icon(item.icon),
-                      label: item.label,
-                    ))
-                .toList(),
+          bottomNavigationBar: Material(
+            color: Colors.white,
+            child: SafeArea(
+              child: SizedBox(
+                height: 64,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _navItems.length,
+                  itemBuilder: (context, index) {
+                    final item = _navItems[index];
+                    final selected = index == _selectedIndex;
+                    final color = selected
+                        ? const Color(0xFF0E5A47)
+                        : const Color(0xFF8A9491);
+                    return InkWell(
+                      onTap: () => setState(() => _selectedIndex = index),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(item.icon, color: color, size: 22),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: color,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
           ),
         );
       },

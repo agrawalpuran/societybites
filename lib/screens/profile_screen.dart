@@ -28,6 +28,8 @@ import 'admin/admin_shell_screen.dart';
 import 'guest_landing_screen.dart';
 import 'main_shell_screen.dart';
 import 'help_center_screen.dart';
+import 'my_reports_screen.dart';
+import 'report_issue_screen.dart';
 import 'legal_screen.dart';
 import 'login_screen.dart';
 import 'profile_photo_crop_screen.dart';
@@ -1706,6 +1708,28 @@ class ProfileScreenState extends State<ProfileScreen> {
         },
       ),
       ProfileMenuTile(
+        icon: Icons.flag_outlined,
+        title: 'Help & Report an Issue',
+        subtitle: 'Tell us about an order, payment, or the app',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ReportIssueScreen()),
+          );
+        },
+      ),
+      ProfileMenuTile(
+        icon: Icons.inbox_outlined,
+        title: 'My Reports',
+        subtitle: 'See status and replies',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const MyReportsScreen()),
+          );
+        },
+      ),
+      ProfileMenuTile(
         icon: Icons.privacy_tip_outlined,
         title: 'Privacy Policy',
         onTap: () => _openLegal('Privacy Policy', kPrivacyPolicyBody),
@@ -1962,6 +1986,32 @@ class ProfileScreenState extends State<ProfileScreen> {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => const HelpCenterScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          ProfileMenuTile(
+                            icon: Icons.flag_outlined,
+                            title: 'Help & Report an Issue',
+                            subtitle: 'Tell us about an order, payment, or the app',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ReportIssueScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          ProfileMenuTile(
+                            icon: Icons.inbox_outlined,
+                            title: 'My Reports',
+                            subtitle: 'See status and replies',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const MyReportsScreen(),
                                 ),
                               );
                             },

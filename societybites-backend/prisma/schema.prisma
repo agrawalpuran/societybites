@@ -49,6 +49,7 @@ model User {
   reviews              Review[]
   sentMessages         Message[]
   sellerTermsAcceptances SellerTermsAcceptance[]
+  issueReports         IssueReport[]
   flat                 Flat?              @relation(fields: [flatId], references: [id])
   society              Society?           @relation(fields: [societyId], references: [id])
 }
@@ -342,6 +343,34 @@ model DeviceToken {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, active])
+}
+
+/// In-app issue and feedback reports. Isolated from orders, listings, and payments.
+model IssueReport {
+  id            String    @id @default(uuid())
+  issueNumber   Int       @unique @default(autoincrement())
+  reference     String    @unique
+  userId        String
+  /// Role captured from the authenticated user at submission time.
+  userRole      String
+  category      String
+  description   String
+  orderId       String?
+  listingId     String?
+  sellerId      String?
+  /// OPEN | UNDER_REVIEW | RESOLVED | CLOSED
+  status        String    @default("OPEN")
+  adminResponse String?
+  /// ANDROID | IOS | WEB
+  platform      String?
+  appVersion    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  resolvedAt    DateTime?
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 /// Hashed refresh tokens for 2Factor persistent login. Firebase login is unchanged.

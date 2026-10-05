@@ -3,6 +3,11 @@ const prisma = require("../lib/prisma");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser } = require("../middleware/requireUser");
 const { requireAdmin } = require("../middleware/requireAdmin");
+const {
+  listAdminIssues,
+  getAdminIssue,
+  updateAdminIssue,
+} = require("../lib/issueReports");
 const { canonicalCityKey } = require("../lib/launchCity");
 const { validateCityReachRadii } = require("../lib/sellingReach");
 const { serializeFssai } = require("../lib/fssai");
@@ -697,6 +702,30 @@ router.put(
     });
 
     res.json(config);
+  })
+);
+
+router.get(
+  "/issues",
+  asyncHandler(async (req, res) => {
+    const issues = await listAdminIssues(req.query.status);
+    res.json({ issues });
+  })
+);
+
+router.get(
+  "/issues/:id",
+  asyncHandler(async (req, res) => {
+    const issue = await getAdminIssue(req.params.id);
+    res.json(issue);
+  })
+);
+
+router.patch(
+  "/issues/:id",
+  asyncHandler(async (req, res) => {
+    const issue = await updateAdminIssue(req.params.id, req.body);
+    res.json(issue);
   })
 );
 

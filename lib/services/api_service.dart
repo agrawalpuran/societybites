@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:http/http.dart' as http_client;
 
+import '../models/issue_report.dart';
 import '../models/order_lifecycle.dart';
 import '../models/seller_order_history.dart';
 import '../models/selling_reach.dart';
@@ -1937,6 +1938,111 @@ class ApiService {
       body: jsonEncode({if (token != null) 'token': token}),
     );
     if (response.statusCode == 200) return;
+    _throwFromResponse(response);
+  }
+
+  static Future<IssueReport> createIssue({
+    required String category,
+    required String description,
+    String? orderId,
+    String? listingId,
+    String? sellerId,
+    String? platform,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/issues'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'category': category,
+        'description': description,
+        if (orderId != null && orderId.isNotEmpty) 'orderId': orderId,
+        if (listingId != null && listingId.isNotEmpty) 'listingId': listingId,
+        if (sellerId != null && sellerId.isNotEmpty) 'sellerId': sellerId,
+        'platform': ?platform,
+      }),
+    );
+    if (response.statusCode == 201) {
+      return IssueReport.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<IssueReport>> getMyIssues() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/issues/my'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      final issues = data is Map ? data['issues'] : data;
+      return (issues as List)
+          .map((row) => IssueReport.fromJson(Map<String, dynamic>.from(row as Map)))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<IssueReport> getIssue(String id) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/issues/$id'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return IssueReport.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<IssueReport>> getAdminIssues({String? status}) async {
+    final uri = Uri.parse('$baseUrl/admin/issues').replace(
+      queryParameters: {'status': ?status},
+    );
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      final issues = data is Map ? data['issues'] : data;
+      return (issues as List)
+          .map((row) => IssueReport.fromJson(Map<String, dynamic>.from(row as Map)))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<IssueReport> getAdminIssue(String id) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/issues/$id'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return IssueReport.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<IssueReport> updateAdminIssue(
+    String id, {
+    String? status,
+    String? adminResponse,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/issues/$id'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'status': ?status,
+        'adminResponse': adminResponse,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return IssueReport.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
     _throwFromResponse(response);
   }
 }
