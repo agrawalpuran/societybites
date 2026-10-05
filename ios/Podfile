@@ -53,11 +53,18 @@ post_install do |installer|
       end
     end
 
-    if target.name == 'gRPC-C++'
-      basic_seq = File.expand_path(
+    # Permanent gRPC compiler compatibility fix.
+    # Handle both gRPC-C++ and gRPC-Core generated Pod paths.
+    [
+      File.expand_path(
         File.join('Pods', 'gRPC-C++', 'src', 'core', 'lib', 'promise', 'detail', 'basic_seq.h'),
         __dir__
+      ),
+      File.expand_path(
+        File.join('Pods', 'gRPC-Core', 'src', 'core', 'lib', 'promise', 'detail', 'basic_seq.h'),
+        __dir__
       )
+    ].each do |basic_seq|
       if File.exist?(basic_seq)
         contents = File.read(basic_seq)
         broken = 'Traits::template CallSeqFactory(f_, *cur_, std::move(arg))'
@@ -65,6 +72,7 @@ post_install do |installer|
         if contents.include?(broken)
           File.chmod(0o644, basic_seq) unless File.writable?(basic_seq)
           File.write(basic_seq, contents.sub(broken, fixed))
+          puts "gRPC compatibility fix applied: #{basic_seq}"
         end
       end
     end
