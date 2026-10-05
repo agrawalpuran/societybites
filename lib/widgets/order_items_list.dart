@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/listing_image.dart';
+import '../models/coupon.dart';
 import '../models/data.dart';
 
 class OrderItemsList extends StatelessWidget {
@@ -130,6 +131,30 @@ class OrderTotalRow extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF3A4644),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if ((order.couponDiscount ?? 0) > 0) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Text(
+                  'Coupon${order.couponCode == null ? '' : ' (${order.couponCode})'}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6A7774),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '-${formatRupee(order.couponDiscount!)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0E5A47),
                   ),
                 ),
               ],

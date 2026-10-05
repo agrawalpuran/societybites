@@ -159,6 +159,10 @@ function serializeOrder(order) {
     distanceKmBetweenCoordinates(buyerSociety, sellerSociety)
   );
 
+  const activeCoupon = Array.isArray(order.couponRedemptions)
+    ? order.couponRedemptions[0]
+    : null;
+
   return {
     id: order.id,
     orderId: order.orderNumber,
@@ -174,6 +178,10 @@ function serializeOrder(order) {
     communityFee: order.communityFee,
     platformFee: order.communityFee,
     total: order.total,
+    couponCode: activeCoupon?.coupon?.code || null,
+    couponDiscount: activeCoupon ? activeCoupon.discountAmount : null,
+    societyEatsSubsidy: activeCoupon ? activeCoupon.discountAmount : null,
+    sellerGrossAmount: order.subtotal,
     societyId: order.societyId,
     buyerId: order.buyerId,
     buyerName: buyer.name || null,

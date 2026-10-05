@@ -8,6 +8,8 @@ import '../widgets/listing_image.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/order_timing_notice.dart';
+import '../widgets/checkout_coupon_section.dart';
+import '../models/coupon.dart';
 import '../widgets/requested_ready_summary.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/status_banner.dart';
@@ -46,6 +48,7 @@ class CheckoutScreen extends StatefulWidget {
     required String paymentMethod,
     String? fulfilmentMethod,
     DateTime? requestedReadyAt,
+    String? couponCode,
   })? placeOrder;
 
   @override
@@ -64,6 +67,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   SellerFulfilment? _sellerFulfilment;
   bool _needBySpecified = false;
   DateTime? _needBy;
+  CouponQuote? _couponQuote;
 
   @override
   void initState() {
@@ -169,7 +173,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  double get _grandTotal => _subtotal + _platformFee + _deliveryCharge;
+  double get _couponDiscount => _couponQuote?.discountAmount ?? 0;
+
+  double get _grandTotal =>
+      (_subtotal + _platformFee + _deliveryCharge - _couponDiscount)
+          .clamp(0, double.infinity);
 
   int get _totalQuantity =>
       _items.fold<int>(0, (sum, item) => sum + item.quantity);
@@ -329,6 +337,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             required String paymentMethod,
             String? fulfilmentMethod,
             DateTime? requestedReadyAt,
+            String? couponCode,
           }) {
             return ApiService.createOrder(
               societyId: societyId,
@@ -336,6 +345,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               items: items,
               fulfilmentMethod: fulfilmentMethod,
               requestedReadyAt: requestedReadyAt,
+              couponCode: couponCode,
             );
           };
 
@@ -357,6 +367,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         fulfilmentMethod: _fulfilmentMethod,
         requestedReadyAt:
             _showNeedBy && _needBySpecified ? _needBy : null,
+        couponCode: _couponQuote?.code,
       );
 
       if (!mounted) return;
@@ -483,6 +494,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             _buildFulfilmentSection(),
                             const SizedBox(height: 24),
                           ],
+                          CheckoutCouponSection(
+                            orderSubtotal: _subtotal,
+                            onQuoteChanged: (quote) {
+                              setState(() => _couponQuote = quote);
+                            },
+                          ),
+                          const SizedBox(height: 24),
                           _buildPaymentSection(),
                           const SizedBox(height: 24),
                           _buildBillSummary(size),
@@ -662,6 +680,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _buildFulfilmentSection(),
           const SizedBox(height: 24),
         ],
+        CheckoutCouponSection(
+          orderSubtotal: _subtotal,
+          onQuoteChanged: (quote) {
+            setState(() => _couponQuote = quote);
+          },
+        ),
+        const SizedBox(height: 24),
         _buildPaymentSection(),
       ],
     );
@@ -944,6 +969,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _BillRow(
               label: 'Delivery charge',
               value: '₹${_deliveryCharge.toStringAsFixed(0)}',
+            ),
+          ],
+          if (_couponDiscount > 0) ...[
+            const SizedBox(height: 10),
+            _BillRow(
+              label: 'Coupon (${_couponQuote!.code})',
+              value: '-${formatRupee(_couponDiscount)}',
             ),
           ],
           const SizedBox(height: 16),

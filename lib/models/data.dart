@@ -521,6 +521,8 @@ class Order {
   final double subtotal;
   final double communityFee;
   final double deliveryCharge;
+  final String? couponCode;
+  final double? couponDiscount;
   final String type;
   final String? campaignId;
   final String? fulfilmentMethod;
@@ -567,6 +569,8 @@ class Order {
     required this.subtotal,
     required this.communityFee,
     this.deliveryCharge = 0,
+    this.couponCode,
+    this.couponDiscount,
     this.type = 'regular',
     this.campaignId,
     this.fulfilmentMethod,
@@ -762,6 +766,8 @@ class Order {
       subtotal: subtotal,
       communityFee: communityFee,
       deliveryCharge: deliveryCharge,
+      couponCode: couponCode,
+      couponDiscount: couponDiscount,
       type: type,
       campaignId: campaignId,
       fulfilmentMethod: fulfilmentMethod,
@@ -805,6 +811,8 @@ class Order {
       subtotal: subtotal,
       communityFee: communityFee,
       deliveryCharge: deliveryCharge,
+      couponCode: couponCode,
+      couponDiscount: couponDiscount,
       type: type,
       campaignId: campaignId,
       fulfilmentMethod: fulfilmentMethod,
@@ -886,6 +894,8 @@ class Order {
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? computedSubtotal,
       communityFee: (json['communityFee'] as num?)?.toDouble() ?? 0,
       deliveryCharge: (json['deliveryCharge'] as num?)?.toDouble() ?? 0,
+      couponCode: json['couponCode'] as String?,
+      couponDiscount: (json['couponDiscount'] as num?)?.toDouble(),
       type: (json['type'] as String?) ?? 'regular',
       campaignId: json['campaignId'] as String?,
       fulfilmentMethod: json['fulfilmentMethod'] as String?,

@@ -57,6 +57,12 @@ const {
 } = require("../lib/orderAcceptance");
 const { parseRequestedReadyAt } = require("../lib/orderReadyTime");
 const { listSellerOrders } = require("../lib/sellerOrderList");
+const {
+  attachCouponRedemption,
+  reverseCouponForOrder,
+  couponErrorMessage,
+  money: couponMoney,
+} = require("../lib/coupons");
 
 const router = express.Router();
 
@@ -175,6 +181,11 @@ const orderInclude = {
     },
   },
   reviews: { select: { id: true } },
+  couponRedemptions: {
+    where: { status: { in: ["APPLIED", "REDEEMED"] } },
+    include: { coupon: { select: { code: true } } },
+    take: 1,
+  },
 };
 
 router.get(
@@ -812,7 +823,14 @@ router.post(
       0
     );
     const platformFee = await getPlatformFee();
-    const total = subtotal + platformFee + deliveryCharge;
+    const preCouponTotal = subtotal + platformFee + deliveryCharge;
+    const couponCode =
+      typeof req.body.couponCode === "string" ? req.body.couponCode.trim() : "";
+    if (couponCode && orderType !== "regular") {
+      return res.status(400).json({
+        error: "Coupons are only available on regular orders right now",
+      });
+    }
 
     let order;
     try {
@@ -860,7 +878,7 @@ router.post(
           }
         }
 
-        return tx.order.create({
+        const created = await tx.order.create({
           data: {
             orderNumber: generateOrderNumber(),
             buyerId: req.user.id,
@@ -877,7 +895,7 @@ router.post(
             paymentMethod,
             subtotal,
             communityFee: platformFee,
-            total,
+            total: preCouponTotal,
             items: {
               create: preparedItems.map(({ listing, quantity }) => ({
                 listingId: listing.id,
@@ -888,12 +906,44 @@ router.post(
           },
           include: orderInclude,
         });
+
+        if (!couponCode) return created;
+
+        const couponResult = await attachCouponRedemption({
+          code: couponCode,
+          userId: req.user.id,
+          orderSubtotal: subtotal,
+          orderId: created.id,
+          db: tx,
+          status: "REDEEMED",
+        });
+        if (!couponResult.valid) {
+          const err = new Error(couponErrorMessage(couponResult.reason));
+          err.statusCode = 400;
+          err.couponReason = couponResult.reason;
+          throw err;
+        }
+
+        const discountedTotal = couponMoney(
+          Math.max(0, preCouponTotal - couponResult.discountAmount)
+        );
+        return tx.order.update({
+          where: { id: created.id },
+          data: { total: discountedTotal },
+          include: orderInclude,
+        });
       });
     } catch (err) {
       if (err.statusCode === 409) {
         return res.status(409).json({
           error: err.message,
           availableQuantity: err.availableQuantity,
+        });
+      }
+      if (err.statusCode === 400 && err.couponReason) {
+        return res.status(400).json({
+          error: err.message,
+          code: err.couponReason,
         });
       }
       throw err;
@@ -1029,6 +1079,7 @@ router.patch(
         });
 
         await restoreReservedInventory(tx, order.items);
+        await reverseCouponForOrder(order.id, tx);
 
         logger.info("order", `Cancelled ${order.orderNumber} — inventory restored`);
       });

@@ -1,3 +1,48 @@
+class CouponQuote {
+  const CouponQuote({
+    required this.code,
+    required this.discountAmount,
+    required this.orderSubtotal,
+    required this.buyerPayable,
+    required this.sellerGrossAmount,
+    required this.societyEatsSubsidy,
+  });
+
+  final String code;
+  final double discountAmount;
+  final double orderSubtotal;
+  final double buyerPayable;
+  final double sellerGrossAmount;
+  final double societyEatsSubsidy;
+
+  factory CouponQuote.fromJson(Map<String, dynamic> json) {
+    return CouponQuote(
+      code: json['code']?.toString() ?? '',
+      discountAmount: _asDouble(json['discountAmount']),
+      orderSubtotal: _asDouble(json['orderSubtotal']),
+      buyerPayable: _asDouble(json['buyerPayable']),
+      sellerGrossAmount: _asDouble(json['sellerGrossAmount']),
+      societyEatsSubsidy: _asDouble(json['societyEatsSubsidy']),
+    );
+  }
+}
+
+String couponReasonMessage(String? reason) {
+  return switch (reason) {
+    'INVALID_COUPON' => 'This coupon code is not valid',
+    'COUPON_EXPIRED' => 'This coupon has expired',
+    'COUPON_NOT_STARTED' => 'This coupon is not active yet',
+    'MINIMUM_ORDER_NOT_MET' => 'Your order does not meet the minimum for this coupon',
+    'USAGE_LIMIT_REACHED' => 'This coupon has reached its usage limit',
+    'BUYER_USAGE_LIMIT_REACHED' => 'You have already used this coupon',
+    'NOT_ELIGIBLE' => 'This coupon is not available for your account',
+    'COUPON_PAUSED' => 'This coupon is paused',
+    'COUPON_EXHAUSTED' => 'This coupon is no longer available',
+    'COUPON_ALREADY_APPLIED' => 'A coupon is already applied to this order',
+    _ => 'This coupon could not be applied',
+  };
+}
+
 class AdminCoupon {
   const AdminCoupon({
     required this.id,

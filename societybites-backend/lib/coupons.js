@@ -171,38 +171,89 @@ async function validateCoupon({ code, userId, orderSubtotal, now = new Date(), d
   return quoteFromDiscount(coupon, subtotal, discountAmount);
 }
 
-async function applyCoupon({ code, userId, orderSubtotal, orderId = null, now = new Date() }) {
-  const quote = await validateCoupon({ code, userId, orderSubtotal, now });
+function couponErrorMessage(reason) {
+  return (
+    {
+      INVALID_COUPON: "This coupon code is not valid",
+      COUPON_EXPIRED: "This coupon has expired",
+      COUPON_NOT_STARTED: "This coupon is not active yet",
+      MINIMUM_ORDER_NOT_MET: "Your order does not meet the minimum amount for this coupon",
+      USAGE_LIMIT_REACHED: "This coupon has reached its usage limit",
+      BUYER_USAGE_LIMIT_REACHED: "You have already used this coupon",
+      NOT_ELIGIBLE: "This coupon is not available for your account",
+      COUPON_PAUSED: "This coupon is paused",
+      COUPON_EXHAUSTED: "This coupon is no longer available",
+      COUPON_ALREADY_APPLIED: "A coupon is already applied to this order",
+    }[reason] || "This coupon could not be applied"
+  );
+}
+
+async function attachCouponRedemption({
+  code,
+  userId,
+  orderSubtotal,
+  orderId = null,
+  now = new Date(),
+  db,
+  status = "APPLIED",
+}) {
+  if (orderId) {
+    const existing = await db.couponRedemption.findFirst({
+      where: { orderId, status: { in: ACTIVE_ORDER_STATUSES } },
+    });
+    if (existing) return invalid(REASONS.COUPON_ALREADY_APPLIED);
+  }
+
+  const normalized = normalizeCode(code);
+  const coupon = await db.coupon.findUnique({ where: { code: normalized } });
+  if (!coupon) return invalid(REASONS.INVALID_COUPON);
+  await db.$queryRaw`SELECT "id" FROM "Coupon" WHERE "id" = ${coupon.id} FOR UPDATE`;
+
+  const quote = await validateCoupon({ code, userId, orderSubtotal, now, db });
   if (!quote.valid) return quote;
 
+  await db.couponRedemption.create({
+    data: {
+      couponId: quote.couponId,
+      userId,
+      orderId,
+      discountAmount: quote.discountAmount,
+      status,
+      appliedAt: now,
+      redeemedAt: status === "REDEEMED" ? now : null,
+    },
+  });
+  return quote;
+}
+
+async function applyCoupon({ code, userId, orderSubtotal, orderId = null, now = new Date() }) {
   try {
-    await prisma.$transaction(async (tx) => {
-      if (orderId) {
-        const existing = await tx.couponRedemption.findFirst({
-          where: { orderId, status: { in: ACTIVE_ORDER_STATUSES } },
-        });
-        if (existing) throw httpError(409, REASONS.COUPON_ALREADY_APPLIED);
-      }
-      await tx.$queryRaw`SELECT "id" FROM "Coupon" WHERE "id" = ${quote.couponId} FOR UPDATE`;
-      const again = await validateCoupon({ code, userId, orderSubtotal, now, db: tx });
-      if (!again.valid) throw httpError(409, again.reason);
-      await tx.couponRedemption.create({
-        data: {
-          couponId: quote.couponId,
-          userId,
-          orderId,
-          discountAmount: quote.discountAmount,
-          status: "APPLIED",
-          appliedAt: now,
-        },
-      });
-    });
+    const quote = await prisma.$transaction(async (tx) =>
+      attachCouponRedemption({
+        code,
+        userId,
+        orderSubtotal,
+        orderId,
+        now,
+        db: tx,
+        status: "APPLIED",
+      })
+    );
+    if (!quote.valid) return quote;
+    return quote;
   } catch (err) {
     if (err.statusCode) return invalid(err.message);
     if (err.code === "P2002") return invalid(REASONS.COUPON_ALREADY_APPLIED);
     throw err;
   }
-  return quote;
+}
+
+async function reverseCouponForOrder(orderId, db = prisma) {
+  if (!orderId) return;
+  await db.couponRedemption.updateMany({
+    where: { orderId, status: { in: ACTIVE_ORDER_STATUSES } },
+    data: { status: "REVERSED", reversedAt: new Date() },
+  });
 }
 
 function usageSummary(coupon, redemptions) {
@@ -418,6 +469,9 @@ module.exports = {
   normalizeCode,
   validateCoupon,
   applyCoupon,
+  attachCouponRedemption,
+  reverseCouponForOrder,
+  couponErrorMessage,
   usageSummary,
   serializeCoupon,
   discountFor,

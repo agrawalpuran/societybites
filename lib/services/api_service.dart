@@ -828,6 +828,28 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<CouponQuote?> validateCoupon(
+    String code,
+    double orderSubtotal,
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/coupons/validate'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'code': code,
+        'orderSubtotal': orderSubtotal,
+      }),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      if (data['valid'] == true) {
+        return CouponQuote.fromJson(data);
+      }
+      throw Exception(couponReasonMessage(data['reason']?.toString()));
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> createOrder({
     required String societyId,
     required List<Map<String, dynamic>> items,
@@ -837,6 +859,7 @@ class ApiService {
     String? fulfilmentMethod,
     String? fulfilmentNotes,
     DateTime? requestedReadyAt,
+    String? couponCode,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/orders'),
@@ -851,6 +874,8 @@ class ApiService {
           'fulfilmentNotes': fulfilmentNotes.trim(),
         if (requestedReadyAt != null)
           'requestedReadyAt': requestedReadyAt.toUtc().toIso8601String(),
+        if (couponCode != null && couponCode.trim().isNotEmpty)
+          'couponCode': couponCode.trim(),
         'items': items,
       }),
     );
