@@ -27,6 +27,15 @@ function httpError(statusCode, message) {
   return err;
 }
 
+function optionalImageUrl(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const text = String(value).trim();
+  if (text.length > 500 || !/^https:\/\//i.test(text)) {
+    throw httpError(400, "Photo is invalid");
+  }
+  return text;
+}
+
 function optionalId(value, label) {
   if (value == null || value === "") return null;
   const text = String(value).trim();
@@ -76,6 +85,7 @@ function assertIssueCreate(body, user) {
     sellerId: optionalId(source.sellerId, "Seller"),
     platform,
     appVersion,
+    imageUrl: optionalImageUrl(source.imageUrl),
     userId: user.id,
     userRole: role,
   };
@@ -85,7 +95,41 @@ function issueReference(issueNumber) {
   return `SE-${issueNumber}`;
 }
 
-function serializeIssue(row, { includeReporter = false } = {}) {
+function serializeMessage(row) {
+  return {
+    id: row.id,
+    authorRole: row.authorRole,
+    body: row.body,
+    imageUrl: row.imageUrl,
+    createdAt: row.createdAt,
+  };
+}
+
+function threadFor(row) {
+  const stored = Array.isArray(row.messages) ? row.messages : [];
+  if (stored.length) return stored.map(serializeMessage);
+  const thread = [
+    {
+      id: `${row.id}-opened`,
+      authorRole: "USER",
+      body: row.description,
+      imageUrl: row.imageUrl || null,
+      createdAt: row.createdAt,
+    },
+  ];
+  if (row.adminResponse) {
+    thread.push({
+      id: `${row.id}-admin`,
+      authorRole: "SOCIETYEATS",
+      body: row.adminResponse,
+      imageUrl: null,
+      createdAt: row.adminRespondedAt || row.updatedAt,
+    });
+  }
+  return thread;
+}
+
+function serializeIssue(row, { includeReporter = false, includeThread = false } = {}) {
   const payload = {
     id: row.id,
     reference: row.reference,
@@ -98,12 +142,15 @@ function serializeIssue(row, { includeReporter = false } = {}) {
     sellerId: row.sellerId,
     status: row.status,
     adminResponse: row.adminResponse,
+    adminRespondedAt: row.adminRespondedAt || null,
+    imageUrl: row.imageUrl || null,
     platform: row.platform,
     appVersion: row.appVersion,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     resolvedAt: row.resolvedAt,
   };
+  if (includeThread) payload.messages = threadFor(row);
   if (includeReporter) {
     payload.reporter = {
       name: row.user && row.user.name ? row.user.name : "Resident",
@@ -132,12 +179,22 @@ async function createIssueReport(body, user) {
         ...input,
       },
     });
+    await tx.issueMessage.create({
+      data: {
+        issueId: row.id,
+        authorId: input.userId,
+        authorRole: "USER",
+        body: input.description,
+        imageUrl: input.imageUrl,
+      },
+    });
     return tx.issueReport.update({
       where: { id: row.id },
       data: { reference: issueReference(row.issueNumber) },
+      include: { messages: { orderBy: { createdAt: "asc" } } },
     });
   });
-  return serializeIssue(created);
+  return serializeIssue(created, { includeThread: true });
 }
 
 async function listMyIssues(userId) {
@@ -151,9 +208,10 @@ async function listMyIssues(userId) {
 async function getOwnIssue(userId, id) {
   const row = await prisma.issueReport.findFirst({
     where: { id, userId },
+    include: { messages: { orderBy: { createdAt: "asc" } } },
   });
   if (!row) throw httpError(404, "Report not found");
-  return serializeIssue(row);
+  return serializeIssue(row, { includeThread: true });
 }
 
 async function listAdminIssues(status) {
@@ -176,14 +234,75 @@ async function listAdminIssues(status) {
 async function getAdminIssue(id) {
   const row = await prisma.issueReport.findUnique({
     where: { id },
-    include: { user: { select: { name: true } } },
+    include: {
+      user: { select: { name: true } },
+      messages: { orderBy: { createdAt: "asc" } },
+    },
   });
   if (!row) throw httpError(404, "Report not found");
-  return serializeIssue(row, { includeReporter: true });
+  return serializeIssue(row, { includeReporter: true, includeThread: true });
 }
 
-async function updateAdminIssue(id, body) {
+async function backfillThread(tx, issue) {
+  const count = await tx.issueMessage.count({ where: { issueId: issue.id } });
+  if (count > 0) return;
+  await tx.issueMessage.create({
+    data: {
+      issueId: issue.id,
+      authorId: issue.userId,
+      authorRole: "USER",
+      body: issue.description,
+      imageUrl: issue.imageUrl,
+      createdAt: issue.createdAt,
+    },
+  });
+  if (issue.adminResponse) {
+    await tx.issueMessage.create({
+      data: {
+        issueId: issue.id,
+        authorId: issue.userId,
+        authorRole: "SOCIETYEATS",
+        body: issue.adminResponse,
+        createdAt: issue.adminRespondedAt || issue.updatedAt,
+      },
+    });
+  }
+}
+
+async function addUserReply(user, issueId, body) {
   const source = body && typeof body === "object" ? body : {};
+  const text = String(source.body || "").trim();
+  const imageUrl = optionalImageUrl(source.imageUrl);
+  if (!text && !imageUrl) throw httpError(400, "Write a reply or add a photo");
+  if (text.length > MAX_TEXT) {
+    throw httpError(400, `Reply must be ${MAX_TEXT} characters or less`);
+  }
+  const issue = await prisma.issueReport.findFirst({
+    where: { id: issueId, userId: user.id },
+  });
+  if (!issue) throw httpError(404, "Report not found");
+  await prisma.$transaction(async (tx) => {
+    await backfillThread(tx, issue);
+    await tx.issueMessage.create({
+      data: {
+        issueId,
+        authorId: user.id,
+        authorRole: "USER",
+        body: text,
+        imageUrl,
+      },
+    });
+  });
+  return getOwnIssue(user.id, issueId);
+}
+
+async function updateAdminIssue(id, body, adminUser) {
+  const source = body && typeof body === "object" ? body : {};
+  const existing = await prisma.issueReport.findUnique({
+    where: { id },
+    include: { messages: { orderBy: { createdAt: "asc" } } },
+  });
+  if (!existing) throw httpError(404, "Report not found");
   const data = {};
   if (source.status != null) {
     const status = String(source.status).trim().toUpperCase();
@@ -193,27 +312,46 @@ async function updateAdminIssue(id, body) {
     data.status = status;
     data.resolvedAt = status === "RESOLVED" || status === "CLOSED" ? new Date() : null;
   }
+  let reply = null;
   if (Object.prototype.hasOwnProperty.call(source, "adminResponse")) {
     const text = source.adminResponse == null ? "" : String(source.adminResponse).trim();
     if (text.length > MAX_TEXT) {
       throw httpError(400, `Response must be ${MAX_TEXT} characters or less`);
     }
     data.adminResponse = text || null;
+    if (text) {
+      const previous = (existing.messages || []).filter((row) => row.authorRole === "SOCIETYEATS");
+      const last = previous[previous.length - 1];
+      const alreadyStored = !last && text === (existing.adminResponse || "");
+      if (!alreadyStored && (!last || last.body !== text)) reply = text;
+    }
   }
   if (!Object.keys(data).length) {
     throw httpError(400, "Nothing to update");
   }
-  try {
-    const row = await prisma.issueReport.update({
+  const row = await prisma.$transaction(async (tx) => {
+    await backfillThread(tx, existing);
+    if (reply) {
+      data.adminRespondedAt = new Date();
+      await tx.issueMessage.create({
+        data: {
+          issueId: id,
+          authorId: adminUser.id,
+          authorRole: "SOCIETYEATS",
+          body: reply,
+        },
+      });
+    }
+    return tx.issueReport.update({
       where: { id },
       data,
-      include: { user: { select: { name: true } } },
+      include: {
+        user: { select: { name: true } },
+        messages: { orderBy: { createdAt: "asc" } },
+      },
     });
-    return serializeIssue(row, { includeReporter: true });
-  } catch (err) {
-    if (err.code === "P2025") throw httpError(404, "Report not found");
-    throw err;
-  }
+  });
+  return serializeIssue(row, { includeReporter: true, includeThread: true });
 }
 
 module.exports = {
@@ -230,4 +368,5 @@ module.exports = {
   listAdminIssues,
   getAdminIssue,
   updateAdminIssue,
+  addUserReply,
 };

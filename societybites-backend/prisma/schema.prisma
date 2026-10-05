@@ -50,6 +50,7 @@ model User {
   sentMessages         Message[]
   sellerTermsAcceptances SellerTermsAcceptance[]
   issueReports         IssueReport[]
+  issueMessages        IssueMessage[]
   flat                 Flat?              @relation(fields: [flatId], references: [id])
   society              Society?           @relation(fields: [societyId], references: [id])
 }
@@ -361,6 +362,10 @@ model IssueReport {
   /// OPEN | UNDER_REVIEW | RESOLVED | CLOSED
   status        String    @default("OPEN")
   adminResponse String?
+  /// When SocietyEats last wrote a reply. Null until the first reply.
+  adminRespondedAt DateTime?
+  /// Optional photo attached to the original report.
+  imageUrl      String?
   /// ANDROID | IOS | WEB
   platform      String?
   appVersion    String?
@@ -368,9 +373,26 @@ model IssueReport {
   updatedAt     DateTime  @updatedAt
   resolvedAt    DateTime?
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      IssueMessage[]
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+
+/// One entry in an issue thread. The original report is the first USER message.
+model IssueMessage {
+  id         String      @id @default(uuid())
+  issueId    String
+  authorId   String
+  /// USER | SOCIETYEATS
+  authorRole String
+  body       String
+  imageUrl   String?
+  createdAt  DateTime    @default(now())
+  issue      IssueReport @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  author     User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([issueId, createdAt])
 }
 
 /// Hashed refresh tokens for 2Factor persistent login. Firebase login is unchanged.

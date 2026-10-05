@@ -66,7 +66,9 @@ function parseImageUpload(body) {
 function storagePrefixForPurpose(purpose) {
   return String(purpose || "").trim().toLowerCase() === "profile"
     ? "profiles"
-    : "listings";
+    : String(purpose || "").trim().toLowerCase() === "issue"
+      ? "issues"
+      : "listings";
 }
 
 function normalizeStoredProfilePhotoUrl(value) {

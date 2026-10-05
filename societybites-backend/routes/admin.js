@@ -724,7 +724,7 @@ router.get(
 router.patch(
   "/issues/:id",
   asyncHandler(async (req, res) => {
-    const issue = await updateAdminIssue(req.params.id, req.body);
+    const issue = await updateAdminIssue(req.params.id, req.body, req.user);
     res.json(issue);
   })
 );

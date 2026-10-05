@@ -1948,6 +1948,7 @@ class ApiService {
     String? listingId,
     String? sellerId,
     String? platform,
+    String? imageUrl,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/issues'),
@@ -1958,7 +1959,29 @@ class ApiService {
         if (orderId != null && orderId.isNotEmpty) 'orderId': orderId,
         if (listingId != null && listingId.isNotEmpty) 'listingId': listingId,
         if (sellerId != null && sellerId.isNotEmpty) 'sellerId': sellerId,
-        'platform': ?platform,
+        if (platform != null) 'platform': platform,
+        if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
+      }),
+    );
+    if (response.statusCode == 201) {
+      return IssueReport.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<IssueReport> replyToIssue(
+    String id, {
+    String? body,
+    String? imageUrl,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/issues/$id/messages'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'body': body ?? '',
+        if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
       }),
     );
     if (response.statusCode == 201) {
@@ -2035,7 +2058,8 @@ class ApiService {
       headers: await _authHeaders(),
       body: jsonEncode({
         'status': ?status,
-        'adminResponse': adminResponse,
+        if (adminResponse != null && adminResponse.trim().isNotEmpty)
+          'adminResponse': adminResponse.trim(),
       }),
     );
     if (response.statusCode == 200) {

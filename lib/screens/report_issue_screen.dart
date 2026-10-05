@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/issue_report.dart';
 import '../services/api_service.dart';
 import '../web/web_page_frame.dart';
+import '../widgets/photo_source_sheet.dart';
 import 'issue_detail_screen.dart';
 import 'my_reports_screen.dart';
 
@@ -38,6 +40,9 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
   List<IssueReport> _reports = const [];
   bool _loadingReports = true;
   String? _reportsError;
+  final _picker = ImagePicker();
+  List<int>? _photoBytes;
+  String _photoMime = 'image/jpeg';
 
   @override
   void initState() {
@@ -98,6 +103,14 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       _error = null;
     });
     try {
+      String? imageUrl;
+      if (_photoBytes != null) {
+        imageUrl = await ApiService.uploadListingImage(
+          bytes: _photoBytes!,
+          mimeType: _photoMime,
+          purpose: 'issue',
+        );
+      }
       final issue = await ApiService.createIssue(
         category: _category!,
         description: description,
@@ -105,12 +118,14 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
         listingId: widget.listingId,
         sellerId: widget.sellerId,
         platform: _platform,
+        imageUrl: imageUrl,
       );
       if (!mounted) return;
       _description.clear();
       setState(() {
         _submitted = issue;
         _category = null;
+        _photoBytes = null;
         _reports = [issue, ..._reports.where((row) => row.id != issue.id)];
         _reportsError = null;
         _loadingReports = false;
@@ -261,6 +276,12 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
           const SizedBox(height: 12),
           Text(_error!, style: const TextStyle(color: Color(0xFFD94F4F))),
         ],
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _submitting ? null : _pickPhoto,
+          icon: const Icon(Icons.photo_camera_outlined),
+          label: Text(_photoBytes == null ? 'Add a photo' : 'Photo added'),
+        ),
         const SizedBox(height: 18),
         FilledButton(
           onPressed: _submitting ? null : _submit,
@@ -332,6 +353,23 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
           },
         ),
     ];
+  }
+
+  Future<void> _pickPhoto() async {
+    final source = await showPhotoSourceSheet(context, title: 'Photo of the issue');
+    if (source == null || !mounted) return;
+    final file = await _picker.pickImage(
+      source: source,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (file == null || !mounted) return;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _photoBytes = bytes;
+      _photoMime = file.mimeType ?? 'image/jpeg';
+    });
   }
 
   Widget _contextLine(String label, String value) {

@@ -1,7 +1,7 @@
 const express = require("express");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser } = require("../middleware/requireUser");
-const { createIssueReport, listMyIssues, getOwnIssue } = require("../lib/issueReports");
+const { createIssueReport, listMyIssues, getOwnIssue, addUserReply } = require("../lib/issueReports");
 
 const router = express.Router();
 
@@ -20,6 +20,15 @@ router.get(
   asyncHandler(async (req, res) => {
     const issues = await listMyIssues(req.user.id);
     res.json({ issues });
+  })
+);
+
+router.post(
+  "/:id/messages",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const issue = await addUserReply(req.user, req.params.id, req.body);
+    res.status(201).json(issue);
   })
 );
 

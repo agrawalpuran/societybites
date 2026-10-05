@@ -225,6 +225,28 @@ async function main() {
       token: buyerToken,
     });
     assert(after.json.adminResponse === "Payment has been confirmed.", "owner sees the latest response");
+    const societyMessage = after.json.messages.find((row) => row.authorRole === "SOCIETYEATS" && row.body === "Payment has been confirmed.");
+    assert(societyMessage, "admin reply is kept in the thread");
+    assert(societyMessage.createdAt, "admin reply stores a timestamp");
+
+    const reply = await jsonRequest(server, {
+      method: "POST",
+      path: `/issues/${created.json.id}/messages`,
+      token: buyerToken,
+      body: { body: "This is resolved", imageUrl: "https://example.com/issue.jpg" },
+    });
+    assert(reply.status === 201, "owner can reply on the thread");
+    assert(
+      reply.json.messages.some((row) => row.authorRole === "USER" && row.body === "This is resolved" && row.imageUrl === "https://example.com/issue.jpg"),
+      "reply and photo are stored"
+    );
+    const strangerReply = await jsonRequest(server, {
+      method: "POST",
+      path: `/issues/${created.json.id}/messages`,
+      token: sellerToken,
+      body: { body: "Not my issue" },
+    });
+    assert(strangerReply.status === 404, "another user cannot reply");
 
     const blocked = await jsonRequest(server, {
       method: "PATCH",

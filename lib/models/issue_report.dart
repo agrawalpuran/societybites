@@ -1,3 +1,32 @@
+class IssueMessage {
+  const IssueMessage({
+    required this.id,
+    required this.authorRole,
+    required this.body,
+    required this.createdAt,
+    this.imageUrl,
+  });
+
+  final String id;
+  final String authorRole;
+  final String body;
+  final DateTime createdAt;
+  final String? imageUrl;
+
+  bool get isSocietyEats => authorRole == 'SOCIETYEATS';
+
+  factory IssueMessage.fromJson(Map<String, dynamic> json) {
+    return IssueMessage(
+      id: json['id']?.toString() ?? '',
+      authorRole: json['authorRole']?.toString() ?? 'USER',
+      body: json['body']?.toString() ?? '',
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      imageUrl: _optional(json['imageUrl']),
+    );
+  }
+}
+
 class IssueReport {
   const IssueReport({
     required this.id,
@@ -11,7 +40,9 @@ class IssueReport {
     this.listingId,
     this.sellerId,
     this.adminResponse,
+    this.imageUrl,
     this.reporterName,
+    this.messages = const [],
   });
 
   final String id;
@@ -25,7 +56,9 @@ class IssueReport {
   final String? listingId;
   final String? sellerId;
   final String? adminResponse;
+  final String? imageUrl;
   final String? reporterName;
+  final List<IssueMessage> messages;
 
   static const categories = <String, String>{
     'ORDER_ISSUE': 'Order Issue',
@@ -75,7 +108,14 @@ class IssueReport {
       listingId: _optional(json['listingId']),
       sellerId: _optional(json['sellerId']),
       adminResponse: _optional(json['adminResponse']),
+      imageUrl: _optional(json['imageUrl']),
       reporterName: reporter is Map ? _optional(reporter['name']) : null,
+      messages: json['messages'] is List
+          ? (json['messages'] as List)
+              .whereType<Map>()
+              .map((row) => IssueMessage.fromJson(Map<String, dynamic>.from(row)))
+              .toList()
+          : const [],
     );
   }
 }
@@ -86,6 +126,7 @@ String? _optional(Object? value) {
 }
 
 String formatIssueDate(DateTime value) {
+  final ist = _asIst(value);
   const months = [
     'Jan',
     'Feb',
@@ -100,6 +141,17 @@ String formatIssueDate(DateTime value) {
     'Nov',
     'Dec',
   ];
-  final local = value.toLocal();
-  return '${local.day} ${months[local.month - 1]} ${local.year}';
+  return '${ist.day} ${months[ist.month - 1]} ${ist.year}';
+}
+
+String formatIssueDateTimeIst(DateTime value) {
+  final ist = _asIst(value);
+  final hour = ist.hour % 12 == 0 ? 12 : ist.hour % 12;
+  final minute = ist.minute.toString().padLeft(2, '0');
+  final suffix = ist.hour >= 12 ? 'pm' : 'am';
+  return '${formatIssueDate(value)}, $hour:$minute $suffix IST';
+}
+
+DateTime _asIst(DateTime value) {
+  return value.toUtc().add(const Duration(hours: 5, minutes: 30));
 }

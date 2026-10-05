@@ -49,5 +49,9 @@ void main() {
     expect(report.statusLabel, 'Under Review');
     expect(report.orderId, 'SB-548969');
     expect(report.shortDescription, 'Payment failed after scanning QR');
+    expect(
+      formatIssueDateTimeIst(DateTime.utc(2026, 10, 5, 6, 54)),
+      '5 Oct 2026, 12:24 pm IST',
+    );
   });
 }

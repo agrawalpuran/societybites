@@ -4,6 +4,7 @@ import '../../models/issue_report.dart';
 import '../../services/api_service.dart';
 import '../../web/web_page_frame.dart';
 import '../../widgets/screen_loading_note.dart';
+import '../issue_detail_screen.dart';
 
 class AdminIssuesScreen extends StatefulWidget {
   const AdminIssuesScreen({super.key});
@@ -159,12 +160,12 @@ class _AdminIssueDetailScreenState extends State<AdminIssueDetailScreen> {
     try {
       final issue = await ApiService.getAdminIssue(widget.issueId);
       if (!mounted) return;
-      _response.text = issue.adminResponse ?? '';
       setState(() {
         _issue = issue;
         _status = issue.status;
         _loading = false;
       });
+      _response.clear();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -188,6 +189,7 @@ class _AdminIssueDetailScreenState extends State<AdminIssueDetailScreen> {
         adminResponse: _response.text.trim(),
       );
       if (!mounted) return;
+      _response.clear();
       setState(() => _issue = updated);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Report updated')),
@@ -223,9 +225,26 @@ class _AdminIssueDetailScreenState extends State<AdminIssueDetailScreen> {
                     const SizedBox(height: 8),
                     Text('${issue.reporterName ?? 'Resident'} · ${issue.roleLabel}'),
                     const SizedBox(height: 8),
-                    Text('Submitted ${formatIssueDate(issue.createdAt)}'),
+                    Text('Submitted ${formatIssueDateTimeIst(issue.createdAt)}'),
                     const SizedBox(height: 16),
                     Text(issue.description),
+                    if (issue.imageUrl != null) ...[
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(issue.imageUrl!, height: 180, fit: BoxFit.cover),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    const Text('Conversation', style: TextStyle(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 8),
+                    for (final message in issue.messages)
+                      IssueMessageTile(
+                        message: message,
+                        label: message.isSocietyEats
+                            ? 'SocietyEats'
+                            : (issue.reporterName ?? 'Resident'),
+                      ),
                     if (issue.orderId != null) ...[
                       const SizedBox(height: 12),
                       Text('Order: ${issue.orderId}'),
@@ -255,8 +274,8 @@ class _AdminIssueDetailScreenState extends State<AdminIssueDetailScreen> {
                       maxLines: 6,
                       maxLength: 2000,
                       decoration: const InputDecoration(
-                        labelText: 'Admin response',
-                        hintText: 'Optional note for the person who reported this',
+                        labelText: 'Reply',
+                        hintText: 'Add a reply. The time is saved in IST.',
                       ),
                     ),
                     if (_error != null) ...[
