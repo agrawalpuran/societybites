@@ -1988,6 +1988,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
+    final isRejected = order.isRejected;
     final lifecycle = SellerOrderLifecycle.forStatus(order.status);
     final allowReadyBy = kitchenOrderAllowsReadyBy(order);
     final payment = SellerPaymentActions.fromOrder(
@@ -1998,23 +1999,26 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     );
     final isCash = payment.isCash;
     final cashPaid = order.paymentStatus == 'paid';
-    final needsCashConfirm = isCash &&
+    final needsCashConfirm = !isRejected &&
+        isCash &&
         lifecycle.treatAsReady &&
         !cashPaid &&
         order.paymentStatus != 'failed';
-    final canComplete = lifecycle.showComplete && (!isCash || cashPaid);
+    final canComplete = !isRejected && lifecycle.showComplete && (!isCash || cashPaid);
     final hasSellerAction =
-        lifecycle.showAccept || payment.showMarkReady || canComplete;
-    final rejectLocked = widget.rejectBusy || order.isRejected;
-    final canReject =
-        lifecycle.showReject || order.sellerCanDecline || rejectLocked;
-    final canSetReadyBy = payment.canSetReadyBy;
-    final showUpiConfirm = payment.showConfirmOrderAndChooseTime;
+        !isRejected &&
+        (lifecycle.showAccept || payment.showMarkReady || canComplete);
+    final rejectLocked = widget.rejectBusy || isRejected;
+    final canReject = !isRejected &&
+        (lifecycle.showReject || order.sellerCanDecline || widget.rejectBusy);
+    final canSetReadyBy = !isRejected && payment.canSetReadyBy;
+    final showUpiConfirm = !isRejected && payment.showConfirmOrderAndChooseTime;
     // Accepted and Buyer paid chips already say this. The extra headline
     // and "buyer marked paid" banner only repeat those chips.
     final showStatusCopy =
-        lifecycle.headline != null && !lifecycle.showMarkReady;
-    final showUpiPaymentPending = payment.showPaymentPending &&
+        !isRejected && lifecycle.headline != null && !lifecycle.showMarkReady;
+    final showUpiPaymentPending = !isRejected &&
+        payment.showPaymentPending &&
         order.paymentStatus != 'buyer_marked_paid';
 
     return Container(
@@ -2079,7 +2083,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      order.buyerLabel,
+                      order.sellerKitchenBuyerLine,
                       style: const TextStyle(
                         fontSize: 13,
                         color: Color(0xFF3A4644),
@@ -2134,20 +2138,24 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: lifecycle.treatAsReady || lifecycle.showMarkReady
-                      ? const Color(0xFFE8F5EE)
-                      : const Color(0xFFEDE8F5),
+                  color: isRejected
+                      ? const Color(0xFFFFF0F0)
+                      : lifecycle.treatAsReady || lifecycle.showMarkReady
+                          ? const Color(0xFFE8F5EE)
+                          : const Color(0xFFEDE8F5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  lifecycle.badge,
+                  isRejected ? 'ORDER REJECTED' : lifecycle.badge,
                   style: TextStyle(
                     fontSize: 11,
                     letterSpacing: 0.6,
                     fontWeight: FontWeight.w700,
-                    color: lifecycle.treatAsReady || lifecycle.showMarkReady
-                        ? const Color(0xFF0E5A47)
-                        : const Color(0xFF5A3E8A),
+                    color: isRejected
+                        ? const Color(0xFFD94F4F)
+                        : lifecycle.treatAsReady || lifecycle.showMarkReady
+                            ? const Color(0xFF0E5A47)
+                            : const Color(0xFF5A3E8A),
                   ),
                 ),
               ),
@@ -2170,6 +2178,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
               ),
             ],
           ),
+          if (isRejected) OrderRejectReasonBlock(order: order, isSellerView: true),
           if (showStatusCopy) ...[
             const SizedBox(height: 12),
             Text(
@@ -2459,7 +2468,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
               height: 42,
               child: OutlinedButton.icon(
                 key: const Key('seller-reject-button'),
-                onPressed: rejectLocked || _isUpdating
+                onPressed: rejectLocked || _isUpdating || widget.rejectBusy
                     ? null
                     : () => widget.onReject(order),
                 style: OutlinedButton.styleFrom(
@@ -2638,7 +2647,7 @@ class SellerPastOrderCard extends StatelessWidget {
     final isCancelled = order.status == 'cancelled';
     final isRejected = order.status == 'rejected';
     final statusLabel = isRejected
-        ? 'REJECTED'
+        ? 'ORDER REJECTED'
         : isCancelled
         ? 'CANCELLED'
         : 'COMPLETED';
@@ -2711,7 +2720,7 @@ class SellerPastOrderCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      order.buyerLabel,
+                      order.sellerKitchenBuyerLine,
                       style: const TextStyle(
                         fontSize: 13,
                         color: Color(0xFF3A4644),
@@ -2788,28 +2797,7 @@ class SellerPastOrderCard extends StatelessWidget {
               ),
             ],
           ),
-          if (isRejected &&
-              order.rejectReason != null &&
-              order.rejectReason!.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF5F5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFFD4D4)),
-              ),
-              child: Text(
-                'Reason: ${order.rejectReason}',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF8A3030),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
+          if (isRejected) OrderRejectReasonBlock(order: order, isSellerView: true),
         ],
       ),
     );

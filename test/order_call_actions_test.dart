@@ -13,6 +13,8 @@ Map<String, dynamic> _orderJson({
   String paymentMethod = 'upi',
   String paymentStatus = 'pending',
   bool sellerCanDecline = false,
+  String? rejectReason,
+  bool refundDue = false,
 }) {
   return {
     'id': 'o1',
@@ -27,6 +29,8 @@ Map<String, dynamic> _orderJson({
     'total': 120,
     'subtotal': 115,
     'communityFee': 5,
+    'rejectReason': rejectReason,
+    'refundDue': refundDue,
     'createdAt': '2026-09-18T10:00:00.000Z',
     'items': [
       {
@@ -186,17 +190,25 @@ void main() {
     expect(button.onPressed, isNotNull);
   });
 
-  testWidgets('rejected order greys out the decline so it cannot be pressed again', (
+  testWidgets('rejected order hides decline and shows rejection summary', (
     tester,
   ) async {
     await tester.pumpWidget(
-      _sellerCard(Order.fromJson(_orderJson(status: 'rejected'))),
+      _sellerCard(
+        Order.fromJson(
+          _orderJson(
+            status: 'rejected',
+            rejectReason: 'Not enough time\nApologies had to step out',
+            refundDue: true,
+            paymentStatus: 'buyer_marked_paid',
+          ),
+        ),
+      ),
     );
-    final button = tester.widget<OutlinedButton>(
-      find.byKey(const Key('seller-reject-button')),
-    );
-    expect(button.onPressed, isNull);
-    expect(find.text("Can't fulfil"), findsOneWidget);
+    expect(find.byKey(const Key('seller-reject-button')), findsNothing);
+    expect(find.text('ORDER REJECTED'), findsOneWidget);
+    expect(find.textContaining('Not enough time'), findsOneWidget);
+    expect(find.byKey(const Key('seller-refund-due')), findsOneWidget);
   });
 
   testWidgets('accepted order offers Can\'t fulfil to the seller', (

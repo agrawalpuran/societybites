@@ -1212,13 +1212,24 @@ class _PastOrderTile extends StatelessWidget {
                           Text(
                             isSellerView
                                 ? '${order.orderId} • ${order.placedAtLabel}'
-                                : '${order.sellerLabel} • ${order.placedAtLabel}',
+                                : '${order.orderId} · ${order.placedAtLabel}',
                             style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF8A9491),
-                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                              color: Color(0xFFADB5B2),
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
+                          if (!isSellerView) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              order.sellerLabel,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF8A9491),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                           if (order.isPreOrder &&
                               order.fulfilmentAt != null) ...[
                             const SizedBox(height: 3),

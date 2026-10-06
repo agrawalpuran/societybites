@@ -18,6 +18,7 @@ Future<RejectOrderResult?> confirmRejectOrder(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: Colors.white,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -64,9 +65,11 @@ class _RejectOrderSheetState extends State<_RejectOrderSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final media = MediaQuery.of(context);
+    final bottomPad =
+        16 + media.viewInsets.bottom + media.viewPadding.bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + bottom),
+      padding: EdgeInsets.fromLTRB(20, 16, 20, bottomPad),
       child: SingleChildScrollView(
         child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -226,21 +229,29 @@ Future<bool> confirmCompleteOrder(BuildContext context) async {
 }
 
 class OrderRejectReasonBlock extends StatelessWidget {
-  const OrderRejectReasonBlock({super.key, required this.order});
+  const OrderRejectReasonBlock({
+    super.key,
+    required this.order,
+    this.isSellerView = false,
+  });
 
   final Order order;
+  final bool isSellerView;
 
   @override
   Widget build(BuildContext context) {
     final reason = BuyerOrderVisibility.rejectReasonLabel(order.rejectReason);
     final note = BuyerOrderVisibility.rejectNote(order.rejectReason);
+    final intro = isSellerView
+        ? 'This order was rejected.'
+        : BuyerOrderLifecycle.detail('rejected')!;
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            BuyerOrderLifecycle.detail('rejected')!,
+            intro,
             style: const TextStyle(
               fontSize: 13,
               color: Color(0xFF8A3030),
@@ -271,7 +282,9 @@ class OrderRejectReasonBlock extends StatelessWidget {
                   if (note != null) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Seller note:\n$note',
+                      isSellerView
+                          ? 'Your note:\n$note'
+                          : 'Seller note:\n$note',
                       style: const TextStyle(
                         fontSize: 13,
                         color: Color(0xFF8A3030),
@@ -286,7 +299,7 @@ class OrderRejectReasonBlock extends StatelessWidget {
           if (order.refundDue) ...[
             const SizedBox(height: 10),
             Container(
-              key: const Key('order-refund-due'),
+              key: Key(isSellerView ? 'seller-refund-due' : 'order-refund-due'),
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -295,9 +308,13 @@ class OrderRejectReasonBlock extends StatelessWidget {
                 border: Border.all(color: const Color(0xFFFFE0B2)),
               ),
               child: Text(
-                '₹${order.total.toStringAsFixed(0)} to be returned by the '
-                'seller. SocietyEats does not hold the money, so use Messages '
-                'to settle it.',
+                isSellerView
+                    ? 'Return ₹${order.total.toStringAsFixed(0)} to the buyer. '
+                        'SocietyEats does not hold the money — use Messages to '
+                        'coordinate the refund.'
+                    : '₹${order.total.toStringAsFixed(0)} to be returned by the '
+                        'seller. SocietyEats does not hold the money, so use Messages '
+                        'to settle it.',
                 style: const TextStyle(
                   fontSize: 13,
                   color: Color(0xFF8A5A1F),

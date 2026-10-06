@@ -58,11 +58,9 @@ class OrderFulfilmentBanner extends StatelessWidget {
             ] else if (order.buyerSocietyName != null &&
                 order.buyerSocietyName!.isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text(
-                'Buyer Society: ${order.buyerSocietyName}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Color(0xFF3A4644)),
+              _placeLine(
+                _sellerPickupBuyerAddress(order),
+                order.approxDistanceLabel,
               ),
             ],
           ] else ...[
@@ -118,6 +116,20 @@ String _buyerPickupPlace(Order order) {
   if (society.isNotEmpty) parts.add(society);
   final door = order.food.locationLabel.trim();
   if (door.isNotEmpty && door != 'Pickup at seller home') parts.add(door);
+  return parts.join(' · ');
+}
+
+/// Apartment, then flat, on one line. Distance stays visible at the end.
+String _sellerPickupBuyerAddress(Order order) {
+  final parts = <String>[];
+  final society = order.buyerSocietyName?.trim() ?? '';
+  if (society.isNotEmpty) parts.add(society);
+  final location = <String>[];
+  final block = order.buyerBlock?.trim() ?? '';
+  final flat = order.buyerFlatNumber?.trim() ?? '';
+  if (block.isNotEmpty) location.add('Block $block');
+  if (flat.isNotEmpty) location.add('Flat $flat');
+  if (location.isNotEmpty) parts.add(location.join(', '));
   return parts.join(' · ');
 }
 

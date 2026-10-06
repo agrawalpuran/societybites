@@ -386,8 +386,11 @@ class _OtpScreenState extends State<OtpScreen> {
             ),
           ),
           const SizedBox(height: 32),
-          Center(
+          Padding(
+            // Use more horizontal space on phones so digit cells can scale up.
+            padding: const EdgeInsets.symmetric(horizontal: -16),
             child: _OtpDigitRow(
+              compact: false,
               controllers: _controllers,
               focusNodes: _focusNodes,
               onChanged: _onOtpChanged,
@@ -469,6 +472,7 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 24),
               Center(
                 child: _OtpDigitRow(
+                  compact: true,
                   controllers: _controllers,
                   focusNodes: _focusNodes,
                   onChanged: _onOtpChanged,
@@ -602,35 +606,75 @@ class _SecurityBadge extends StatelessWidget {
 
 class _OtpDigitRow extends StatelessWidget {
   const _OtpDigitRow({
+    required this.compact,
     required this.controllers,
     required this.focusNodes,
     required this.onChanged,
   });
 
+  final bool compact;
   final List<TextEditingController> controllers;
   final List<FocusNode> focusNodes;
   final void Function(int index, String value) onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return AutofillGroup(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          for (var index = 0; index < kOtpLength; index++) ...[
-            if (index > 0) const SizedBox(width: otpBoxGap),
-            _OtpInputBox(
-              controller: controllers[index],
-              focusNode: focusNodes[index],
-              autoFocus: index == 0,
-              enableOtpAutofill: index == 0,
-              onChanged: (value) => onChanged(index, value),
-              isPrimary: index == 0,
-            ),
+    if (compact) {
+      return AutofillGroup(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var index = 0; index < kOtpLength; index++) ...[
+              if (index > 0) const SizedBox(width: otpBoxGap),
+              _OtpInputBox(
+                boxSize: otpBoxSize,
+                fontSize: otpBoxFontSize,
+                borderRadius: otpBoxBorderRadius,
+                controller: controllers[index],
+                focusNode: focusNodes[index],
+                autoFocus: index == 0,
+                enableOtpAutofill: index == 0,
+                onChanged: (value) => onChanged(index, value),
+                isPrimary: index == 0,
+              ),
+            ],
           ],
-        ],
-      ),
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final gaps = otpBoxGapMobile * (kOtpLength - 1);
+        final cellWidth = (constraints.maxWidth - gaps) / kOtpLength;
+        final fontSize = (cellWidth * 0.44).clamp(22.0, 30.0);
+        final borderRadius = (cellWidth * 0.18).clamp(12.0, 16.0);
+
+        return AutofillGroup(
+          child: Row(
+            children: [
+              for (var index = 0; index < kOtpLength; index++) ...[
+                if (index > 0) const SizedBox(width: otpBoxGapMobile),
+                SizedBox(
+                  width: cellWidth,
+                  height: cellWidth,
+                  child: _OtpInputBox(
+                    fontSize: fontSize,
+                    borderRadius: borderRadius,
+                    controller: controllers[index],
+                    focusNode: focusNodes[index],
+                    autoFocus: index == 0,
+                    enableOtpAutofill: index == 0,
+                    onChanged: (value) => onChanged(index, value),
+                    isPrimary: index == 0,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -641,6 +685,9 @@ class _OtpInputBox extends StatelessWidget {
     required this.focusNode,
     required this.onChanged,
     required this.isPrimary,
+    required this.fontSize,
+    required this.borderRadius,
+    this.boxSize,
     this.autoFocus = false,
     this.enableOtpAutofill = false,
   });
@@ -651,14 +698,14 @@ class _OtpInputBox extends StatelessWidget {
   final bool enableOtpAutofill;
   final ValueChanged<String> onChanged;
   final bool isPrimary;
+  final double? boxSize;
+  final double fontSize;
+  final double borderRadius;
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(otpBoxBorderRadius);
-    return SizedBox(
-      width: otpBoxSize,
-      height: otpBoxSize,
-      child: TextField(
+    final radius = BorderRadius.circular(borderRadius);
+    final field = TextField(
         controller: controller,
         focusNode: focusNode,
         autofocus: autoFocus,
@@ -677,10 +724,10 @@ class _OtpInputBox extends StatelessWidget {
         enableSuggestions: enableOtpAutofill,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         onChanged: onChanged,
-        style: const TextStyle(
-          fontSize: otpBoxFontSize,
+        style: TextStyle(
+          fontSize: fontSize,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF1D2E2B),
+          color: const Color(0xFF1D2E2B),
           height: 1,
         ),
         decoration: InputDecoration(
@@ -703,8 +750,12 @@ class _OtpInputBox extends StatelessWidget {
             borderSide: const BorderSide(color: Color(0xFF2D7BFF), width: 1.6),
           ),
         ),
-      ),
-    );
+      );
+
+    if (boxSize != null) {
+      return SizedBox(width: boxSize, height: boxSize, child: field);
+    }
+    return field;
   }
 }
 

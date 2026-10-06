@@ -701,6 +701,19 @@ class Order {
     return parts.join(' · ');
   }
 
+  String get buyerNameLabel {
+    final name = buyerName?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    return 'Neighbor';
+  }
+
+  /// On seller kitchen cards, the fulfilment banner holds the address.
+  String get sellerKitchenBuyerLine {
+    final method = fulfilmentMethod?.trim() ?? '';
+    if (method.isNotEmpty) return buyerNameLabel;
+    return buyerLabel;
+  }
+
   /// Rough society-to-society distance. Empty for same-society orders.
   String get approxDistanceLabel {
     final km = distanceKm;

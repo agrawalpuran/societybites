@@ -171,28 +171,40 @@ function sortIssues(rows) {
 async function createIssueReport(body, user) {
   const input = assertIssueCreate(body, user);
   const id = crypto.randomUUID();
-  const created = await prisma.$transaction(async (tx) => {
-    const row = await tx.issueReport.create({
+  let row;
+  try {
+    row = await prisma.issueReport.create({
       data: {
         id,
         reference: `pending-${id}`,
         ...input,
       },
     });
-    await tx.issueMessage.create({
-      data: {
-        issueId: row.id,
-        authorId: input.userId,
-        authorRole: "USER",
-        body: input.description,
-        imageUrl: input.imageUrl,
-      },
-    });
-    return tx.issueReport.update({
-      where: { id: row.id },
-      data: { reference: issueReference(row.issueNumber) },
-      include: { messages: { orderBy: { createdAt: "asc" } } },
-    });
+    // Batch transaction (not interactive) — works with Supabase PgBouncer pooler.
+    await prisma.$transaction([
+      prisma.issueMessage.create({
+        data: {
+          issueId: row.id,
+          authorId: input.userId,
+          authorRole: "USER",
+          body: input.description,
+          imageUrl: input.imageUrl,
+        },
+      }),
+      prisma.issueReport.update({
+        where: { id: row.id },
+        data: { reference: issueReference(row.issueNumber) },
+      }),
+    ]);
+  } catch (err) {
+    if (row) {
+      await prisma.issueReport.delete({ where: { id: row.id } }).catch(() => {});
+    }
+    throw err;
+  }
+  const created = await prisma.issueReport.findUnique({
+    where: { id: row.id },
+    include: { messages: { orderBy: { createdAt: "asc" } } },
   });
   return serializeIssue(created, { includeThread: true });
 }
@@ -243,30 +255,35 @@ async function getAdminIssue(id) {
   return serializeIssue(row, { includeReporter: true, includeThread: true });
 }
 
-async function backfillThread(tx, issue) {
-  const count = await tx.issueMessage.count({ where: { issueId: issue.id } });
+async function backfillThread(issue) {
+  const count = await prisma.issueMessage.count({ where: { issueId: issue.id } });
   if (count > 0) return;
-  await tx.issueMessage.create({
-    data: {
-      issueId: issue.id,
-      authorId: issue.userId,
-      authorRole: "USER",
-      body: issue.description,
-      imageUrl: issue.imageUrl,
-      createdAt: issue.createdAt,
-    },
-  });
-  if (issue.adminResponse) {
-    await tx.issueMessage.create({
+  const ops = [
+    prisma.issueMessage.create({
       data: {
         issueId: issue.id,
         authorId: issue.userId,
-        authorRole: "SOCIETYEATS",
-        body: issue.adminResponse,
-        createdAt: issue.adminRespondedAt || issue.updatedAt,
+        authorRole: "USER",
+        body: issue.description,
+        imageUrl: issue.imageUrl,
+        createdAt: issue.createdAt,
       },
-    });
+    }),
+  ];
+  if (issue.adminResponse) {
+    ops.push(
+      prisma.issueMessage.create({
+        data: {
+          issueId: issue.id,
+          authorId: issue.userId,
+          authorRole: "SOCIETYEATS",
+          body: issue.adminResponse,
+          createdAt: issue.adminRespondedAt || issue.updatedAt,
+        },
+      })
+    );
   }
+  await prisma.$transaction(ops);
 }
 
 async function addUserReply(user, issueId, body) {
@@ -281,17 +298,15 @@ async function addUserReply(user, issueId, body) {
     where: { id: issueId, userId: user.id },
   });
   if (!issue) throw httpError(404, "Report not found");
-  await prisma.$transaction(async (tx) => {
-    await backfillThread(tx, issue);
-    await tx.issueMessage.create({
-      data: {
-        issueId,
-        authorId: user.id,
-        authorRole: "USER",
-        body: text,
-        imageUrl,
-      },
-    });
+  await backfillThread(issue);
+  await prisma.issueMessage.create({
+    data: {
+      issueId,
+      authorId: user.id,
+      authorRole: "USER",
+      body: text,
+      imageUrl,
+    },
   });
   return getOwnIssue(user.id, issueId);
 }
@@ -329,27 +344,25 @@ async function updateAdminIssue(id, body, adminUser) {
   if (!Object.keys(data).length) {
     throw httpError(400, "Nothing to update");
   }
-  const row = await prisma.$transaction(async (tx) => {
-    await backfillThread(tx, existing);
-    if (reply) {
-      data.adminRespondedAt = new Date();
-      await tx.issueMessage.create({
-        data: {
-          issueId: id,
-          authorId: adminUser.id,
-          authorRole: "SOCIETYEATS",
-          body: reply,
-        },
-      });
-    }
-    return tx.issueReport.update({
-      where: { id },
-      data,
-      include: {
-        user: { select: { name: true } },
-        messages: { orderBy: { createdAt: "asc" } },
+  await backfillThread(existing);
+  if (reply) {
+    data.adminRespondedAt = new Date();
+    await prisma.issueMessage.create({
+      data: {
+        issueId: id,
+        authorId: adminUser.id,
+        authorRole: "SOCIETYEATS",
+        body: reply,
       },
     });
+  }
+  const row = await prisma.issueReport.update({
+    where: { id },
+    data,
+    include: {
+      user: { select: { name: true } },
+      messages: { orderBy: { createdAt: "asc" } },
+    },
   });
   return serializeIssue(row, { includeReporter: true, includeThread: true });
 }

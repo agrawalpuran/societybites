@@ -6,11 +6,14 @@ const otpVerifyHeadingFontSize = 38.0;
 /// Reduced primary CTA height; still above a 44pt touch target.
 const otpVerifyButtonHeight = 48.0;
 
-/// Compact square OTP cells (centered row, not full-width pills).
+/// Compact square OTP cells on web (centered row).
 const otpBoxSize = 44.0;
 const otpBoxGap = 8.0;
 const otpBoxBorderRadius = 10.0;
 const otpBoxFontSize = 18.0;
+
+/// Mobile uses full-width squares; gap between digit cells.
+const otpBoxGapMobile = 8.0;
 
 /// Extra space above the iOS keyboard so the SMS OTP autofill chip stays tappable.
 const otpIosAutofillBarGap = 52.0;

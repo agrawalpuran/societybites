@@ -251,7 +251,7 @@ async function main() {
 
   const completedOrder = await prisma.order.create({
     data: {
-      orderNumber: "SB-SEED01",
+      orderNumber: "SE-SEED01",
       buyerId: buyer.id,
       societyId: SOCIETY_ID,
       status: "completed",
