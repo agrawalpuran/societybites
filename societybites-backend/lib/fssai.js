@@ -74,5 +74,7 @@ function assertSellerFssaiUpdate({ role, number, expiry, registeredName } = {}) 
 module.exports = {
   serializeFssai,
   parseFssaiNumber,
+  parseFssaiExpiry,
+  parseFssaiRegisteredName,
   assertSellerFssaiUpdate,
 };

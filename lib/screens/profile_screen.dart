@@ -72,6 +72,9 @@ class ProfileScreen extends StatefulWidget {
     double? deliveryChargeNearby,
     double? deliveryChargeExtended,
     String? paymentPreference,
+    String? kitchenOpensAt,
+    String? kitchenClosesAt,
+    bool? clearKitchenHours,
   })? updateProfile;
 
   /// Test seam. Production uses [ApiService.updateMyProfile] for UPI.
@@ -202,12 +205,52 @@ class ProfileScreenState extends State<ProfileScreen> {
         _paymentPreference = paymentPreferenceFromAuthMe(profile);
         _applyFssaiFromProfile(profile);
         _profilePhotoUrl = profile['profilePhotoUrl'] as String? ?? _profilePhotoUrl;
+        _applyPendingSellerDraftToUi();
       } catch (_) {}
     }
 
     if (!mounted) return;
     setState(() {});
     _refreshSellerSettings();
+  }
+
+  /// Keeps first-time seller setup choices while role is still `buyer` on the server.
+  void _applyPendingSellerDraftToUi() {
+    final pending = _pendingSellerEnable;
+    if (pending == null) return;
+
+    if (pending.includeUpi && pending.upiId != null) {
+      _upiId = pending.upiId;
+      _upiDisplayName = pending.upiDisplayName;
+    }
+    if (pending.paymentPreference != null) {
+      _paymentPreference =
+          parseSellerPaymentPreference(pending.paymentPreference);
+    }
+    if (pending.sellingReachLevel != null) {
+      _sellingReachLevel = parseSellingReachLevel(pending.sellingReachLevel);
+    }
+    if (pending.includeFulfilment && pending.fulfilmentMode != null) {
+      final mode = parseFulfilmentMode(pending.fulfilmentMode);
+      final nearby = pending.deliveryChargeNearby ?? pending.deliveryCharge ?? 0;
+      _fulfilment = SellerFulfilment(
+        mode: mode,
+        deliveryCharge: nearby,
+        deliveryChargeInSociety: pending.deliveryChargeInSociety ?? 0,
+        deliveryChargeNearby: nearby,
+        deliveryChargeExtended:
+            pending.deliveryChargeExtended ?? nearby,
+      );
+    }
+    if (pending.includeKitchenHours) {
+      if (pending.clearKitchenHours) {
+        _kitchenOpensAt = null;
+        _kitchenClosesAt = null;
+      } else {
+        _kitchenOpensAt = pending.kitchenOpensAt;
+        _kitchenClosesAt = pending.kitchenClosesAt;
+      }
+    }
   }
 
   String get _displayName {
@@ -410,6 +453,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                 _kitchenClosesAt,
               ),
               fssaiSubtitle: _fssaiSubtitle,
+              fssaiRequirementEnabled: _fssaiRequirementEnabled,
               onEditUpi: () => _editUpi(),
               onChangePaymentPreference: _changePaymentPreference,
               onChangeSellingReach: _changeSellingReach,
@@ -795,10 +839,14 @@ class ProfileScreenState extends State<ProfileScreen> {
     return null;
   }
 
+  bool _fssaiRequirementEnabled = false;
+
   void _applyFssaiFromProfile(Map<String, dynamic> profile) {
     final fssai = _asStringKeyedMap(profile['fssai']);
     if (fssai == null) return;
+    _fssaiRequirementEnabled = fssai['requirementEnabled'] == true;
     _fssaiStatus = fssai['status']?.toString();
+    _fssaiDetailsDeferred = fssai['detailsDeferred'] == true;
     final number = fssai['registrationNumber']?.toString().trim() ??
         fssai['number']?.toString().trim();
     if (number != null && number.isNotEmpty && number != 'null') {
@@ -826,12 +874,24 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   String? _fssaiStatus;
+  bool _fssaiDetailsDeferred = false;
 
   String get _fssaiSubtitle {
+    final deferred = _fssaiDetailsDeferred;
+    if (!_fssaiRequirementEnabled && deferred) {
+      return 'No details yet — add when ready';
+    }
+    if (!_fssaiRequirementEnabled &&
+        (_fssaiStatus == null || _fssaiStatus == 'NOT_SUBMITTED')) {
+      return 'Fill FSSAI details';
+    }
     if (_fssaiStatus != null) {
       final label = SellerFssaiRegistration.statusLabels[_fssaiStatus!] ??
           _fssaiStatus!;
       return 'Status: $label';
+    }
+    if (!_fssaiRequirementEnabled) {
+      return 'Fill FSSAI details';
     }
     if (_fssaiNumber == null || _fssaiNumber!.isEmpty) {
       return 'Add your FSSAI registration details';
@@ -866,6 +926,13 @@ class ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveAndEnableSelling() async {
     final pending = _pendingSellerEnable;
     if (pending == null || !mounted) return;
+    final kitchenDraft = pending.includeKitchenHours
+        ? (
+            opens: pending.kitchenOpensAt,
+            closes: pending.kitchenClosesAt,
+            clear: pending.clearKitchenHours,
+          )
+        : null;
     final termsResult = await Navigator.push<SellerTermsAcceptResult>(
       context,
       MaterialPageRoute(
@@ -887,9 +954,23 @@ class ProfileScreenState extends State<ProfileScreen> {
             );
       if (!mounted) return;
       final body = pending.toJson()..['addressProofUrl'] = proofUrl;
-      final updated = widget.acceptSellerTerms != null
+      var updated = widget.acceptSellerTerms != null
           ? await widget.acceptSellerTerms!(body)
           : await ApiService.acceptSellerTerms(body);
+      if (!mounted) return;
+      if (kitchenDraft != null && widget.updateProfile == null) {
+        updated = await ApiService.updateMyProfile(
+          kitchenOpensAt: kitchenDraft.opens,
+          kitchenClosesAt: kitchenDraft.closes,
+          clearKitchenHours: kitchenDraft.clear,
+        );
+      } else if (kitchenDraft != null && widget.updateProfile != null) {
+        updated = await widget.updateProfile!(
+          kitchenOpensAt: kitchenDraft.opens,
+          kitchenClosesAt: kitchenDraft.closes,
+          clearKitchenHours: kitchenDraft.clear,
+        );
+      }
       if (!mounted) return;
       try {
         await SessionService.cacheProfileFromApi(updated);
@@ -1281,7 +1362,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _changeKitchenHours() async {
-    if (!_isSeller) {
+    if (!_isSeller && _pendingSellerEnable == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Save and enable selling before setting kitchen hours'),
@@ -1306,6 +1387,38 @@ class ProfileScreenState extends State<ProfileScreen> {
       ),
     );
     if (saved == null || !mounted) return;
+
+    final pending = _pendingSellerEnable;
+    if (pending != null) {
+      setState(() {
+        if (saved.clear) {
+          _kitchenOpensAt = null;
+          _kitchenClosesAt = null;
+          pending
+            ..includeKitchenHours = true
+            ..clearKitchenHours = true
+            ..kitchenOpensAt = null
+            ..kitchenClosesAt = null;
+        } else {
+          _kitchenOpensAt = saved.opensAt;
+          _kitchenClosesAt = saved.closesAt;
+          pending
+            ..includeKitchenHours = true
+            ..clearKitchenHours = false
+            ..kitchenOpensAt = saved.opensAt
+            ..kitchenClosesAt = saved.closesAt;
+        }
+      });
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            saved.clear ? 'Kitchen is always open' : 'Kitchen hours updated',
+          ),
+        ),
+      );
+      return;
+    }
 
     final previousOpen = _kitchenOpensAt;
     final previousClose = _kitchenClosesAt;
@@ -2422,6 +2535,10 @@ class _PendingSellerEnable {
   String? fssaiNumber;
   String? fssaiRegisteredName;
   String? fssaiExpiry;
+  bool includeKitchenHours = false;
+  bool clearKitchenHours = false;
+  String? kitchenOpensAt;
+  String? kitchenClosesAt;
 
   Map<String, dynamic> toJson() {
     return {

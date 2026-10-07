@@ -1,6 +1,10 @@
 const crypto = require("crypto");
 const prisma = require("./prisma");
-const { parseFssaiNumber } = require("./fssai");
+const {
+  parseFssaiNumber,
+  parseFssaiExpiry,
+  parseFssaiRegisteredName,
+} = require("./fssai");
 const { uploadPrivateObject, createSignedObjectUrl } = require("./objectStorage");
 const { parseImageUpload } = require("./profileImage");
 const { isFssaiSellingRequirementEnabled } = require("./fssaiRequirement");
@@ -26,27 +30,72 @@ function isSellerRole(role) {
   return role === "seller" || role === "super_admin";
 }
 
+/** Buyers who joined a society can complete FSSAI before seller terms enable. */
+function canManageOwnFssai(user) {
+  if (isSellerRole(user.role)) return true;
+  return user.role === "buyer" && Boolean(user.societyId);
+}
+
 function serializeSellerFssai(row) {
   if (!row) {
     return {
       status: "NOT_SUBMITTED",
       registrationNumber: null,
+      registeredName: null,
+      licenceExpiry: null,
       rejectionReason: null,
       submittedAt: null,
       reviewedAt: null,
       needsAssistance: false,
       hasDocument: false,
+      detailsDeferred: false,
     };
   }
   return {
     status: row.status || "NOT_SUBMITTED",
     registrationNumber: row.registrationNumber || null,
+    registeredName: row.registeredName || null,
+    licenceExpiry: row.licenceExpiry || null,
     rejectionReason: row.rejectionReason || null,
     submittedAt: row.submittedAt || null,
     reviewedAt: row.reviewedAt || null,
     needsAssistance: Boolean(row.needsAssistance),
     hasDocument: Boolean(row.documentStorageReference),
+    detailsDeferred: Boolean(row.detailsDeferred),
   };
+}
+
+async function assertOptionalFssaiDraftAllowed(user) {
+  if (!canManageOwnFssai(user)) {
+    throw httpError(400, "Join your society before managing FSSAI registration");
+  }
+  const requirementEnabled = await isFssaiSellingRequirementEnabled();
+  if (requirementEnabled) {
+    throw httpError(
+      400,
+      "Save your FSSAI details using Submit for Review while verification is required"
+    );
+  }
+}
+
+function parseOptionalFssaiNumber(value) {
+  if (value == null) return undefined;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  return parseFssaiNumber(trimmed);
+}
+
+function parseOptionalFssaiRegisteredName(value) {
+  if (value == null) return undefined;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  return parseFssaiRegisteredName(trimmed);
+}
+
+function parseOptionalFssaiExpiry(value) {
+  if (value == null) return undefined;
+  if (value === "") return null;
+  return parseFssaiExpiry(value);
 }
 
 async function ensureSellerFssaiRow(userId) {
@@ -80,8 +129,8 @@ async function assertSellerCanReceiveOrders(userId) {
 }
 
 async function getMyFssai(user) {
-  if (!isSellerRole(user.role)) {
-    throw httpError(400, "Only sellers can view FSSAI registration");
+  if (!canManageOwnFssai(user)) {
+    throw httpError(400, "Join your society before managing FSSAI registration");
   }
   const row = await ensureSellerFssaiRow(user.id);
   const requirementEnabled = await isFssaiSellingRequirementEnabled();
@@ -102,8 +151,8 @@ async function getMyFssai(user) {
 }
 
 async function uploadMyFssaiDocument(user, body) {
-  if (!isSellerRole(user.role)) {
-    throw httpError(400, "Only sellers can upload FSSAI documents");
+  if (!canManageOwnFssai(user)) {
+    throw httpError(400, "Join your society before managing FSSAI registration");
   }
   const parsed = parseImageUpload(body);
   const storageReference = await uploadPrivateObject({
@@ -124,13 +173,23 @@ async function uploadMyFssaiDocument(user, body) {
 }
 
 async function submitMyFssai(user, body) {
-  if (!isSellerRole(user.role)) {
-    throw httpError(400, "Only sellers can submit FSSAI registration");
+  if (!canManageOwnFssai(user)) {
+    throw httpError(400, "Join your society before managing FSSAI registration");
   }
   const source = body && typeof body === "object" ? body : {};
   const registrationNumber = parseFssaiNumber(source.registrationNumber);
   if (!registrationNumber) {
     throw httpError(400, "FSSAI registration number is required");
+  }
+  const registeredName = parseFssaiRegisteredName(source.registeredName);
+  if (!registeredName) {
+    throw httpError(400, "FSSAI registered name is required");
+  }
+  const licenceExpiry = parseFssaiExpiry(
+    source.licenceExpiry !== undefined ? source.licenceExpiry : source.expiry
+  );
+  if (!licenceExpiry) {
+    throw httpError(400, "FSSAI licence expiry is required");
   }
   let storageReference =
     source.storageReference != null ? String(source.storageReference).trim() : "";
@@ -149,15 +208,54 @@ async function submitMyFssai(user, body) {
     where: { id: row.id },
     data: {
       registrationNumber,
+      registeredName,
+      licenceExpiry,
       documentStorageReference: effectiveRef,
       status: "UNDER_REVIEW",
       rejectionReason: null,
       submittedAt: new Date(),
       reviewedAt: null,
       reviewedBy: null,
+      detailsDeferred: false,
     },
   });
   return serializeSellerFssai(updated);
+}
+
+async function saveMyFssaiDraft(user, body) {
+  await assertOptionalFssaiDraftAllowed(user);
+  const source = body && typeof body === "object" ? body : {};
+  const row = await ensureSellerFssaiRow(user.id);
+  if (row.status === "UNDER_REVIEW" || row.status === "APPROVED") {
+    throw httpError(400, "Cannot save draft while a submission is in review or approved");
+  }
+  const data = { detailsDeferred: false };
+  const registrationNumber = parseOptionalFssaiNumber(source.registrationNumber);
+  const registeredName = parseOptionalFssaiRegisteredName(source.registeredName);
+  const licenceExpiry = parseOptionalFssaiExpiry(
+    source.licenceExpiry !== undefined ? source.licenceExpiry : source.expiry
+  );
+  if (registrationNumber !== undefined) data.registrationNumber = registrationNumber;
+  if (registeredName !== undefined) data.registeredName = registeredName;
+  if (licenceExpiry !== undefined) data.licenceExpiry = licenceExpiry;
+  await prisma.sellerFssai.update({
+    where: { id: row.id },
+    data,
+  });
+  return getMyFssai(user);
+}
+
+async function deferMyFssaiDetails(user) {
+  await assertOptionalFssaiDraftAllowed(user);
+  const row = await ensureSellerFssaiRow(user.id);
+  if (row.status !== "NOT_SUBMITTED") {
+    throw httpError(400, "FSSAI details can only be deferred before a submission is sent");
+  }
+  await prisma.sellerFssai.update({
+    where: { id: row.id },
+    data: { detailsDeferred: true },
+  });
+  return getMyFssai(user);
 }
 
 async function getMyFssaiDocumentUrl(user) {
@@ -170,8 +268,8 @@ async function getMyFssaiDocumentUrl(user) {
 }
 
 async function requestFssaiAssistance(user) {
-  if (!isSellerRole(user.role)) {
-    throw httpError(400, "Only sellers can request FSSAI assistance");
+  if (!canManageOwnFssai(user)) {
+    throw httpError(400, "Join your society before managing FSSAI registration");
   }
   await prisma.sellerFssai.updateMany({
     where: { userId: user.id },
@@ -251,12 +349,15 @@ async function listAdminFssaiSubmissions({ status } = {}) {
     phone: row.user?.phone || null,
     societyName: row.user?.society?.name || null,
     registrationNumber: row.registrationNumber,
+    registeredName: row.registeredName,
+    licenceExpiry: row.licenceExpiry,
     status: row.status,
     submittedAt: row.submittedAt,
     reviewedAt: row.reviewedAt,
     rejectionReason: row.rejectionReason,
     hasDocument: Boolean(row.documentStorageReference),
     needsAssistance: row.needsAssistance,
+    detailsDeferred: row.detailsDeferred,
   }));
 }
 
@@ -376,6 +477,8 @@ module.exports = {
   getMyFssai,
   uploadMyFssaiDocument,
   submitMyFssai,
+  saveMyFssaiDraft,
+  deferMyFssaiDetails,
   getMyFssaiDocumentUrl,
   requestFssaiAssistance,
   getAdminFssaiSummary,

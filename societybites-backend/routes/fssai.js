@@ -5,6 +5,8 @@ const {
   getMyFssai,
   uploadMyFssaiDocument,
   submitMyFssai,
+  saveMyFssaiDraft,
+  deferMyFssaiDetails,
   getMyFssaiDocumentUrl,
   requestFssaiAssistance,
 } = require("../lib/fssaiCompliance");
@@ -34,6 +36,24 @@ router.post(
   requireUser,
   asyncHandler(async (req, res) => {
     const fssai = await submitMyFssai(req.user, req.body);
+    res.json({ fssai });
+  })
+);
+
+router.post(
+  "/me/draft",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const fssai = await saveMyFssaiDraft(req.user, req.body);
+    res.json({ fssai });
+  })
+);
+
+router.post(
+  "/me/defer",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const fssai = await deferMyFssaiDetails(req.user);
     res.json({ fssai });
   })
 );

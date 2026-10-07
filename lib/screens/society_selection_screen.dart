@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'main_shell_screen.dart';
+import '../web/web_breakpoints.dart';
+import '../web/web_page_frame.dart';
 import '../widgets/app_header.dart';
 import '../services/api_service.dart';
 import '../services/session_service.dart';
@@ -316,13 +318,18 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
     }
   }
 
+  static const _formMaxWidth = 600.0;
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final hp = size.width * 0.07;
+    final wideWeb = useWebMarketplaceLayout(context);
+    final hp = wideWeb ? 20.0 : (size.width * 0.07).clamp(16.0, 28.0);
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
 
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       resizeToAvoidBottomInset: true,
       body: SafeArea(
@@ -386,6 +393,8 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
           ],
         ),
       ),
+      ),
+      maxWidth: _formMaxWidth,
     );
   }
 

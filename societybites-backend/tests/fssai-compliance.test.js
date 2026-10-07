@@ -157,7 +157,12 @@ async function main() {
       method: "POST",
       path: "/fssai/me/submit",
       token: sellerToken,
-      body: { registrationNumber: "12345678901234", storageReference: docPath },
+      body: {
+        registrationNumber: "12345678901234",
+        registeredName: "Test Kitchen",
+        licenceExpiry: "2030-12-31",
+        storageReference: docPath,
+      },
     });
     assert(submitted.status === 200, `submit ${submitted.status} ${JSON.stringify(submitted.json)}`);
     assert(submitted.json.fssai.status === "UNDER_REVIEW", "under review");
@@ -180,6 +185,35 @@ async function main() {
     });
     assert(buyerBlocked.status === 403, "buyer cannot admin");
 
+    const buyerFssai = await jsonRequest(server, {
+      method: "GET",
+      path: "/fssai/me",
+      token: buyerToken,
+    });
+    assert(buyerFssai.status === 200, "buyer in society can view own FSSAI during onboarding");
+    assert(buyerFssai.json.fssai.status === "NOT_SUBMITTED", "buyer fssai initial");
+
+    const draft = await jsonRequest(server, {
+      method: "POST",
+      path: "/fssai/me/draft",
+      token: seller2Token,
+      body: {
+        registrationNumber: "98765432109876",
+        registeredName: "Partial Kitchen",
+      },
+    });
+    assert(draft.status === 200, `draft save ${JSON.stringify(draft.json)}`);
+    assert(draft.json.fssai.registrationNumber === "98765432109876", "draft number saved");
+    assert(draft.json.fssai.detailsDeferred === false, "draft clears defer");
+
+    const defer = await jsonRequest(server, {
+      method: "POST",
+      path: "/fssai/me/defer",
+      token: buyerToken,
+    });
+    assert(defer.status === 200, `defer ${JSON.stringify(defer.json)}`);
+    assert(defer.json.fssai.detailsDeferred === true, "deferred flag set");
+
     const reject = await jsonRequest(server, {
       method: "POST",
       path: `/admin/fssai/submissions/${seller.id}/reject`,
@@ -196,7 +230,11 @@ async function main() {
       method: "POST",
       path: "/fssai/me/submit",
       token: sellerToken,
-      body: { registrationNumber: "12345678901234" },
+      body: {
+        registrationNumber: "12345678901234",
+        registeredName: "Test Kitchen",
+        licenceExpiry: "2030-12-31",
+      },
     });
     assert(resubmit.status === 200, "resubmit");
     assert(resubmit.json.fssai.status === "UNDER_REVIEW", "back under review");
@@ -242,6 +280,22 @@ async function main() {
     created.listings.push(listing.id);
 
     await setFssaiSellingRequirement(true);
+
+    const draftBlocked = await jsonRequest(server, {
+      method: "POST",
+      path: "/fssai/me/draft",
+      token: seller2Token,
+      body: { registrationNumber: "11111111111111" },
+    });
+    assert(draftBlocked.status === 400, "draft blocked when requirement on");
+
+    const deferBlocked = await jsonRequest(server, {
+      method: "POST",
+      path: "/fssai/me/defer",
+      token: buyerToken,
+    });
+    assert(deferBlocked.status === 400, "defer blocked when requirement on");
+
     await prisma.sellerFssai.upsert({
       where: { userId: seller2.id },
       update: { status: "NOT_SUBMITTED", rejectionReason: null },

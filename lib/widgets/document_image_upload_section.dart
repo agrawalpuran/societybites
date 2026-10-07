@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../utils/picked_image.dart';
 
@@ -11,7 +12,7 @@ class DocumentImageUploadSection extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.bytes,
-    required this.onPick,
+    required this.onPickFromSource,
     required this.onRemove,
     this.sheetTitle = 'Address proof',
     this.previewHeight = 170,
@@ -20,7 +21,7 @@ class DocumentImageUploadSection extends StatelessWidget {
   final String title;
   final String subtitle;
   final Uint8List? bytes;
-  final Future<void> Function() onPick;
+  final Future<void> Function(ImageSource source) onPickFromSource;
   final VoidCallback onRemove;
   final String sheetTitle;
   final double previewHeight;
@@ -55,14 +56,14 @@ class DocumentImageUploadSection extends StatelessWidget {
         if (!hasImage) ...[
           _PickRow(
             icon: Icons.photo_camera_outlined,
-            label: '📷 Take Photo',
-            onTap: onPick,
+            label: 'Take Photo',
+            onTap: () => onPickFromSource(ImageSource.camera),
           ),
           const SizedBox(height: 8),
           _PickRow(
             icon: Icons.photo_library_outlined,
-            label: '🖼️ Choose from Gallery',
-            onTap: onPick,
+            label: 'Choose from Gallery',
+            onTap: () => onPickFromSource(ImageSource.gallery),
           ),
         ] else ...[
           ClipRRect(
@@ -92,7 +93,7 @@ class DocumentImageUploadSection extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   key: const Key('document-upload-replace'),
-                  onPressed: onPick,
+                  onPressed: () => onPickFromSource(ImageSource.gallery),
                   icon: const Icon(Icons.swap_horiz_rounded, size: 20),
                   label: const Text('Replace'),
                   style: OutlinedButton.styleFrom(

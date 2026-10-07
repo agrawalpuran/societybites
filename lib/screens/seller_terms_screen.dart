@@ -1,10 +1,12 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/seller_terms.dart';
 import '../models/seller_terms_accept_result.dart';
 import '../utils/picked_image.dart';
+import '../web/web_page_frame.dart';
 import '../widgets/document_image_upload_section.dart';
 
 class SellerTermsScreen extends StatefulWidget {
@@ -57,10 +59,10 @@ class _SellerTermsScreenState extends State<SellerTermsScreen> {
     );
   }
 
-  Future<void> _pickDocument() async {
+  Future<void> _pickFromSource(ImageSource source) async {
     final picked = widget.pickDocument != null
         ? await widget.pickDocument!()
-        : await pickDocumentImage(context);
+        : await pickDocumentImageFromSource(context, source: source);
     if (picked == null || !mounted) return;
     setState(() {
       _documentBytes = picked.bytes;
@@ -75,9 +77,13 @@ class _SellerTermsScreenState extends State<SellerTermsScreen> {
     });
   }
 
+  static const _formMaxWidth = 600.0;
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return centerOnWeb(
+      context,
+      Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -118,7 +124,7 @@ class _SellerTermsScreenState extends State<SellerTermsScreen> {
                     title: sellerAddressProofTitle,
                     subtitle: sellerAddressProofSubtitle,
                     bytes: _documentBytes,
-                    onPick: _pickDocument,
+                    onPickFromSource: _pickFromSource,
                     onRemove: _removeDocument,
                   ),
                   const SizedBox(height: 24),
@@ -221,6 +227,8 @@ class _SellerTermsScreenState extends State<SellerTermsScreen> {
           ),
         ],
       ),
+      ),
+      maxWidth: _formMaxWidth,
     );
   }
 }

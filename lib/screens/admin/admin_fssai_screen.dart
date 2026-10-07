@@ -136,7 +136,8 @@ class _AdminFssaiScreenState extends State<AdminFssaiScreen> {
               child: ListTile(
                 title: Text(row['name']?.toString() ?? 'Seller'),
                 subtitle: Text(
-                  '${row['societyName'] ?? '—'} · ${row['status']} · ${row['registrationNumber'] ?? '—'}',
+                  '${row['societyName'] ?? '—'} · ${row['status']}\n'
+                  '${row['registeredName'] ?? '—'} · ${row['registrationNumber'] ?? '—'}',
                 ),
                 trailing: row['status'] == 'UNDER_REVIEW'
                     ? Row(

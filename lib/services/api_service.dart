@@ -1665,8 +1665,48 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<SellerFssaiRegistration> saveFssaiDraft({
+    String? registrationNumber,
+    String? registeredName,
+    String? licenceExpiry,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/fssai/me/draft'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        if (registrationNumber != null) 'registrationNumber': registrationNumber,
+        if (registeredName != null) 'registeredName': registeredName,
+        if (licenceExpiry != null) 'licenceExpiry': licenceExpiry,
+      }),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return SellerFssaiRegistration.fromJson(
+        Map<String, dynamic>.from(data['fssai'] as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<SellerFssaiRegistration> deferFssaiDetails() async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/fssai/me/defer'),
+      headers: await _authHeaders(),
+      body: jsonEncode({}),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return SellerFssaiRegistration.fromJson(
+        Map<String, dynamic>.from(data['fssai'] as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<SellerFssaiRegistration> submitFssaiForReview({
     required String registrationNumber,
+    required String registeredName,
+    required String licenceExpiry,
     String? storageReference,
   }) async {
     final response = await http.post(
@@ -1674,6 +1714,8 @@ class ApiService {
       headers: await _authHeaders(),
       body: jsonEncode({
         'registrationNumber': registrationNumber,
+        'registeredName': registeredName,
+        'licenceExpiry': licenceExpiry,
         if (storageReference != null && storageReference.isNotEmpty)
           'storageReference': storageReference,
       }),

@@ -17,6 +17,7 @@ class SellerSettingsScreen extends StatelessWidget {
     required this.fulfilmentSubtitle,
     required this.kitchenHoursSubtitle,
     required this.fssaiSubtitle,
+    this.fssaiRequirementEnabled = false,
     required this.onEditUpi,
     required this.onChangePaymentPreference,
     required this.onChangeSellingReach,
@@ -34,6 +35,7 @@ class SellerSettingsScreen extends StatelessWidget {
   final String fulfilmentSubtitle;
   final String kitchenHoursSubtitle;
   final String fssaiSubtitle;
+  final bool fssaiRequirementEnabled;
   final VoidCallback onEditUpi;
   final VoidCallback onChangePaymentPreference;
   final VoidCallback onChangeSellingReach;
@@ -71,7 +73,9 @@ class SellerSettingsScreen extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     isFirstTimeSetup
-                        ? 'Fill in payment methods, UPI, selling reach, fulfilment, and FSSAI so you can start listing.'
+                        ? (fssaiRequirementEnabled
+                            ? 'Fill in payment methods, UPI, selling reach, fulfilment, and FSSAI so you can start listing.'
+                            : 'Fill in payment methods, UPI, selling reach, and fulfilment. You can add FSSAI details when ready.')
                         : 'Manage payments, kitchen hours, fulfilment & FSSAI',
                     style: const TextStyle(
                       fontSize: 14,
@@ -135,7 +139,8 @@ class SellerSettingsScreen extends StatelessWidget {
                     icon: Icons.badge_outlined,
                     title: 'FSSAI details',
                     subtitle: fssaiSubtitle,
-                    trailingLabel: 'Update',
+                    trailingLabel:
+                        fssaiRequirementEnabled ? 'Update' : 'Fill',
                     onTap: onEditFssai,
                   ),
                 ],

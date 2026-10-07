@@ -112,6 +112,9 @@ void main() {
             deliveryChargeNearby,
             deliveryChargeExtended,
             paymentPreference,
+            kitchenOpensAt,
+            kitchenClosesAt,
+            clearKitchenHours,
           }) async {
             profileSaves += 1;
             return {
@@ -238,6 +241,9 @@ void main() {
             deliveryChargeNearby,
             deliveryChargeExtended,
             paymentPreference,
+            kitchenOpensAt,
+            kitchenClosesAt,
+            clearKitchenHours,
           }) async {
             profileSaves += 1;
             return {

@@ -17,15 +17,12 @@ class PickedImage {
 const double kDocumentPickMaxWidth = 1600;
 const int kDocumentPickQuality = 85;
 
-/// Reuses the app-wide photo source sheet and picker limits used for listings.
-Future<PickedImage?> pickImageViaSourceSheet(
+/// Picks a document image from camera or gallery without an extra source sheet.
+Future<PickedImage?> pickDocumentImageFromSource(
   BuildContext context, {
-  required String sheetTitle,
+  required ImageSource source,
   ImagePicker? picker,
 }) async {
-  final source = await showPhotoSourceSheet(context, title: sheetTitle);
-  if (source == null || !context.mounted) return null;
-
   final imagePicker = picker ?? ImagePicker();
   try {
     final file = await imagePicker.pickImage(
@@ -58,4 +55,16 @@ Future<PickedImage?> pickImageViaSourceSheet(
     );
     return null;
   }
+}
+
+/// Reuses the app-wide photo source sheet and picker limits used for listings.
+Future<PickedImage?> pickImageViaSourceSheet(
+  BuildContext context, {
+  required String sheetTitle,
+  ImagePicker? picker,
+}) async {
+  final source = await showPhotoSourceSheet(context, title: sheetTitle);
+  if (source == null || !context.mounted) return null;
+
+  return pickDocumentImageFromSource(context, source: source, picker: picker);
 }
