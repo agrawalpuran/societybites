@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../widgets/admin_loading_panel.dart';
 import '../../widgets/screen_loading_note.dart';
 
 class AdminAuditScreen extends StatefulWidget {
@@ -61,7 +62,7 @@ class _AdminAuditScreenState extends State<AdminAuditScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading && _logs.isEmpty) {
-      return const ScreenLoadingNote(message: 'Loading audit log…');
+      return const AdminLoadingPanel(message: 'Loading audit log…');
     }
     if (_error != null && _logs.isEmpty) {
       return Center(

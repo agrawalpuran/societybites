@@ -286,4 +286,24 @@ void main() {
     expect(find.text('Not available now'), findsOneWidget);
     expect(find.text('Add'), findsNothing);
   });
+
+  testWidgets('recurring closed with FSSAI block shows FSSAI pending only', (
+    tester,
+  ) async {
+    final closed = FoodItem.fromJson({
+      ..._listingJson(recurring: true, unavailable: true),
+      'sellerAcceptingOrders': false,
+      'sellerOrderBlockReason': 'FSSAI registration required',
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: RecurringAvailabilityHint(food: closed, compact: true),
+        ),
+      ),
+    );
+    expect(find.text('FSSAI pending'), findsOneWidget);
+    expect(find.text('Not available now'), findsNothing);
+    expect(find.text('Mon–Sat · 7:00 AM – 11:00 AM'), findsNothing);
+  });
 }

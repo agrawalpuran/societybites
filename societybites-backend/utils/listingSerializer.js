@@ -34,12 +34,19 @@ function serializeListing(listing, options = {}) {
     options.sellerOrderBlockReason != null ? options.sellerOrderBlockReason : null;
   const seller = listing.seller || {};
   const flat = seller.flat;
-  const reviews = listing.reviews || [];
-  const reviewCount = reviews.length;
   const fulfilment = serializeFulfilment(seller);
-  const avgRating = reviewCount > 0
-    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
-    : 0;
+  let reviewCount;
+  let avgRating;
+  if (listing.reviewStats) {
+    reviewCount = listing.reviewStats.reviewCount;
+    avgRating = listing.reviewStats.avgRating;
+  } else {
+    const reviews = listing.reviews || [];
+    reviewCount = reviews.length;
+    avgRating = reviewCount > 0
+      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+      : 0;
+  }
   const recurring = evaluateRecurringAvailability(listing, {
     soldToday: listing.recurringSoldToday || 0,
   });
@@ -133,6 +140,39 @@ async function attachQuantitySold(prisma, listings) {
     if (listing && listing.id) {
       listing.quantitySold = soldByListing[listing.id] || 0;
     }
+  }
+  return list;
+}
+
+/**
+ * Batched review count + average rating for catalog listing reads.
+ * Matches serializeListing's in-memory reduce over listing.reviews (all rows, including hidden).
+ */
+async function attachListingReviewAggregates(prisma, listings) {
+  const list = Array.isArray(listings) ? listings : [];
+  const ids = [...new Set(list.map((listing) => listing && listing.id).filter(Boolean))];
+  if (ids.length === 0) return list;
+
+  const groups = await prisma.review.groupBy({
+    by: ["listingId"],
+    where: { listingId: { in: ids } },
+    _count: { _all: true },
+    _avg: { rating: true },
+  });
+  const statsByListing = Object.fromEntries(
+    groups.map((row) => {
+      const reviewCount = row._count._all;
+      const avg =
+        reviewCount > 0 && row._avg.rating != null ? row._avg.rating : 0;
+      return [row.listingId, { reviewCount, avgRating: avg }];
+    })
+  );
+  for (const listing of list) {
+    if (!listing || !listing.id) continue;
+    listing.reviewStats = statsByListing[listing.id] || {
+      reviewCount: 0,
+      avgRating: 0,
+    };
   }
   return list;
 }
@@ -265,4 +305,5 @@ module.exports = {
   serializeOrder,
   serializeReview,
   attachQuantitySold,
+  attachListingReviewAggregates,
 };

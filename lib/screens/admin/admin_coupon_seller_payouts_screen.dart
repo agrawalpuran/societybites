@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/coupon.dart';
 import '../../services/api_service.dart';
-import '../../widgets/screen_loading_note.dart';
+import '../../widgets/admin_loading_panel.dart';
 
 const _green = Color(0xFF0E5A47);
 
@@ -89,7 +89,7 @@ class _AdminCouponSellerPayoutsScreenState
   @override
   Widget build(BuildContext context) {
     if (_loading && _report == null) {
-      return const ScreenLoadingNote(message: 'Loading seller payouts…');
+      return const AdminLoadingPanel(message: 'Loading seller payouts…');
     }
 
     final report = _report;

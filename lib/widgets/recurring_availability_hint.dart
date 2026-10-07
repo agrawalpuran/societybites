@@ -16,6 +16,22 @@ class RecurringAvailabilityHint extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!food.showsBuyerAvailabilityHint) return const SizedBox.shrink();
     final unavailable = food.recurringUnavailable;
+    if (unavailable && food.showFssaiPendingOnListing) {
+      return Padding(
+        padding: EdgeInsets.only(top: compact ? 4 : 8),
+        child: Text(
+          'FSSAI pending',
+          maxLines: compact ? 2 : 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: compact ? 11 : 12,
+            fontWeight: FontWeight.w700,
+            height: 1.2,
+            color: const Color(0xFFD94F4F),
+          ),
+        ),
+      );
+    }
     final window = food.recurringWindowLabel;
     final primary = unavailable
         ? 'Not available now'

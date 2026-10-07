@@ -129,10 +129,29 @@ app.use((err, _req, res, _next) => {
   if (err.code === "P2025") {
     return res.status(404).json({ error: "Record not found" });
   }
+  if (
+    err.name === "PrismaClientValidationError" ||
+    (typeof err.message === "string" &&
+      err.message.includes("Unknown field") &&
+      err.message.includes("Prisma"))
+  ) {
+    return res.status(503).json({
+      error:
+        "API database client is out of date. Stop the server, run npx prisma generate in societybites-backend, then start the server again.",
+      code: "PRISMA_CLIENT_STALE",
+    });
+  }
 
   const statusCode = err.statusCode || 500;
   const message = statusCode === 500 ? "Internal server error" : err.message;
   const payload = { error: message };
+  if (
+    typeof err.code === "string" &&
+    err.code.length > 0 &&
+    !err.code.startsWith("P")
+  ) {
+    payload.code = err.code;
+  }
   if (err.availableQuantity !== undefined) {
     payload.availableQuantity = err.availableQuantity;
   }

@@ -2,7 +2,10 @@ const express = require("express");
 const prisma = require("../lib/prisma");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser, requireJoinedSociety } = require("../middleware/requireUser");
-const { attachQuantitySold } = require("../utils/listingSerializer");
+const {
+  attachQuantitySold,
+  attachListingReviewAggregates,
+} = require("../utils/listingSerializer");
 const { serializeListingsWithSellerOrderability } = require("../lib/listingOrderability");
 const {
   parseFoodType,
@@ -50,6 +53,7 @@ async function jsonListings(listings) {
   const withCapacity = await attachMadeToOrderCapacity(prisma, listings);
   const withRecurring = await attachRecurringAvailability(prisma, withCapacity);
   await attachQuantitySold(prisma, withRecurring);
+  await attachListingReviewAggregates(prisma, withRecurring);
   return serializeListingsWithSellerOrderability(withRecurring);
 }
 
@@ -61,9 +65,6 @@ async function jsonListing(listing) {
 const listingInclude = {
   seller: {
     include: { flat: true },
-  },
-  reviews: {
-    select: { rating: true },
   },
 };
 

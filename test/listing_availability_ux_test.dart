@@ -47,6 +47,54 @@ void _ignoreOverflow() {
 }
 
 void main() {
+  test('FSSAI block explains seller compliance, not sold out', () {
+    final food = FoodItem.fromJson({
+      ..._listingJson(name: 'thali', quantity: 10),
+      'sellerAcceptingOrders': false,
+      'sellerOrderBlockReason': 'FSSAI registration required',
+    });
+    expect(food.canAddToCart, isFalse);
+    expect(food.blockedBySellerFssai, isTrue);
+    expect(
+      food.addToCartBlockedMessage(),
+      contains('FSSAI registration is approved'),
+    );
+    expect(food.orderActionLabel, 'FSSAI approval pending');
+  });
+
+  test('out of stock and FSSAI pending both surface on listing UX', () {
+    final food = FoodItem.fromJson({
+      ..._listingJson(name: 'coconut', quantity: 0, status: 'expired'),
+      'sellerAcceptingOrders': false,
+      'sellerOrderBlockReason': 'FSSAI registration required',
+    });
+    expect(food.listingStockUnavailableLabel, 'Out of stock');
+    expect(food.showFssaiPendingOnListing, isTrue);
+    expect(food.orderActionLabel, 'Out of stock · FSSAI pending');
+  });
+
+  test('FSSAI-blocked dishes hide from buyer home feed, not seller presence', () {
+    final blocked = FoodItem.fromJson({
+      ..._listingJson(name: 'thali', quantity: 10),
+      'sellerAcceptingOrders': false,
+      'sellerOrderBlockReason': 'FSSAI registration required',
+    });
+    final active = FoodItem.fromJson(_listingJson(name: 'Dal'));
+    final feed = applyHomeListingFilters(
+      [blocked, active],
+      excludeFssaiBlockedFromBuyerFeed: true,
+    );
+    expect(feed.map((item) => item.name), ['Dal']);
+    final presence = applyHomeListingFilters(
+      [blocked, active],
+      includeNotSelling: true,
+    );
+    expect(
+      presence.map((item) => item.name),
+      containsAll(['Dal', 'thali']),
+    );
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {

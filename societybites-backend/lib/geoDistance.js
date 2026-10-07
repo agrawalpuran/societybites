@@ -35,8 +35,24 @@ function distanceKmBetweenCoordinates(a, b) {
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(hav)));
 }
 
+/**
+ * Conservative axis-aligned bounds for a great-circle radius (km).
+ * Every point within radiusKm of (lat, lng) lies inside the box; some box
+ * corners lie outside the circle and are filtered later by Haversine.
+ */
+function latitudeLongitudeBoundingDeltas(latitude, radiusKm) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(radiusKm) || radiusKm <= 0) {
+    return null;
+  }
+  const latDelta = radiusKm / 111.32;
+  const cosLat = Math.cos((latitude * Math.PI) / 180);
+  const lngDelta = cosLat > 0.01 ? radiusKm / (111.32 * cosLat) : 180;
+  return { latDelta, lngDelta };
+}
+
 module.exports = {
   EARTH_RADIUS_KM,
   isValidSocietyLocation,
   distanceKmBetweenCoordinates,
+  latitudeLongitudeBoundingDeltas,
 };

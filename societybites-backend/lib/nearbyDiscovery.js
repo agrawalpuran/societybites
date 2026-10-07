@@ -1,13 +1,21 @@
 const prisma = require("./prisma");
 const { canonicalCityKey } = require("./launchCity");
-const { isValidSocietyLocation } = require("./geoDistance");
+const {
+  isValidSocietyLocation,
+  latitudeLongitudeBoundingDeltas,
+} = require("./geoDistance");
+const { SELLING_REACH_LEVELS } = require("./sellingReach");
 const { evaluateSellerDiscoveryEligibility, discoveryDisplayReach } = require("./sellingReachEligibility");
 const { serializeSellingReach } = require("./sellingReach");
 const { serializeFulfilment } = require("./sellerFulfilment");
 const { serializePaymentPreference } = require("./sellerPaymentPreference");
-const { serializeListing, attachQuantitySold } = require("../utils/listingSerializer");
+const {
+  attachQuantitySold,
+  attachListingReviewAggregates,
+} = require("../utils/listingSerializer");
 const { expireDueListings, DISCOVERABLE_STATUSES } = require("../utils/listingExpiry");
 const { attachRecurringAvailability } = require("./recurringAvailability");
+const { serializeListingsWithSellerOrderability } = require("./listingOrderability");
 
 const ACTIVE_LISTING_WHERE = {
   status: { in: DISCOVERABLE_STATUSES },
@@ -15,6 +23,14 @@ const ACTIVE_LISTING_WHERE = {
   catalogType: "REGULAR",
 };
 
+/** Catalog listings for GET /listings/nearby-sellers (reviewStats via groupBy). */
+const nearbyCatalogListingInclude = {
+  seller: {
+    include: { flat: true },
+  },
+};
+
+/** Single-seller storefront still loads reviews until optimized separately. */
 const listingInclude = {
   seller: {
     include: { flat: true },
@@ -54,6 +70,61 @@ async function loadBuyerSociety(buyer) {
   return prisma.society.findUnique({ where: { id: buyer.societyId } });
 }
 
+/**
+ * Cross-society sellers must share the buyer's canonical city and sit within
+ * the configured extended reach (outer bound). Same-society sellers are added
+ * separately and are not subject to reach level or bbox filters here.
+ */
+async function loadCrossSocietyCandidateSocietyIds(buyerSociety, reach) {
+  const buyerCityKey = canonicalCityKey(buyerSociety && buyerSociety.city);
+  if (!buyerCityKey || !isValidSocietyLocation(buyerSociety)) return [];
+
+  const maxKm = appliedDisplayRadiusKm(reach);
+  if (!maxKm) return [];
+
+  const deltas = latitudeLongitudeBoundingDeltas(buyerSociety.latitude, maxKm);
+  if (!deltas) return [];
+
+  const latMin = buyerSociety.latitude - deltas.latDelta;
+  const latMax = buyerSociety.latitude + deltas.latDelta;
+  const lngMin = buyerSociety.longitude - deltas.lngDelta;
+  const lngMax = buyerSociety.longitude + deltas.lngDelta;
+
+  const societies = await prisma.society.findMany({
+    where: {
+      id: { not: buyerSociety.id },
+      latitude: { gte: latMin, lte: latMax },
+      longitude: { gte: lngMin, lte: lngMax },
+    },
+    select: { id: true, city: true },
+  });
+
+  return societies
+    .filter((row) => canonicalCityKey(row.city) === buyerCityKey)
+    .map((row) => row.id);
+}
+
+function buildNearbySellerCandidateWhere(buyerSocietyId, crossSocietyIds) {
+  const crossReach =
+    crossSocietyIds.length > 0
+      ? [
+          {
+            societyId: { in: crossSocietyIds },
+            sellingReachLevel: {
+              in: [SELLING_REACH_LEVELS.NEARBY, SELLING_REACH_LEVELS.EXTENDED],
+            },
+          },
+        ]
+      : [];
+
+  return {
+    role: { in: ["seller", "super_admin"] },
+    societyId: { not: null },
+    listings: { some: ACTIVE_LISTING_WHERE },
+    OR: [{ societyId: buyerSocietyId }, ...crossReach],
+  };
+}
+
 async function loadCityReachConfig(society) {
   const cityKey = canonicalCityKey(society && society.city);
   if (!cityKey) return { cityKey: null, config: null, reach: serializeSellingReach(society && society.city, null) };
@@ -65,10 +136,7 @@ async function loadCityReachConfig(society) {
   };
 }
 
-async function serializeNearbySeller(seller, eligibility) {
-  const attached = await attachRecurringAvailability(prisma, seller.listings || []);
-  const { serializeListingsWithSellerOrderability } = require("./listingOrderability");
-  const listings = await serializeListingsWithSellerOrderability(attached);
+function buildNearbySellerCard(seller, eligibility, listings) {
   return {
     seller: {
       id: seller.id,
@@ -84,6 +152,12 @@ async function serializeNearbySeller(seller, eligibility) {
     paymentPreference: serializePaymentPreference(seller),
     listings,
   };
+}
+
+async function serializeNearbySeller(seller, eligibility) {
+  const attached = await attachRecurringAvailability(prisma, seller.listings || []);
+  const listings = await serializeListingsWithSellerOrderability(attached);
+  return buildNearbySellerCard(seller, eligibility, listings);
 }
 
 async function discoverNearbySellers({ buyer, query } = {}) {
@@ -111,31 +185,28 @@ async function discoverNearbySellers({ buyer, query } = {}) {
     });
   }
 
-  await expireDueListings(prisma);
+  // Cross-society listings are expired on society-scoped GET /listings reads.
+  // Avoid a platform-wide expireDueListings() on every Home nearby-sellers call.
+
+  const crossSocietyIds = await loadCrossSocietyCandidateSocietyIds(
+    buyerSociety,
+    reach
+  );
 
   const candidates = await prisma.user.findMany({
-    where: {
-      role: { in: ["seller", "super_admin"] },
-      societyId: { not: null },
-      listings: { some: ACTIVE_LISTING_WHERE },
-    },
+    where: buildNearbySellerCandidateWhere(buyerSociety.id, crossSocietyIds),
     include: {
       society: true,
       flat: true,
       listings: {
         where: ACTIVE_LISTING_WHERE,
-        include: listingInclude,
+        include: nearbyCatalogListingInclude,
         orderBy: { createdAt: "desc" },
       },
     },
   });
 
-  await attachQuantitySold(
-    prisma,
-    candidates.flatMap((candidate) => candidate.listings || [])
-  );
-
-  const sellers = [];
+  const eligible = [];
   for (const candidate of candidates) {
     if (!candidate.listings || candidate.listings.length === 0) continue;
     const eligibility = evaluateSellerDiscoveryEligibility({
@@ -148,11 +219,29 @@ async function discoverNearbySellers({ buyer, query } = {}) {
       distanceKm: query && query.distanceKm,
     });
     if (!eligibility.eligible) continue;
-    sellers.push({
-      card: await serializeNearbySeller(candidate, eligibility),
-      distanceKm: eligibility.distanceKm == null ? Number.POSITIVE_INFINITY : eligibility.distanceKm,
-    });
+    eligible.push({ candidate, eligibility });
   }
+
+  const allListings = eligible.flatMap((entry) => entry.candidate.listings || []);
+  await attachQuantitySold(prisma, allListings);
+  const withRecurring = await attachRecurringAvailability(prisma, allListings);
+  await attachListingReviewAggregates(prisma, withRecurring);
+  const serializedListings = await serializeListingsWithSellerOrderability(withRecurring);
+  const serializedById = new Map();
+  for (let i = 0; i < withRecurring.length; i++) {
+    serializedById.set(withRecurring[i].id, serializedListings[i]);
+  }
+
+  const sellers = eligible.map(({ candidate, eligibility }) => {
+    const listings = (candidate.listings || [])
+      .map((listing) => serializedById.get(listing.id))
+      .filter(Boolean);
+    return {
+      card: buildNearbySellerCard(candidate, eligibility, listings),
+      distanceKm:
+        eligibility.distanceKm == null ? Number.POSITIVE_INFINITY : eligibility.distanceKm,
+    };
+  });
 
   sellers.sort((a, b) => a.distanceKm - b.distanceKm);
 

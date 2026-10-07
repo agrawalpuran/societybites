@@ -4,6 +4,7 @@
  * Requires DIRECT_URL for Supabase direct/session pooler (see .env.example).
  */
 const { spawnSync } = require("child_process");
+const fs = require("fs");
 const path = require("path");
 
 if (process.env.SKIP_DB_MIGRATE === "true") {
@@ -11,11 +12,17 @@ if (process.env.SKIP_DB_MIGRATE === "true") {
 }
 
 const backendRoot = path.join(__dirname, "..");
-const result = spawnSync(
-  process.platform === "win32" ? "npx.cmd" : "npx",
-  ["prisma", "migrate", "deploy"],
-  { cwd: backendRoot, stdio: "inherit", env: process.env }
-);
+const prismaCli = path.join(backendRoot, "node_modules", "prisma", "build", "index.js");
+if (!fs.existsSync(prismaCli)) {
+  console.error("[ensure-db-migrations] Prisma CLI not found. Run npm install in societybites-backend.");
+  process.exit(1);
+}
+
+const result = spawnSync(process.execPath, [prismaCli, "migrate", "deploy"], {
+  cwd: backendRoot,
+  stdio: "inherit",
+  env: process.env,
+});
 
 if (result.error) {
   console.error("[ensure-db-migrations]", result.error.message);

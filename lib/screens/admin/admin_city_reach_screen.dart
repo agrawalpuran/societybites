@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/selling_reach.dart';
 import '../../services/api_service.dart';
-import '../../widgets/screen_loading_note.dart';
+import '../../widgets/admin_loading_panel.dart';
 
 class AdminCityReachScreen extends StatefulWidget {
   const AdminCityReachScreen({super.key});
@@ -155,7 +155,7 @@ class _AdminCityReachScreenState extends State<AdminCityReachScreen> {
         child: const Icon(Icons.add, color: Colors.white),
       ),
       body: _isLoading
-          ? const ScreenLoadingNote(message: 'Loading city reach…')
+          ? const AdminLoadingPanel(message: 'Loading city reach…')
           : _error != null
               ? Center(
                   child: Padding(

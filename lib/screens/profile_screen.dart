@@ -25,6 +25,7 @@ import '../widgets/kitchen_hours_sheet.dart';
 import '../widgets/photo_source_sheet.dart';
 import '../widgets/profile_menu_tile.dart';
 import '../widgets/seller_avatar.dart';
+import '../widgets/status_banner.dart';
 import 'admin/admin_shell_screen.dart';
 import 'guest_landing_screen.dart';
 import 'main_shell_screen.dart';
@@ -253,6 +254,102 @@ class ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _syncPendingSellerEnableDefaults() {
+    final pending = _pendingSellerEnable;
+    if (pending == null) return;
+    pending.sellingReachLevel ??= _sellingReachLevel.apiValue;
+    if (!pending.includeFulfilment) {
+      pending
+        ..includeFulfilment = true
+        ..fulfilmentMode = _fulfilment.mode.apiValue
+        ..deliveryCharge = _fulfilment.nearbyCharge
+        ..deliveryChargeInSociety = _fulfilment.inSocietyCharge
+        ..deliveryChargeNearby = _fulfilment.nearbyCharge
+        ..deliveryChargeExtended = _fulfilment.extendedCharge;
+    }
+  }
+
+  void _onPendingPaymentPreferenceChanged(SellerPaymentPreference selected) {
+    final pending = _pendingSellerEnable;
+    if (pending == null) return;
+    setState(() {
+      _paymentPreference = selected;
+      pending.paymentPreference = selected.apiValue;
+    });
+    _refreshSellerSettings();
+  }
+
+  void _onPendingUpiDetailsChanged(String upiId, String displayName) {
+    final pending = _pendingSellerEnable;
+    if (pending == null) return;
+    setState(() {
+      _upiId = upiId;
+      _upiDisplayName = displayName.isEmpty ? null : displayName;
+      if (upiId.isEmpty) {
+        pending.includeUpi = false;
+        pending.upiId = null;
+        pending.upiDisplayName = null;
+      } else {
+        pending
+          ..includeUpi = true
+          ..upiId = upiId
+          ..upiDisplayName = displayName.isEmpty ? null : displayName;
+      }
+    });
+    _refreshSellerSettings();
+  }
+
+  void _onPendingSellingReachChanged(SellingReachLevel selected) {
+    final pending = _pendingSellerEnable;
+    if (pending == null) return;
+    setState(() {
+      _sellingReachLevel = selected;
+      pending.sellingReachLevel = selected.apiValue;
+    });
+    _refreshSellerSettings();
+  }
+
+  void _onPendingFulfilmentChanged(SellerFulfilment updated) {
+    final pending = _pendingSellerEnable;
+    if (pending == null) return;
+    setState(() {
+      _fulfilment = updated;
+      pending
+        ..includeFulfilment = true
+        ..fulfilmentMode = updated.mode.apiValue
+        ..deliveryCharge = updated.nearbyCharge
+        ..deliveryChargeInSociety = updated.inSocietyCharge
+        ..deliveryChargeNearby = updated.nearbyCharge
+        ..deliveryChargeExtended = updated.extendedCharge;
+    });
+    _refreshSellerSettings();
+  }
+
+  void _onPendingKitchenHoursChanged(KitchenHoursDraft saved) {
+    final pending = _pendingSellerEnable;
+    if (pending == null) return;
+    setState(() {
+      if (saved.clear) {
+        _kitchenOpensAt = null;
+        _kitchenClosesAt = null;
+        pending
+          ..includeKitchenHours = true
+          ..clearKitchenHours = true
+          ..kitchenOpensAt = null
+          ..kitchenClosesAt = null;
+      } else {
+        _kitchenOpensAt = saved.opensAt;
+        _kitchenClosesAt = saved.closesAt;
+        pending
+          ..includeKitchenHours = true
+          ..clearKitchenHours = false
+          ..kitchenOpensAt = saved.opensAt
+          ..kitchenClosesAt = saved.closesAt;
+      }
+    });
+    _refreshSellerSettings();
+  }
+
   String get _displayName {
     if (_name != null && _name!.isNotEmpty) return _name!;
     if (_phone != null && _phone!.length >= 4) {
@@ -420,16 +517,17 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> openSellerSettingsAfterEnable() async {
-    await _loadProfile();
-    if (!mounted) return;
-    _openSellerSettings(firstTime: true);
+    await _openSellerSettings(firstTime: true);
   }
 
-  void _openSellerSettings({bool firstTime = false}) {
+  Future<void> _openSellerSettings({bool firstTime = false}) async {
+    await _loadProfile();
+    if (!mounted) return;
     if (firstTime) {
       _pendingSellerEnable = _PendingSellerEnable()
         ..paymentPreference = defaultSellerPaymentPreference.apiValue;
       _paymentPreference = defaultSellerPaymentPreference;
+      _syncPendingSellerEnableDefaults();
     }
     Navigator.push(
       context,
@@ -454,6 +552,7 @@ class ProfileScreenState extends State<ProfileScreen> {
               ),
               fssaiSubtitle: _fssaiSubtitle,
               fssaiRequirementEnabled: _fssaiRequirementEnabled,
+              fssaiAllowsEnableSelling: _fssaiAllowsEnableSelling,
               onEditUpi: () => _editUpi(),
               onChangePaymentPreference: _changePaymentPreference,
               onChangeSellingReach: _changeSellingReach,
@@ -461,6 +560,29 @@ class ProfileScreenState extends State<ProfileScreen> {
               onChangeKitchenHours: _changeKitchenHours,
               onEditFssai: _editFssai,
               onSaveAndEnable: holdingSetup ? _saveAndEnableSelling : null,
+              paymentPreference:
+                  holdingSetup ? _paymentPreference : null,
+              onPaymentPreferenceChanged: holdingSetup
+                  ? _onPendingPaymentPreferenceChanged
+                  : null,
+              upiId: holdingSetup ? _upiId : null,
+              upiDisplayName: holdingSetup ? _upiDisplayName : null,
+              onUpiDetailsChanged:
+                  holdingSetup ? _onPendingUpiDetailsChanged : null,
+              sellingReachLevel:
+                  holdingSetup ? _sellingReachLevel : null,
+              sellingReach: holdingSetup ? _sellingReach : null,
+              onSellingReachChanged: holdingSetup
+                  ? _onPendingSellingReachChanged
+                  : null,
+              fulfilment: holdingSetup ? _fulfilment : null,
+              onFulfilmentChanged:
+                  holdingSetup ? _onPendingFulfilmentChanged : null,
+              kitchenOpensAt: holdingSetup ? _kitchenOpensAt : null,
+              kitchenClosesAt: holdingSetup ? _kitchenClosesAt : null,
+              onKitchenHoursChanged: holdingSetup
+                  ? _onPendingKitchenHoursChanged
+                  : null,
             );
           },
         ),
@@ -843,10 +965,21 @@ class ProfileScreenState extends State<ProfileScreen> {
 
   void _applyFssaiFromProfile(Map<String, dynamic> profile) {
     final fssai = _asStringKeyedMap(profile['fssai']);
-    if (fssai == null) return;
+    if (fssai == null) {
+      _fssaiRequirementEnabled = false;
+      _fssaiCanEnableSellingFlag = true;
+      _fssaiCanSellDespiteFssai = true;
+      return;
+    }
     _fssaiRequirementEnabled = fssai['requirementEnabled'] == true;
     _fssaiStatus = fssai['status']?.toString();
     _fssaiDetailsDeferred = fssai['detailsDeferred'] == true;
+    _fssaiCanEnableSellingFlag = _fssaiRequirementEnabled
+        ? fssai['canEnableSellingDespiteFssai'] == true
+        : true;
+    _fssaiCanSellDespiteFssai = !_fssaiRequirementEnabled ||
+        fssai['canSellDespiteFssai'] == true ||
+        _fssaiStatus == 'APPROVED';
     final number = fssai['registrationNumber']?.toString().trim() ??
         fssai['number']?.toString().trim();
     if (number != null && number.isNotEmpty && number != 'null') {
@@ -875,6 +1008,46 @@ class ProfileScreenState extends State<ProfileScreen> {
 
   String? _fssaiStatus;
   bool _fssaiDetailsDeferred = false;
+  bool _fssaiCanEnableSellingFlag = true;
+  bool _fssaiCanSellDespiteFssai = true;
+
+  bool get _fssaiAllowsEnableSelling =>
+      !_fssaiRequirementEnabled || _fssaiCanEnableSellingFlag;
+
+  bool get _showSellerFssaiComplianceBanner =>
+      _isSeller && _fssaiRequirementEnabled && !_fssaiCanSellDespiteFssai;
+
+  String get _sellerFssaiComplianceMessage {
+    switch (_fssaiStatus) {
+      case 'UNDER_REVIEW':
+        return 'Your FSSAI registration is under review. Buyers cannot order until SocietyBites approves it.';
+      case 'REJECTED':
+        return 'Update your FSSAI registration to continue selling on SocietyBites.';
+      default:
+        return 'Complete your FSSAI registration to continue selling on SocietyBites.';
+    }
+  }
+
+  Widget _buildSellerFssaiComplianceBanner() {
+    return StatusBanner(
+      padding: EdgeInsets.zero,
+      title: 'FSSAI required to sell',
+      message: _sellerFssaiComplianceMessage,
+      action: TextButton(
+        onPressed: _editFssai,
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          foregroundColor: const Color(0xFF0E5A47),
+        ),
+        child: const Text(
+          'Complete FSSAI',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
 
   String get _fssaiSubtitle {
     final deferred = _fssaiDetailsDeferred;
@@ -906,6 +1079,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     );
     if (!mounted) return;
     await _loadProfile();
+    _refreshSellerSettings();
   }
 
   Future<void> _enableSelling() async {
@@ -926,6 +1100,19 @@ class ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveAndEnableSelling() async {
     final pending = _pendingSellerEnable;
     if (pending == null || !mounted) return;
+    await _loadProfile();
+    if (!mounted) return;
+    _refreshSellerSettings();
+    if (!_fssaiAllowsEnableSelling) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Submit your FSSAI registration for review before enabling selling.',
+          ),
+        ),
+      );
+      return;
+    }
     final kitchenDraft = pending.includeKitchenHours
         ? (
             opens: pending.kitchenOpensAt,
@@ -1599,11 +1786,17 @@ class ProfileScreenState extends State<ProfileScreen> {
           ),
       ],
       if (_isSeller) ...[
+        if (_showSellerFssaiComplianceBanner) ...[
+          _buildSellerFssaiComplianceBanner(),
+          const SizedBox(height: 16),
+        ],
         const _WebSectionLabel('SELLER'),
         ProfileMenuTile(
           icon: Icons.settings_outlined,
           title: 'Seller Settings',
-          subtitle: 'Manage payments, fulfilment & FSSAI',
+          subtitle: _showSellerFssaiComplianceBanner
+              ? 'Complete FSSAI to continue selling'
+              : 'Manage payments, fulfilment & FSSAI',
           onTap: _openSellerSettings,
         ),
       ],
@@ -1810,6 +2003,10 @@ class ProfileScreenState extends State<ProfileScreen> {
                             photoUrl: _profilePhotoUrl,
                             onEdit: _openProfileEditor,
                           ),
+                          if (_showSellerFssaiComplianceBanner) ...[
+                            const SizedBox(height: 16),
+                            _buildSellerFssaiComplianceBanner(),
+                          ],
                           if (_role == 'buyer' ||
                               _role == null ||
                               _role == 'super_admin') ...[
@@ -1862,8 +2059,9 @@ class ProfileScreenState extends State<ProfileScreen> {
                             ProfileMenuTile(
                               icon: Icons.settings_outlined,
                               title: 'Seller Settings',
-                              subtitle:
-                                  'Manage payments, fulfilment & FSSAI',
+                              subtitle: _showSellerFssaiComplianceBanner
+                                  ? 'Complete FSSAI to continue selling'
+                                  : 'Manage payments, fulfilment & FSSAI',
                               onTap: _openSellerSettings,
                             ),
                           ],

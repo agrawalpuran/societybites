@@ -25,6 +25,7 @@ const {
   approveAdminFssai,
   rejectAdminFssai,
   listAdminFssaiAssistance,
+  getAdminFssaiAssistanceDetail,
   updateAdminFssaiAssistance,
   REJECTION_PRESETS,
 } = require("../lib/fssaiCompliance");
@@ -141,11 +142,24 @@ router.get(
   })
 );
 
+router.get(
+  "/fssai/assistance/:id",
+  asyncHandler(async (req, res) => {
+    const request = await getAdminFssaiAssistanceDetail(req.params.id);
+    res.json({ request });
+  })
+);
+
 router.patch(
   "/fssai/assistance/:id",
   asyncHandler(async (req, res) => {
-    const request = await updateAdminFssaiAssistance(req.params.id, req.body);
-    res.json({ request });
+    const request = await updateAdminFssaiAssistance(
+      req.params.id,
+      req.body,
+      req.user
+    );
+    const detail = await getAdminFssaiAssistanceDetail(request.id);
+    res.json({ request: detail });
   })
 );
 

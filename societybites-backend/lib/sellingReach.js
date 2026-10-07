@@ -1,7 +1,10 @@
 const { canonicalCityKey } = require("./launchCity");
 const { serializeFulfilment, DEFAULT_FULFILMENT_MODE } = require("./sellerFulfilment");
 const { serializePaymentPreference } = require("./sellerPaymentPreference");
-const { serializeSellerFssai } = require("./fssaiCompliance");
+const {
+  serializeSellerFssai,
+  canEnableSellingDespiteFssai,
+} = require("./fssaiCompliance");
 const { isFssaiSellingRequirementEnabled } = require("./fssaiRequirement");
 
 const SELLING_REACH_LEVELS = Object.freeze({
@@ -122,9 +125,15 @@ async function attachSellingReach(user, prismaClient) {
     where: { userId: user.id },
   });
   const requirementEnabled = await isFssaiSellingRequirementEnabled();
+  const fssaiStatus = sellerFssai ? sellerFssai.status : "NOT_SUBMITTED";
   const fssaiPayload = {
     ...serializeSellerFssai(sellerFssai),
     requirementEnabled,
+    canSellDespiteFssai: !requirementEnabled || fssaiStatus === "APPROVED",
+    canEnableSellingDespiteFssai: canEnableSellingDespiteFssai(
+      fssaiStatus,
+      requirementEnabled
+    ),
   };
   return {
     ...user,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../widgets/admin_loading_panel.dart';
 import '../../widgets/screen_loading_note.dart';
 
 class AdminReviewsScreen extends StatefulWidget {
@@ -61,7 +62,7 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading && _reviews.isEmpty) {
-      return const ScreenLoadingNote(message: 'Loading reviews…');
+      return const AdminLoadingPanel(message: 'Loading reviews…');
     }
     if (_error != null && _reviews.isEmpty) {
       return Center(

@@ -28,11 +28,31 @@ class MarketplacePurchaseSlot extends StatelessWidget {
     if (food.recurringUnavailable) {
       return const SizedBox.shrink();
     }
-    if (food.isExpired) {
-      return TemporarilyUnavailableLabel(compact: compact, text: 'Out of stock');
+    final stockLabel = food.listingStockUnavailableLabel;
+    final fssaiPending = food.showFssaiPendingOnListing;
+    if (stockLabel != null && fssaiPending) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TemporarilyUnavailableLabel(compact: compact, text: stockLabel),
+          SizedBox(height: compact ? 2 : 4),
+          TemporarilyUnavailableLabel(
+            compact: compact,
+            text: 'FSSAI pending',
+          ),
+        ],
+      );
     }
-    if (!food.isRecurringReadyNow && food.quantity <= 0) {
-      return soldOut;
+    if (stockLabel != null) {
+      if (stockLabel == 'Sold out') return soldOut;
+      return TemporarilyUnavailableLabel(compact: compact, text: stockLabel);
+    }
+    if (!food.sellerAcceptingOrders) {
+      return TemporarilyUnavailableLabel(
+        compact: compact,
+        text: food.blockedBySellerFssai ? 'FSSAI pending' : 'Not taking orders',
+      );
     }
     if (cartQty == 0) {
       return addButton;

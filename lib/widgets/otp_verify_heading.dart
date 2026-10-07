@@ -6,11 +6,12 @@ const otpVerifyHeadingFontSize = 38.0;
 /// Reduced primary CTA height; still above a 44pt touch target.
 const otpVerifyButtonHeight = 48.0;
 
-/// Compact square OTP cells on web (centered row).
-const otpBoxSize = 44.0;
-const otpBoxGap = 8.0;
-const otpBoxBorderRadius = 10.0;
-const otpBoxFontSize = 18.0;
+/// Compact OTP cells on web (centered row). Height 2× legacy 44px; width 75% of height.
+const otpBoxHeight = 88.0;
+const otpBoxWidth = 66.0;
+const otpBoxGap = 16.0;
+const otpBoxBorderRadius = 20.0;
+const otpBoxFontSize = 36.0;
 
 /// Mobile uses full-width squares; gap between digit cells.
 const otpBoxGapMobile = 8.0;
@@ -19,11 +20,15 @@ const otpBoxGapMobile = 8.0;
 const otpIosAutofillBarGap = 52.0;
 
 class OtpVerifyHeading extends StatelessWidget {
-  const OtpVerifyHeading({super.key});
+  const OtpVerifyHeading({super.key, this.fontSize});
+
+  /// Defaults to [otpVerifyHeadingFontSize]; web OTP uses [otpVerifyHeadingFontSizeWeb].
+  final double? fontSize;
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    final size = fontSize ?? otpVerifyHeadingFontSize;
+    return SizedBox(
       width: double.infinity,
       child: FittedBox(
         fit: BoxFit.scaleDown,
@@ -32,9 +37,9 @@ class OtpVerifyHeading extends StatelessWidget {
           'Verify your number',
           maxLines: 1,
           style: TextStyle(
-            fontSize: otpVerifyHeadingFontSize,
+            fontSize: size,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF101617),
+            color: const Color(0xFF101617),
             height: 1.1,
           ),
         ),

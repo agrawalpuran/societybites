@@ -1,6 +1,24 @@
+const https = require("https");
+
 const logger = require("./logger");
 
 const BASE = "https://2factor.in/API/V1";
+
+let insecureTlsAgent;
+function twoFactorHttpsAgent() {
+  const insecure =
+    String(process.env.TWOFACTOR_TLS_INSECURE || "").trim().toLowerCase() ===
+    "true";
+  if (!insecure) return undefined;
+  if (!insecureTlsAgent) {
+    logger.warn(
+      "twofactor",
+      "TWOFACTOR_TLS_INSECURE=true — TLS verification disabled for 2Factor only (local dev)"
+    );
+    insecureTlsAgent = new https.Agent({ rejectUnauthorized: false });
+  }
+  return insecureTlsAgent;
+}
 
 function apiKey() {
   return process.env.TWOFACTOR_API_KEY || "";
@@ -10,15 +28,49 @@ function isConfigured() {
   return Boolean(apiKey());
 }
 
-async function getJson(url) {
-  const res = await fetch(url);
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    data = { Status: "Error", Details: "Invalid 2Factor response" };
+function smsReachabilityMessage(cause) {
+  const code = cause && cause.code ? String(cause.code) : "";
+  if (code === "SELF_SIGNED_CERT_IN_CHAIN" || code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE") {
+    return (
+      "Could not reach the SMS provider (TLS blocked by a corporate proxy). " +
+      "For local dev set NODE_EXTRA_CA_CERTS to your company root CA, or " +
+      "TWOFACTOR_TLS_INSECURE=true in .env (dev only)."
+    );
   }
-  return { ok: res.ok, data };
+  return "Could not reach the SMS provider. Check network access to 2factor.in.";
+}
+
+function getJson(url) {
+  return new Promise((resolve, reject) => {
+    const agent = twoFactorHttpsAgent();
+    const req = https.get(url, { agent }, (res) => {
+      let body = "";
+      res.on("data", (chunk) => {
+        body += chunk;
+      });
+      res.on("end", () => {
+        let data;
+        try {
+          data = JSON.parse(body);
+        } catch {
+          data = { Status: "Error", Details: "Invalid 2Factor response" };
+        }
+        resolve({
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          data,
+        });
+      });
+    });
+    req.on("error", (err) => {
+      logger.warn("twofactor", "HTTP request failed", {
+        message: err.message,
+        code: err.code,
+      });
+      const smsErr = new Error(smsReachabilityMessage(err));
+      smsErr.statusCode = 502;
+      reject(smsErr);
+    });
+  });
 }
 
 /**

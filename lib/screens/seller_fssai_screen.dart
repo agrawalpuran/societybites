@@ -235,6 +235,8 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
             onRemove: _removeDocument,
             sheetTitle: 'FSSAI document',
           ),
+          const SizedBox(height: 20),
+          _buildHelpSection(),
         ],
         const SizedBox(height: 16),
         if (_noDetailsNow && _showNoDetailsCheckbox)
@@ -427,6 +429,36 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
     }
   }
 
+  Widget _buildHelpSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Need help getting your FSSAI registration?',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        if (_fssai?.assistanceRequested == true)
+          const Text(
+            'FSSAI assistance requested',
+            style: TextStyle(
+              color: Color(0xFF0E5A47),
+              fontWeight: FontWeight.w600,
+            ),
+          )
+        else
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton(
+              onPressed: _requestAssistance,
+              child: const Text('Yes, I need help'),
+            ),
+          ),
+      ],
+    );
+  }
+
   Future<void> _requestAssistance() async {
     try {
       await ApiService.requestFssaiAssistance();
@@ -480,10 +512,16 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
                   : LayoutBuilder(
                       builder: (context, constraints) {
                         final hPad = constraints.maxWidth > 400 ? 20.0 : 16.0;
+                        final bottomInset = MediaQuery.paddingOf(context).bottom;
                         return ListView(
                           keyboardDismissBehavior:
                               ScrollViewKeyboardDismissBehavior.onDrag,
-                          padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 28),
+                          padding: EdgeInsets.fromLTRB(
+                            hPad,
+                            16,
+                            hPad,
+                            32 + bottomInset,
+                          ),
                           children: [
                     if (_fssai != null && !_fssai!.canSellDespiteFssai) ...[
                       _blockedBanner(),
@@ -502,26 +540,13 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
                           color: Color(0xFF6A7774),
                         ),
                       ),
+                      const SizedBox(height: 20),
+                      _buildHelpSection(),
                     ],
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Need help getting your FSSAI registration?',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 8),
-                    if (_fssai?.assistanceRequested == true)
-                      const Text(
-                        'FSSAI assistance requested',
-                        style: TextStyle(color: Color(0xFF0E5A47), fontWeight: FontWeight.w600),
-                      )
-                    else
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton(
-                          onPressed: _requestAssistance,
-                          child: const Text('Yes, I need help'),
-                        ),
-                      ),
+                    if (_fssai?.status == 'APPROVED') ...[
+                      const SizedBox(height: 8),
+                      _buildHelpSection(),
+                    ],
                           ],
                         );
                       },

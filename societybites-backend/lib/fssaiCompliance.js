@@ -11,6 +11,13 @@ const { isFssaiSellingRequirementEnabled } = require("./fssaiRequirement");
 
 const FSSAI_STATUSES = ["NOT_SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED"];
 const ASSISTANCE_STATUSES = ["NEW", "CONTACTED", "IN_PROGRESS", "COMPLETED"];
+
+/** Anonymized accounts kept for order history (phone `deleted_<userId>`). */
+function isDeletedMarketplaceUser(user) {
+  if (!user) return true;
+  const phone = String(user.phone || "");
+  return phone.startsWith("deleted_");
+}
 const REJECTION_PRESETS = [
   "Document unclear",
   "Registration number does not match",
@@ -111,11 +118,32 @@ async function getSellerFssaiStatus(userId) {
   return row ? row.status : "NOT_SUBMITTED";
 }
 
+function fssaiStatusAllowsEnableSelling(status) {
+  return status === "UNDER_REVIEW" || status === "APPROVED";
+}
+
+function canEnableSellingDespiteFssai(status, requirementEnabled) {
+  if (!requirementEnabled) return true;
+  return fssaiStatusAllowsEnableSelling(status || "NOT_SUBMITTED");
+}
+
 async function sellerCanReceiveOrders(userId) {
   const requirement = await isFssaiSellingRequirementEnabled();
   if (!requirement) return true;
   const status = await getSellerFssaiStatus(userId);
   return status === "APPROVED";
+}
+
+async function assertSellerFssaiForEnableSelling(userId) {
+  const requirement = await isFssaiSellingRequirementEnabled();
+  if (!requirement) return;
+  const status = await getSellerFssaiStatus(userId);
+  if (fssaiStatusAllowsEnableSelling(status)) return;
+  throw httpError(
+    400,
+    "Submit your FSSAI registration for review before enabling selling",
+    { code: "FSSAI_SUBMIT_REQUIRED" }
+  );
 }
 
 async function assertSellerCanReceiveOrders(userId) {
@@ -147,6 +175,10 @@ async function getMyFssai(user) {
     assistanceRequested: Boolean(assistance),
     assistanceStatus: assistance ? assistance.status : null,
     canSellDespiteFssai: !requirementEnabled || row.status === "APPROVED",
+    canEnableSellingDespiteFssai: canEnableSellingDespiteFssai(
+      row.status,
+      requirementEnabled
+    ),
   };
 }
 
@@ -292,21 +324,69 @@ async function requestFssaiAssistance(user) {
   });
 }
 
+const FSSAI_ADMIN_STATUS_SORT = {
+  UNDER_REVIEW: 0,
+  REJECTED: 1,
+  NOT_SUBMITTED: 2,
+  APPROVED: 3,
+};
+
+async function fetchActiveSellersWithFssai() {
+  const users = await prisma.user.findMany({
+    where: {
+      role: "seller",
+      suspended: false,
+    },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      role: true,
+      society: { select: { name: true, city: true } },
+      flat: { select: { flatNumber: true } },
+      sellerFssai: true,
+    },
+  });
+  return users.filter((user) => !isDeletedMarketplaceUser(user));
+}
+
+function serializeAdminFssaiSubmission(user) {
+  const row = user.sellerFssai;
+  const status = row?.status || "NOT_SUBMITTED";
+  return {
+    sellerId: user.id,
+    name: user.name || "Seller",
+    phone: user.phone || null,
+    role: user.role || null,
+    societyName: user.society?.name || null,
+    societyCity: user.society?.city || null,
+    flatNumber: user.flat?.flatNumber || null,
+    registrationNumber: row?.registrationNumber ?? null,
+    registeredName: row?.registeredName ?? null,
+    licenceExpiry: row?.licenceExpiry ?? null,
+    status,
+    submittedAt: row?.submittedAt ?? null,
+    reviewedAt: row?.reviewedAt ?? null,
+    rejectionReason: row?.rejectionReason ?? null,
+    hasDocument: Boolean(row?.documentStorageReference),
+    needsAssistance: Boolean(row?.needsAssistance),
+    detailsDeferred: Boolean(row?.detailsDeferred),
+  };
+}
+
 async function getAdminFssaiSummary() {
-  const [requirementEnabled, grouped, assistanceGrouped] = await Promise.all([
+  const [requirementEnabled, sellers, assistanceGrouped] = await Promise.all([
     isFssaiSellingRequirementEnabled(),
-    prisma.sellerFssai.groupBy({
-      by: ["status"],
-      _count: { _all: true },
-    }),
+    fetchActiveSellersWithFssai(),
     prisma.fssaiAssistanceRequest.groupBy({
       by: ["status"],
       _count: { _all: true },
     }),
   ]);
   const counts = Object.fromEntries(FSSAI_STATUSES.map((s) => [s, 0]));
-  for (const row of grouped) {
-    counts[row.status] = row._count._all;
+  for (const user of sellers) {
+    const st = user.sellerFssai?.status || "NOT_SUBMITTED";
+    counts[st] = (counts[st] || 0) + 1;
   }
   const assistance = { NEW: 0, CONTACTED: 0, IN_PROGRESS: 0, COMPLETED: 0 };
   for (const row of assistanceGrouped) {
@@ -321,44 +401,28 @@ async function getAdminFssaiSummary() {
 }
 
 async function listAdminFssaiSubmissions({ status } = {}) {
-  const where = {};
+  let normalized = null;
   if (status && status !== "ALL") {
-    const normalized = String(status).trim().toUpperCase();
+    normalized = String(status).trim().toUpperCase();
     if (!FSSAI_STATUSES.includes(normalized)) {
       throw httpError(400, "Invalid status filter");
     }
-    where.status = normalized;
   }
-  const rows = await prisma.sellerFssai.findMany({
-    where,
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          phone: true,
-          society: { select: { name: true } },
-        },
-      },
-    },
-    orderBy: [{ status: "asc" }, { submittedAt: "desc" }],
+  const sellers = await fetchActiveSellersWithFssai();
+  let records = sellers.map(serializeAdminFssaiSubmission);
+  if (normalized) {
+    records = records.filter((row) => row.status === normalized);
+  }
+  records.sort((a, b) => {
+    const pa = FSSAI_ADMIN_STATUS_SORT[a.status] ?? 9;
+    const pb = FSSAI_ADMIN_STATUS_SORT[b.status] ?? 9;
+    if (pa !== pb) return pa - pb;
+    const at = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+    const bt = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+    if (bt !== at) return bt - at;
+    return String(a.name || "").localeCompare(String(b.name || ""));
   });
-  return rows.map((row) => ({
-    sellerId: row.userId,
-    name: row.user?.name || "Seller",
-    phone: row.user?.phone || null,
-    societyName: row.user?.society?.name || null,
-    registrationNumber: row.registrationNumber,
-    registeredName: row.registeredName,
-    licenceExpiry: row.licenceExpiry,
-    status: row.status,
-    submittedAt: row.submittedAt,
-    reviewedAt: row.reviewedAt,
-    rejectionReason: row.rejectionReason,
-    hasDocument: Boolean(row.documentStorageReference),
-    needsAssistance: row.needsAssistance,
-    detailsDeferred: row.detailsDeferred,
-  }));
+  return records;
 }
 
 async function getAdminFssaiDocumentUrl(adminUser, sellerId) {
@@ -428,7 +492,7 @@ async function listAdminFssaiAssistance({ status } = {}) {
     },
     orderBy: { requestedAt: "desc" },
   });
-  return rows.map((row) => ({
+  return rows.filter((row) => !isDeletedMarketplaceUser(row.user)).map((row) => ({
     id: row.id,
     sellerId: row.userId,
     sellerName: row.user?.name || "Seller",
@@ -436,20 +500,125 @@ async function listAdminFssaiAssistance({ status } = {}) {
     societyName: row.society?.name || null,
     status: row.status,
     requestedAt: row.requestedAt,
+    updatedAt: row.updatedAt,
   }));
 }
 
-async function updateAdminFssaiAssistance(id, body) {
+function buildAssistanceAuditTrail(row, auditLogs) {
+  const trail = [
+    {
+      at: row.requestedAt,
+      kind: "CREATED",
+      label: "Seller requested FSSAI assistance",
+      actorName: row.user?.name || "Seller",
+    },
+  ];
+  for (const log of auditLogs || []) {
+    let details = {};
+    try {
+      details = JSON.parse(log.details || "{}");
+    } catch (_) {}
+    const from = details.from ? String(details.from) : null;
+    const to = details.to ? String(details.to) : null;
+    trail.push({
+      at: log.createdAt,
+      kind: "STATUS_CHANGE",
+      label:
+        from && to ? `Status: ${from} → ${to}` : to ? `Status set to ${to}` : "Status updated",
+      actorName: log.admin?.name || "Admin",
+    });
+  }
+  if (trail.length === 1 && row.updatedAt && row.requestedAt) {
+    const updatedMs = new Date(row.updatedAt).getTime();
+    const requestedMs = new Date(row.requestedAt).getTime();
+    if (updatedMs > requestedMs + 1000) {
+      trail.push({
+        at: row.updatedAt,
+        kind: "NOTE",
+        label: `Current status: ${row.status}`,
+        actorName: null,
+      });
+    }
+  }
+  return trail;
+}
+
+async function getAdminFssaiAssistanceDetail(id) {
+  const row = await prisma.fssaiAssistanceRequest.findUnique({
+    where: { id: String(id) },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          role: true,
+          society: { select: { name: true, city: true } },
+          flat: { select: { flatNumber: true } },
+        },
+      },
+      society: { select: { name: true } },
+    },
+  });
+  if (!row) throw httpError(404, "Assistance request not found");
+
+  const fssai = await prisma.sellerFssai.findUnique({ where: { userId: row.userId } });
+  const auditLogs = await prisma.auditLog.findMany({
+    where: { action: "FSSAI_ASSISTANCE_STATUS", target: row.id },
+    include: { admin: { select: { name: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return {
+    id: row.id,
+    sellerId: row.userId,
+    sellerName: row.user?.name || "Seller",
+    phone: row.user?.phone || null,
+    role: row.user?.role || null,
+    societyName: row.user?.society?.name || row.society?.name || null,
+    societyCity: row.user?.society?.city || null,
+    flatNumber: row.user?.flat?.flatNumber || null,
+    status: row.status,
+    requestedAt: row.requestedAt,
+    updatedAt: row.updatedAt,
+    fssaiStatus: fssai?.status || "NOT_SUBMITTED",
+    fssaiRegistrationNumber: fssai?.registrationNumber || null,
+    fssaiRegisteredName: fssai?.registeredName || null,
+    detailsDeferred: Boolean(fssai?.detailsDeferred),
+    auditTrail: buildAssistanceAuditTrail(row, auditLogs),
+  };
+}
+
+async function updateAdminFssaiAssistance(id, body, adminUser) {
   const status = body && body.status != null ? String(body.status).trim().toUpperCase() : "";
   if (!ASSISTANCE_STATUSES.includes(status)) {
     throw httpError(400, "Invalid assistance status");
   }
   const row = await prisma.fssaiAssistanceRequest.findUnique({ where: { id: String(id) } });
   if (!row) throw httpError(404, "Assistance request not found");
-  return prisma.fssaiAssistanceRequest.update({
+  if (row.status !== status && adminUser && adminUser.id) {
+    await prisma.auditLog.create({
+      data: {
+        adminId: adminUser.id,
+        action: "FSSAI_ASSISTANCE_STATUS",
+        target: row.id,
+        details: JSON.stringify({
+          from: row.status,
+          to: status,
+          userId: row.userId,
+        }),
+      },
+    });
+  }
+  const updated = await prisma.fssaiAssistanceRequest.update({
     where: { id: row.id },
     data: { status },
+    include: {
+      user: { select: { id: true, name: true, phone: true } },
+      society: { select: { name: true } },
+    },
   });
+  return updated;
 }
 
 async function statusesForSellerIds(sellerIds) {
@@ -472,8 +641,11 @@ module.exports = {
   serializeSellerFssai,
   ensureSellerFssaiRow,
   getSellerFssaiStatus,
+  fssaiStatusAllowsEnableSelling,
+  canEnableSellingDespiteFssai,
   sellerCanReceiveOrders,
   assertSellerCanReceiveOrders,
+  assertSellerFssaiForEnableSelling,
   getMyFssai,
   uploadMyFssaiDocument,
   submitMyFssai,
@@ -487,6 +659,7 @@ module.exports = {
   approveAdminFssai,
   rejectAdminFssai,
   listAdminFssaiAssistance,
+  getAdminFssaiAssistanceDetail,
   updateAdminFssaiAssistance,
   statusesForSellerIds,
 };

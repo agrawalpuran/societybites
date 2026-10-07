@@ -1,9 +1,14 @@
 require("dotenv").config();
 const http = require("http");
 const express = require("express");
+const crypto = require("crypto");
 const prisma = require("../lib/prisma");
 const { signToken } = require("../lib/jwt");
 const { SELLER_TERMS_VERSION } = require("../lib/sellerTerms");
+const {
+  isFssaiSellingRequirementEnabled,
+  setFssaiSellingRequirement,
+} = require("../lib/fssaiRequirement");
 const authRoutes = require("../routes/auth");
 
 const BUYER_PHONE = "+919800000201";
@@ -53,13 +58,18 @@ function jsonRequest(server, { method, path, token, body }) {
 async function main() {
   assert(SELLER_TERMS_VERSION === "1.0", "canonical seller terms version is 1.0");
 
+  const requirementBeforeTests = await isFssaiSellingRequirementEnabled();
   const created = [];
   const app = express();
   app.use(express.json());
   app.use("/auth", authRoutes);
   app.use((err, req, res, next) => {
     const statusCode = err.statusCode || 500;
-    res.status(statusCode).json({ error: err.message });
+    const payload = { error: err.message };
+    if (typeof err.code === "string" && err.code.length > 0) {
+      payload.code = err.code;
+    }
+    res.status(statusCode).json(payload);
   });
   const server = await new Promise((resolve) => {
     const s = http.createServer(app);
@@ -67,6 +77,7 @@ async function main() {
   });
 
   try {
+    await setFssaiSellingRequirement(false);
     const buyer = await prisma.user.upsert({
       where: { phone: BUYER_PHONE },
       update: { role: "buyer", paymentPreference: "UPI_AND_COD", suspended: false },
@@ -81,6 +92,7 @@ async function main() {
     await prisma.sellerTermsAcceptance.deleteMany({
       where: { userId: { in: created } },
     });
+    await prisma.sellerFssai.deleteMany({ where: { userId: { in: created } } });
 
     const buyerToken = signToken(buyer);
     const sellerToken = signToken(seller);
@@ -139,8 +151,34 @@ async function main() {
       "missing proof message"
     );
 
-    const before = Date.now();
     const proofUrl = "https://example.com/address-proofs/buyer-proof.jpg";
+
+    await setFssaiSellingRequirement(true);
+    const fssaiBlocked = await jsonRequest(server, {
+      method: "POST",
+      path: "/auth/me/seller-terms",
+      token: buyerToken,
+      body: {
+        termsVersion: "1.0",
+        paymentPreference: "UPI_ONLY",
+        addressProofUrl: proofUrl,
+      },
+    });
+    assert(fssaiBlocked.status === 400, `FSSAI gate: ${fssaiBlocked.status}`);
+    assert(fssaiBlocked.json.code === "FSSAI_SUBMIT_REQUIRED", "fssai submit code");
+    const stillBuyerAfterFssai = await prisma.user.findUnique({ where: { id: buyer.id } });
+    assert(stillBuyerAfterFssai.role === "buyer", "FSSAI gate keeps buyer role");
+
+    await prisma.sellerFssai.create({
+      data: {
+        id: crypto.randomUUID(),
+        userId: buyer.id,
+        status: "UNDER_REVIEW",
+        submittedAt: new Date(),
+      },
+    });
+
+    const before = Date.now();
     const accepted = await jsonRequest(server, {
       method: "POST",
       path: "/auth/me/seller-terms",
@@ -194,14 +232,18 @@ async function main() {
   } finally {
     server.close();
     if (created.length) {
+      await prisma.sellerFssai.deleteMany({ where: { userId: { in: created } } });
       await prisma.sellerTermsAcceptance.deleteMany({ where: { userId: { in: created } } });
       await prisma.user.deleteMany({ where: { id: { in: created } } });
     }
+    await setFssaiSellingRequirement(requirementBeforeTests);
     await prisma.$disconnect();
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

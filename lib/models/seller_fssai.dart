@@ -12,6 +12,7 @@ class SellerFssaiRegistration {
     this.requirementEnabled = false,
     this.assistanceRequested = false,
     this.canSellDespiteFssai = true,
+    this.canEnableSellingDespiteFssai = true,
     this.detailsDeferred = false,
   });
 
@@ -27,6 +28,7 @@ class SellerFssaiRegistration {
   final bool requirementEnabled;
   final bool assistanceRequested;
   final bool canSellDespiteFssai;
+  final bool canEnableSellingDespiteFssai;
   final bool detailsDeferred;
 
   static const statusLabels = <String, String>{
@@ -52,6 +54,8 @@ class SellerFssaiRegistration {
       requirementEnabled: json['requirementEnabled'] == true,
       assistanceRequested: json['assistanceRequested'] == true,
       canSellDespiteFssai: json['canSellDespiteFssai'] != false,
+      canEnableSellingDespiteFssai:
+          json['canEnableSellingDespiteFssai'] != false,
       detailsDeferred: json['detailsDeferred'] == true,
     );
   }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
-import '../../widgets/screen_loading_note.dart';
+import '../../widgets/admin_loading_panel.dart';
 import 'admin_city_reach_screen.dart';
 import 'admin_fssai_screen.dart';
 
@@ -107,7 +107,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const ScreenLoadingNote(message: 'Loading overview…');
+      return const AdminLoadingPanel(message: 'Loading overview…');
     }
 
     if (_error != null) {

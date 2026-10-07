@@ -91,6 +91,26 @@ class SellingReach {
     }
   }
 
+  /// Short helper shown during seller setup so choices are easy to compare.
+  String setupHintFor(SellingReachLevel level) {
+    switch (level) {
+      case SellingReachLevel.mySociety:
+        return 'Only residents of your society can discover and order from you.';
+      case SellingReachLevel.nearby:
+        if (!nearbyAvailable) {
+          return 'Your city has not enabled nearby reach yet.';
+        }
+        return 'Residents in your society plus buyers within '
+            '${formatReachRadiusKm(nearbyRadiusKm!)} km of your society.';
+      case SellingReachLevel.extended:
+        if (!extendedAvailable) {
+          return 'Your city has not enabled extended reach yet.';
+        }
+        return 'Widest reach: buyers within '
+            '${formatReachRadiusKm(extendedRadiusKm!)} km of your society.';
+    }
+  }
+
   bool isSelectable(SellingReachLevel level) {
     switch (level) {
       case SellingReachLevel.mySociety:

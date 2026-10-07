@@ -21,8 +21,23 @@ async function setFssaiSellingRequirement(enabled) {
   return enabled;
 }
 
+/**
+ * Integration tests mutate this global AppSetting. Always restore the value that
+ * was present before the test run when using a shared dev/staging database.
+ */
+async function withFssaiSellingRequirement(enabled, fn) {
+  const previous = await isFssaiSellingRequirementEnabled();
+  await setFssaiSellingRequirement(enabled);
+  try {
+    return await fn();
+  } finally {
+    await setFssaiSellingRequirement(previous);
+  }
+}
+
 module.exports = {
   FSSAI_REQUIREMENT_KEY,
   isFssaiSellingRequirementEnabled,
   setFssaiSellingRequirement,
+  withFssaiSellingRequirement,
 };

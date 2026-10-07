@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../models/seller_fssai.dart';
 import '../../services/api_service.dart';
-import '../../widgets/screen_loading_note.dart';
+import '../../widgets/admin_loading_panel.dart';
+import 'admin_fssai_assistance_detail_screen.dart';
+import 'admin_fssai_submission_detail_screen.dart';
 
 class AdminFssaiScreen extends StatefulWidget {
   const AdminFssaiScreen({super.key});
@@ -62,55 +65,46 @@ class _AdminFssaiScreenState extends State<AdminFssaiScreen> {
     }
   }
 
-  Future<void> _openDocument(String sellerId) async {
-    try {
-      final url = await ApiService.getAdminFssaiDocumentUrl(sellerId);
-      if (!mounted) return;
-      await showDialog(
-        context: context,
-        builder: (ctx) => Dialog(
-          child: InteractiveViewer(
-            child: Image.network(url, fit: BoxFit.contain),
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open document: $e')),
-      );
-    }
-  }
-
-  Future<void> _reject(String sellerId) async {
-    final controller = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Reject FSSAI'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Rejection reason'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Reject'),
-          ),
-        ],
+  Future<void> _openAssistance(Map<String, dynamic> row) async {
+    final id = row['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdminFssaiAssistanceDetailScreen(assistanceId: id),
       ),
     );
-    controller.dispose();
-    if (reason == null || reason.isEmpty) return;
-    await ApiService.rejectAdminFssai(sellerId, rejectionReason: reason);
     await _load();
+  }
+
+  Future<void> _openSubmission(Map<String, dynamic> row) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdminFssaiSubmissionDetailScreen(submission: row),
+      ),
+    );
+    if (changed == true) await _load();
+  }
+
+  String _submissionSubtitle(Map<String, dynamic> row) {
+    final status = row['status']?.toString() ?? '';
+    final society = row['societyName']?.toString() ?? '—';
+    final phone = row['phone']?.toString();
+    final reg = row['registrationNumber']?.toString();
+    final parts = <String>[society];
+    if (phone != null && phone.isNotEmpty) parts.add(phone);
+    if (reg != null && reg.isNotEmpty) parts.add('Licence: $reg');
+    if (status == 'NOT_SUBMITTED' && row['detailsDeferred'] == true) {
+      parts.add('Deferred');
+    }
+    return parts.join(' · ');
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const ScreenLoadingNote(message: 'Loading FSSAI…');
+      return const AdminLoadingPanel(message: 'Loading FSSAI…');
     }
     final submissions = _summary?['submissions'] as Map? ?? {};
     return RefreshIndicator(
@@ -129,61 +123,191 @@ class _AdminFssaiScreenState extends State<AdminFssaiScreen> {
             'Approved: ${submissions['APPROVED'] ?? 0} · '
             'Rejected: ${submissions['REJECTED'] ?? 0}',
           ),
+          const SizedBox(height: 8),
+          const Text(
+            'Tap a row to view seller and licence details, open the document, '
+            'and approve or reject.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF6A7774), height: 1.35),
+          ),
           const SizedBox(height: 16),
           const Text('Submissions', style: TextStyle(fontWeight: FontWeight.w800)),
           for (final row in _records)
             Card(
-              child: ListTile(
-                title: Text(row['name']?.toString() ?? 'Seller'),
-                subtitle: Text(
-                  '${row['societyName'] ?? '—'} · ${row['status']}\n'
-                  '${row['registeredName'] ?? '—'} · ${row['registrationNumber'] ?? '—'}',
-                ),
-                trailing: row['status'] == 'UNDER_REVIEW'
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (row['hasDocument'] == true)
-                            IconButton(
-                              icon: const Icon(Icons.image_outlined),
-                              onPressed: () =>
-                                  _openDocument(row['sellerId'].toString()),
+              margin: const EdgeInsets.only(top: 8),
+              child: InkWell(
+                onTap: () => _openSubmission(row),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              row['name']?.toString() ?? 'Seller',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
                             ),
-                          TextButton(
-                            onPressed: () =>
-                                ApiService.approveAdminFssai(row['sellerId'].toString())
-                                    .then((_) => _load()),
-                            child: const Text('Approve'),
-                          ),
-                          TextButton(
-                            onPressed: () => _reject(row['sellerId'].toString()),
-                            child: const Text('Reject'),
-                          ),
-                        ],
-                      )
-                    : null,
+                            const SizedBox(height: 4),
+                            Text(
+                              _submissionSubtitle(row),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF6A7774),
+                                height: 1.35,
+                              ),
+                            ),
+                            if (row['registeredName'] != null &&
+                                row['registeredName'].toString().isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'On licence: ${row['registeredName']}',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _StatusChip(status: row['status']?.toString() ?? ''),
+                      const Icon(Icons.chevron_right, color: Color(0xFF8A9491)),
+                    ],
+                  ),
+                ),
               ),
             ),
           const SizedBox(height: 16),
           const Text('FSSAI assistance', style: TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          const Text(
+            'Tap a request for seller details and the audit trail.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF6A7774), height: 1.35),
+          ),
           for (final row in _assistance)
-            ListTile(
-              title: Text(row['sellerName']?.toString() ?? 'Seller'),
-              subtitle: Text('${row['societyName'] ?? '—'} · ${row['status']}'),
-              trailing: PopupMenuButton<String>(
-                onSelected: (status) => ApiService.updateAdminFssaiAssistance(
-                  row['id'].toString(),
-                  status: status,
-                ).then((_) => _load()),
-                itemBuilder: (ctx) => const [
-                  PopupMenuItem(value: 'NEW', child: Text('NEW')),
-                  PopupMenuItem(value: 'CONTACTED', child: Text('CONTACTED')),
-                  PopupMenuItem(value: 'IN_PROGRESS', child: Text('IN PROGRESS')),
-                  PopupMenuItem(value: 'COMPLETED', child: Text('COMPLETED')),
-                ],
+            Card(
+              margin: const EdgeInsets.only(top: 8),
+              child: InkWell(
+                onTap: () => _openAssistance(row),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              row['sellerName']?.toString() ?? 'Seller',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${row['societyName'] ?? '—'} · ${row['phone'] ?? '—'}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF6A7774),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _AssistanceStatusChip(
+                        status: row['status']?.toString() ?? 'NEW',
+                      ),
+                      const Icon(Icons.chevron_right, color: Color(0xFF8A9491)),
+                    ],
+                  ),
+                ),
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _AssistanceStatusChip extends StatelessWidget {
+  const _AssistanceStatusChip({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    String label;
+    switch (status) {
+      case 'CONTACTED':
+        label = 'Contacted';
+      case 'IN_PROGRESS':
+        label = 'In progress';
+      case 'COMPLETED':
+        label = 'Done';
+      default:
+        label = 'New';
+    }
+    return Container(
+      margin: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F0FF),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF1A4FA3),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = SellerFssaiRegistration.statusLabels[status] ?? status;
+    Color bg;
+    Color fg;
+    switch (status) {
+      case 'UNDER_REVIEW':
+        bg = const Color(0xFFFFF4E5);
+        fg = const Color(0xFF8A5A00);
+      case 'APPROVED':
+        bg = const Color(0xFFE8F5EE);
+        fg = const Color(0xFF0E5A47);
+      case 'REJECTED':
+        bg = const Color(0xFFFDECEC);
+        fg = const Color(0xFFC62828);
+      default:
+        bg = const Color(0xFFF0F2F1);
+        fg = const Color(0xFF6A7774);
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
       ),
     );
   }

@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../models/coupon.dart';
 import '../../services/api_service.dart';
 import '../../web/web_page_frame.dart';
-import '../../widgets/screen_loading_note.dart';
+import '../../widgets/admin_loading_panel.dart';
 import 'admin_coupon_seller_payouts_screen.dart';
 
 const _green = Color(0xFF0E5A47);
@@ -164,7 +164,7 @@ class _AdminCouponsScreenState extends State<AdminCouponsScreen>
         ),
         Expanded(
           child: _loading
-              ? const ScreenLoadingNote(message: 'Loading coupons…')
+              ? const AdminLoadingPanel(message: 'Loading coupons…')
               : _error != null
                   ? Center(
                       child: Padding(
@@ -517,7 +517,10 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
           title: Text(_editing ? (_coupon?.code ?? 'Coupon') : 'New coupon'),
         ),
         body: _loading
-            ? const ScreenLoadingNote(message: 'Loading coupon…')
+            ? const AdminLoadingPanel(
+                message: 'Loading coupon…',
+                showSkeleton: false,
+              )
             : ListView(
                 key: const Key('coupon-editor-list'),
                 padding: const EdgeInsets.all(16),

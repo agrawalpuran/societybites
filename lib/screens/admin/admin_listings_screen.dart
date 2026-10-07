@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../widgets/admin_loading_panel.dart';
 import '../../widgets/screen_loading_note.dart';
 
 class AdminListingsScreen extends StatefulWidget {
@@ -161,7 +162,7 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
   Widget _buildContent() {
     if (_isLoading && _listings.isEmpty) {
-      return const ScreenLoadingNote(message: 'Loading listings…');
+      return const AdminLoadingPanel(message: 'Loading listings…');
     }
     if (_error != null && _listings.isEmpty) {
       return Center(

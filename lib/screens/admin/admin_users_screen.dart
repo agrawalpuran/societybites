@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../widgets/admin_loading_panel.dart';
 import '../../widgets/screen_loading_note.dart';
 
 class AdminUsersScreen extends StatefulWidget {

@@ -239,6 +239,71 @@ class FoodItem {
     return quantity > 0;
   }
 
+  bool get blockedBySellerFssai {
+    if (sellerAcceptingOrders) return false;
+    final reason = sellerOrderBlockReason?.toLowerCase() ?? '';
+    return reason.contains('fssai');
+  }
+
+  /// Snackbar / dialog when [canAddToCart] is false (not always stock-related).
+  String addToCartBlockedMessage() {
+    if (!sellerAcceptingOrders) {
+      if (blockedBySellerFssai) {
+        return '$sellerName is not taking orders until FSSAI registration is '
+            'approved by SocietyBites.';
+      }
+      final reason = sellerOrderBlockReason?.trim();
+      if (reason != null && reason.isNotEmpty) {
+        return '$sellerName is not taking orders right now ($reason).';
+      }
+      return '$sellerName is not taking orders right now.';
+    }
+    if (isExpired) return '$name is out of stock.';
+    if (recurringUnavailable) {
+      if (recurringWindowLabel.isNotEmpty) {
+        return '$name is not available now. Available ${recurringWindowLabel}.';
+      }
+      if (recurringNextLabel.isNotEmpty) {
+        return '$name is not available now. $recurringNextLabel';
+      }
+      return '$name is not available now.';
+    }
+    if (madeToOrderUnavailableToday) {
+      return '$name is currently unavailable.';
+    }
+    return '$name is sold out.';
+  }
+
+  /// Stock or item-level block shown beside price on listing cards.
+  String? get listingStockUnavailableLabel {
+    if (isExpired) return 'Out of stock';
+    if (madeToOrderUnavailableToday) return 'Unavailable';
+    if (!isRecurringReadyNow && quantity <= 0) return 'Sold out';
+    return null;
+  }
+
+  bool get showFssaiPendingOnListing =>
+      !sellerAcceptingOrders && blockedBySellerFssai;
+
+  /// Primary action label on listing detail when ordering is blocked.
+  String get orderActionLabel {
+    if (isKitchenClosed) return 'Kitchen closed';
+    final fssaiPending = showFssaiPendingOnListing;
+    if (fssaiPending && recurringUnavailable) {
+      return 'FSSAI approval pending';
+    }
+    if (recurringUnavailable) return 'Not available now';
+    final stock = listingStockUnavailableLabel;
+    if (fssaiPending && stock != null) {
+      return '$stock · FSSAI pending';
+    }
+    if (!sellerAcceptingOrders) {
+      return blockedBySellerFssai ? 'FSSAI approval pending' : 'Not taking orders';
+    }
+    if (stock != null) return stock;
+    return 'Order now';
+  }
+
   /// Human-readable pickup / seller location for cards and detail.
   String get locationLabel {
     final parts = <String>[];

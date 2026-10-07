@@ -2,7 +2,8 @@ const { serializeListing } = require("../utils/listingSerializer");
 const { isFssaiSellingRequirementEnabled } = require("./fssaiRequirement");
 const { statusesForSellerIds } = require("./fssaiCompliance");
 
-const FSSAI_BLOCK_REASON = "FSSAI registration required";
+const FSSAI_BLOCK_REASON =
+  "FSSAI registration must be approved before this seller can receive orders";
 
 async function serializeListingsWithSellerOrderability(listings) {
   const list = Array.isArray(listings) ? listings : [];

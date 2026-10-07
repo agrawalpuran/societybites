@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../web/admin_content_frame.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_societies_screen.dart';
 import 'admin_fssai_screen.dart';
@@ -19,6 +20,7 @@ class AdminShellScreen extends StatefulWidget {
 
 class _AdminShellScreenState extends State<AdminShellScreen> {
   int _selectedIndex = 0;
+  late final List<Widget?> _pageCache;
 
   static const _navItems = <_NavItem>[
     _NavItem(icon: Icons.dashboard_rounded, label: 'Dashboard'),
@@ -32,8 +34,15 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     _NavItem(icon: Icons.history_rounded, label: 'Audit Log'),
   ];
 
-  Widget _buildBody() {
-    switch (_selectedIndex) {
+  @override
+  void initState() {
+    super.initState();
+    _pageCache = List<Widget?>.filled(_navItems.length, null);
+    _pageCache[0] = _createPage(0);
+  }
+
+  Widget _createPage(int index) {
+    switch (index) {
       case 0:
         return const AdminDashboardScreen();
       case 1:
@@ -57,6 +66,24 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     }
   }
 
+  void _selectTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+      _pageCache[index] ??= _createPage(index);
+    });
+  }
+
+  Widget _buildBody() {
+    return IndexedStack(
+      index: _selectedIndex,
+      sizing: StackFit.expand,
+      children: List.generate(
+        _navItems.length,
+        (i) => _pageCache[i] ?? const SizedBox.shrink(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -71,10 +98,12 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                 _SideNav(
                   items: _navItems,
                   selectedIndex: _selectedIndex,
-                  onSelected: (i) => setState(() => _selectedIndex = i),
+                  onSelected: _selectTab,
                   onBack: () => Navigator.pop(context),
                 ),
-                Expanded(child: _buildBody()),
+                Expanded(
+                  child: AdminContentFrame(child: _buildBody()),
+                ),
               ],
             ),
           );
@@ -94,7 +123,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
               onPressed: () => Navigator.pop(context),
             ),
           ),
-          body: _buildBody(),
+          body: AdminContentFrame(child: _buildBody()),
           bottomNavigationBar: Material(
             color: Colors.white,
             child: SafeArea(
@@ -110,7 +139,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                         ? const Color(0xFF0E5A47)
                         : const Color(0xFF8A9491);
                     return InkWell(
-                      onTap: () => setState(() => _selectedIndex = index),
+                      onTap: () => _selectTab(index),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         child: Column(

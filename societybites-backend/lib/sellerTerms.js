@@ -1,3 +1,4 @@
+const { assertSellerFssaiForEnableSelling } = require("./fssaiCompliance");
 const { assertSellerSellingReachLevel } = require("./sellingReach");
 const { assertSellerFulfilmentUpdate } = require("./sellerFulfilment");
 const { assertSellerPaymentPreferenceUpdate, DEFAULT_PAYMENT_PREFERENCE } = require("./sellerPaymentPreference");
@@ -51,6 +52,9 @@ async function acceptSellerTermsAndEnable({ prisma, user, body }) {
 
   const enablingRole = user.role === "super_admin" ? "super_admin" : "seller";
   const becomingSeller = user.role !== "seller" && user.role !== "super_admin";
+  if (becomingSeller) {
+    await assertSellerFssaiForEnableSelling(user.id);
+  }
   const data = {};
   if (becomingSeller) {
     data.role = "seller";

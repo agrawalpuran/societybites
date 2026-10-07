@@ -120,8 +120,13 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       foodType: widget.foodTypeFilter,
     );
     if (!widget.showOnlyOrderable) return matched;
-    return matched.where((item) => item.canAddToCart).toList();
+    return matched
+        .where((item) => item.canAddToCart || item.blockedBySellerFssai)
+        .toList();
   }
+
+  bool get _storefrontBlockedByFssai =>
+      _products.any((item) => item.blockedBySellerFssai);
 
   @override
   void initState() {
@@ -295,17 +300,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       return;
     }
     if (delta > 0 && !food.canAddToCart) {
-      _show(
-        food.isExpired
-            ? '${food.name} is out of stock.'
-            : food.recurringUnavailable
-            ? (food.recurringWindowLabel.isNotEmpty
-                  ? '${food.name} is not available now. Available ${food.recurringWindowLabel}.'
-                  : '${food.name} is not available now.')
-            : food.madeToOrderUnavailableToday
-            ? '${food.name} is currently unavailable.'
-            : '${food.name} is sold out.',
-      );
+      _show(food.addToCartBlockedMessage());
       return;
     }
     if (delta > 0) {
@@ -503,10 +498,14 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                 ] else if (_visibleProducts.isEmpty && _campaigns.isEmpty) ...[
                   const SizedBox(height: 24),
                   PreOrderEmptyState(
-                    title: widget.showOnlyOrderable
+                    title: _storefrontBlockedByFssai
+                        ? 'FSSAI approval pending'
+                        : widget.showOnlyOrderable
                         ? 'Not selling right now'
                         : 'Nothing available right now',
-                    message: widget.showOnlyOrderable
+                    message: _storefrontBlockedByFssai
+                        ? '${widget.seller.name} is not taking orders until FSSAI registration is approved.'
+                        : widget.showOnlyOrderable
                         ? '${widget.seller.name} is not selling right now.'
                         : 'This seller has no items available right now.',
                   ),

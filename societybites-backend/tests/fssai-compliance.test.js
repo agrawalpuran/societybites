@@ -10,7 +10,10 @@ const adminRoutes = require("../routes/admin");
 const fssaiRoutes = require("../routes/fssai");
 const orderRoutes = require("../routes/orders");
 const listingRoutes = require("../routes/listings");
-const { setFssaiSellingRequirement } = require("../lib/fssaiRequirement");
+const {
+  isFssaiSellingRequirementEnabled,
+  setFssaiSellingRequirement,
+} = require("../lib/fssaiRequirement");
 
 const SELLER_PHONE = "+919800000301";
 const SELLER2_PHONE = "+919800000302";
@@ -59,7 +62,7 @@ function jsonRequest(server, { method, path, token, body }) {
 }
 
 async function main() {
-  await setFssaiSellingRequirement(false);
+  const requirementBeforeTests = await isFssaiSellingRequirementEnabled();
 
   const app = express();
   app.use(express.json());
@@ -79,6 +82,7 @@ async function main() {
   const created = { users: [], listings: [], orders: [] };
 
   try {
+    await setFssaiSellingRequirement(false);
     const society = await prisma.society.findFirst();
     assert(society, "seed society required");
 
@@ -339,8 +343,6 @@ async function main() {
     const countAfter = await prisma.listing.count({ where: { sellerId: seller2.id } });
     assert(countAfter >= 1, "listings not deleted");
 
-    await setFssaiSellingRequirement(false);
-
     console.log("fssai compliance ok");
   } finally {
     server.close();
@@ -356,11 +358,14 @@ async function main() {
       await prisma.sellerFssai.deleteMany({ where: { userId: { in: created.users } } });
       await prisma.user.deleteMany({ where: { id: { in: created.users } } });
     }
-    await setFssaiSellingRequirement(false);
+    await setFssaiSellingRequirement(requirementBeforeTests);
+    await prisma.$disconnect();
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

@@ -296,12 +296,12 @@ class _OtpScreenState extends State<OtpScreen> {
           _verificationId = verificationId;
         },
       );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'We could not resend the OTP. Check your connection and try again.',
+            'We could not resend the OTP. ${ApiService.userFacingError(e)}',
           ),
         ),
       );
@@ -471,11 +471,14 @@ class _OtpScreenState extends State<OtpScreen> {
               ),
               const SizedBox(height: 24),
               Center(
-                child: _OtpDigitRow(
-                  compact: true,
-                  controllers: _controllers,
-                  focusNodes: _focusNodes,
-                  onChanged: _onOtpChanged,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: _OtpDigitRow(
+                    compact: true,
+                    controllers: _controllers,
+                    focusNodes: _focusNodes,
+                    onChanged: _onOtpChanged,
+                  ),
                 ),
               ),
               const SizedBox(height: 22),
@@ -628,7 +631,8 @@ class _OtpDigitRow extends StatelessWidget {
             for (var index = 0; index < kOtpLength; index++) ...[
               if (index > 0) const SizedBox(width: otpBoxGap),
               _OtpInputBox(
-                boxSize: otpBoxSize,
+                boxWidth: otpBoxWidth,
+                boxHeight: otpBoxHeight,
                 fontSize: otpBoxFontSize,
                 borderRadius: otpBoxBorderRadius,
                 controller: controllers[index],
@@ -688,6 +692,8 @@ class _OtpInputBox extends StatelessWidget {
     required this.fontSize,
     required this.borderRadius,
     this.boxSize,
+    this.boxWidth,
+    this.boxHeight,
     this.autoFocus = false,
     this.enableOtpAutofill = false,
   });
@@ -699,6 +705,8 @@ class _OtpInputBox extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final bool isPrimary;
   final double? boxSize;
+  final double? boxWidth;
+  final double? boxHeight;
   final double fontSize;
   final double borderRadius;
 
@@ -755,6 +763,9 @@ class _OtpInputBox extends StatelessWidget {
     if (boxSize != null) {
       return SizedBox(width: boxSize, height: boxSize, child: field);
     }
+    if (boxWidth != null && boxHeight != null) {
+      return SizedBox(width: boxWidth, height: boxHeight, child: field);
+    }
     return field;
   }
 }
@@ -763,16 +774,22 @@ class _PrimaryActionButton extends StatelessWidget {
   const _PrimaryActionButton({
     required this.onTap,
     required this.isLoading,
+    this.height,
+    this.labelFontSize = 16,
+    this.iconSize = 18,
   });
 
   final VoidCallback? onTap;
   final bool isLoading;
+  final double? height;
+  final double labelFontSize;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: otpVerifyButtonHeight,
+      height: height ?? otpVerifyButtonHeight,
       child: ElevatedButton(
         key: const Key('otp-verify-continue'),
         onPressed: onTap,
@@ -794,21 +811,21 @@ class _PrimaryActionButton extends StatelessWidget {
                   color: Colors.white,
                 ),
               )
-            : const Row(
+            : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     'Verify & continue',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: labelFontSize,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.15,
                       height: 1.2,
                     ),
                   ),
-                  SizedBox(width: 6),
-                  Icon(Icons.arrow_forward_rounded, size: 18),
+                  SizedBox(width: iconSize * 0.35),
+                  Icon(Icons.arrow_forward_rounded, size: iconSize),
                 ],
               ),
       ),
@@ -821,11 +838,19 @@ class _ResendOtpButton extends StatelessWidget {
     required this.onTap,
     required this.isLoading,
     required this.secondsRemaining,
+    this.labelFontSize = 16,
+    this.iconSize = 18,
+    this.horizontalPadding = 24,
+    this.verticalPadding = 12,
   });
 
   final VoidCallback? onTap;
   final bool isLoading;
   final int secondsRemaining;
+  final double labelFontSize;
+  final double iconSize;
+  final double horizontalPadding;
+  final double verticalPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -835,25 +860,32 @@ class _ResendOtpButton extends StatelessWidget {
         backgroundColor: Colors.white,
         side: BorderSide.none,
         shape: const StadiumBorder(),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        padding: EdgeInsets.symmetric(
+          horizontal: horizontalPadding,
+          vertical: verticalPadding,
+        ),
       ),
       icon: isLoading
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
+          ? SizedBox(
+              width: iconSize,
+              height: iconSize,
+              child: const CircularProgressIndicator(strokeWidth: 2),
             )
-          : const Icon(Icons.refresh_rounded, color: Color(0xFF0E5A47)),
+          : Icon(
+              Icons.refresh_rounded,
+              color: const Color(0xFF0E5A47),
+              size: iconSize,
+            ),
       label: Text(
         isLoading
             ? 'Resending...'
             : secondsRemaining > 0
             ? 'Resend OTP in ${secondsRemaining}s'
             : 'Resend OTP',
-        style: const TextStyle(
-          color: Color(0xFF0E5A47),
+        style: TextStyle(
+          color: const Color(0xFF0E5A47),
           fontWeight: FontWeight.w700,
-          fontSize: 16,
+          fontSize: labelFontSize,
         ),
       ),
     );
@@ -861,55 +893,65 @@ class _ResendOtpButton extends StatelessWidget {
 }
 
 class _SecurityInfoCard extends StatelessWidget {
-  const _SecurityInfoCard();
+  const _SecurityInfoCard({this.large = false});
+
+  final bool large;
 
   @override
   Widget build(BuildContext context) {
+    final iconBox = large ? 104.0 : 52.0;
+    final iconSize = large ? 56.0 : 28.0;
+    final titleSize = large ? 38.0 : 19.0;
+    final bodySize = large ? 28.0 : 14.0;
+    final hPad = large ? 36.0 : 18.0;
+    final vPad = large ? 36.0 : 18.0;
+    final radius = large ? 56.0 : 28.0;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: const Color(0xFFEAEFED)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: iconBox,
+            height: iconBox,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(999),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.shield_rounded,
-              color: Color(0xFF0E5A47),
-              size: 28,
+              color: const Color(0xFF0E5A47),
+              size: iconSize,
             ),
           ),
-          const SizedBox(width: 14),
-          const Expanded(
+          SizedBox(width: large ? 28 : 14),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Secure Verification',
                   style: TextStyle(
-                    fontSize: 19,
+                    fontSize: titleSize,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF101617),
+                    color: const Color(0xFF101617),
                   ),
                 ),
-                SizedBox(height: 4),
+                SizedBox(height: large ? 8 : 4),
                 Text(
                   'Your data is safe and secure and never shared. '
                   'We take community safety seriously at SocietyEats.',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: bodySize,
                     height: 1.4,
-                    color: Color(0xFF3A4644),
+                    color: const Color(0xFF3A4644),
                     fontWeight: FontWeight.w500,
                   ),
                 ),

@@ -227,6 +227,7 @@ class HomeScreenState extends State<HomeScreen> {
       foodType: _selectedFoodType,
       listingType: _listingType,
       buyerSocietyId: _buyerSocietyId,
+      excludeFssaiBlockedFromBuyerFeed: true,
       justAdded: _justAdded,
     );
   }
@@ -244,8 +245,22 @@ class HomeScreenState extends State<HomeScreen> {
 
     try {
       List<Map<String, dynamic>> raw;
+      SellingReach cityReach = _cityReach;
       final fetchListings = widget.fetchListings;
+      final shouldLoadNearby =
+          fetchListings == null || widget.fetchNearbySellers != null;
+
+      Future<Map<String, dynamic>>? startNearbyRequest() {
+        if (!shouldLoadNearby) return null;
+        return widget.fetchNearbySellers != null
+            ? widget.fetchNearbySellers!()
+            : ApiService.getNearbySellers();
+      }
+
+      Future<Map<String, dynamic>>? nearbyFuture;
+
       if (fetchListings != null) {
+        nearbyFuture = startNearbyRequest();
         raw = await fetchListings();
       } else {
         final societyId = await SessionService.getSocietyId();
@@ -265,21 +280,18 @@ class HomeScreenState extends State<HomeScreen> {
           }
           return;
         }
-        raw = await ApiService.getListings(
+        final societyListingsFuture = ApiService.getListings(
           societyId: societyId,
           catalogType: 'REGULAR',
           status: 'discoverable',
         );
+        nearbyFuture = startNearbyRequest();
+        raw = await societyListingsFuture;
       }
 
-      final shouldLoadNearby =
-          fetchListings == null || widget.fetchNearbySellers != null;
-      SellingReach cityReach = _cityReach;
-      if (shouldLoadNearby) {
+      if (nearbyFuture != null) {
         try {
-          final nearbyRaw = widget.fetchNearbySellers != null
-              ? await widget.fetchNearbySellers!()
-              : await ApiService.getNearbySellers();
+          final nearbyRaw = await nearbyFuture;
           cityReach = SellingReach.fromAuthMe(nearbyRaw);
           raw = mergeSocietyAndNearbyListingMaps(
             raw,
@@ -289,6 +301,7 @@ class HomeScreenState extends State<HomeScreen> {
           // Home still works if nearby discovery is unavailable.
         }
       }
+
       final listings = raw.map(FoodItem.fromJson).toList();
 
       if (!mounted) return;
@@ -422,19 +435,7 @@ class HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            food.isExpired
-                ? '${food.name} is out of stock'
-                : food.recurringUnavailable
-                ? (food.recurringWindowLabel.isNotEmpty
-                      ? '${food.name} is not available now. Available ${food.recurringWindowLabel}'
-                      : food.recurringNextLabel.isNotEmpty
-                      ? '${food.name} is not available now. ${food.recurringNextLabel}'
-                      : '${food.name} is not available now')
-                : food.madeToOrderUnavailableToday
-                ? '${food.name} is currently unavailable'
-                : '${food.name} is sold out',
-          ),
+          content: Text(food.addToCartBlockedMessage()),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -584,6 +585,7 @@ class HomeScreenState extends State<HomeScreen> {
         searchQuery: _searchQuery,
         foodType: _selectedFoodType,
         buyerSocietyId: _buyerSocietyId,
+        excludeFssaiBlockedFromBuyerFeed: true,
         justAdded: _justAdded,
       ),
       choice: _effectiveDistance,

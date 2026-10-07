@@ -146,19 +146,15 @@ void main() {
 
     await _openFirstTimeSettings(tester);
     expect(find.byType(SellerSettingsScreen), findsOneWidget);
-    expect(find.text('Payment Methods'), findsOneWidget);
     expect(find.text('Cash on Delivery in society, UPI outside'), findsOneWidget);
-    expect(find.text('UPI for Payments'), findsOneWidget);
-    expect(find.text('Selling Reach'), findsOneWidget);
+    expect(find.text('UPI ID'), findsOneWidget);
+    expect(find.text('My Society'), findsOneWidget);
     expect(find.text('FSSAI details'), findsOneWidget);
     expect(find.text('Save / Enable Selling'), findsOneWidget);
+    expect(find.text('Payment Methods'), findsNothing);
     expect(profileSaves, 0);
 
-    await tester.tap(find.text('Payment Methods'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('UPI Only'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Save'));
     await tester.pumpAndSettle();
 
     expect(find.text('UPI Only'), findsWidgets);

@@ -20,7 +20,9 @@ class MadeToOrderHint extends StatelessWidget {
     final short = formatPreparationShort(food.preparationTimeMinutes);
     final unavailable = food.madeToOrderUnavailableToday;
     final label = unavailable
-        ? 'Currently unavailable'
+        ? (food.showFssaiPendingOnListing
+            ? 'FSSAI pending'
+            : 'Currently unavailable')
         : compact
             ? (short.isEmpty
                 ? 'Made to Order'

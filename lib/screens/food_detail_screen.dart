@@ -894,10 +894,8 @@ class _BottomCta extends StatelessWidget {
                 label: Text(
                   food.isKitchenClosed
                       ? kitchenClosedMessage
-                      : food.isExpired
-                      ? 'Out of stock'
-                      : food.quantity <= 0
-                      ? 'Sold out'
+                      : !food.canAddToCart
+                      ? food.orderActionLabel
                       : 'Order Now',
                   style: const TextStyle(
                     fontSize: 15,

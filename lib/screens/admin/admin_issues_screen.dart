@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/issue_report.dart';
 import '../../services/api_service.dart';
 import '../../web/web_page_frame.dart';
-import '../../widgets/screen_loading_note.dart';
+import '../../widgets/admin_loading_panel.dart';
 import '../issue_detail_screen.dart';
 
 class AdminIssuesScreen extends StatefulWidget {
@@ -81,7 +81,7 @@ class _AdminIssuesScreenState extends State<AdminIssuesScreen> {
         ),
         Expanded(
           child: _loading
-              ? const ScreenLoadingNote(message: 'Loading issues…')
+              ? const AdminLoadingPanel(message: 'Loading issues…')
               : _error != null
                   ? Center(child: Text(_error!))
                   : _issues.isEmpty
@@ -215,7 +215,10 @@ class _AdminIssueDetailScreenState extends State<AdminIssueDetailScreen> {
         title: Text(issue?.reference ?? 'Issue'),
       ),
       body: _loading
-          ? const ScreenLoadingNote(message: 'Loading issue…')
+          ? const AdminLoadingPanel(
+              message: 'Loading issue…',
+              showSkeleton: false,
+            )
           : issue == null
               ? Center(child: Text(_error ?? 'Report not found'))
               : ListView(

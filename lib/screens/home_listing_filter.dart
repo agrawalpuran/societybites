@@ -23,6 +23,7 @@ List<FoodItem> applyHomeListingFilters(
   HomeListingType listingType = HomeListingType.all,
   String? buyerSocietyId,
   bool includeNotSelling = false,
+  bool excludeFssaiBlockedFromBuyerFeed = false,
   bool justAdded = false,
   DateTime? now,
 }) {
@@ -92,6 +93,10 @@ List<FoodItem> applyHomeListingFilters(
   results = indexed.map((entry) => entry.value).toList();
   if (!justAdded) {
     results = _limitNewListingsPerSeller(results, now: clock);
+  }
+
+  if (excludeFssaiBlockedFromBuyerFeed) {
+    results = results.where((food) => !food.blockedBySellerFssai).toList();
   }
 
   return results;

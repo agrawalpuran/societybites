@@ -1815,7 +1815,21 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<void> updateAdminFssaiAssistance(
+  static Future<Map<String, dynamic>> getAdminFssaiAssistanceDetail(
+    String id,
+  ) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/fssai/assistance/$id'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return Map<String, dynamic>.from(data['request'] as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateAdminFssaiAssistance(
     String id, {
     required String status,
   }) async {
@@ -1824,7 +1838,10 @@ class ApiService {
       headers: await _authHeaders(),
       body: jsonEncode({'status': status}),
     );
-    if (response.statusCode == 200) return;
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return Map<String, dynamic>.from(data['request'] as Map);
+    }
     _throwFromResponse(response);
   }
 

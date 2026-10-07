@@ -574,6 +574,63 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('FSSAI-blocked storefront still lists dishes as FSSAI pending', (
+    tester,
+  ) async {
+    await _openStorefront(
+      tester,
+      seller: _seller('fssai', 'Pending Kitchen'),
+      showOnlyOrderable: true,
+      fetchListings: () async => [
+        {
+          'id': 'thali',
+          'name': 'Home Thali',
+          'sellerId': 'fssai',
+          'sellerName': 'Pending Kitchen',
+          'price': 120,
+          'status': 'active',
+          'quantity': 5,
+          'sellerAcceptingOrders': false,
+          'sellerOrderBlockReason': 'FSSAI registration required',
+        },
+      ],
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Home Thali'), findsOneWidget);
+    expect(find.text('FSSAI pending'), findsOneWidget);
+    expect(find.text('Not selling right now'), findsNothing);
+  });
+
+  testWidgets('storefront shows out of stock and FSSAI pending together', (
+    tester,
+  ) async {
+    await _openStorefront(
+      tester,
+      seller: _seller('fssai', 'Pending Kitchen'),
+      fetchListings: () async => [
+        {
+          'id': 'coconut',
+          'name': 'Tender coconut',
+          'sellerId': 'fssai',
+          'sellerName': 'Pending Kitchen',
+          'price': 75,
+          'status': 'expired',
+          'quantity': 0,
+          'sellerAcceptingOrders': false,
+          'sellerOrderBlockReason': 'FSSAI registration required',
+        },
+      ],
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Tender coconut'), findsOneWidget);
+    expect(find.text('Out of stock'), findsOneWidget);
+    expect(find.text('FSSAI pending'), findsOneWidget);
+  });
 }
 
 Map<String, dynamic> _listingJson({

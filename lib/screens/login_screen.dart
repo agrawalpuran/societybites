@@ -136,13 +136,13 @@ class _LoginScreenState extends State<LoginScreen> {
           setState(() => _isSendingOtp = false);
         },
       );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _isSendingOtp = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'We could not send the OTP. Check your connection and try again.',
+            'We could not send the OTP. ${ApiService.userFacingError(e)}',
           ),
         ),
       );
