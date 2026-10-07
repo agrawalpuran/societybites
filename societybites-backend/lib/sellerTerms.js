@@ -1,7 +1,6 @@
 const { assertSellerSellingReachLevel } = require("./sellingReach");
 const { assertSellerFulfilmentUpdate } = require("./sellerFulfilment");
 const { assertSellerPaymentPreferenceUpdate, DEFAULT_PAYMENT_PREFERENCE } = require("./sellerPaymentPreference");
-const { assertSellerFssaiUpdate } = require("./fssai");
 
 // Framework / Draft — Legal Review Required.
 // Not legally approved or counsel approved. Qualified Indian legal counsel
@@ -21,6 +20,20 @@ function assertSellerTermsVersion(version) {
   return SELLER_TERMS_VERSION;
 }
 
+function assertAddressProofUrl(value, { required }) {
+  if (value == null || String(value).trim() === "") {
+    if (required) {
+      throw httpError(400, "Address proof is required");
+    }
+    return undefined;
+  }
+  const text = String(value).trim();
+  if (text.length > 2000 || !/^https:\/\//i.test(text)) {
+    throw httpError(400, "Address proof is invalid");
+  }
+  return text;
+}
+
 /**
  * Records seller-terms acceptance and enables selling in one transaction.
  * acceptedAt is always generated here. Optional seller settings in `body`
@@ -37,9 +50,17 @@ async function acceptSellerTermsAndEnable({ prisma, user, body }) {
   const termsVersion = assertSellerTermsVersion(body.termsVersion);
 
   const enablingRole = user.role === "super_admin" ? "super_admin" : "seller";
+  const becomingSeller = user.role !== "seller" && user.role !== "super_admin";
   const data = {};
-  if (user.role !== "seller" && user.role !== "super_admin") {
+  if (becomingSeller) {
     data.role = "seller";
+  }
+
+  const proofUrl = assertAddressProofUrl(body.addressProofUrl, {
+    required: becomingSeller && !user.addressProofUrl,
+  });
+  if (proofUrl !== undefined) {
+    data.addressProofUrl = proofUrl;
   }
 
   if (body.sellingReachLevel !== undefined) {
@@ -118,22 +139,6 @@ async function acceptSellerTermsAndEnable({ prisma, user, body }) {
   } else if (user.role !== "seller" && user.role !== "super_admin") {
     data.paymentPreference = DEFAULT_PAYMENT_PREFERENCE;
   }
-  if (body.fssai !== undefined) {
-    const fssaiBody = body.fssai;
-    Object.assign(
-      data,
-      assertSellerFssaiUpdate({
-        role: enablingRole,
-        number: fssaiBody && fssaiBody.number !== undefined ? fssaiBody.number : undefined,
-        expiry: fssaiBody && fssaiBody.expiry !== undefined ? fssaiBody.expiry : undefined,
-        registeredName:
-          fssaiBody && fssaiBody.registeredName !== undefined
-            ? fssaiBody.registeredName
-            : undefined,
-      })
-    );
-  }
-
   const acceptedAt = new Date();
   return prisma.$transaction(async (tx) => {
     const existing = await tx.sellerTermsAcceptance.findUnique({

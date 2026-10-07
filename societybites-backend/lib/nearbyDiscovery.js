@@ -67,7 +67,8 @@ async function loadCityReachConfig(society) {
 
 async function serializeNearbySeller(seller, eligibility) {
   const attached = await attachRecurringAvailability(prisma, seller.listings || []);
-  const listings = attached.map((listing) => serializeListing(listing));
+  const { serializeListingsWithSellerOrderability } = require("./listingOrderability");
+  const listings = await serializeListingsWithSellerOrderability(attached);
   return {
     seller: {
       id: seller.id,

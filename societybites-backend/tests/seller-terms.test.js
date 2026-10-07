@@ -127,17 +127,35 @@ async function main() {
     const sellerRows = await prisma.sellerTermsAcceptance.count({ where: { userId: seller.id } });
     assert(sellerRows === 0, "existing sellers are not required to accept terms");
 
-    const before = Date.now();
-    const accepted = await jsonRequest(server, {
+    const noProof = await jsonRequest(server, {
       method: "POST",
       path: "/auth/me/seller-terms",
       token: buyerToken,
       body: { termsVersion: "1.0", paymentPreference: "UPI_ONLY" },
     });
+    assert(noProof.status === 400, "address proof is required for new sellers");
+    assert(
+      String(noProof.json.error).includes("Address proof"),
+      "missing proof message"
+    );
+
+    const before = Date.now();
+    const proofUrl = "https://example.com/address-proofs/buyer-proof.jpg";
+    const accepted = await jsonRequest(server, {
+      method: "POST",
+      path: "/auth/me/seller-terms",
+      token: buyerToken,
+      body: {
+        termsVersion: "1.0",
+        paymentPreference: "UPI_ONLY",
+        addressProofUrl: proofUrl,
+      },
+    });
     const after = Date.now();
     assert(accepted.status === 200, `accept failed: ${accepted.status} ${JSON.stringify(accepted.json)}`);
     assert(accepted.json.user.role === "seller", "acceptance enables selling");
     assert(accepted.json.user.paymentPreference === "UPI_ONLY", "pending settings save with acceptance");
+    assert(accepted.json.user.addressProofUrl === proofUrl, "address proof URL is stored");
     assert(accepted.json.sellerTerms.termsVersion === "1.0", "response records termsVersion 1.0");
     const acceptedAt = new Date(accepted.json.sellerTerms.acceptedAt).getTime();
     assert(

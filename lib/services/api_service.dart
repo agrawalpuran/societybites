@@ -7,6 +7,7 @@ import '../models/coupon.dart';
 import '../models/issue_report.dart';
 import '../models/order_lifecycle.dart';
 import '../models/seller_order_history.dart';
+import '../models/seller_fssai.dart';
 import '../models/selling_reach.dart';
 import 'auth_config.dart';
 import 'session_service.dart';
@@ -1631,13 +1632,169 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<Map<String, dynamic>> getAdminFssai() async {
+  static Future<SellerFssaiRegistration> getMyFssai() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/admin/fssai'),
+      Uri.parse('$baseUrl/fssai/me'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return SellerFssaiRegistration.fromJson(
+        Map<String, dynamic>.from(data['fssai'] as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<String> uploadFssaiDocument({
+    required List<int> bytes,
+    String mimeType = 'image/jpeg',
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/fssai/me/document'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'imageBase64': base64Encode(bytes),
+        'mimeType': mimeType,
+      }),
+    );
+    if (response.statusCode == 201) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return data['storageReference'] as String;
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<SellerFssaiRegistration> submitFssaiForReview({
+    required String registrationNumber,
+    String? storageReference,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/fssai/me/submit'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'registrationNumber': registrationNumber,
+        if (storageReference != null && storageReference.isNotEmpty)
+          'storageReference': storageReference,
+      }),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return SellerFssaiRegistration.fromJson(
+        Map<String, dynamic>.from(data['fssai'] as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<void> requestFssaiAssistance() async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/fssai/me/assistance'),
+      headers: await _authHeaders(),
+      body: jsonEncode({}),
+    );
+    if (response.statusCode == 201) return;
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getAdminFssaiSummary() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/fssai/summary'),
       headers: await _authHeaders(),
     );
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminFssaiSubmissions({
+    String? status,
+  }) async {
+    final uri = Uri.parse('$baseUrl/admin/fssai/submissions').replace(
+      queryParameters: status != null ? {'status': status} : null,
+    );
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return (data['records'] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<String> getAdminFssaiDocumentUrl(String sellerId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/fssai/submissions/$sellerId/document-url'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return data['url'] as String;
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<void> approveAdminFssai(String sellerId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/fssai/submissions/$sellerId/approve'),
+      headers: await _authHeaders(),
+      body: jsonEncode({}),
+    );
+    if (response.statusCode == 200) return;
+    _throwFromResponse(response);
+  }
+
+  static Future<void> rejectAdminFssai(
+    String sellerId, {
+    required String rejectionReason,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/fssai/submissions/$sellerId/reject'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'rejectionReason': rejectionReason}),
+    );
+    if (response.statusCode == 200) return;
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminFssaiAssistance() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/fssai/assistance'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return (data['requests'] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<void> updateAdminFssaiAssistance(
+    String id, {
+    required String status,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/fssai/assistance/$id'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'status': status}),
+    );
+    if (response.statusCode == 200) return;
+    _throwFromResponse(response);
+  }
+
+  static Future<bool> updateAdminFssaiRequirement(bool enabled) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/settings'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'fssaiSellingRequirement': enabled}),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return data['fssaiSellingRequirement'] == true;
     }
     _throwFromResponse(response);
   }

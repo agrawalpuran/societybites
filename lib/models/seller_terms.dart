@@ -7,7 +7,15 @@
 const sellerTermsVersion = '1.0';
 
 const sellerTermsIntro =
-    'Before you start selling on SocietyEats, please read and accept the following Seller Terms & Conditions.';
+    'Before you start selling on SocietyEats, upload proof of your address in the society, then read and accept the Seller Terms & Conditions.';
+
+const sellerAddressProofTitle = 'Address proof';
+
+const sellerAddressProofSubtitle =
+    'Upload a clear photo of a document that shows your name and flat or society address (for example society ID, utility bill, or rental agreement). JPG, PNG, or WebP.';
+
+const sellerAddressProofDeclaration =
+    'I confirm that the address document I uploaded is genuine, shows my residence in this society, and is provided for SocietyEats seller verification.';
 
 const sellerTermsBody = '''
 A. Seller Responsibility

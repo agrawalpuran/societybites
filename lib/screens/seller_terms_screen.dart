@@ -1,24 +1,78 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../models/seller_terms.dart';
+import '../models/seller_terms_accept_result.dart';
+import '../utils/picked_image.dart';
+import '../widgets/document_image_upload_section.dart';
 
 class SellerTermsScreen extends StatefulWidget {
-  const SellerTermsScreen({super.key});
+  const SellerTermsScreen({
+    super.key,
+    this.initialDocumentBytes,
+    this.pickDocument,
+  });
+
+  /// Test seam — skips the platform image picker.
+  final Uint8List? initialDocumentBytes;
+
+  /// Test seam — returns document bytes when the seller picks a document.
+  final Future<PickedImage?> Function()? pickDocument;
 
   @override
   State<SellerTermsScreen> createState() => _SellerTermsScreenState();
 }
 
 class _SellerTermsScreenState extends State<SellerTermsScreen> {
-  bool _agreed = false;
+  bool _agreedTerms = false;
+  bool _agreedDeclaration = false;
+  Uint8List? _documentBytes;
+  String _documentMime = 'image/jpeg';
+
+  @override
+  void initState() {
+    super.initState();
+    _documentBytes = widget.initialDocumentBytes;
+  }
+
+  bool get _canAccept =>
+      _agreedTerms &&
+      _agreedDeclaration &&
+      _documentBytes != null &&
+      _documentBytes!.isNotEmpty;
 
   void _decline() {
-    Navigator.pop(context, false);
+    Navigator.pop(context, null);
   }
 
   void _accept() {
-    if (!_agreed) return;
-    Navigator.pop(context, true);
+    if (!_canAccept || _documentBytes == null) return;
+    Navigator.pop(
+      context,
+      SellerTermsAcceptResult(
+        documentBytes: _documentBytes!,
+        documentMimeType: _documentMime,
+      ),
+    );
+  }
+
+  Future<void> _pickDocument() async {
+    final picked = widget.pickDocument != null
+        ? await widget.pickDocument!()
+        : await pickDocumentImage(context);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _documentBytes = picked.bytes;
+      _documentMime = picked.mimeType;
+    });
+  }
+
+  void _removeDocument() {
+    setState(() {
+      _documentBytes = null;
+      _documentMime = 'image/jpeg';
+    });
   }
 
   @override
@@ -59,7 +113,15 @@ class _SellerTermsScreenState extends State<SellerTermsScreen> {
                       color: Color(0xFF223531),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
+                  DocumentImageUploadSection(
+                    title: sellerAddressProofTitle,
+                    subtitle: sellerAddressProofSubtitle,
+                    bytes: _documentBytes,
+                    onPick: _pickDocument,
+                    onRemove: _removeDocument,
+                  ),
+                  const SizedBox(height: 24),
                   Text(
                     sellerTermsBody.trim(),
                     style: const TextStyle(
@@ -82,10 +144,29 @@ class _SellerTermsScreenState extends State<SellerTermsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     CheckboxListTile(
-                      key: const Key('seller-terms-agree'),
-                      value: _agreed,
+                      key: const Key('seller-terms-declaration'),
+                      value: _agreedDeclaration,
                       onChanged: (value) {
-                        setState(() => _agreed = value == true);
+                        setState(() => _agreedDeclaration = value == true);
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: const Color(0xFF0E5A47),
+                      title: Text(
+                        sellerAddressProofDeclaration,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF223531),
+                        ),
+                      ),
+                    ),
+                    CheckboxListTile(
+                      key: const Key('seller-terms-agree'),
+                      value: _agreedTerms,
+                      onChanged: (value) {
+                        setState(() => _agreedTerms = value == true);
                       },
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
@@ -105,7 +186,7 @@ class _SellerTermsScreenState extends State<SellerTermsScreen> {
                       height: 48,
                       child: ElevatedButton(
                         key: const Key('seller-terms-accept'),
-                        onPressed: _agreed ? _accept : null,
+                        onPressed: _canAccept ? _accept : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF0E5A47),
                           disabledBackgroundColor: const Color(0xFFD5DDDA),
@@ -117,7 +198,7 @@ class _SellerTermsScreenState extends State<SellerTermsScreen> {
                           ),
                         ),
                         child: const Text(
-                          'Accept & Continue',
+                          'Submit & Enable Selling',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                         ),
                       ),

@@ -1,7 +1,8 @@
 const { canonicalCityKey } = require("./launchCity");
 const { serializeFulfilment, DEFAULT_FULFILMENT_MODE } = require("./sellerFulfilment");
 const { serializePaymentPreference } = require("./sellerPaymentPreference");
-const { serializeFssai } = require("./fssai");
+const { serializeSellerFssai } = require("./fssaiCompliance");
+const { isFssaiSellingRequirementEnabled } = require("./fssaiRequirement");
 
 const SELLING_REACH_LEVELS = Object.freeze({
   MY_SOCIETY: "MY_SOCIETY",
@@ -117,6 +118,14 @@ async function attachSellingReach(user, prismaClient) {
   if (cityKey) {
     config = await prismaClient.cityReachConfig.findUnique({ where: { cityKey } });
   }
+  const sellerFssai = await prismaClient.sellerFssai.findUnique({
+    where: { userId: user.id },
+  });
+  const requirementEnabled = await isFssaiSellingRequirementEnabled();
+  const fssaiPayload = {
+    ...serializeSellerFssai(sellerFssai),
+    requirementEnabled,
+  };
   return {
     ...user,
     sellingReachLevel: user.sellingReachLevel || DEFAULT_SELLING_REACH_LEVEL,
@@ -124,7 +133,7 @@ async function attachSellingReach(user, prismaClient) {
     fulfilmentMode: (user && user.fulfilmentMode) || DEFAULT_FULFILMENT_MODE,
     fulfilment: serializeFulfilment(user),
     paymentPreference: serializePaymentPreference(user),
-    fssai: serializeFssai(user),
+    fssai: fssaiPayload,
   };
 }
 

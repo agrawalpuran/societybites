@@ -118,11 +118,66 @@ async function uploadLocalFile({ filePath, mimeType, userId, prefix }) {
   return uploadPublicImage({ buffer, mimeType, userId, prefix });
 }
 
+async function getStorageClient() {
+  return ensureBucket();
+}
+
+async function uploadPrivateObject({ buffer, mimeType, userId, prefix = "fssai-private" }) {
+  if (!buffer || !buffer.length) {
+    const err = new Error("Invalid image data");
+    err.statusCode = 400;
+    throw err;
+  }
+  if (buffer.length > MAX_BYTES) {
+    const err = new Error("Image too large (max 5 MB)");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const supabase = await getStorageClient();
+  const ext = extensionForMime(mimeType);
+  const safeUser = String(userId || "anonymous").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 12);
+  const objectPath = `${prefix}/${safeUser || "user"}/${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}.${ext}`;
+
+  const { error } = await supabase.storage.from(BUCKET).upload(objectPath, buffer, {
+    contentType: contentTypeForExt(ext),
+    upsert: false,
+  });
+  if (error) {
+    const err = new Error("Could not store the document. Please try again.");
+    err.statusCode = 502;
+    throw err;
+  }
+  return objectPath;
+}
+
+async function createSignedObjectUrl(objectPath, expiresInSeconds = 300) {
+  if (!objectPath || typeof objectPath !== "string") {
+    const err = new Error("Document not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  const supabase = await getStorageClient();
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(objectPath, expiresInSeconds);
+  if (error || !data?.signedUrl) {
+    const err = new Error("Could not open document");
+    err.statusCode = 502;
+    throw err;
+  }
+  return data.signedUrl;
+}
+
 module.exports = {
   BUCKET,
   MAX_BYTES,
   isObjectStorageConfigured,
   uploadPublicImage,
+  uploadPrivateObject,
+  createSignedObjectUrl,
   uploadLocalFile,
   extensionForMime,
 };

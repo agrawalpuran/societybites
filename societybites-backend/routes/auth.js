@@ -19,7 +19,6 @@ const { assertSellerFulfilmentUpdate } = require("../lib/sellerFulfilment");
 const {
   assertSellerPaymentPreferenceUpdate,
 } = require("../lib/sellerPaymentPreference");
-const { assertSellerFssaiUpdate } = require("../lib/fssai");
 const { assertKitchenHoursUpdate } = require("../lib/kitchenHours");
 const { acceptSellerTermsAndEnable } = require("../lib/sellerTerms");
 const { deleteAuthenticatedAccount } = require("../lib/accountDeletion");
@@ -455,25 +454,9 @@ router.patch(
       req.body.fssaiExpiry !== undefined ||
       req.body.fssaiRegisteredName !== undefined
     ) {
-      const nextRole = data.role || req.user.role;
-      Object.assign(
-        data,
-        assertSellerFssaiUpdate({
-          role: nextRole,
-          number:
-            fssaiBody && fssaiBody.number !== undefined
-              ? fssaiBody.number
-              : req.body.fssaiNumber,
-          expiry:
-            fssaiBody && fssaiBody.expiry !== undefined
-              ? fssaiBody.expiry
-              : req.body.fssaiExpiry,
-          registeredName:
-            fssaiBody && fssaiBody.registeredName !== undefined
-              ? fssaiBody.registeredName
-              : req.body.fssaiRegisteredName,
-        })
-      );
+      return res.status(400).json({
+        error: "Use FSSAI Registration in Seller Settings to submit FSSAI details",
+      });
     }
 
     const user = await prisma.user.update({

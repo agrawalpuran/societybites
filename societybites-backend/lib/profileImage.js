@@ -68,7 +68,9 @@ function storagePrefixForPurpose(purpose) {
     ? "profiles"
     : String(purpose || "").trim().toLowerCase() === "issue"
       ? "issues"
-      : "listings";
+      : String(purpose || "").trim().toLowerCase() === "address-proof"
+        ? "address-proofs"
+        : "listings";
 }
 
 function normalizeStoredProfilePhotoUrl(value) {

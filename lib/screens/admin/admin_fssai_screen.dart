@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../widgets/screen_loading_note.dart';
 
-/// Admin view for submitted FSSAI details. Capture only — no approve/reject.
 class AdminFssaiScreen extends StatefulWidget {
   const AdminFssaiScreen({super.key});
 
@@ -12,11 +11,11 @@ class AdminFssaiScreen extends StatefulWidget {
 }
 
 class _AdminFssaiScreenState extends State<AdminFssaiScreen> {
+  Map<String, dynamic>? _summary;
+  List<Map<String, dynamic>> _records = const [];
+  List<Map<String, dynamic>> _assistance = const [];
   bool _loading = true;
-  String? _error;
-  int _sellerCount = 0;
-  int _submittedCount = 0;
-  List<Map<String, dynamic>> _records = [];
+  bool _requirementOn = false;
 
   @override
   void initState() {
@@ -25,170 +24,165 @@ class _AdminFssaiScreenState extends State<AdminFssaiScreen> {
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() => _loading = true);
     try {
-      final data = await ApiService.getAdminFssai();
+      final results = await Future.wait([
+        ApiService.getAdminFssaiSummary(),
+        ApiService.getAdminFssaiSubmissions(),
+        ApiService.getAdminFssaiAssistance(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _sellerCount = (data['sellerCount'] as num?)?.toInt() ?? 0;
-        _submittedCount = (data['submittedCount'] as num?)?.toInt() ?? 0;
-        final raw = data['records'];
-        _records = raw is List
-            ? raw
-                  .whereType<Map>()
-                  .map((item) => Map<String, dynamic>.from(item))
-                  .toList()
-            : [];
+        _summary = results[0] as Map<String, dynamic>;
+        _records = results[1] as List<Map<String, dynamic>>;
+        _assistance = results[2] as List<Map<String, dynamic>>;
+        _requirementOn = _summary!['requirementEnabled'] == true;
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load FSSAI admin: $e')),
+      );
     }
+  }
+
+  Future<void> _toggleRequirement(bool value) async {
+    try {
+      final on = await ApiService.updateAdminFssaiRequirement(value);
+      if (!mounted) return;
+      setState(() => _requirementOn = on);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update requirement: $e')),
+      );
+    }
+  }
+
+  Future<void> _openDocument(String sellerId) async {
+    try {
+      final url = await ApiService.getAdminFssaiDocumentUrl(sellerId);
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (ctx) => Dialog(
+          child: InteractiveViewer(
+            child: Image.network(url, fit: BoxFit.contain),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open document: $e')),
+      );
+    }
+  }
+
+  Future<void> _reject(String sellerId) async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reject FSSAI'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Rejection reason'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (reason == null || reason.isEmpty) return;
+    await ApiService.rejectAdminFssai(sellerId, rejectionReason: reason);
+    await _load();
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const ScreenLoadingNote(message: 'Loading FSSAI records…');
+      return const ScreenLoadingNote(message: 'Loading FSSAI…');
     }
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!, style: const TextStyle(color: Color(0xFF6A7774))),
-              const SizedBox(height: 12),
-              TextButton(onPressed: _load, child: const Text('Retry')),
-            ],
-          ),
-        ),
-      );
-    }
-
+    final submissions = _summary?['submissions'] as Map? ?? {};
     return RefreshIndicator(
-      color: const Color(0xFF0E5A47),
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'FSSAI',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF101617),
-            ),
+          SwitchListTile(
+            title: const Text('FSSAI selling requirement'),
+            subtitle: Text(_requirementOn ? 'ON' : 'OFF'),
+            value: _requirementOn,
+            onChanged: _toggleRequirement,
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'Submitted licence details. Record view only — no approval yet.',
-            style: TextStyle(
-              color: Color(0xFF6A7774),
-              height: 1.4,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 16),
           Text(
-            '$_submittedCount of $_sellerCount sellers have submitted a licence',
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF0E5A47),
-            ),
+            'Pending review: ${submissions['UNDER_REVIEW'] ?? 0} · '
+            'Approved: ${submissions['APPROVED'] ?? 0} · '
+            'Rejected: ${submissions['REJECTED'] ?? 0}',
           ),
           const SizedBox(height: 16),
-          if (_records.isEmpty)
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE6EBE9)),
+          const Text('Submissions', style: TextStyle(fontWeight: FontWeight.w800)),
+          for (final row in _records)
+            Card(
+              child: ListTile(
+                title: Text(row['name']?.toString() ?? 'Seller'),
+                subtitle: Text(
+                  '${row['societyName'] ?? '—'} · ${row['status']} · ${row['registrationNumber'] ?? '—'}',
+                ),
+                trailing: row['status'] == 'UNDER_REVIEW'
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (row['hasDocument'] == true)
+                            IconButton(
+                              icon: const Icon(Icons.image_outlined),
+                              onPressed: () =>
+                                  _openDocument(row['sellerId'].toString()),
+                            ),
+                          TextButton(
+                            onPressed: () =>
+                                ApiService.approveAdminFssai(row['sellerId'].toString())
+                                    .then((_) => _load()),
+                            child: const Text('Approve'),
+                          ),
+                          TextButton(
+                            onPressed: () => _reject(row['sellerId'].toString()),
+                            child: const Text('Reject'),
+                          ),
+                        ],
+                      )
+                    : null,
               ),
-              child: const Column(
-                children: [
-                  Icon(Icons.badge_outlined, size: 36, color: Color(0xFF0E5A47)),
-                  SizedBox(height: 12),
-                  Text(
-                    'No FSSAI records yet',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      color: Color(0xFF101617),
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Sellers add their licence from Profile → FSSAI details.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0xFF6A7774), height: 1.4),
-                  ),
+            ),
+          const SizedBox(height: 16),
+          const Text('FSSAI assistance', style: TextStyle(fontWeight: FontWeight.w800)),
+          for (final row in _assistance)
+            ListTile(
+              title: Text(row['sellerName']?.toString() ?? 'Seller'),
+              subtitle: Text('${row['societyName'] ?? '—'} · ${row['status']}'),
+              trailing: PopupMenuButton<String>(
+                onSelected: (status) => ApiService.updateAdminFssaiAssistance(
+                  row['id'].toString(),
+                  status: status,
+                ).then((_) => _load()),
+                itemBuilder: (ctx) => const [
+                  PopupMenuItem(value: 'NEW', child: Text('NEW')),
+                  PopupMenuItem(value: 'CONTACTED', child: Text('CONTACTED')),
+                  PopupMenuItem(value: 'IN_PROGRESS', child: Text('IN PROGRESS')),
+                  PopupMenuItem(value: 'COMPLETED', child: Text('COMPLETED')),
                 ],
               ),
-            )
-          else
-            ..._records.map(_recordCard),
+            ),
         ],
-      ),
-    );
-  }
-
-  Widget _recordCard(Map<String, dynamic> row) {
-    final fssai = row['fssai'] is Map
-        ? Map<String, dynamic>.from(row['fssai'] as Map)
-        : const <String, dynamic>{};
-    final name = row['name']?.toString() ?? 'Seller';
-    final society = row['societyName']?.toString();
-    final number = fssai['number']?.toString() ?? '—';
-    final registered = fssai['registeredName']?.toString();
-    final expiry = fssai['expiry']?.toString();
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              name,
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 16,
-                color: Color(0xFF101617),
-              ),
-            ),
-            if (society != null && society.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(society, style: const TextStyle(color: Color(0xFF6A7774))),
-            ],
-            const SizedBox(height: 10),
-            Text(
-              number,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0E5A47),
-              ),
-            ),
-            if (registered != null && registered.isNotEmpty)
-              Text(registered, style: const TextStyle(color: Color(0xFF6A7774))),
-            if (expiry != null && expiry.isNotEmpty)
-              Text(
-                'Expires ${expiry.split('T').first}',
-                style: const TextStyle(color: Color(0xFF6A7774), fontSize: 12),
-              ),
-          ],
-        ),
       ),
     );
   }

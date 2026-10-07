@@ -28,7 +28,10 @@ const ORDER_STATUS_TO_STEP = {
   rejected: -1,
 };
 
-function serializeListing(listing) {
+function serializeListing(listing, options = {}) {
+  const sellerAcceptingOrders = options.sellerAcceptingOrders !== false;
+  const sellerOrderBlockReason =
+    options.sellerOrderBlockReason != null ? options.sellerOrderBlockReason : null;
   const seller = listing.seller || {};
   const flat = seller.flat;
   const reviews = listing.reviews || [];
@@ -102,6 +105,8 @@ function serializeListing(listing) {
     avgRating: Math.round(avgRating * 10) / 10,
     reviewCount,
     quantitySold: Number(listing.quantitySold) || 0,
+    sellerAcceptingOrders,
+    sellerOrderBlockReason,
     createdAt: listing.createdAt,
     updatedAt: listing.updatedAt,
   };

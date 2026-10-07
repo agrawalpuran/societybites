@@ -18,7 +18,20 @@ const {
 } = require("../lib/coupons");
 const { canonicalCityKey } = require("../lib/launchCity");
 const { validateCityReachRadii } = require("../lib/sellingReach");
-const { serializeFssai } = require("../lib/fssai");
+const {
+  getAdminFssaiSummary,
+  listAdminFssaiSubmissions,
+  getAdminFssaiDocumentUrl,
+  approveAdminFssai,
+  rejectAdminFssai,
+  listAdminFssaiAssistance,
+  updateAdminFssaiAssistance,
+  REJECTION_PRESETS,
+} = require("../lib/fssaiCompliance");
+const {
+  isFssaiSellingRequirementEnabled,
+  setFssaiSellingRequirement,
+} = require("../lib/fssaiRequirement");
 const { listCouponSellerPayouts } = require("../lib/couponRecon");
 
 const router = express.Router();
@@ -80,67 +93,59 @@ router.get(
   })
 );
 
-function serializeAdminFssaiRow(user) {
-  const fssai = serializeFssai(user);
-  return {
-    sellerId: user.id,
-    name: user.name || "Seller",
-    societyName: (user.society && user.society.name) || null,
-    fssai,
-    updatedAt: user.updatedAt || user.createdAt,
-  };
-}
-
-// GET /admin/fssai — submitted FSSAI records. Capture view only.
 router.get(
-  "/fssai",
-  asyncHandler(async (req, res) => {
-    const sellerWhere = { role: { in: ["seller", "super_admin"] } };
-    const [sellerCount, submitted] = await Promise.all([
-      prisma.user.count({ where: sellerWhere }),
-      prisma.user.findMany({
-        where: { ...sellerWhere, fssaiNumber: { not: null } },
-        select: {
-          id: true,
-          name: true,
-          createdAt: true,
-          fssaiNumber: true,
-          fssaiExpiry: true,
-          fssaiRegisteredName: true,
-          society: { select: { name: true } },
-        },
-        orderBy: { name: "asc" },
-      }),
-    ]);
-    res.json({
-      sellerCount,
-      submittedCount: submitted.length,
-      records: submitted.map(serializeAdminFssaiRow),
-    });
+  "/fssai/summary",
+  asyncHandler(async (_req, res) => {
+    const summary = await getAdminFssaiSummary();
+    res.json(summary);
   })
 );
 
-// GET /admin/fssai/:sellerId
 router.get(
-  "/fssai/:sellerId",
+  "/fssai/submissions",
   asyncHandler(async (req, res) => {
-    const user = await prisma.user.findUnique({
-      where: { id: String(req.params.sellerId) },
-      select: {
-        id: true,
-        name: true,
-        role: true,
-        createdAt: true,
-        fssaiNumber: true,
-        fssaiExpiry: true,
-        fssaiRegisteredName: true,
-        society: { select: { name: true } },
-      },
-    });
-    if (!user || !["seller", "super_admin"].includes(user.role || "")) {
-      return res.status(404).json({ error: "Seller not found" });
-    }
-    res.json(serializeAdminFssaiRow(user));
+    const records = await listAdminFssaiSubmissions({ status: req.query.status });
+    res.json({ records });
+  })
+);
+
+router.get(
+  "/fssai/submissions/:sellerId/document-url",
+  asyncHandler(async (req, res) => {
+    const payload = await getAdminFssaiDocumentUrl(req.user, req.params.sellerId);
+    res.json(payload);
+  })
+);
+
+router.post(
+  "/fssai/submissions/:sellerId/approve",
+  asyncHandler(async (req, res) => {
+    const fssai = await approveAdminFssai(req.user, req.params.sellerId);
+    res.json({ fssai });
+  })
+);
+
+router.post(
+  "/fssai/submissions/:sellerId/reject",
+  asyncHandler(async (req, res) => {
+    const fssai = await rejectAdminFssai(req.user, req.params.sellerId, req.body);
+    res.json({ fssai, rejectionPresets: REJECTION_PRESETS });
+  })
+);
+
+router.get(
+  "/fssai/assistance",
+  asyncHandler(async (req, res) => {
+    const requests = await listAdminFssaiAssistance({ status: req.query.status });
+    res.json({ requests });
+  })
+);
+
+router.patch(
+  "/fssai/assistance/:id",
+  asyncHandler(async (req, res) => {
+    const request = await updateAdminFssaiAssistance(req.params.id, req.body);
+    res.json({ request });
   })
 );
 
@@ -630,7 +635,8 @@ router.get(
   asyncHandler(async (_req, res) => {
     const { getPlatformFee } = require("../lib/platformFee");
     const platformFee = await getPlatformFee();
-    res.json({ platformFee });
+    const fssaiSellingRequirement = await isFssaiSellingRequirementEnabled();
+    res.json({ platformFee, fssaiSellingRequirement });
   })
 );
 
@@ -639,24 +645,35 @@ router.patch(
   "/settings",
   asyncHandler(async (req, res) => {
     const { setPlatformFee } = require("../lib/platformFee");
-    const { platformFee } = req.body;
+    const { platformFee, fssaiSellingRequirement } = req.body;
 
-    if (platformFee === undefined || platformFee === null) {
-      return res.status(400).json({ error: "platformFee is required" });
+    const updates = {};
+    if (platformFee !== undefined && platformFee !== null) {
+      updates.platformFee = await setPlatformFee(platformFee);
     }
-
-    const value = await setPlatformFee(platformFee);
+    if (fssaiSellingRequirement !== undefined) {
+      updates.fssaiSellingRequirement = await setFssaiSellingRequirement(
+        Boolean(fssaiSellingRequirement)
+      );
+    }
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ error: "Nothing to update" });
+    }
 
     await prisma.auditLog.create({
       data: {
         adminId: req.user.id,
-        action: "UPDATE_PLATFORM_FEE",
+        action: "UPDATE_ADMIN_SETTINGS",
         target: "settings",
-        details: JSON.stringify({ platformFee: value }),
+        details: JSON.stringify(updates),
       },
     });
 
-    res.json({ platformFee: value });
+    res.json({
+      platformFee: updates.platformFee ?? (await require("../lib/platformFee").getPlatformFee()),
+      fssaiSellingRequirement:
+        updates.fssaiSellingRequirement ?? (await isFssaiSellingRequirementEnabled()),
+    });
   })
 );
 

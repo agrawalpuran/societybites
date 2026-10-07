@@ -36,6 +36,8 @@ model User {
   fssaiNumber             String?
   fssaiExpiry             DateTime?
   fssaiRegisteredName     String?
+  /// Seller address verification document (URL from media upload).
+  addressProofUrl         String?
   suspended               Boolean                 @default(false)
   createdAt               DateTime                @default(now())
   societyId               String?
@@ -53,8 +55,50 @@ model User {
   issueMessages           IssueMessage[]
   couponRedemptions       CouponRedemption[]
   couponEligibilities     CouponEligibleUser[]
+  sellerFssai             SellerFssai?
+  fssaiAssistanceRequests FssaiAssistanceRequest[]
+  fssaiReviews            SellerFssai[]           @relation("FssaiReviewedBy")
   flat                    Flat?                   @relation(fields: [flatId], references: [id])
   society                 Society?                @relation(fields: [societyId], references: [id])
+}
+
+/// One current FSSAI registration record per seller (review workflow).
+model SellerFssai {
+  id                       String    @id @default(uuid())
+  userId                   String    @unique
+  registrationNumber       String?
+  /// Private object path in Supabase storage (not a public URL).
+  documentStorageReference String?
+  documentType             String?
+  /// NOT_SUBMITTED | UNDER_REVIEW | APPROVED | REJECTED
+  status                   String    @default("NOT_SUBMITTED")
+  rejectionReason          String?
+  submittedAt              DateTime?
+  reviewedAt               DateTime?
+  reviewedBy               String?
+  needsAssistance          Boolean   @default(false)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  user                     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer                 User?     @relation("FssaiReviewedBy", fields: [reviewedBy], references: [id])
+
+  @@index([status, submittedAt])
+}
+
+/// Lightweight seller request for help obtaining FSSAI registration.
+model FssaiAssistanceRequest {
+  id          String   @id @default(uuid())
+  userId      String
+  societyId   String?
+  /// NEW | CONTACTED | IN_PROGRESS | COMPLETED
+  status      String   @default("NEW")
+  requestedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  society     Society? @relation(fields: [societyId], references: [id])
+
+  @@index([status, requestedAt])
+  @@index([userId, requestedAt])
 }
 
 /// Record that a user accepted a seller-terms version. Existing sellers are not required to have a row.
@@ -93,6 +137,7 @@ model Society {
   preOrderCampaigns PreOrderCampaign[]
   orders            Order[]
   users             User[]
+  fssaiAssistance   FssaiAssistanceRequest[]
 }
 
 model Block {

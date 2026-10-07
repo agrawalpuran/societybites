@@ -20,6 +20,7 @@ const settingsRoutes = require("./routes/settings");
 const deviceRoutes = require("./routes/devices");
 const issueRoutes = require("./routes/issues");
 const couponRoutes = require("./routes/coupons");
+const fssaiRoutes = require("./routes/fssai");
 const preorderCampaignRoutes = require("./routes/preorderCampaigns");
 
 const app = express();
@@ -117,6 +118,7 @@ app.use("/settings", settingsRoutes);
 app.use("/devices", deviceRoutes);
 app.use("/issues", issueRoutes);
 app.use("/coupons", couponRoutes);
+app.use("/fssai", fssaiRoutes);
 
 app.use((err, _req, res, _next) => {
   logger.error("server", err.message, { stack: err.stack });

@@ -11,6 +11,7 @@ import '../models/legal_documents.dart';
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
 import '../models/seller_terms.dart';
+import '../models/seller_terms_accept_result.dart';
 import '../models/selling_reach.dart';
 import '../services/api_service.dart';
 import '../services/profile_photo_processor.dart';
@@ -32,8 +33,10 @@ import 'report_issue_screen.dart';
 import 'legal_screen.dart';
 import 'login_screen.dart';
 import 'profile_photo_crop_screen.dart';
+import 'seller_fssai_screen.dart';
 import 'seller_settings_screen.dart';
 import 'seller_terms_screen.dart';
+import '../models/seller_fssai.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
@@ -50,6 +53,8 @@ class ProfileScreen extends StatefulWidget {
     this.saveProfilePhoto,
     this.startSelling,
     this.acceptSellerTerms,
+    this.uploadAddressProof,
+    this.buildSellerTermsScreen,
   });
 
   /// Switches the main shell tab instead of pushing a new route.
@@ -99,6 +104,13 @@ class ProfileScreen extends StatefulWidget {
   /// Test seam. Production uses [ApiService.acceptSellerTerms].
   final Future<Map<String, dynamic>> Function(Map<String, dynamic> body)?
       acceptSellerTerms;
+
+  /// Test seam. Production uses [ApiService.uploadListingImage] with purpose address-proof.
+  final Future<String> Function(List<int> bytes, String mimeType)?
+      uploadAddressProof;
+
+  /// Test seam for [SellerTermsScreen] (document picker / initial bytes).
+  final Widget Function()? buildSellerTermsScreen;
 
   @override
   ProfileScreenState createState() => ProfileScreenState();
@@ -786,7 +798,9 @@ class ProfileScreenState extends State<ProfileScreen> {
   void _applyFssaiFromProfile(Map<String, dynamic> profile) {
     final fssai = _asStringKeyedMap(profile['fssai']);
     if (fssai == null) return;
-    final number = fssai['number']?.toString().trim();
+    _fssaiStatus = fssai['status']?.toString();
+    final number = fssai['registrationNumber']?.toString().trim() ??
+        fssai['number']?.toString().trim();
     if (number != null && number.isNotEmpty && number != 'null') {
       _fssaiNumber = number;
     }
@@ -811,255 +825,27 @@ class ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  String? _fssaiStatus;
+
   String get _fssaiSubtitle {
+    if (_fssaiStatus != null) {
+      final label = SellerFssaiRegistration.statusLabels[_fssaiStatus!] ??
+          _fssaiStatus!;
+      return 'Status: $label';
+    }
     if (_fssaiNumber == null || _fssaiNumber!.isEmpty) {
-      return 'Add your 14-digit FSSAI Registration Number';
+      return 'Add your FSSAI registration details';
     }
-    final parts = <String>[_fssaiNumber!];
-    if (_fssaiRegisteredName != null && _fssaiRegisteredName!.isNotEmpty) {
-      parts.add(_fssaiRegisteredName!);
-    }
-    if (_fssaiExpiry != null) {
-      final expiry = _fssaiExpiry!;
-      parts.add(
-        'Exp ${expiry.day.toString().padLeft(2, '0')}/${expiry.month.toString().padLeft(2, '0')}/${expiry.year}',
-      );
-    }
-    return parts.join(' · ');
+    return _fssaiNumber!;
   }
 
   Future<void> _editFssai() async {
-    final numberController = TextEditingController(text: _fssaiNumber ?? '');
-    final nameController = TextEditingController(
-      text: _fssaiRegisteredName ?? '',
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SellerFssaiScreen()),
     );
-    DateTime? expiry = _fssaiExpiry;
-    String? errorText;
-
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            String expiryLabel = 'Optional';
-            if (expiry != null) {
-              expiryLabel =
-                  '${expiry!.day.toString().padLeft(2, '0')}/${expiry!.month.toString().padLeft(2, '0')}/${expiry!.year}';
-            }
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                24,
-                24,
-                24,
-                24 + MediaQuery.of(ctx).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'FSSAI details',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF101617),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    (_fssaiNumber != null && _fssaiNumber!.isNotEmpty)
-                        ? 'Saved licence $_fssaiNumber. You can update the details below.'
-                        : 'Existing sellers can add or update their licence here. This is stored for records only — not verified yet.',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF6A7774),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  TextField(
-                    controller: numberController,
-                    keyboardType: TextInputType.number,
-                    maxLength: 14,
-                    decoration: InputDecoration(
-                      labelText: 'FSSAI registration number',
-                      hintText: '14 digits',
-                      errorText: errorText,
-                      filled: true,
-                      fillColor: const Color(0xFFF5F7F6),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFF0E5A47)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: 'Registered name (optional)',
-                      filled: true,
-                      fillColor: const Color(0xFFF5F7F6),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFF0E5A47)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Expiry date'),
-                    subtitle: Text(expiryLabel),
-                    trailing: TextButton(
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: ctx,
-                          initialDate: expiry ?? DateTime.now(),
-                          firstDate: DateTime(2015),
-                          lastDate: DateTime.now().add(const Duration(days: 3650)),
-                        );
-                        if (picked != null) {
-                          setSheetState(() => expiry = picked);
-                        }
-                      },
-                      child: const Text('Choose'),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        final digits = numberController.text.replaceAll(
-                          RegExp(r'\D'),
-                          '',
-                        );
-                        if (digits.isNotEmpty && digits.length != 14) {
-                          setSheetState(
-                            () => errorText = 'Enter a 14-digit FSSAI number',
-                          );
-                          return;
-                        }
-                        Navigator.pop(ctx, true);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0E5A47),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text(
-                        'Save',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    if (saved != true || !mounted) {
-      Future<void>.delayed(const Duration(milliseconds: 300), () {
-        numberController.dispose();
-        nameController.dispose();
-      });
-      return;
-    }
-
-    final number = numberController.text.replaceAll(RegExp(r'\D'), '');
-    final registeredName = nameController.text.trim();
-    Future<void>.delayed(const Duration(milliseconds: 300), () {
-      numberController.dispose();
-      nameController.dispose();
-    });
-    final expiryIso = expiry == null
-        ? ''
-        : '${expiry!.year.toString().padLeft(4, '0')}-${expiry!.month.toString().padLeft(2, '0')}-${expiry!.day.toString().padLeft(2, '0')}';
-
-    final pending = _pendingSellerEnable;
-    if (pending != null) {
-      setState(() {
-        _fssaiNumber = number.isEmpty ? _fssaiNumber : number;
-        _fssaiRegisteredName =
-            registeredName.isEmpty ? _fssaiRegisteredName : registeredName;
-        _fssaiExpiry = expiry ?? _fssaiExpiry;
-        pending
-          ..includeFssai = true
-          ..fssaiNumber = number
-          ..fssaiRegisteredName = registeredName.isEmpty ? null : registeredName
-          ..fssaiExpiry = expiryIso.isEmpty ? null : expiryIso;
-      });
-      _refreshSellerSettings();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('FSSAI details saved')),
-      );
-      return;
-    }
-
-    try {
-      if (widget.saveFssaiDetails != null) {
-        await widget.saveFssaiDetails!(
-          fssaiNumber: number,
-          fssaiRegisteredName: registeredName,
-          fssaiExpiry: expiryIso,
-        );
-      } else {
-        final updated = await ApiService.updateMyProfile(
-          fssaiNumber: number,
-          fssaiRegisteredName: registeredName.isEmpty ? null : registeredName,
-          fssaiExpiry: expiryIso.isEmpty ? null : expiryIso,
-        );
-        _applyFssaiFromProfile(updated);
-      }
-      if (!mounted) return;
-      setState(() {
-        _fssaiNumber = number.isEmpty ? _fssaiNumber : number;
-        _fssaiRegisteredName =
-            registeredName.isEmpty ? _fssaiRegisteredName : registeredName;
-        _fssaiExpiry = expiry ?? _fssaiExpiry;
-      });
-      await _loadProfile();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('FSSAI details saved')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save FSSAI details: $e')),
-      );
-    }
+    if (!mounted) return;
+    await _loadProfile();
   }
 
   Future<void> _enableSelling() async {
@@ -1080,13 +866,27 @@ class ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveAndEnableSelling() async {
     final pending = _pendingSellerEnable;
     if (pending == null || !mounted) return;
-    final accepted = await Navigator.push<bool>(
+    final termsResult = await Navigator.push<SellerTermsAcceptResult>(
       context,
-      MaterialPageRoute(builder: (_) => const SellerTermsScreen()),
+      MaterialPageRoute(
+        builder: (_) =>
+            widget.buildSellerTermsScreen?.call() ?? const SellerTermsScreen(),
+      ),
     );
-    if (accepted != true || !mounted) return;
+    if (termsResult == null || !mounted) return;
     try {
-      final body = pending.toJson();
+      final proofUrl = widget.uploadAddressProof != null
+          ? await widget.uploadAddressProof!(
+              termsResult.documentBytes,
+              termsResult.documentMimeType,
+            )
+          : await ApiService.uploadListingImage(
+              bytes: termsResult.documentBytes,
+              mimeType: termsResult.documentMimeType,
+              purpose: 'address-proof',
+            );
+      if (!mounted) return;
+      final body = pending.toJson()..['addressProofUrl'] = proofUrl;
       final updated = widget.acceptSellerTerms != null
           ? await widget.acceptSellerTerms!(body)
           : await ApiService.acceptSellerTerms(body);

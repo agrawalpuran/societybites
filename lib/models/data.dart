@@ -108,6 +108,8 @@ class FoodItem {
   final String? sellerProfilePhotoUrl;
   final String? kitchenOpensAt;
   final String? kitchenClosesAt;
+  final bool sellerAcceptingOrders;
+  final String? sellerOrderBlockReason;
 
   const FoodItem({
     required this.id,
@@ -164,6 +166,8 @@ class FoodItem {
     this.sellerProfilePhotoUrl,
     this.kitchenOpensAt,
     this.kitchenClosesAt,
+    this.sellerAcceptingOrders = true,
+    this.sellerOrderBlockReason,
   });
 
   List<String> get listingCategories {
@@ -227,6 +231,7 @@ class FoodItem {
       !isKitchenOpen(opensAt: kitchenOpensAt, closesAt: kitchenClosesAt);
 
   bool get canAddToCart {
+    if (!sellerAcceptingOrders) return false;
     if (!isActive || madeToOrderUnavailableToday || recurringUnavailable) {
       return false;
     }
@@ -389,6 +394,8 @@ class FoodItem {
       ),
       kitchenOpensAt: _clock(json['kitchenOpensAt']),
       kitchenClosesAt: _clock(json['kitchenClosesAt']),
+      sellerAcceptingOrders: json['sellerAcceptingOrders'] != false,
+      sellerOrderBlockReason: json['sellerOrderBlockReason']?.toString(),
     );
   }
 

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -53,23 +55,34 @@ void main() {
     });
   });
 
-  testWidgets('Accept stays disabled until the seller terms checkbox is selected', (
+  testWidgets('Submit stays disabled until proof and both declarations are set', (
     tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: SellerTermsScreen()));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SellerTermsScreen(
+          initialDocumentBytes: Uint8List.fromList([1, 2, 3]),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Seller Terms & Conditions'), findsOneWidget);
-    expect(
-      find.textContaining('Before you start selling on SocietyEats'),
-      findsOneWidget,
-    );
+    expect(find.text('Take Photo'), findsNothing);
+    expect(find.text('Replace'), findsOneWidget);
     final button = tester.widget<ElevatedButton>(
       find.byKey(const Key('seller-terms-accept')),
     );
     expect(button.onPressed, isNull);
 
     await tester.tap(find.byKey(const Key('seller-terms-agree')));
+    await tester.pump();
+    expect(
+      tester.widget<ElevatedButton>(find.byKey(const Key('seller-terms-accept'))).onPressed,
+      isNull,
+    );
+
+    await tester.tap(find.byKey(const Key('seller-terms-declaration')));
     await tester.pump();
 
     final enabled = tester.widget<ElevatedButton>(
@@ -117,6 +130,10 @@ void main() {
               'fulfilmentMode': 'BUYER_PICKUP',
             };
           },
+          uploadAddressProof: (_, __) async => 'https://example.com/proof.jpg',
+          buildSellerTermsScreen: () => SellerTermsScreen(
+            initialDocumentBytes: Uint8List.fromList([1, 2, 3]),
+          ),
         ),
       ),
     );
@@ -170,12 +187,15 @@ void main() {
     expect(find.byType(SellerTermsScreen), findsOneWidget);
     expect(sent, isNull);
 
+    await tester.tap(find.byKey(const Key('seller-terms-declaration')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('seller-terms-agree')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('seller-terms-accept')));
     await tester.pumpAndSettle();
 
     expect(sent, isNotNull);
+    expect(sent!['addressProofUrl'], 'https://example.com/proof.jpg');
     expect(sent!['termsVersion'], sellerTermsVersion);
     expect(sent!['termsVersion'], '1.0');
     expect(sent!.containsKey('acceptedAt'), isFalse);

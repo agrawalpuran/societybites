@@ -531,6 +531,8 @@ router.post(
       if (!kitchenChecked.has(listing.sellerId)) {
         try {
           await assertSellerKitchenOpen(prisma, listing.sellerId);
+          const { assertSellerCanReceiveOrders } = require("../lib/fssaiCompliance");
+          await assertSellerCanReceiveOrders(listing.sellerId);
         } catch (err) {
           return res.status(err.statusCode || 400).json({
             error: err.message,
