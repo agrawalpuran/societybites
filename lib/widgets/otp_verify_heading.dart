@@ -6,12 +6,12 @@ const otpVerifyHeadingFontSize = 38.0;
 /// Reduced primary CTA height; still above a 44pt touch target.
 const otpVerifyButtonHeight = 48.0;
 
-/// Compact OTP cells on web (centered row). Height 2× legacy 44px; width 75% of height.
-const otpBoxHeight = 88.0;
-const otpBoxWidth = 66.0;
-const otpBoxGap = 16.0;
-const otpBoxBorderRadius = 20.0;
-const otpBoxFontSize = 36.0;
+/// Compact OTP cells on web (centered row). Sized for ~28px digits with comfortable padding.
+const otpBoxHeight = 72.0;
+const otpBoxWidth = 54.0;
+const otpBoxGap = 12.0;
+const otpBoxBorderRadius = 14.0;
+const otpBoxFontSize = 28.0;
 
 /// Mobile uses full-width squares; gap between digit cells.
 const otpBoxGapMobile = 8.0;

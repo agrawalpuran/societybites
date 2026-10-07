@@ -652,7 +652,7 @@ class _OtpDigitRow extends StatelessWidget {
       builder: (context, constraints) {
         final gaps = otpBoxGapMobile * (kOtpLength - 1);
         final cellWidth = (constraints.maxWidth - gaps) / kOtpLength;
-        final fontSize = (cellWidth * 0.44).clamp(22.0, 30.0);
+        final fontSize = (cellWidth * 0.38).clamp(20.0, 26.0);
         final borderRadius = (cellWidth * 0.18).clamp(12.0, 16.0);
 
         return AutofillGroup(
@@ -736,14 +736,14 @@ class _OtpInputBox extends StatelessWidget {
           fontSize: fontSize,
           fontWeight: FontWeight.w600,
           color: const Color(0xFF1D2E2B),
-          height: 1,
+          height: 1.1,
         ),
         decoration: InputDecoration(
           counterText: '',
           isDense: true,
           filled: true,
           fillColor: Colors.white.withOpacity(0.78),
-          contentPadding: EdgeInsets.zero,
+          contentPadding: const EdgeInsets.symmetric(vertical: 2),
           enabledBorder: OutlineInputBorder(
             borderRadius: radius,
             borderSide: BorderSide(

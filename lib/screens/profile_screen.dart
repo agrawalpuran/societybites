@@ -864,7 +864,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                           return;
                         }
                         final confirmed = await confirmUpiIdBeforeSave(
-                          ctx,
+                          context,
                           upiId: upi,
                         );
                         if (confirmed && ctx.mounted) {
@@ -1103,6 +1103,19 @@ class ProfileScreenState extends State<ProfileScreen> {
     await _loadProfile();
     if (!mounted) return;
     _refreshSellerSettings();
+    if (pending.includeUpi) {
+      final upi = pending.upiId?.trim() ?? '';
+      if (upi.isEmpty || !upi.contains('@')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Enter a valid UPI ID (e.g. name@oksbi) before enabling selling.'),
+          ),
+        );
+        return;
+      }
+      final confirmed = await confirmUpiIdBeforeSave(context, upiId: upi);
+      if (!confirmed || !mounted) return;
+    }
     if (!_fssaiAllowsEnableSelling) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

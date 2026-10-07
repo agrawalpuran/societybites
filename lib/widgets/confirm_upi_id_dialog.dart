@@ -10,6 +10,8 @@ Future<bool> confirmUpiIdBeforeSave(
 }) async {
   final result = await showDialog<bool>(
     context: context,
+    useRootNavigator: true,
+    barrierDismissible: false,
     builder: (ctx) => ConfirmUpiIdDialog(upiId: upiId),
   );
   return result == true;
