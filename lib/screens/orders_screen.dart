@@ -904,19 +904,7 @@ class _ActiveOrderCard extends StatelessWidget {
                       : const Color(0xFF8A9491),
                 ),
               ),
-              const Spacer(),
-              Flexible(
-                child: Text(
-                  '${order.orderId} · ${order.placedAtLabel}',
-                  textAlign: TextAlign.right,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFFADB5B2),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+              _OrderCardPlacedMeta(order: order),
             ],
           ),
           if (order.isPreOrder) ...[
@@ -1895,6 +1883,45 @@ class _ExploreBanner extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Order # and placed time on separate lines so the clock is never clipped.
+class _OrderCardPlacedMeta extends StatelessWidget {
+  const _OrderCardPlacedMeta({required this.order});
+
+  final Order order;
+
+  static const _style = TextStyle(
+    fontSize: 12,
+    color: Color(0xFFADB5B2),
+    fontWeight: FontWeight.w600,
+    height: 1.25,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            order.orderId,
+            textAlign: TextAlign.right,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _style,
+          ),
+          Text(
+            order.placedAtLabel,
+            textAlign: TextAlign.right,
+            maxLines: 1,
+            style: _style,
           ),
         ],
       ),
