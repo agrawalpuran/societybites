@@ -2078,39 +2078,62 @@ class _SpecialCard extends StatelessWidget {
               ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 2,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  GestureDetector(
-                    onTap: onSellerTap,
-                    child: Text(
-                      'By ${food.sellerName}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.25,
-                        color: isDark
-                            ? Colors.white
-                            : const Color(0xFF0E5A47),
-                        decoration: TextDecoration.underline,
-                        decorationColor: isDark
-                            ? Colors.white
-                            : const Color(0xFF0E5A47),
-                        fontWeight: FontWeight.w700,
-                      ),
+                  Expanded(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        GestureDetector(
+                          onTap: onSellerTap,
+                          child: Text(
+                            'By ${food.sellerName}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.25,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF0E5A47),
+                              decoration: TextDecoration.underline,
+                              decorationColor: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF0E5A47),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (food.homePlaceLabel.isNotEmpty)
+                          Text(
+                            food.homePlaceLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.25,
+                              color: isDark
+                                  ? Colors.white70
+                                  : const Color(0xFF6A7774),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  if (food.homePlaceLabel.isNotEmpty)
-                    Text(
-                      food.homePlaceLabel,
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.25,
-                        color: isDark
-                            ? Colors.white70
-                            : const Color(0xFF6A7774),
-                        fontWeight: FontWeight.w500,
+                  if (listingSoldCaption(food.quantitySold).isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6, top: 1),
+                      child: Text(
+                        listingSoldCaption(food.quantitySold),
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.25,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? Colors.white70
+                              : const Color(0xFF6A7774),
+                        ),
                       ),
                     ),
                 ],
@@ -2119,25 +2142,13 @@ class _SpecialCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 10, 12),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
-                    child: Text(
-                      '₹${food.price.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: isDark
-                            ? Colors.white
-                            : const Color(0xFF101617),
-                      ),
-                    ),
+                    child: ListingCompactPriceRow(food: food, isDark: isDark),
                   ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: MarketplacePurchaseSlot(
+                  const SizedBox(width: 6),
+                  MarketplacePurchaseSlot(
                         food: food,
                         cartQty: cartQty,
                         soldOut: Container(
@@ -2225,8 +2236,6 @@ class _SpecialCard extends StatelessWidget {
                             ],
                           ),
                         ),
-                      ),
-                    ),
                   ),
                 ],
               ),

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/data.dart';
-import '../utils/listing_portion_label.dart';
 import 'listing_type_badge.dart';
 
-/// Top of narrow home / nearby carousel cards: one badge row + optional meta line.
+/// Top of narrow home / nearby carousel cards: type badge + NEW / rating.
 class ListingCompactCardHeader extends StatelessWidget {
   const ListingCompactCardHeader({
     super.key,
@@ -17,54 +16,25 @@ class ListingCompactCardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final meta = <String>[];
-    final portion = portionLabelForFood(food);
-    if (portion != null) meta.add(portion);
-    final sold = listingSoldCaption(food.quantitySold);
-    if (sold.isNotEmpty) meta.add(sold);
-    final metaLine = meta.join(' · ');
-
-    final muted = isDark ? Colors.white70 : const Color(0xFF6A7774);
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Flexible(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: ListingTypeBadge(food: food, compact: true),
-                ),
-              ),
-              const SizedBox(width: 6),
-              _ListingTrustTrail(food: food, isDark: isDark),
-            ],
-          ),
-          if (metaLine.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: Text(
-                metaLine,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: muted,
-                  height: 1.2,
-                ),
-              ),
+          Flexible(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ListingTypeBadge(food: food, compact: true),
             ),
+          ),
+          const SizedBox(width: 6),
+          _ListingTrustTrail(food: food, isDark: isDark),
         ],
       ),
     );
   }
 }
 
-/// NEW and/or star rating — never "No reviews yet" on compact cards (sold → meta line).
+/// NEW and/or star rating — never "No reviews yet" on compact cards.
 class _ListingTrustTrail extends StatelessWidget {
   const _ListingTrustTrail({required this.food, required this.isDark});
 
