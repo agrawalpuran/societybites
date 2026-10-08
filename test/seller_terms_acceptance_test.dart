@@ -43,6 +43,21 @@ Future<void> _openFirstTimeSettings(WidgetTester tester) async {
   while (tester.takeException() != null) {}
 }
 
+Future<void> _enterAndConfirmSellerUpi(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('seller-setup-upi-id')));
+  await tester.pump();
+  await tester.enterText(
+    find.byKey(const Key('seller-setup-upi-id')),
+    'seller@oksbi',
+  );
+  await tester.testTextInput.receiveAction(TextInputAction.done);
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('confirm-upi-id-checkbox')));
+  await tester.pump();
+  await tester.tap(find.byKey(const Key('confirm-upi-id-save')));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -147,7 +162,7 @@ void main() {
     await _openFirstTimeSettings(tester);
     expect(find.byType(SellerSettingsScreen), findsOneWidget);
     expect(find.text('Cash on Delivery in society, UPI outside'), findsOneWidget);
-    expect(find.text('UPI ID'), findsOneWidget);
+    expect(find.byKey(const Key('seller-setup-upi-id')), findsOneWidget);
     expect(find.text('My Society'), findsOneWidget);
     expect(find.text('FSSAI details'), findsOneWidget);
     expect(find.text('Save / Enable Selling'), findsOneWidget);
@@ -160,6 +175,20 @@ void main() {
     expect(find.text('UPI Only'), findsWidgets);
     expect(profileSaves, 0);
     expect(sent, isNull);
+
+    expect(
+      tester
+          .widget<ElevatedButton>(find.byKey(const Key('seller-settings-enable')))
+          .onPressed,
+      isNull,
+    );
+    await _enterAndConfirmSellerUpi(tester);
+    expect(
+      tester
+          .widget<ElevatedButton>(find.byKey(const Key('seller-settings-enable')))
+          .onPressed,
+      isNotNull,
+    );
 
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();

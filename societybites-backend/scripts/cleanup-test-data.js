@@ -232,6 +232,15 @@ async function main() {
     console.log("dry run only");
     return;
   }
+  const {
+    clearAddressProofForAnonymizedUsers,
+  } = require("../lib/addressProofReview");
+  const clearedProofs = await clearAddressProofForAnonymizedUsers();
+  if (clearedProofs > 0) {
+    console.log(
+      `cleared stale address proof on ${clearedProofs} anonymized account(s)`
+    );
+  }
   await apply(plan);
   const after = await collect();
   console.log(

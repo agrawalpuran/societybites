@@ -1,4 +1,5 @@
 const prisma = require("./prisma");
+const { isAnonymizedDeletedUser } = require("./accountDeletion");
 
 const ADDRESS_PROOF_STATUSES = ["PENDING", "OK", "FOLLOW_UP"];
 
@@ -64,7 +65,9 @@ async function listAddressProofs({ status } = {}) {
     include: userInclude,
     orderBy: { createdAt: "desc" },
   });
-  return users.map(serializeSummary);
+  return users
+    .filter((user) => !isAnonymizedDeletedUser(user))
+    .map(serializeSummary);
 }
 
 async function getAddressProof(userId) {
@@ -72,7 +75,7 @@ async function getAddressProof(userId) {
     where: { id: String(userId) },
     include: userInclude,
   });
-  if (!user || !user.addressProofUrl) {
+  if (!user || !user.addressProofUrl || isAnonymizedDeletedUser(user)) {
     throw httpError(404, "Address proof not found");
   }
   return serializeDetail(user);
@@ -87,7 +90,7 @@ async function reviewAddressProof({ adminUser, userId, status }) {
     where: { id: String(userId) },
     include: userInclude,
   });
-  if (!user || !user.addressProofUrl) {
+  if (!user || !user.addressProofUrl || isAnonymizedDeletedUser(user)) {
     throw httpError(404, "Address proof not found");
   }
   const from = displayStatus(user.addressProofStatus);
@@ -114,9 +117,27 @@ async function reviewAddressProof({ adminUser, userId, status }) {
   return serializeDetail(updated);
 }
 
+/** Clears address-proof fields left on anonymized accounts (legacy rows). */
+async function clearAddressProofForAnonymizedUsers() {
+  const result = await prisma.user.updateMany({
+    where: {
+      phone: { startsWith: "deleted_" },
+      addressProofUrl: { not: null },
+    },
+    data: {
+      addressProofUrl: null,
+      addressProofStatus: null,
+      addressProofReviewedAt: null,
+      addressProofReviewedBy: null,
+    },
+  });
+  return result.count;
+}
+
 module.exports = {
   ADDRESS_PROOF_STATUSES,
   listAddressProofs,
   getAddressProof,
   reviewAddressProof,
+  clearAddressProofForAnonymizedUsers,
 };

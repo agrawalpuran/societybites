@@ -30,6 +30,7 @@ class SellerSettingsScreen extends StatelessWidget {
     required this.onChangeKitchenHours,
     required this.onEditFssai,
     this.onSaveAndEnable,
+    this.upiReadyForEnableSelling = true,
     this.isFirstTimeSetup = false,
     this.paymentPreference,
     this.onPaymentPreferenceChanged,
@@ -65,6 +66,7 @@ class SellerSettingsScreen extends StatelessWidget {
   final VoidCallback onChangeKitchenHours;
   final VoidCallback onEditFssai;
   final VoidCallback? onSaveAndEnable;
+  final bool upiReadyForEnableSelling;
   final bool isFirstTimeSetup;
 
   final SellerPaymentPreference? paymentPreference;
@@ -279,13 +281,30 @@ class SellerSettingsScreen extends StatelessWidget {
                             ),
                           ),
                         ),
+                      if (!upiReadyForEnableSelling)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 10),
+                          child: Text(
+                            'Enter your UPI ID and confirm it before you can enable selling.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.35,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF6A7774),
+                            ),
+                          ),
+                        ),
                       SizedBox(
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
                           key: const Key('seller-settings-enable'),
                           onPressed:
-                              fssaiAllowsEnableSelling ? onSaveAndEnable : null,
+                              fssaiAllowsEnableSelling &&
+                                      upiReadyForEnableSelling
+                                  ? onSaveAndEnable
+                                  : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF0E5A47),
                             foregroundColor: Colors.white,

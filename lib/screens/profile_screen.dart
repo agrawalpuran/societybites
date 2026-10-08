@@ -318,6 +318,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       pending.upiIdConfirmed = true;
     });
+    _refreshSellerSettings();
   }
 
   void _onPendingUpiConfirmationInvalidated() {
@@ -328,6 +329,14 @@ class ProfileScreenState extends State<ProfileScreen> {
       pending.includeUpi = false;
     });
     _refreshSellerSettings();
+  }
+
+  bool get _pendingUpiReadyForEnable {
+    final pending = _pendingSellerEnable;
+    if (pending == null) return true;
+    final upi = pending.upiId?.trim() ?? _upiId?.trim() ?? '';
+    if (upi.isEmpty || !upi.contains('@')) return false;
+    return pending.upiIdConfirmed;
   }
 
   void _onPendingSellingReachChanged(SellingReachLevel selected) {
@@ -591,6 +600,8 @@ class ProfileScreenState extends State<ProfileScreen> {
               onChangeKitchenHours: _changeKitchenHours,
               onEditFssai: _editFssai,
               onSaveAndEnable: holdingSetup ? _saveAndEnableSelling : null,
+              upiReadyForEnableSelling:
+                  holdingSetup ? _pendingUpiReadyForEnable : true,
               paymentPreference:
                   holdingSetup ? _paymentPreference : null,
               onPaymentPreferenceChanged: holdingSetup
@@ -1156,21 +1167,25 @@ class ProfileScreenState extends State<ProfileScreen> {
     await _loadProfile();
     if (!mounted) return;
     _refreshSellerSettings();
-    if (pending.includeUpi) {
-      final upi = pending.upiId?.trim() ?? '';
-      if (upi.isEmpty || !upi.contains('@')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Enter a valid UPI ID (e.g. name@oksbi) before enabling selling.'),
+    final upi = pending.upiId?.trim() ?? _upiId?.trim() ?? '';
+    if (upi.isEmpty || !upi.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Enter a valid UPI ID (e.g. name@oksbi) before enabling selling.',
           ),
-        );
-        return;
-      }
-      if (!pending.upiIdConfirmed) {
-        final confirmed = await confirmUpiIdBeforeSave(context, upiId: upi);
-        if (!confirmed || !mounted) return;
-        pending.upiIdConfirmed = true;
-      }
+        ),
+      );
+      return;
+    }
+    if (!pending.upiIdConfirmed) {
+      final confirmed = await confirmUpiIdBeforeSave(context, upiId: upi);
+      if (!confirmed || !mounted) return;
+      pending.upiIdConfirmed = true;
+      pending
+        ..includeUpi = true
+        ..upiId = upi
+        ..upiDisplayName = pending.upiDisplayName ?? _upiDisplayName;
     }
     if (!_fssaiAllowsEnableSelling) {
       ScaffoldMessenger.of(context).showSnackBar(

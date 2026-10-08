@@ -228,6 +228,7 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
         }),
         const SizedBox(height: 12),
         TextField(
+          key: const Key('seller-setup-upi-id'),
           controller: _upiController,
           focusNode: _upiFocus,
           keyboardType: TextInputType.emailAddress,
@@ -236,6 +237,7 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
           decoration: _fieldDecoration(
             label: 'UPI ID',
             hint: 'yourname@oksbi',
+            required: true,
           ),
         ),
         if (_confirmedUpiSnapshot != null &&
@@ -363,9 +365,27 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
     required String label,
     String? hint,
     String? prefix,
+    bool required = false,
   }) {
     return InputDecoration(
-      labelText: label,
+      label: required
+          ? Text.rich(
+              TextSpan(
+                text: label,
+                style: const TextStyle(color: Color(0xFF6A7774)),
+                children: const [
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Color(0xFFC62828),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : null,
+      labelText: required ? null : label,
       hintText: hint,
       prefixText: prefix,
       filled: true,

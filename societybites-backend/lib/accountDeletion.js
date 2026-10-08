@@ -1,5 +1,11 @@
 const prisma = require("./prisma");
 
+/** Accounts anonymized for privacy; row kept for order/listing FK history. */
+function isAnonymizedDeletedUser(user) {
+  if (!user) return true;
+  return String(user.phone || "").startsWith("deleted_");
+}
+
 /**
  * Privacy-preserving account deletion for SocietyBites.
  *
@@ -72,6 +78,10 @@ async function deleteAuthenticatedAccount(userId) {
         societyId: null,
         flatId: null,
         suspended: true,
+        addressProofUrl: null,
+        addressProofStatus: null,
+        addressProofReviewedAt: null,
+        addressProofReviewedBy: null,
       },
     });
 
@@ -81,4 +91,5 @@ async function deleteAuthenticatedAccount(userId) {
 
 module.exports = {
   deleteAuthenticatedAccount,
+  isAnonymizedDeletedUser,
 };

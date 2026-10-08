@@ -218,6 +218,26 @@ async function main() {
     });
     assert(kept.user.addressProofStatus === "OK", "the same photo keeps its review");
 
+    await prisma.user.update({
+      where: { id: seller.id },
+      data: {
+        phone: `deleted_${seller.id}`,
+        name: null,
+        suspended: true,
+        societyId: null,
+        flatId: null,
+      },
+    });
+    const hidden = await jsonRequest(server, {
+      method: "GET",
+      path: "/admin/address-proofs?status=PENDING",
+      token: adminToken,
+    });
+    assert(
+      !hidden.json.records.some((item) => item.userId === seller.id),
+      "anonymized deleted accounts are not listed"
+    );
+
     console.log("address proof review ok");
   } finally {
     server.close();
