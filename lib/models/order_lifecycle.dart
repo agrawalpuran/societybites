@@ -289,15 +289,23 @@ class BuyerOrderLifecycle {
   /// Cancel remains a separate existing action, not a status-progress action.
   static bool hasProgressAction(String status) => false;
 
-  /// UPI: until the buyer taps I've Paid. COD: until the seller accepts.
+  /// UPI: until the buyer taps I've Paid. Cash: until the order is ready
+  /// (including auto-confirmed regular orders that skip pending).
   static bool canCancel({
     required String status,
     required String paymentStatus,
     String? paymentMethod,
+    bool sellerCanDecline = false,
   }) {
     final method = (paymentMethod ?? 'upi').toLowerCase();
     final isCash = method == 'cash';
-    if (isCash) return status == 'pending';
+    if (isCash) {
+      if (status == 'pending') return true;
+      // Auto-accepted regular orders stay cancellable at accepted; MTO/pre-order
+      // cash closes once the seller accepts ([buyerCancelDeniedReason]).
+      if (status == 'accepted' && sellerCanDecline) return true;
+      return false;
+    }
 
     final paymentLocked = paymentStatus == 'buyer_marked_paid' ||
         paymentStatus == 'seller_confirmed' ||

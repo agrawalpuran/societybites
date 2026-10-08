@@ -6,8 +6,8 @@ import '../models/data.dart';
 import '../models/listing_availability.dart';
 import '../services/api_service.dart';
 import '../services/my_listings_cache.dart';
+import '../services/my_listings_prefetch.dart';
 import '../services/seller_onboarding.dart';
-import '../services/session_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/listing_type_badge.dart';
@@ -97,7 +97,8 @@ class MyListingsScreenState extends State<MyListingsScreen>
   }
 
   Future<void> _loadListings() async {
-    if (!_hasSuccessfullyLoaded && mounted) {
+    final showSpinner = !_hasSuccessfullyLoaded && !MyListingsCache.hasSnapshot;
+    if (showSpinner && mounted) {
       setState(() {
         _isLoading = true;
         _error = null;
@@ -105,42 +106,8 @@ class MyListingsScreenState extends State<MyListingsScreen>
     }
 
     try {
-      List<Map<String, dynamic>> raw;
-      final fetchListings = widget.fetchListings;
-      if (fetchListings != null) {
-        raw = await fetchListings();
-      } else {
-        final societyId = await SessionService.getSocietyId();
-        final userId = await SessionService.getUserId();
-        if (userId == null) {
-          throw Exception('Please log in again.');
-        }
-        if (societyId == null || societyId.isEmpty) {
-          throw Exception('Join your society to manage listings.');
-        }
-
-        raw = await ApiService.getListings(
-          societyId: societyId,
-          sellerId: userId,
-          status: 'all',
-          catalogType: 'all',
-        ).timeout(
-          const Duration(seconds: 20),
-          onTimeout: () {
-            throw Exception('Could not load listings. Please try again.');
-          },
-        );
-      }
-      final listings = <FoodItem>[];
-      for (final item in raw) {
-        try {
-          listings.add(FoodItem.fromJson(item));
-        } catch (_) {
-          // Skip a corrupt row so one bad listing cannot blank the screen.
-        }
-      }
-
-      MyListingsCache.replace(listings);
+      await MyListingsPrefetch.warm(fetchListings: widget.fetchListings);
+      final listings = MyListingsCache.listings;
       if (!mounted) return;
       setState(() {
         _listings = listings;
@@ -611,35 +578,52 @@ class MyListingsScreenState extends State<MyListingsScreen>
                               child: TabBarView(
                                 controller: _tabController,
                                 children: [
-                                  _buildCatalogPane(
-                                    listings: _listings,
-                                    emptyTitle: 'No listings yet',
-                                    emptyBody:
-                                        'Add food items for regular orders, made to order, or pre-orders.',
-                                    addLabel: 'Add Listing',
+                                  _LazyCatalogTab(
+                                    tabIndex: 0,
+                                    controller: _tabController,
+                                    child: _buildCatalogPane(
+                                      listings: _listings,
+                                      emptyTitle: 'No listings yet',
+                                      emptyBody:
+                                          'Add food items for regular orders, made to order, or pre-orders.',
+                                      addLabel: 'Add Listing',
+                                    ),
                                   ),
-                                  _buildCatalogPane(
-                                    listings: _regularReadyNowListings,
-                                    emptyTitle: 'No regular listings yet',
-                                    emptyBody:
-                                        'Add food items that customers can order anytime.',
-                                    addLabel: 'Add Listing',
+                                  _LazyCatalogTab(
+                                    tabIndex: 1,
+                                    controller: _tabController,
+                                    child: _buildCatalogPane(
+                                      listings: _regularReadyNowListings,
+                                      emptyTitle: 'No regular listings yet',
+                                      emptyBody:
+                                          'Add food items that customers can order anytime.',
+                                      addLabel: 'Add Listing',
+                                    ),
                                   ),
-                                  _buildCatalogPane(
-                                    listings: _madeToOrderListings,
-                                    emptyTitle: 'No made-to-order listings yet',
-                                    emptyBody:
-                                        'Add items you will prepare after a buyer places an order.',
-                                    addLabel: 'Add Listing',
+                                  _LazyCatalogTab(
+                                    tabIndex: 2,
+                                    controller: _tabController,
+                                    child: _buildCatalogPane(
+                                      listings: _madeToOrderListings,
+                                      emptyTitle:
+                                          'No made-to-order listings yet',
+                                      emptyBody:
+                                          'Add items you will prepare after a buyer places an order.',
+                                      addLabel: 'Add Listing',
+                                    ),
                                   ),
-                                  _buildCatalogPane(
-                                    listings: _preorderListings,
-                                    emptyTitle: 'No pre-order items yet',
-                                    emptyBody:
-                                        'Add food items that customers can order through your pre-order campaigns.',
-                                    addLabel: 'Add catalog',
-                                    createPreorderItem: true,
-                                    showAddCatalog: true,
+                                  _LazyCatalogTab(
+                                    tabIndex: 3,
+                                    controller: _tabController,
+                                    child: _buildCatalogPane(
+                                      listings: _preorderListings,
+                                      emptyTitle: 'No pre-order items yet',
+                                      emptyBody:
+                                          'Add food items that customers can order through your pre-order campaigns.',
+                                      addLabel: 'Add catalog',
+                                      createPreorderItem: true,
+                                      showAddCatalog: true,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1353,5 +1337,51 @@ class _RenewListingDialogState extends State<_RenewListingDialog> {
         ),
       ],
     );
+  }
+}
+
+/// Builds catalog content only after its tab is first selected.
+class _LazyCatalogTab extends StatefulWidget {
+  const _LazyCatalogTab({
+    required this.tabIndex,
+    required this.controller,
+    required this.child,
+  });
+
+  final int tabIndex;
+  final TabController controller;
+  final Widget child;
+
+  @override
+  State<_LazyCatalogTab> createState() => _LazyCatalogTabState();
+}
+
+class _LazyCatalogTabState extends State<_LazyCatalogTab> {
+  bool _built = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onTabChanged);
+    _onTabChanged();
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onTabChanged);
+    super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (_built || widget.controller.index != widget.tabIndex) return;
+    setState(() => _built = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_built) {
+      return const ColoredBox(color: Color(0xFFF8FAF9));
+    }
+    return widget.child;
   }
 }

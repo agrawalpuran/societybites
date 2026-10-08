@@ -5,6 +5,7 @@ import '../models/food_type.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/listing_type_badge.dart';
+import '../widgets/listing_portion_caption.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/recurring_availability_hint.dart';
 import 'web_breakpoints.dart';
@@ -170,6 +171,14 @@ class WebFoodCard extends StatelessWidget {
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                               color: webInk,
+                            ),
+                          ),
+                          ListingPortionCaption(
+                            food: food,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: webMuted,
                             ),
                           ),
                           if (food.quantity > 0 && !food.isExpired)

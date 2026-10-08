@@ -14,6 +14,7 @@ const {
 const {
   expireDueListings,
   expireListingIfDue,
+  isPastAvailableAt,
   DISCOVERABLE_STATUSES,
 } = require("../utils/listingExpiry");
 const { campaignHasOrders } = require("../lib/preorder");
@@ -52,8 +53,10 @@ const {
 async function jsonListings(listings) {
   const withCapacity = await attachMadeToOrderCapacity(prisma, listings);
   const withRecurring = await attachRecurringAvailability(prisma, withCapacity);
-  await attachQuantitySold(prisma, withRecurring);
-  await attachListingReviewAggregates(prisma, withRecurring);
+  await Promise.all([
+    attachQuantitySold(prisma, withRecurring),
+    attachListingReviewAggregates(prisma, withRecurring),
+  ]);
   return serializeListingsWithSellerOrderability(withRecurring);
 }
 
@@ -140,12 +143,8 @@ router.get(
     const { sellerId, status = "active", search, category, catalogType } = req.query;
 
     const searchTerm = search ? String(search).trim() : "";
-
-    // Lazy expiry before any listing read (no cron).
-    await expireDueListings(prisma, {
-      societyId,
-      ...(sellerId && { sellerId: String(sellerId) }),
-    });
+    const sellerScope = sellerId ? String(sellerId) : null;
+    const isDiscoverableBuyerFeed = status === "discoverable" && !sellerScope;
 
     let statusFilter;
     if (status === "all") {
@@ -185,11 +184,18 @@ router.get(
       });
     }
 
+    if (!isDiscoverableBuyerFeed) {
+      await expireDueListings(
+        prisma,
+        sellerScope ? { sellerId: sellerScope } : { societyId }
+      );
+    }
+
     const listings = await prisma.listing.findMany({
       where: {
         societyId,
         ...catalogWhere,
-        ...(sellerId && { sellerId: String(sellerId) }),
+        ...(sellerScope && { sellerId: sellerScope }),
         ...statusFilter,
         ...(extraFilters.length === 1 ? extraFilters[0] : {}),
         ...(extraFilters.length > 1 ? { AND: extraFilters } : {}),
@@ -197,6 +203,20 @@ router.get(
       include: listingInclude,
       orderBy: { createdAt: "desc" },
     });
+
+    if (isDiscoverableBuyerFeed) {
+      const dueIds = listings
+        .filter((listing) => isPastAvailableAt(listing))
+        .map((listing) => listing.id);
+      if (dueIds.length > 0) {
+        await expireDueListings(prisma, { ids: dueIds });
+        for (const listing of listings) {
+          if (dueIds.includes(listing.id)) {
+            listing.status = "expired";
+          }
+        }
+      }
+    }
 
     const payload = await jsonListings(listings);
     res.json(payload);

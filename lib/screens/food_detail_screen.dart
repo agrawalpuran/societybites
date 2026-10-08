@@ -5,6 +5,8 @@ import '../widgets/listing_image.dart';
 import '../widgets/listing_rating_mark.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/app_header.dart';
+import '../utils/listing_portion_label.dart';
+import '../utils/listing_timing_chip.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/recurring_availability_hint.dart';
 import '../widgets/temporarily_unavailable_label.dart';
@@ -237,7 +239,7 @@ class _HeroSection extends StatelessWidget {
               ],
               const SizedBox(height: 6),
               Text(
-                '₹${food.price.toStringAsFixed(0)} / portion',
+                listingPricePerUnitLabel(food),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -283,26 +285,41 @@ class _QuickInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final soldOut = food.quantity <= 0;
+    final portion = portionLabelForFood(food);
+    final timing = listingTimingChipFor(food);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: _InfoChip(
-              label: 'AVAILABILITY',
-              value: soldOut ? 'Sold out' : '${food.quantity}',
-              sub: soldOut ? 'currently unavailable' : 'portions left',
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _InfoChip(
+                label: 'AVAILABILITY',
+                value: soldOut ? 'Sold out' : '${food.quantity}',
+                sub: soldOut ? 'currently unavailable' : 'portions left',
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _InfoChip(
-              label: 'PICKUP',
-              value: food.pickupTime,
-              sub: food.buyerPlaceLabel,
+            const SizedBox(width: 12),
+            if (portion != null) ...[
+              Expanded(
+                child: _InfoChip(
+                  label: 'PORTION',
+                  value: portion,
+                  sub: 'per unit',
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: _InfoChip(
+                label: timing.label,
+                value: timing.value,
+                sub: timing.sub,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -320,8 +337,10 @@ class _InfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compactValue = value.length > 14;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      constraints: const BoxConstraints(minHeight: 104),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -339,23 +358,31 @@ class _InfoChip extends StatelessWidget {
               color: Color(0xFF8A9491),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 24,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: compactValue ? 17 : 24,
+              height: compactValue ? 1.2 : 1.1,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF101617),
+              color: const Color(0xFF101617),
             ),
           ),
-          Text(
-            sub,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF8A9491),
-              fontWeight: FontWeight.w500,
+          const Spacer(),
+          if (sub.isNotEmpty)
+            Text(
+              sub,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF8A9491),
+                fontWeight: FontWeight.w500,
+                height: 1.25,
+              ),
             ),
-          ),
         ],
       ),
     );

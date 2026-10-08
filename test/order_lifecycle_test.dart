@@ -226,7 +226,7 @@ void main() {
     );
   });
 
-  test('buyer cancel is allowed only before UPI I\'ve Paid or COD accept', () {
+  test('buyer cancel is allowed only before UPI I\'ve Paid or COD ready', () {
     expect(
       BuyerOrderLifecycle.canCancel(
         status: 'pending',
@@ -272,6 +272,16 @@ void main() {
         status: 'accepted',
         paymentStatus: 'pending',
         paymentMethod: 'cash',
+        sellerCanDecline: true,
+      ),
+      isTrue,
+    );
+    expect(
+      BuyerOrderLifecycle.canCancel(
+        status: 'accepted',
+        paymentStatus: 'pending',
+        paymentMethod: 'cash',
+        sellerCanDecline: false,
       ),
       isFalse,
     );

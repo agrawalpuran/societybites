@@ -34,12 +34,10 @@ class SellerInsightsPanel extends StatefulWidget {
     super.key,
     this.fetchInsights,
     this.showHeading = true,
-    this.onSeeAllOrders,
   });
 
   final SellerInsightsFetcher? fetchInsights;
   final bool showHeading;
-  final VoidCallback? onSeeAllOrders;
 
   @override
   State<SellerInsightsPanel> createState() => _SellerInsightsPanelState();
@@ -218,10 +216,7 @@ class _SellerInsightsPanelState extends State<SellerInsightsPanel> {
           else if (_error != null)
             _ErrorCard(message: _error!, onRetry: _load)
           else
-            _InsightsBody(
-              data: _data,
-              onSeeAllOrders: widget.onSeeAllOrders,
-            ),
+            _InsightsBody(data: _data),
         ],
       ),
     );
@@ -270,10 +265,9 @@ class _ErrorCard extends StatelessWidget {
 }
 
 class _InsightsBody extends StatelessWidget {
-  const _InsightsBody({required this.data, this.onSeeAllOrders});
+  const _InsightsBody({required this.data});
 
   final Map<String, dynamic> data;
-  final VoidCallback? onSeeAllOrders;
 
   Map<String, dynamic> get summary =>
       Map<String, dynamic>.from(data['summary'] as Map? ?? const {});
@@ -393,12 +387,6 @@ class _InsightsBody extends StatelessWidget {
           );
           final recentCard = _SectionCard(
             title: 'Recent orders',
-            trailing: onSeeAllOrders == null
-                ? null
-                : TextButton(
-                    onPressed: onSeeAllOrders,
-                    child: const Text('See all'),
-                  ),
             child: recent.isEmpty
                 ? const Text(
                     'No orders in this period.',
@@ -518,12 +506,6 @@ class _InsightsBody extends StatelessWidget {
         const SizedBox(height: 12),
         _SectionCard(
           title: 'Recent orders',
-          trailing: onSeeAllOrders == null
-              ? null
-              : TextButton(
-                  onPressed: onSeeAllOrders,
-                  child: const Text('See all'),
-                ),
           child: recent.isEmpty
               ? const Text(
                   'No orders in this period.',

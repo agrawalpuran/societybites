@@ -89,6 +89,7 @@ Future<Widget> resolveAuthStartScreen() async {
   }
 
   if (await SessionService.isOnboarded()) {
+    await SessionService.warmAuthCache();
     return const MainShellScreen();
   }
 

@@ -1,5 +1,6 @@
 ﻿import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../web/web_breakpoints.dart';
 import '../web/web_page_frame.dart';
@@ -13,6 +14,7 @@ import '../models/order_lifecycle.dart';
 import '../models/seller_order_history.dart';
 import '../services/api_service.dart';
 import '../widgets/order_lifecycle_dialogs.dart';
+import '../services/my_listings_prefetch.dart';
 import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
@@ -84,6 +86,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   bool _preOrdersSlow = false;
   Timer? _ordersSlowTimer;
   Timer? _preOrdersSlowTimer;
+  Timer? _ordersBackgroundRefreshTimer;
   bool _didNotifyInitialSettle = false;
   int _ordersLoadGen = 0;
   final _pullRefresh = PullRefreshGate();
@@ -98,6 +101,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   KitchenOrderCategory _kitchenFilter = KitchenOrderCategory.orders;
   String? _role;
   bool _roleLoaded = false;
+  bool _sellerWarmStarted = false;
+  bool _listingAssetsPrecacheScheduled = false;
 
   bool get _canSell => _role == 'seller' || _role == 'super_admin';
 
@@ -112,7 +117,16 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   void dispose() {
     _ordersSlowTimer?.cancel();
     _preOrdersSlowTimer?.cancel();
+    _ordersBackgroundRefreshTimer?.cancel();
     super.dispose();
+  }
+
+  /// Debounced full refresh (e.g. after closing order messages), not status actions.
+  Future<void> _scheduleBackgroundOrdersRefresh() async {
+    _ordersBackgroundRefreshTimer?.cancel();
+    _ordersBackgroundRefreshTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) unawaited(_loadOrders());
+    });
   }
 
   void _armSlowTimer({
@@ -193,6 +207,50 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       _role = role;
       _roleLoaded = true;
     });
+    _warmSellerSurfaces(role);
+  }
+
+  void _warmSellerSurfaces(String? role) {
+    if (role != 'seller' && role != 'super_admin') return;
+    if (!_sellerWarmStarted) {
+      _sellerWarmStarted = true;
+      unawaited(_warmListingsCacheWhenReady());
+      unawaited(SellerOnboarding.refreshListingGateCache());
+    }
+    _scheduleListingAssetPrecacheOnce();
+  }
+
+  Future<void> _warmListingsCacheWhenReady() async {
+    final societyId = await SessionService.getSocietyId();
+    if (societyId == null || societyId.isEmpty) return;
+    try {
+      await MyListingsPrefetch.warm();
+    } catch (_) {}
+  }
+
+  void _scheduleListingAssetPrecacheOnce() {
+    if (_listingAssetsPrecacheScheduled) return;
+    _listingAssetsPrecacheScheduled = true;
+    // Web debug can serve assets slightly after the first frame (preload path).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_precacheAddListingAssetsSafely());
+    });
+  }
+
+  Future<void> _precacheAddListingAssetsSafely() async {
+    if (!mounted) return;
+    if (kIsWeb && kDebugMode) return;
+
+    const assets = [
+      'assets/images/available_now.jpg',
+      'assets/images/made_to_order.jpg',
+      'assets/images/pre_order.jpg',
+    ];
+    for (final asset in assets) {
+      if (!mounted) return;
+      await precacheImage(AssetImage(asset), context).catchError((_) {});
+    }
   }
 
   Future<void> _startSelling() async {
@@ -617,7 +675,6 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       if (!mounted) return;
 
       _upsertOrder(Order.fromJson(json));
-      unawaited(_loadOrders());
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -697,25 +754,26 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   Future<void> _applyReadyBy(String orderId, Object result) async {
     try {
+      Map<String, dynamic> json;
       if (result == 'clear') {
-        await ApiService.setOrderReadyTime(
+        json = await ApiService.setOrderReadyTime(
           orderId: orderId,
           expectedReadyAt: null,
         );
       } else if (result is DateTime) {
-        await ApiService.setOrderReadyTime(
+        json = await ApiService.setOrderReadyTime(
           orderId: orderId,
           expectedReadyAt: result,
         );
       } else if (result is num) {
-        await ApiService.setOrderReadyTime(
+        json = await ApiService.setOrderReadyTime(
           orderId: orderId,
           readyInMinutes: result,
         );
       } else {
         return;
       }
-      await _loadOrders();
+      if (mounted) _upsertOrder(Order.fromJson(json));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -752,7 +810,6 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         otherText: result.note,
       );
       if (mounted) _upsertOrder(Order.fromJson(json));
-      await _loadOrders();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1045,10 +1102,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           SliverToBoxAdapter(child: _buildDashboardHeader()),
           SliverToBoxAdapter(child: _buildSatisfactionRow()),
           SliverToBoxAdapter(
-            child: SellerInsightsPanel(
-              showHeading: false,
-              onSeeAllOrders: () => _selectAreaTab(0),
-            ),
+            child: SellerInsightsPanel(showHeading: false),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 30)),
         ],
@@ -1520,7 +1574,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                       order: order,
                       onAction: _updateStatus,
                       onOrderUpdated: _upsertOrder,
-                      onPaymentConfirmed: _loadOrders,
+                      onPaymentConfirmed: _scheduleBackgroundOrdersRefresh,
                       onReject: _rejectOrder,
                       onReadyBy: _editReadyBy,
                       rejectBusy: _rejectingOrderId == order.id,
@@ -1541,7 +1595,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 order: order,
                 onAction: _updateStatus,
                 onOrderUpdated: _upsertOrder,
-                onPaymentConfirmed: _loadOrders,
+                onPaymentConfirmed: _scheduleBackgroundOrdersRefresh,
                 onReject: _rejectOrder,
                 onReadyBy: _editReadyBy,
                 rejectBusy: _rejectingOrderId == order.id,
@@ -1586,7 +1640,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           onOrderRefresh: _loadOrders,
           onAction: openOrders ? _updateStatus : null,
           onOrderUpdated: openOrders ? _upsertOrder : null,
-          onPaymentConfirmed: openOrders ? _loadOrders : null,
+          onPaymentConfirmed:
+              openOrders ? _scheduleBackgroundOrdersRefresh : null,
           onReject: openOrders ? _rejectOrder : null,
           onReadyBy: openOrders ? _editReadyBy : null,
         ),
@@ -1916,7 +1971,6 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
         readyInMinutes: readyInMinutes,
       );
       widget.onOrderUpdated(Order.fromJson(json));
-      await widget.onPaymentConfirmed();
       if (!mounted) return;
       _showCompactPaymentNotice(context, 'Payment confirmed');
     } catch (e) {
@@ -1959,7 +2013,6 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     try {
       final json = await ApiService.confirmCashPayment(orderId: order.id);
       widget.onOrderUpdated(Order.fromJson(json));
-      await widget.onPaymentConfirmed();
       if (!mounted) return;
       _showCompactPaymentNotice(context, 'Payment received');
     } catch (e) {
@@ -2213,7 +2266,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
               ),
               child: const Text(
                 'Payment Pending',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFFB8860B),

@@ -223,9 +223,11 @@ async function discoverNearbySellers({ buyer, query } = {}) {
   }
 
   const allListings = eligible.flatMap((entry) => entry.candidate.listings || []);
-  await attachQuantitySold(prisma, allListings);
   const withRecurring = await attachRecurringAvailability(prisma, allListings);
-  await attachListingReviewAggregates(prisma, withRecurring);
+  await Promise.all([
+    attachQuantitySold(prisma, withRecurring),
+    attachListingReviewAggregates(prisma, withRecurring),
+  ]);
   const serializedListings = await serializeListingsWithSellerOrderability(withRecurring);
   const serializedById = new Map();
   for (let i = 0; i < withRecurring.length; i++) {

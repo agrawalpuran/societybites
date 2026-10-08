@@ -696,6 +696,7 @@ class Order {
       status: status,
       paymentStatus: paymentStatus,
       paymentMethod: paymentMethod,
+      sellerCanDecline: sellerCanDecline,
     );
   }
 

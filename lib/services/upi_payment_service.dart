@@ -284,24 +284,30 @@ Future<List<UpiAppOption>> getAvailableUpiApps(
     return const [];
   }
 
-  final available = <UpiAppOption>[];
   final handoff = shouldHandoffUpiCollect(platform: platform);
-  for (final app in configuredUpiApps) {
+  final probes = configuredUpiApps.map((app) async {
     final targets = handoff
         ? handoffProbeTargetsFor(app, platform: platform)
         : launchTargetsFor(app, platform: platform);
-    for (final target in targets) {
-      final uri = handoff
-          ? buildUpiAppOpenUri(target)
-          : buildUpiAppLaunchUri(upiPayUri: upiPayUri, target: target);
-      final launchable = await _safeCanLaunch(canLaunch, uri);
-      if (launchable) {
-        available.add(app.withLaunchUri(uri));
-        break;
+    final uris = targets
+        .map(
+          (target) => handoff
+              ? buildUpiAppOpenUri(target)
+              : buildUpiAppLaunchUri(upiPayUri: upiPayUri, target: target),
+        )
+        .toList();
+    final launchable = await Future.wait(
+      uris.map((uri) => _safeCanLaunch(canLaunch, uri)),
+    );
+    for (var i = 0; i < uris.length; i++) {
+      if (launchable[i]) {
+        return app.withLaunchUri(uris[i]);
       }
     }
-  }
-  return available;
+    return null;
+  });
+  final found = await Future.wait(probes);
+  return found.whereType<UpiAppOption>().toList();
 }
 
 Future<bool> _safeCanLaunch(

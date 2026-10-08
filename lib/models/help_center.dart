@@ -52,7 +52,7 @@ const helpCategories = <HelpCategory>[
         id: 'buying-how',
         question: 'How do I buy something?',
         answer:
-            'Open Home, tap a dish or a seller, add items to your cart, then checkout. You can pay with UPI or cash when you collect the order.',
+            'Open Home, tap a dish or a seller, add items to your cart, then checkout with UPI or cash. For UPI, use Pay Now on the order after checkout. For cash, pay the seller when you collect the food.',
         keywords: ['order', 'cart', 'checkout', 'buy', 'purchase'],
       ),
       HelpFaq(
@@ -101,7 +101,7 @@ const helpCategories = <HelpCategory>[
         id: 'selling-listing',
         question: 'How do I add or edit a listing?',
         answer:
-            'Open My Listings from Profile or the Seller Dashboard. Tap Add to publish, or open an item to edit, pause, resume, or remove it.',
+            'Open My Kitchen or My Listings and tap Add Listing. Choose Available now, Made to Order, or Pre-Order, then complete the form. Open any item in My Listings to edit, pause, resume, renew, or remove it.',
         keywords: ['create listing', 'edit', 'my listings', 'publish'],
       ),
       HelpFaq(
@@ -122,7 +122,7 @@ const helpCategories = <HelpCategory>[
         id: 'selling-orders',
         question: 'How do I manage seller orders?',
         answer:
-            'Open the Seller Dashboard. Regular orders are confirmed the moment a buyer places them, so you can go straight to marking them ready. Made to order and pre-order requests still wait for you to accept. If you cannot make a dish, use Can\'t fulfil and pick a reason. Confirm cash when a buyer pays in cash. Nearby delivery orders use the charge you set in Profile.',
+            'Open My Kitchen → Orders. Available-now regular orders are confirmed when placed — use Mark Ready when the food is prepared, then Complete Order after handoff. If you cannot fulfil an auto-confirmed order, use Can\'t fulfil before you mark it ready. For UPI, after the buyer taps I\'ve paid, confirm you received the payment — Mark Ready stays hidden until you do. Made to order and pre-order requests start as pending — Accept or Reject them first. For cash, confirm cash received when prompted. Cross-society orders can include the delivery charge you set in Seller Settings.',
         keywords: [
           'accept',
           'ready',
@@ -249,28 +249,35 @@ const helpCategories = <HelpCategory>[
         id: 'orders-status',
         question: 'What do order statuses mean?',
         answer:
-            'Regular orders are confirmed as soon as you place them, so they start at accepted. Made to order and pre-order requests stay pending until the seller accepts. From there the order moves to ready, and once you collect it, completed.',
-        keywords: ['status', 'pending', 'accepted', 'ready', 'completed'],
+            'Pending means waiting for the seller to accept (made to order and pre-orders). Regular available-now orders usually start at accepted. The seller then marks ready when you can collect. After handoff they mark completed. For UPI you may see payment steps before or alongside preparation — pay in your UPI app, tap I\'ve paid, and wait for the seller to confirm.',
+        keywords: ['status', 'pending', 'accepted', 'ready', 'completed', 'upi'],
       ),
       HelpFaq(
-        id: 'orders-picked-up',
-        question: 'How do I mark an order as picked up?',
+        id: 'orders-collect',
+        question: 'When do I collect my order?',
         answer:
-            'When the order is ready, use Mark Picked Up on your order. That tells the seller you have collected it.',
-        keywords: ['picked up', 'collected', 'complete'],
+            'Watch the order in the Orders tab. When the seller marks it ready, you will see ready for pickup with their flat and block. Collect the food in person. The seller marks the order complete after handoff — you do not need a separate picked-up button in the app.',
+        keywords: ['picked up', 'collected', 'pickup', 'ready'],
+      ),
+      HelpFaq(
+        id: 'orders-upi',
+        question: 'How does UPI payment work?',
+        answer:
+            'Choose UPI at checkout, then open Pay Now on the order. Pay the seller in your UPI app using the ID shown, return to SocietyEats, and tap I\'ve paid. The seller confirms they received the money. SocietyEats does not hold your payment — it goes directly to the seller.',
+        keywords: ['upi', 'pay now', 'ive paid', 'payment', 'confirm'],
       ),
       HelpFaq(
         id: 'orders-cancel',
         question: 'Can I cancel an order?',
         answer:
-            'For UPI orders you can cancel until you mark the payment as paid. For cash orders you can cancel until the seller marks it ready. After that, message the seller, or write to support@societybites.in if you need help.',
+            'Use Cancel Order while it still appears on your order. For UPI, that is until you tap I\'ve paid. For cash, until the seller marks the order ready (regular orders are confirmed immediately, so you can still cancel while accepted). Pre-orders can be cancelled before the campaign Order by time. After that, message the seller or email support.societyeats@gmail.com.',
         keywords: ['cancel', 'reject', 'stop order'],
       ),
       HelpFaq(
         id: 'orders-seller-cannot-fulfil',
         question: 'What if the seller cannot make my order?',
         answer:
-            'The seller can mark the order as Can\'t fulfil with a reason, and you will see it on the order. If you had already paid, the order shows the amount the seller owes you. SocietyEats does not hold your money, so use Messages to settle it with the seller directly.',
+            'For made to order or pre-orders, the seller can reject while the order is still pending. For regular orders they may use Can\'t fulfil until the food is ready. You will see the reason on the order. If you had already paid by UPI, settle any refund with the seller through Messages. SocietyEats does not hold your money.',
         keywords: ['cannot fulfil', 'rejected', 'refund', 'money back'],
       ),
       HelpFaq(
@@ -298,7 +305,7 @@ const helpCategories = <HelpCategory>[
         id: 'mto-order',
         question: 'How do I order a Made to Order item?',
         answer:
-            'Add it from Home or the seller\'s menu and checkout as usual. You can say when you need it. The seller then confirms whether they can make it and the timeline.',
+            'Add it from Home or the seller\'s menu and checkout as usual. You can request when you need it. The order stays pending until the seller accepts or rejects it, then they prepare it on the timeline shown on the listing.',
         keywords: ['need by', 'checkout', 'confirm availability', 'lead time'],
       ),
       HelpFaq(
@@ -417,14 +424,14 @@ const helpCategories = <HelpCategory>[
         id: 'profile-pay',
         question: 'How do payments work?',
         answer:
-            'SocietyEats does not take the payment. You pay the seller directly with UPI or cash. There is no in-app payment gateway.',
+            'SocietyEats does not process payments or hold your money. You pay the seller directly by UPI (Pay Now on the order, then I\'ve paid after your UPI app) or in cash at pickup. There is no in-app payment gateway.',
         keywords: ['upi', 'cash', 'gateway', 'razorpay', 'pay'],
       ),
       HelpFaq(
         id: 'profile-society',
         question: 'Can I change my society?',
         answer:
-            'Your society cannot be changed after you join. Email support@societybites.in if you have moved and need help.',
+            'Your society cannot be changed after you join. Email support.societyeats@gmail.com if you have moved and need help.',
         keywords: ['change society', 'move', 'wrong society'],
       ),
       HelpFaq(
@@ -480,7 +487,7 @@ const helpCategories = <HelpCategory>[
         id: 'issues-support',
         question: 'How do I contact support?',
         answer:
-            'Email support@societybites.in. We typically reply within 24 hours.',
+            'Email support.societyeats@gmail.com. We typically reply within 24 hours.',
         keywords: ['email', 'help', 'contact', 'support'],
       ),
     ],

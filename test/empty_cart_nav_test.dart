@@ -88,6 +88,51 @@ void main() {
     expect(CartController.instance.items, isEmpty);
   });
 
+  testWidgets('cart back returns to Home and keeps items', (tester) async {
+    _ignoreOverflow();
+    await tester.binding.setSurfaceSize(const Size(400, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) {
+              return Column(
+                children: [
+                  const Text('Home listings stay'),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CheckoutScreen(
+                            cartItems: [CartItem(food: _food(), quantity: 2)],
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Open cart'),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open cart'));
+    await tester.pumpAndSettle();
+    expect(find.text('Fresh Kachori Chat'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Home listings stay'), findsOneWidget);
+    expect(CartController.instance.itemCount, 2);
+  });
+
   testWidgets('My Kitchen first load shows the page shell and skeletons', (
     tester,
   ) async {

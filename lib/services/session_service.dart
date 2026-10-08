@@ -17,6 +17,8 @@ class SessionService {
   static const _flatIdKey = 'flat_id';
   static const _flatNumberKey = 'flat_number';
   static const _roleKey = 'user_role';
+  static const _upiIdKey = 'seller_upi_id';
+  static const _upiIdCachedKey = 'seller_upi_id_cached';
   static const _jwtKey = 'auth_token';
   static const _refreshTokenKey = 'refresh_token';
   static const _authProviderKey = 'auth_provider';
@@ -111,6 +113,13 @@ class SessionService {
     if (profile['role'] != null) {
       await prefs.setString(_roleKey, profile['role'] as String);
     }
+    if (profile.containsKey('upiId')) {
+      await prefs.setString(
+        _upiIdKey,
+        (profile['upiId'] as String?)?.trim() ?? '',
+      );
+      await prefs.setBool(_upiIdCachedKey, true);
+    }
   }
 
   static Future<String?> getUserId() async {
@@ -153,6 +162,13 @@ class SessionService {
     return prefs.getString(_roleKey);
   }
 
+  /// Cached from the last profile sync. Null when UPI has never been synced.
+  static Future<String?> getUpiId() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_upiIdCachedKey) != true) return null;
+    return prefs.getString(_upiIdKey);
+  }
+
   static Future<bool> isOnboarded() async {
     final userId = await getUserId();
     final societyId = await getSocietyId();
@@ -174,6 +190,11 @@ class SessionService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_jwtKey);
     _secureBestEffort(_secureStorage.write(key: _jwtKey, value: token));
+  }
+
+  /// Loads Keychain tokens once so later API calls avoid repeated secure reads.
+  static Future<void> warmAuthCache() async {
+    await Future.wait([getToken(), getRefreshToken()]);
   }
 
   static Future<String?> getToken() async {

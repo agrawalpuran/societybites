@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'api_service.dart';
@@ -37,6 +39,62 @@ class SellerOnboarding {
   }
 
   static Future<bool> ensureCanCreateListing(BuildContext context) async {
+    final role = await SessionService.getRole();
+    final upiId = await SessionService.getUpiId();
+    final cached = _listingGateFromCache(role, upiId);
+
+    if (cached != null) {
+      if (!cached && context.mounted) {
+        _showListingGateMessage(context, role: role, upiId: upiId);
+      }
+      unawaited(refreshListingGateCache());
+      return cached;
+    }
+
+    return _verifyListingGateFromNetwork(context);
+  }
+
+  static bool? _listingGateFromCache(String? role, String? upiId) {
+    if (role == null) return null;
+    if (role != 'seller' && role != 'super_admin') return false;
+    if (upiId == null) return null;
+    return upiId.isNotEmpty;
+  }
+
+  static void _showListingGateMessage(
+    BuildContext context, {
+    required String? role,
+    required String? upiId,
+  }) {
+    if (role != 'seller' && role != 'super_admin') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Enable selling first: Profile → Start Selling',
+          ),
+        ),
+      );
+      return;
+    }
+    if (upiId != null && upiId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Add your UPI ID in Profile → Seller Settings before creating a listing',
+          ),
+        ),
+      );
+    }
+  }
+
+  static Future<void> refreshListingGateCache() async {
+    try {
+      final profile = await ApiService.getMe();
+      await SessionService.cacheProfileFromApi(profile);
+    } catch (_) {}
+  }
+
+  static Future<bool> _verifyListingGateFromNetwork(BuildContext context) async {
     try {
       final profile = await ApiService.getMe();
       await SessionService.cacheProfileFromApi(profile);

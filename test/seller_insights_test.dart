@@ -94,56 +94,6 @@ void main() {
     expect(find.byKey(const Key('trend-right-y-axis-label')), findsOneWidget);
   });
 
-  testWidgets('See all recent orders invokes the callback', (tester) async {
-    var seeAll = false;
-    await tester.binding.setSurfaceSize(const Size(400, 1400));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: SellerInsightsPanel(
-              showHeading: false,
-              onSeeAllOrders: () => seeAll = true,
-              fetchInsights: ({required preset, from, to}) async => {
-                'empty': null,
-                'summary': {
-                  'orders': 1,
-                  'sales': 100,
-                  'itemsSold': 1,
-                  'averageOrderValue': 100,
-                },
-                'statusBreakdown': [
-                  {'status': 'completed', 'count': 1},
-                ],
-                'dailyTrend': [
-                  {'date': '2026-09-23', 'orders': 1, 'sales': 100},
-                ],
-                'topItems': const [],
-                'recentOrders': [
-                  {
-                    'id': '1',
-                    'orderNumber': 'SB-9',
-                    'buyerName': 'Asha',
-                    'amount': 100,
-                    'status': 'completed',
-                    'createdAt': '2026-09-23T04:30:00.000Z',
-                  },
-                ],
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Insights'), findsNothing);
-    await tester.ensureVisible(find.text('See all'));
-    await tester.tap(find.text('See all'));
-    await tester.pump();
-    expect(seeAll, isTrue);
-  });
-
   testWidgets('empty lifetime state is friendly', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

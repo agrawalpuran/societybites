@@ -21,6 +21,19 @@ class CartController extends ChangeNotifier {
   /// Switch a bottom-nav tab on the existing shell without rebuilding it.
   ValueChanged<int>? onSelectShellTab;
 
+  /// Latest order from payment (mark-paid) before landing on Orders after checkout.
+  Order? _buyerOrderPaymentPatch;
+
+  void stashBuyerOrderPaymentPatch(Order order) {
+    _buyerOrderPaymentPatch = order;
+  }
+
+  Order? takeBuyerOrderPaymentPatch() {
+    final order = _buyerOrderPaymentPatch;
+    _buyerOrderPaymentPatch = null;
+    return order;
+  }
+
   int get itemCount =>
       items.fold<int>(0, (sum, item) => sum + item.quantity);
 

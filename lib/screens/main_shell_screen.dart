@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../services/cart_controller.dart';
+import '../services/listing_publish_navigation.dart';
 import '../services/push_notification_service.dart';
 import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
@@ -63,6 +64,8 @@ class _MainShellScreenState extends State<MainShellScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.registerIfPossible();
     });
+    unawaited(SessionService.warmAuthCache());
+    ListingPublishNavigation.onPublished = _onListingPublishedToHome;
     _sessionCheck = _refreshSignedIn();
     _unreadPoll = Timer.periodic(const Duration(seconds: 12), (_) {
       _pollUnread();
@@ -96,8 +99,18 @@ class _MainShellScreenState extends State<MainShellScreen>
     }());
   }
 
+  void _onListingPublishedToHome() {
+    if (!mounted) return;
+    _dashboardKey.currentState?.refresh();
+    _homeKey.currentState?.refresh();
+    _selectTab(0);
+  }
+
   @override
   void dispose() {
+    if (ListingPublishNavigation.onPublished == _onListingPublishedToHome) {
+      ListingPublishNavigation.onPublished = null;
+    }
     _preload.dispose();
     _unreadPoll?.cancel();
     if (PushNotificationService.onForegroundOrderUpdate == _refreshVisibleTab) {
@@ -144,6 +157,10 @@ class _MainShellScreenState extends State<MainShellScreen>
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      final paymentPatch = CartController.instance.takeBuyerOrderPaymentPatch();
+      if (paymentPatch != null) {
+        _ordersKey.currentState?.applyOrderFromPayment(paymentPatch);
+      }
       if (wasMounted) _ordersKey.currentState?.refresh();
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
@@ -283,11 +300,7 @@ class _MainShellScreenState extends State<MainShellScreen>
               ? SellerDashboardScreen(
                   key: _dashboardKey,
                   onInitialLoadSettled: _preload.onDashboardInitialLoadSettled,
-                  onListingCreated: () {
-                    _dashboardKey.currentState?.refresh();
-                    _homeKey.currentState?.refresh();
-                    _selectTab(0);
-                  },
+                  onListingCreated: _onListingPublishedToHome,
                   onStartSelling: _onMarketplaceStartSelling,
                   onKitchenAttentionCount: (count) {
                     if (!mounted || count == _kitchenAttentionCount) return;

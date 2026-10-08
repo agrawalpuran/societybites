@@ -18,6 +18,7 @@ import '../widgets/status_banner.dart';
 import '../models/data.dart';
 import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
+import '../services/cart_controller.dart';
 import 'feedback_screen.dart';
 import 'food_detail_screen.dart';
 import 'seller_storefront_screen.dart';
@@ -66,11 +67,20 @@ class OrdersScreenState extends State<OrdersScreen>
   bool _ordersSlow = false;
   Timer? _ordersSlowTimer;
 
+  /// Keeps mark-paid ahead of stale GET /orders until the server catches up.
+  Order? _paymentStatusPatch;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() => setState(() {}));
+    final paymentPatch = CartController.instance.takeBuyerOrderPaymentPatch();
+    if (paymentPatch != null) {
+      _mergeOrderFromPayment(paymentPatch);
+      _buyer.hasSuccessfullyLoaded = true;
+      _buyer.isLoading = false;
+    }
     _loadOrders(isInitial: true);
   }
 
@@ -80,10 +90,147 @@ class OrdersScreenState extends State<OrdersScreen>
   /// Called by MainShell on failed first-load retry, app resume, and FCM.
   void refresh() => _loadOrders();
 
+  /// Apply mark-paid response before a network refresh so Pay Now does not flash.
+  void applyOrderFromPayment(Order updated) {
+    _rememberPaymentStatusPatch(updated);
+    _mergeOrderFromPayment(updated);
+    if (mounted) setState(() {});
+  }
+
+  void _rememberPaymentStatusPatch(Order updated) {
+    if (_paymentStatusRank(updated.paymentStatus) <=
+        _paymentStatusRank('pending')) {
+      return;
+    }
+    _paymentStatusPatch = updated;
+  }
+
+  static int _paymentStatusRank(String status) {
+    switch (status) {
+      case 'pending':
+        return 0;
+      case 'buyer_marked_paid':
+        return 1;
+      case 'seller_confirmed':
+        return 2;
+      case 'paid':
+        return 3;
+      default:
+        return 0;
+    }
+  }
+
+  List<Order> _retainCampaignMetadataFromCurrentLists(List<Order> parsed) {
+    final prior = <String, Order>{
+      for (final order in [..._buyer.active, ..._buyer.past]) order.id: order,
+    };
+    return parsed
+        .map(
+          (order) => prior.containsKey(order.id)
+              ? _preserveOrderMetadata(prior[order.id]!, order)
+              : order,
+        )
+        .toList();
+  }
+
+  List<Order> _applyPaymentStatusPatches(List<Order> orders) {
+    final patch = _paymentStatusPatch;
+    if (patch == null) return orders;
+
+    final index = orders.indexWhere((order) => order.id == patch.id);
+    if (index < 0) return orders;
+
+    final server = orders[index];
+    if (_paymentStatusRank(server.paymentStatus) >=
+        _paymentStatusRank(patch.paymentStatus)) {
+      _paymentStatusPatch = null;
+      return orders;
+    }
+
+    final merged = List<Order>.from(orders);
+    merged[index] = _preserveOrderMetadata(server, patch);
+    return merged;
+  }
+
+  void _mergeOrderFromPayment(Order updated) {
+    final combined = <Order>[..._buyer.active, ..._buyer.past];
+    final index = combined.indexWhere((order) => order.id == updated.id);
+    if (index >= 0) {
+      combined[index] = _preserveOrderMetadata(combined[index], updated);
+    } else {
+      combined.insert(0, updated);
+    }
+    _buyer.active =
+        combined.where((order) => order.isInBuyerActiveTab()).toList();
+    _buyer.past =
+        combined.where((order) => !order.isInBuyerActiveTab()).toList();
+  }
+
+  Order _preserveOrderMetadata(Order prior, Order updated) {
+    return Order(
+      id: updated.id,
+      orderId: updated.orderId,
+      items: updated.items.isNotEmpty ? updated.items : prior.items,
+      date: updated.date,
+      status: updated.status,
+      statusStep: updated.statusStep,
+      orderTotal: updated.orderTotal,
+      subtotal: updated.subtotal,
+      communityFee: updated.communityFee,
+      deliveryCharge: updated.deliveryCharge,
+      couponCode: updated.couponCode,
+      couponDiscount: updated.couponDiscount,
+      type: updated.type,
+      campaignId: updated.campaignId ?? prior.campaignId,
+      fulfilmentMethod: updated.fulfilmentMethod ?? prior.fulfilmentMethod,
+      fulfilmentNotes: updated.fulfilmentNotes ?? prior.fulfilmentNotes,
+      fulfilmentAt: updated.fulfilmentAt ?? prior.fulfilmentAt,
+      campaignTitle: updated.campaignTitle ?? prior.campaignTitle,
+      campaignOrderCutoffAt:
+          updated.campaignOrderCutoffAt ?? prior.campaignOrderCutoffAt,
+      paymentMethod: updated.paymentMethod ?? prior.paymentMethod,
+      paymentStatus: updated.paymentStatus,
+      hasReview: updated.hasReview,
+      rejectReason: updated.rejectReason,
+      rejectedAt: updated.rejectedAt,
+      refundDue: updated.refundDue,
+      sellerCanDecline: updated.sellerCanDecline,
+      completedAt: updated.completedAt,
+      cancelledAt: updated.cancelledAt,
+      expectedReadyAt: updated.expectedReadyAt ?? prior.expectedReadyAt,
+      requestedReadyAt: updated.requestedReadyAt ?? prior.requestedReadyAt,
+      createdAt: updated.createdAt ?? prior.createdAt,
+      buyerName: updated.buyerName ?? prior.buyerName,
+      buyerPhone: updated.buyerPhone ?? prior.buyerPhone,
+      buyerFlatNumber: updated.buyerFlatNumber ?? prior.buyerFlatNumber,
+      buyerBlock: updated.buyerBlock ?? prior.buyerBlock,
+      buyerSocietyName: updated.buyerSocietyName ?? prior.buyerSocietyName,
+      sellerSocietyName: updated.sellerSocietyName ?? prior.sellerSocietyName,
+      distanceKm: updated.distanceKm ?? prior.distanceKm,
+      unreadMessageCount: updated.unreadMessageCount,
+    );
+  }
+
+  Future<void> _onPaymentScreenClosed(Object? result) async {
+    final pop = PaymentScreenPopResult.tryParse(result);
+    if (pop != null) {
+      applyOrderFromPayment(pop.order);
+    }
+    if (PaymentScreenPopResult.shouldRefreshOrdersList(result)) {
+      await _loadOrders(fetchCampaignMetadata: false);
+    }
+    if (PaymentScreenPopResult.shouldReturnToOrdersTop(result)) {
+      _showActiveOrdersAtTop();
+    }
+  }
+
   /// Lightweight poll: refresh unread badges without spinner or campaign fetches.
   Future<void> refreshUnread() => _applyUnreadCounts();
 
-  Future<void> _loadOrders({bool isInitial = false}) async {
+  Future<void> _loadOrders({
+    bool isInitial = false,
+    bool fetchCampaignMetadata = true,
+  }) async {
     final bucket = _buyer;
     final showSpinner = !bucket.hasSuccessfullyLoaded;
     if (showSpinner) {
@@ -104,7 +251,7 @@ class OrdersScreenState extends State<OrdersScreen>
           .where((order) => order.isPreOrder && order.campaignId != null)
           .map((order) => order.campaignId!)
           .toSet();
-      if (campaignIds.isNotEmpty) {
+      if (fetchCampaignMetadata && campaignIds.isNotEmpty) {
         final campaigns = <String, PreOrderCampaign>{};
         await Future.wait(
           campaignIds.map((id) async {
@@ -127,6 +274,12 @@ class OrdersScreenState extends State<OrdersScreen>
             )
             .toList();
       }
+
+      if (!fetchCampaignMetadata) {
+        parsed = _retainCampaignMetadataFromCurrentLists(parsed);
+      }
+
+      parsed = _applyPaymentStatusPatches(parsed);
 
       if (!mounted) return;
 
@@ -355,6 +508,7 @@ class OrdersScreenState extends State<OrdersScreen>
           _ActiveTab(
             orders: _buyer.active,
             onRefresh: _loadOrders,
+            onPaymentClosed: _onPaymentScreenClosed,
             onPull: () => _pullRefresh.run(_loadOrders),
             onReturnToTop: _showActiveOrdersAtTop,
             scrollController: _activeOrdersScroll,
@@ -414,6 +568,7 @@ class _ActiveTab extends StatelessWidget {
   const _ActiveTab({
     required this.orders,
     required this.onRefresh,
+    this.onPaymentClosed,
     this.onPull,
     this.onReturnToTop,
     this.scrollController,
@@ -422,6 +577,7 @@ class _ActiveTab extends StatelessWidget {
 
   final List<Order> orders;
   final Future<void> Function() onRefresh;
+  final Future<void> Function(Object? result)? onPaymentClosed;
   final Future<void> Function()? onPull;
   final VoidCallback? onReturnToTop;
   final ScrollController? scrollController;
@@ -456,6 +612,7 @@ class _ActiveTab extends StatelessWidget {
                       : _ActiveOrderCard(
                           order: order,
                           onRefresh: onRefresh,
+                          onPaymentClosed: onPaymentClosed,
                           onReturnToTop: onReturnToTop,
                           isSellerView: isSellerView,
                         ),
@@ -481,6 +638,7 @@ class _ActiveTab extends StatelessWidget {
                   : _ActiveOrderCard(
                       order: o,
                       onRefresh: onRefresh,
+                      onPaymentClosed: onPaymentClosed,
                       onReturnToTop: onReturnToTop,
                       isSellerView: isSellerView,
                     ),
@@ -495,6 +653,7 @@ class _ActiveOrderCard extends StatelessWidget {
   const _ActiveOrderCard({
     required this.order,
     required this.onRefresh,
+    this.onPaymentClosed,
     this.onReturnToTop,
     this.isSellerView = false,
     this.readOnly = false,
@@ -502,6 +661,7 @@ class _ActiveOrderCard extends StatelessWidget {
 
   final Order order;
   final Future<void> Function() onRefresh;
+  final Future<void> Function(Object? result)? onPaymentClosed;
   final VoidCallback? onReturnToTop;
   final bool isSellerView;
   final bool readOnly;
@@ -768,12 +928,17 @@ class _ActiveOrderCard extends StatelessWidget {
                       ),
                     );
                     if (!context.mounted) return;
-                    if (result == true ||
-                        result == PaymentScreen.returnToOrdersTop) {
+                    if (onPaymentClosed != null) {
+                      await onPaymentClosed!(result);
+                    } else if (PaymentScreenPopResult.shouldRefreshOrdersList(
+                      result,
+                    )) {
                       await onRefresh();
-                    }
-                    if (result == PaymentScreen.returnToOrdersTop) {
-                      onReturnToTop?.call();
+                      if (PaymentScreenPopResult.shouldReturnToOrdersTop(
+                        result,
+                      )) {
+                        onReturnToTop?.call();
+                      }
                     }
                   },
                   style: ElevatedButton.styleFrom(

@@ -4,8 +4,9 @@ import '../web/web_page_frame.dart';
 
 import '../models/data.dart';
 import '../models/listing_availability.dart';
-import '../services/api_service.dart';
-import '../services/session_service.dart';
+import '../services/listing_publish_navigation.dart';
+import '../services/my_listings_cache.dart';
+import '../services/my_listings_prefetch.dart';
 import '../widgets/app_header.dart';
 import '../widgets/preorder_widgets.dart';
 import 'add_listing_screen.dart';
@@ -41,25 +42,23 @@ class _AddListingTypeScreenState extends State<AddListingTypeScreen> {
 
   Future<void> _loadPreorderCatalog() async {
     try {
-      late final List<Map<String, dynamic>> raw;
       final fetch = widget.fetchPreorderCatalog;
       if (fetch != null) {
-        raw = await fetch();
-      } else {
-        final societyId = await SessionService.getSocietyId();
-        final sellerId = await SessionService.getUserId();
-        if (sellerId == null || societyId == null || societyId.isEmpty) {
-          return;
-        }
-        raw = await ApiService.getListings(
-          societyId: societyId,
-          sellerId: sellerId,
-          status: 'all',
-          catalogType: listingCatalogPreorder,
-        );
+        final raw = await fetch();
+        if (!mounted) return;
+        setState(() => _preorderCatalogEmpty = raw.isEmpty);
+        return;
+      }
+
+      if (!MyListingsCache.hasSnapshot) {
+        await MyListingsPrefetch.warm();
       }
       if (!mounted) return;
-      setState(() => _preorderCatalogEmpty = raw.isEmpty);
+      setState(() {
+        _preorderCatalogEmpty = MyListingsCache.listings
+            .where((item) => item.isPreOrderCatalog)
+            .isEmpty;
+      });
     } catch (_) {
       // Don't block campaign creation if catalog lookup fails.
     }
@@ -115,10 +114,14 @@ class _AddListingTypeScreenState extends State<AddListingTypeScreen> {
         ),
       );
       if (!mounted) return;
-      if (posted == true) Navigator.pop(context, true);
+      if (posted == true) {
+        ListingPublishNavigation.completeNewListing(context);
+      }
       return;
     }
-    if (created == true) Navigator.pop(context, true);
+    if (created == true) {
+      ListingPublishNavigation.completeNewListing(context);
+    }
   }
 
   @override

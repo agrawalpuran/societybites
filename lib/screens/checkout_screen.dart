@@ -200,6 +200,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return true;
   }
 
+  void _leaveCart() {
+    CartController.instance.replaceItems(_items);
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+    _goToShell(0);
+  }
+
   Future<void> _goToShell(int index) async {
     CartController.instance.onSelectShellTab?.call(index);
     if (!mounted) return;
@@ -387,9 +398,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final showOrders = CartController.instance.onShowOrdersAfterPlace;
       CartController.instance.clear();
       CartController.instance.onOrderPlaced?.call();
-      await navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => PaymentScreen(order: order)),
+      final paymentResult = await navigator.pushReplacement(
+        MaterialPageRoute<Object?>(
+          builder: (_) => PaymentScreen(order: order),
+        ),
       );
+      final paymentPop = PaymentScreenPopResult.tryParse(paymentResult);
+      if (paymentPop != null) {
+        CartController.instance.stashBuyerOrderPaymentPatch(paymentPop.order);
+      }
       showOrders?.call();
       navigator.popUntil((route) => route.isFirst);
     } catch (e) {
@@ -535,13 +552,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   children: [
                     IconButton(
                       tooltip: 'Back',
-                      onPressed: () {
-                        if (Navigator.of(context).canPop()) {
-                          Navigator.pop(context);
-                          return;
-                        }
-                        _goToShell(0);
-                      },
+                      onPressed: _leaveCart,
                       icon: const Icon(Icons.arrow_back_rounded, color: webInk),
                     ),
                     const SizedBox(width: 4),
@@ -694,8 +705,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildHeader() {
     return AppHeader(
-      cartItemCount: _totalQuantity,
-      onCartPressed: () {},
+      padding: const EdgeInsets.fromLTRB(4, 10, 20, 0),
+      showCart: false,
+      leading: IconButton(
+        tooltip: 'Back',
+        onPressed: _leaveCart,
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+        color: const Color(0xFF3A4644),
+      ),
     );
   }
 

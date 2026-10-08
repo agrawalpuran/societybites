@@ -190,7 +190,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(seconds: 1));
     await tester.pump();
 
     expect(find.byType(PaymentScreen), findsNothing);

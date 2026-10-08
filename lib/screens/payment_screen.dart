@@ -20,6 +20,32 @@ typedef PaymentApiCall = Future<Map<String, dynamic>> Function(String orderId);
 typedef UpiLauncher = Future<bool> Function(Uri uri);
 typedef UpiAvailabilityChecker = Future<bool> Function(Uri uri);
 
+/// Navigator pop payload after the buyer marks UPI paid and the short
+/// awaiting-seller pause completes.
+class PaymentScreenPopResult {
+  const PaymentScreenPopResult({required this.order});
+
+  final Order order;
+
+  static PaymentScreenPopResult? tryParse(Object? result) {
+    if (result is PaymentScreenPopResult) return result;
+    return null;
+  }
+
+  static bool shouldRefreshOrdersList(Object? result) {
+    if (result == true) return true;
+    if (result is PaymentScreenPopResult) return true;
+    if (result == PaymentScreen.returnToOrdersTop) return true;
+    return false;
+  }
+
+  static bool shouldReturnToOrdersTop(Object? result) {
+    if (result is PaymentScreenPopResult) return true;
+    if (result == PaymentScreen.returnToOrdersTop) return true;
+    return false;
+  }
+}
+
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({
     super.key,
@@ -30,7 +56,7 @@ class PaymentScreen extends StatefulWidget {
     this.launchUpi,
     this.canLaunchUpi,
     this.pollInterval = const Duration(seconds: 8),
-    this.awaitingSellerPause = const Duration(seconds: 2),
+    this.awaitingSellerPause = const Duration(seconds: 1),
   });
 
   /// Pop result after the buyer has marked a UPI payment and seen the
@@ -109,9 +135,66 @@ class _PaymentScreenState extends State<PaymentScreen>
     if (_order.items.isNotEmpty) {
       _sellerUpiId = _order.items.first.food.sellerUpiId;
     }
-    _loadPaymentInfo();
-    _refreshOrder();
+    unawaited(_bootstrapPaymentScreen());
     _pollTimer = Timer.periodic(widget.pollInterval, (_) => _refreshOrder());
+  }
+
+  Future<void> _bootstrapPaymentScreen() async {
+    setState(() {
+      _isLoadingUpi = true;
+      _loadError = null;
+    });
+    try {
+      final results = await Future.wait<dynamic>([
+        _fetchPaymentInfo(_order.id),
+        _fetchOrder(_order.id),
+      ]);
+      if (!mounted) return;
+
+      final paymentData = Map<String, dynamic>.from(results[0] as Map);
+      final latest = Order.fromJson(results[1] as Map<String, dynamic>);
+      final apiUpi = paymentData['sellerUpiId'] as String?;
+
+      setState(() {
+        _order = latest;
+        if (latest.items.isNotEmpty) {
+          final latestUpi = latest.items.first.food.sellerUpiId;
+          if (latestUpi != null && latestUpi.trim().isNotEmpty) {
+            _sellerUpiId = latestUpi.trim();
+          }
+        }
+        if (apiUpi != null && apiUpi.trim().isNotEmpty) {
+          _sellerUpiId = apiUpi.trim();
+        }
+        _sellerUpiDisplayName = paymentData['sellerUpiDisplayName'] as String?;
+        _isLoadingUpi = false;
+      });
+
+      if (!isOpenPaymentStatus(latest.status) ||
+          isPaymentFinished(latest.paymentStatus) ||
+          isTerminalPaymentLeaveStatus(latest.status)) {
+        _leavePayment(true);
+        return;
+      }
+
+      _scheduleUpiAppProbe();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingUpi = false;
+        if (!_hasUpi) {
+          _loadError = e.toString();
+        }
+      });
+      _scheduleUpiAppProbe();
+    }
+  }
+
+  void _scheduleUpiAppProbe() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_refreshAvailableApps());
+    });
   }
 
   @override
@@ -196,7 +279,7 @@ class _PaymentScreenState extends State<PaymentScreen>
         _sellerUpiDisplayName = data['sellerUpiDisplayName'] as String?;
         _isLoadingUpi = false;
       });
-      await _refreshAvailableApps();
+      _scheduleUpiAppProbe();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -206,6 +289,7 @@ class _PaymentScreenState extends State<PaymentScreen>
           _loadError = e.toString();
         }
       });
+      _scheduleUpiAppProbe();
     }
   }
 
@@ -345,7 +429,7 @@ class _PaymentScreenState extends State<PaymentScreen>
   void _scheduleReturnToOrders() {
     _returnToOrdersTimer?.cancel();
     _returnToOrdersTimer = Timer(widget.awaitingSellerPause, () {
-      _leavePayment(PaymentScreen.returnToOrdersTop);
+      _leavePayment(PaymentScreenPopResult(order: _order));
     });
   }
 

@@ -93,4 +93,4 @@ We may update this policy. The "Last updated" date at the top will change when w
 
 ## 11. Contact
 
-**Email:** support@societybites.in
+**Email:** support.societyeats@gmail.com

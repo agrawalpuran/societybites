@@ -76,7 +76,7 @@ We may update this policy. The "Last updated" date at the top will change when w
 
 11. Contact
 
-For questions: support@societybites.in
+For questions: support.societyeats@gmail.com
 ''';
 
 const kTermsOfServiceBody = '''
@@ -102,7 +102,7 @@ Do not misuse the platform, including for harassment, fake listings, fraud, or a
 
 You may order from cooks in your society and, where a seller has opted in, from nearby societies in the same city. A cart holds items from one seller at a time.
 
-Payment is UPI or cash, according to the seller's settings and whether you are in the same society. There is no in-app cancel button for buyers. Ask the seller, or write to support, if you need help.
+Payment is UPI or cash, according to the seller's settings and whether you are in the same society. You can cancel from the order while the app still allows it; otherwise ask the seller or email support.societyeats@gmail.com.
 
 4. Selling
 
@@ -120,7 +120,7 @@ Sellers must not offer unsafe, adulterated, expired, or prohibited food. We may 
 
 7. Disputes and law
 
-Try to resolve issues with the other party first. For help: support@societybites.in
+Try to resolve issues with the other party first. For help: support.societyeats@gmail.com
 
 These terms are governed by the laws of India. Nothing here excludes any right or liability that cannot legally be excluded.
 ''';

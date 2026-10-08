@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../widgets/listing_image.dart';
+import '../utils/listing_timing_chip.dart';
+import '../widgets/listing_portion_caption.dart';
 import '../widgets/app_header.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/recurring_availability_hint.dart';
@@ -261,7 +263,23 @@ class HomeScreenState extends State<HomeScreen> {
 
       if (fetchListings != null) {
         nearbyFuture = startNearbyRequest();
-        raw = await fetchListings();
+        if (nearbyFuture != null) {
+          final results = await Future.wait<Object>([
+            fetchListings(),
+            nearbyFuture,
+          ]);
+          raw = results[0] as List<Map<String, dynamic>>;
+          try {
+            final nearbyRaw = results[1] as Map<String, dynamic>;
+            cityReach = SellingReach.fromAuthMe(nearbyRaw);
+            raw = mergeSocietyAndNearbyListingMaps(
+              raw,
+              listingMapsFromNearbyPayload(nearbyRaw),
+            );
+          } catch (_) {}
+        } else {
+          raw = await fetchListings();
+        }
       } else {
         final societyId = await SessionService.getSocietyId();
         if (societyId == null || societyId.isEmpty) {
@@ -286,19 +304,24 @@ class HomeScreenState extends State<HomeScreen> {
           status: 'discoverable',
         );
         nearbyFuture = startNearbyRequest();
-        raw = await societyListingsFuture;
-      }
-
-      if (nearbyFuture != null) {
-        try {
-          final nearbyRaw = await nearbyFuture;
-          cityReach = SellingReach.fromAuthMe(nearbyRaw);
-          raw = mergeSocietyAndNearbyListingMaps(
-            raw,
-            listingMapsFromNearbyPayload(nearbyRaw),
-          );
-        } catch (_) {
-          // Home still works if nearby discovery is unavailable.
+        if (nearbyFuture != null) {
+          final results = await Future.wait<Object>([
+            societyListingsFuture,
+            nearbyFuture,
+          ]);
+          raw = results[0] as List<Map<String, dynamic>>;
+          try {
+            final nearbyRaw = results[1] as Map<String, dynamic>;
+            cityReach = SellingReach.fromAuthMe(nearbyRaw);
+            raw = mergeSocietyAndNearbyListingMaps(
+              raw,
+              listingMapsFromNearbyPayload(nearbyRaw),
+            );
+          } catch (_) {
+            // Home still works if nearby discovery is unavailable.
+          }
+        } else {
+          raw = await societyListingsFuture;
         }
       }
 
@@ -2136,6 +2159,7 @@ class _SpecialCard extends StatelessWidget {
                               ),
                           ],
                         ),
+                        ListingPortionCaption(food: food, isDark: isDark),
                         if (listingSoldCaption(food.quantitySold).isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 2),
@@ -2331,6 +2355,7 @@ class _AvailableItemTile extends StatelessWidget {
                               color: Color(0xFF0E5A47),
                             ),
                           ),
+                          ListingPortionCaption(food: food),
                           if (food.quantity > 0 && !food.isExpired) ...[
                             const SizedBox(height: 2),
                             Text(
@@ -2420,7 +2445,7 @@ class _AvailableItemTile extends StatelessWidget {
                               const SizedBox(width: 4),
                               Flexible(
                                 child: Text(
-                                  '${food.pickupTime} pickup',
+                                  listingScheduleCaption(food),
                                   softWrap: true,
                                   style: const TextStyle(
                                     fontSize: 12,

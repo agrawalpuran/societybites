@@ -148,7 +148,7 @@ void main() {
     expect(find.byType(AddListingTypeScreen), findsNothing);
     expect(find.text('What type of order is this?'), findsNothing);
     expect(find.byType(AddListingScreen), findsOneWidget);
-    expect(find.text('Pre-order'), findsOneWidget);
+    expect(find.text('Pre-order Catalog'), findsOneWidget);
   });
 
   testWidgets('Add Listing copy depends on catalog', (tester) async {
@@ -164,7 +164,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('Pre-order'), findsOneWidget);
+    expect(find.text('Pre-order Catalog'), findsOneWidget);
   });
 
   testWidgets('Add Listing photo picker offers camera and gallery', (
@@ -389,7 +389,7 @@ void main() {
     await tester.tap(find.byKey(const Key('create-preorder-catalog-from-nudge')));
     await tester.pumpAndSettle();
     expect(find.byType(AddListingScreen), findsOneWidget);
-    expect(find.text('Pre-order'), findsWidgets);
+    expect(find.text('Pre-order Catalog'), findsWidgets);
   });
 
   testWidgets('Create catalog from Pre-orders opens the catalog listing form', (
@@ -413,7 +413,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AddListingScreen), findsOneWidget);
-    expect(find.text('Pre-order'), findsWidgets);
+    expect(find.text('Pre-order Catalog'), findsWidgets);
     expect(find.text('QUANTITY AVAILABLE'), findsNothing);
     expect(find.text('DATE/TIME AVAILABLE UNTIL'), findsNothing);
     expect(find.text('AVAILABLE UNTIL (OPTIONAL)'), findsNothing);
@@ -494,7 +494,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AddListingScreen), findsOneWidget);
-    expect(find.text('Pre-order'), findsWidgets);
+    expect(find.text('Pre-order Catalog'), findsWidgets);
     expect(
       find.byType(CreatePreOrderScreen, skipOffstage: false),
       findsOneWidget,

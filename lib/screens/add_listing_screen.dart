@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../widgets/app_header.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
+import '../services/listing_publish_navigation.dart';
 import '../services/session_service.dart';
 import '../models/food_type.dart';
 import '../models/listing_availability.dart';
@@ -35,6 +36,12 @@ class AddListingScreen extends StatefulWidget {
 }
 
 class _AddListingScreenState extends State<AddListingScreen> {
+  static final _pairedFieldLabelStyle = requiredFieldLabelStyle.copyWith(
+    fontSize: 9,
+    letterSpacing: 0.9,
+    height: 1.35,
+  );
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
@@ -83,7 +90,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   bool get _showUntilField => false;
 
   String get _orderTypeTitle {
-    if (_isPreorderCatalog) return 'Pre-order';
+    if (_isPreorderCatalog) return 'Pre-order Catalog';
     if (_isMadeToOrder) return 'Made to order';
     return 'Available now order';
   }
@@ -889,7 +896,11 @@ class _AddListingScreenState extends State<AddListingScreen> {
           backgroundColor: const Color(0xFF0E5A47),
         ),
       );
-      Navigator.pop(context, true);
+      if (_isEditing) {
+        Navigator.pop(context, true);
+      } else {
+        ListingPublishNavigation.completeNewListing(context);
+      }
     } catch (e) {
       if (!mounted) return;
 
@@ -1046,7 +1057,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           Expanded(
                             flex: 2,
                             child: _buildField(
-                              label: 'WEIGHT PER PORTION',
+                              label: 'WEIGHT',
+                              labelStyle: _pairedFieldLabelStyle,
                               child: TextFormField(
                                 controller: _weightPerUnitController,
                                 keyboardType: TextInputType.number,
@@ -1062,7 +1074,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           Expanded(
                             flex: 3,
                             child: _buildField(
-                              label: 'UNIT / WEIGHT TYPE',
+                              label: 'UNIT',
+                              labelStyle: _pairedFieldLabelStyle,
                               child: Container(
                                 height: 52,
                                 padding: const EdgeInsets.symmetric(
@@ -1504,11 +1517,16 @@ class _AddListingScreenState extends State<AddListingScreen> {
     required String label,
     required Widget child,
     bool isRequired = false,
+    TextStyle? labelStyle,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        RequiredFieldLabel(label, required: isRequired),
+        RequiredFieldLabel(
+          label,
+          required: isRequired,
+          style: labelStyle ?? requiredFieldLabelStyle,
+        ),
         const SizedBox(height: 8),
         child,
       ],
