@@ -251,6 +251,39 @@ class OrderPushCoordinator {
 
   static List<OrderPushHint> get pendingHints => _pending.values.toList();
 
+  /// Seller (or buyer) action before GET /orders catches up — same path as FCM hints.
+  static void stageHint(OrderPushHint hint) {
+    if (hint.orderId.isEmpty) return;
+    if (hint.status == null && hint.paymentStatus == null) return;
+    _pending[hint.orderId] = _merge(_pending[hint.orderId], hint);
+    unawaited(_persist());
+  }
+
+  static void dropHint(String orderId) {
+    if (orderId.isEmpty) return;
+    _pending.remove(orderId);
+    unawaited(_persist());
+  }
+
+  /// Keep forward progress from [local] when a refresh returns stale status/payment.
+  static Order reconcileServerOrder(Order local, Order server) {
+    var merged = Order.mergePreservingDetails(local, server);
+    if (_orderStatusRank(local.status) > _orderStatusRank(merged.status)) {
+      merged = applyOrderPushHint(
+        merged,
+        OrderPushHint(orderId: merged.id, status: local.status),
+      );
+    }
+    if (_paymentStatusRank(local.paymentStatus) >
+        _paymentStatusRank(merged.paymentStatus)) {
+      merged = applyOrderPushHint(
+        merged,
+        OrderPushHint(orderId: merged.id, paymentStatus: local.paymentStatus),
+      );
+    }
+    return merged;
+  }
+
   static Future<void> recordFromMessage(RemoteMessage message) async {
     final hint = OrderPushHint.fromRemoteMessage(message);
     if (hint == null) return;

@@ -131,19 +131,35 @@ class _PaymentScreenState extends State<PaymentScreen>
     super.initState();
     _order = widget.order;
     WidgetsBinding.instance.addObserver(this);
-    // Prefer UPI embedded on order items (set when listings were loaded).
-    if (_order.items.isNotEmpty) {
-      _sellerUpiId = _order.items.first.food.sellerUpiId;
+    _seedSellerUpiFromOrder();
+    if (_hasUpi) {
+      _isLoadingUpi = false;
+      _scheduleUpiAppProbe();
     }
     unawaited(_bootstrapPaymentScreen());
     _pollTimer = Timer.periodic(widget.pollInterval, (_) => _refreshOrder());
   }
 
+  void _seedSellerUpiFromOrder() {
+    for (final item in _order.items) {
+      final embedded = item.food.sellerUpiId?.trim();
+      if (embedded != null &&
+          embedded.isNotEmpty &&
+          isValidUpiId(embedded)) {
+        _sellerUpiId = embedded;
+        return;
+      }
+    }
+  }
+
   Future<void> _bootstrapPaymentScreen() async {
-    setState(() {
-      _isLoadingUpi = true;
-      _loadError = null;
-    });
+    final blockingLoad = !_hasUpi;
+    if (blockingLoad && mounted) {
+      setState(() {
+        _isLoadingUpi = true;
+        _loadError = null;
+      });
+    }
     try {
       final results = await Future.wait<dynamic>([
         _fetchPaymentInfo(_order.id),
@@ -157,12 +173,7 @@ class _PaymentScreenState extends State<PaymentScreen>
 
       setState(() {
         _order = latest;
-        if (latest.items.isNotEmpty) {
-          final latestUpi = latest.items.first.food.sellerUpiId;
-          if (latestUpi != null && latestUpi.trim().isNotEmpty) {
-            _sellerUpiId = latestUpi.trim();
-          }
-        }
+        _seedSellerUpiFromOrder();
         if (apiUpi != null && apiUpi.trim().isNotEmpty) {
           _sellerUpiId = apiUpi.trim();
         }

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../widgets/listing_image.dart';
 import '../utils/listing_timing_chip.dart';
+import '../widgets/listing_compact_card_header.dart';
 import '../widgets/listing_portion_caption.dart';
 import '../widgets/app_header.dart';
 import '../widgets/made_to_order_hint.dart';
@@ -1649,7 +1650,7 @@ class HomeScreenState extends State<HomeScreen> {
           )
         else
           PagedHorizontalList(
-            height: 268,
+            height: 252,
             itemCount: visible.length,
             itemBuilder: (_, i) {
               final food = visible[i];
@@ -1982,7 +1983,7 @@ class _TodaysSpecialsSection extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         PagedHorizontalList(
-          height: 268,
+          height: 252,
           itemCount: specials.length,
           itemBuilder: (_, i) {
             final food = specials[i];
@@ -2035,25 +2036,15 @@ class _SpecialCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  ListingRatingMark(food: food),
-                  ListingTypeBadge(food: food, compact: true),
-                ],
-              ),
-            ),
+            ListingCompactCardHeader(food: food, isDark: isDark),
             Expanded(
               child: Center(
                 child: ListingImage(
                   food: food,
-                  width: 120,
-                  height: 120,
+                  width: 112,
+                  height: 112,
                   borderRadius: 0,
-                  iconSize: 64,
+                  iconSize: 60,
                 ),
               ),
             ),
@@ -2074,7 +2065,11 @@ class _SpecialCard extends StatelessWidget {
             if (food.isMadeToOrder)
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
-                child: MadeToOrderHint(food: food, compact: true),
+                child: MadeToOrderHint(
+                  food: food,
+                  compact: true,
+                  timingOnly: true,
+                ),
               ),
             if (food.isRecurringReadyNow)
               Padding(
@@ -2083,34 +2078,32 @@ class _SpecialCard extends StatelessWidget {
               ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 2,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Flexible(
-                    child: GestureDetector(
-                      onTap: onSellerTap,
-                      child: Text(
-                        'By ${food.sellerName}',
-                        softWrap: true,
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.25,
-                          color: isDark
-                              ? Colors.white
-                              : const Color(0xFF0E5A47),
-                          decoration: TextDecoration.underline,
-                          decorationColor: isDark
-                              ? Colors.white
-                              : const Color(0xFF0E5A47),
-                          fontWeight: FontWeight.w700,
-                        ),
+                  GestureDetector(
+                    onTap: onSellerTap,
+                    child: Text(
+                      'By ${food.sellerName}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.25,
+                        color: isDark
+                            ? Colors.white
+                            : const Color(0xFF0E5A47),
+                        decoration: TextDecoration.underline,
+                        decorationColor: isDark
+                            ? Colors.white
+                            : const Color(0xFF0E5A47),
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                  Flexible(
-                    child: Text(
-                      ' • ${food.homePlaceLabel}',
-                      softWrap: true,
+                  if (food.homePlaceLabel.isNotEmpty)
+                    Text(
+                      food.homePlaceLabel,
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.25,
@@ -2120,51 +2113,24 @@ class _SpecialCard extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 4, 10, 14),
+              padding: const EdgeInsets.fromLTRB(14, 4, 10, 12),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 10,
-                          children: [
-                            Text(
-                              '₹${food.price.toStringAsFixed(0)}',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: isDark
-                                    ? Colors.white
-                                    : const Color(0xFF101617),
-                              ),
-                            ),
-                          ],
-                        ),
-                        ListingPortionCaption(food: food, isDark: isDark),
-                        if (listingSoldCaption(food.quantitySold).isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              listingSoldCaption(food.quantitySold),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isDark
-                                    ? Colors.white70
-                                    : const Color(0xFF6A7774),
-                              ),
-                            ),
-                          ),
-                      ],
+                    child: Text(
+                      '₹${food.price.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: isDark
+                            ? Colors.white
+                            : const Color(0xFF101617),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),

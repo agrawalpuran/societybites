@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/services/order_push_coordinator.dart';
 
@@ -18,6 +19,8 @@ Order _order({required String id, String status = 'ready'}) {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('order_completed hint advances status immediately', () {
     final order = _order(id: 'o1', status: 'ready');
     final updated = applyOrderPushHint(
@@ -118,6 +121,26 @@ void main() {
     });
     expect(merged.status, 'cancelled');
     expect(merged.cancelReason, 'Changed my mind');
+  });
+
+  test('reconcileServerOrder keeps seller mark-ready before refresh catches up', () {
+    final local = _order(id: 'o7', status: 'ready');
+    final stale = _order(id: 'o7', status: 'accepted');
+    final merged = OrderPushCoordinator.reconcileServerOrder(local, stale);
+    expect(merged.status, 'ready');
+  });
+
+  test('staged hint survives list merge', () {
+    SharedPreferences.setMockInitialValues({});
+    OrderPushCoordinator.stageHint(
+      const OrderPushHint(orderId: 'o8', status: 'accepted'),
+    );
+    final merged = applyOrderPushHints(
+      [_order(id: 'o8', status: 'pending')],
+      OrderPushCoordinator.pendingHints,
+    );
+    expect(merged.single.status, 'accepted');
+    OrderPushCoordinator.dropHint('o8');
   });
 
   test('order_created yields hint for kitchen prefetch', () {

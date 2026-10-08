@@ -773,7 +773,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     return incoming
         .map(
           (order) => byId.containsKey(order.id)
-              ? Order.mergePreservingDetails(byId[order.id]!, order)
+              ? OrderPushCoordinator.reconcileServerOrder(byId[order.id]!, order)
               : order,
         )
         .toList();
@@ -836,10 +836,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       'SELLER STATUS ${order.orderId} ${order.status} → $nextStatus via ${ApiService.baseUrl}',
     );
     final snapshot = _findOrder(order.id) ?? order;
-    final optimistic = applyOrderPushHint(
-      snapshot,
-      OrderPushHint(orderId: snapshot.id, status: nextStatus),
-    );
+    final hint = OrderPushHint(orderId: snapshot.id, status: nextStatus);
+    OrderPushCoordinator.stageHint(hint);
+    final optimistic = applyOrderPushHint(snapshot, hint);
     _mergeKitchenOrder(optimistic);
 
     try {
@@ -880,6 +879,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       debugPrint('SELLER STATUS FAILED ${order.orderId}: $e');
       if (!mounted) return;
 
+      OrderPushCoordinator.dropHint(snapshot.id);
       _mergeKitchenOrder(snapshot);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -983,13 +983,25 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
     _isRejecting = true;
     setState(() => _rejectingOrderId = order.id);
+    final snapshot = _findOrder(order.id) ?? order;
+    const rejectedStatus = 'rejected';
+    final rejectHint = OrderPushHint(
+      orderId: snapshot.id,
+      status: rejectedStatus,
+    );
+    OrderPushCoordinator.stageHint(rejectHint);
+    _mergeKitchenOrder(applyOrderPushHint(snapshot, rejectHint));
     try {
       final json = await ApiService.rejectOrder(
         orderId: order.id,
         reason: result.reason,
         otherText: result.note,
       );
-      if (mounted) _upsertOrder(Order.fromJson(json));
+      if (mounted) {
+        _mergeKitchenOrder(
+          Order.mergeStatusPatch(_findOrder(order.id) ?? snapshot, json),
+        );
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -999,6 +1011,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+      OrderPushCoordinator.dropHint(snapshot.id);
+      _mergeKitchenOrder(snapshot);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not reject order: $e')));
@@ -2178,6 +2192,12 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
       );
     }
 
+    OrderPushCoordinator.stageHint(
+      OrderPushHint(
+        orderId: snapshot.id,
+        paymentStatus: 'seller_confirmed',
+      ),
+    );
     widget.onOrderUpdated(
       Order.mergeStatusPatch(
         snapshot,
@@ -2200,6 +2220,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
       _showCompactPaymentNotice(context, 'Payment confirmed');
     } catch (e) {
       if (!mounted) return;
+      OrderPushCoordinator.dropHint(snapshot.id);
       widget.onOrderUpdated(snapshot);
       ScaffoldMessenger.of(
         context,
@@ -2236,6 +2257,9 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     if (confirmed != true || !mounted) return;
 
     final snapshot = order;
+    OrderPushCoordinator.stageHint(
+      OrderPushHint(orderId: snapshot.id, paymentStatus: 'paid'),
+    );
     widget.onOrderUpdated(
       Order.mergeStatusPatch(
         snapshot,
@@ -2251,6 +2275,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
       _showCompactPaymentNotice(context, 'Payment received');
     } catch (e) {
       if (!mounted) return;
+      OrderPushCoordinator.dropHint(snapshot.id);
       widget.onOrderUpdated(snapshot);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not confirm cash payment: $e')),

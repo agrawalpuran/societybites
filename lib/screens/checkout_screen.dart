@@ -69,6 +69,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _needBySpecified = false;
   DateTime? _needBy;
   CouponQuote? _couponQuote;
+  String? _cachedSocietyId;
 
   @override
   void initState() {
@@ -77,10 +78,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _isCrossSociety = widget.isCrossSociety;
     _sellerFulfilment = widget.sellerFulfilment ??
         (_items.isEmpty ? null : _items.first.food.sellerFulfilment);
+    final prefetchedFee = ApiService.cachedPlatformFee;
+    if (prefetchedFee != null) _platformFee = prefetchedFee;
     _loadPlatformFee();
+    _warmCheckoutSession();
     _applyDefaultPaymentMethod();
     _applyDefaultFulfilmentMethod();
     _inferCrossSocietyFromCart();
+  }
+
+  Future<void> _warmCheckoutSession() async {
+    final societyId = await SessionService.getSocietyId();
+    if (!mounted) return;
+    _cachedSocietyId = societyId;
   }
 
   void _applyDefaultPaymentMethod() {
@@ -335,7 +345,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
 
-      final societyId = await SessionService.getSocietyId();
+      final societyId =
+          _cachedSocietyId ?? await SessionService.getSocietyId();
       if (societyId == null || societyId.isEmpty) {
         throw Exception('Join your society before placing an order.');
       }

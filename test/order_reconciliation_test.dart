@@ -114,6 +114,62 @@ void main() {
     });
   });
 
+  testWidgets('PaymentScreen shows UPI QR without waiting on payment info', (
+    tester,
+  ) async {
+    final orderWithUpi = Order(
+      id: 'order-1',
+      orderId: 'SB-1001',
+      items: [
+        OrderLineItem(
+          quantity: 1,
+          unitPrice: 95,
+          food: FoodItem(
+            id: 'f1',
+            name: 'Samosa',
+            sellerId: 's1',
+            sellerName: 'Chef',
+            block: 'A',
+            price: 95,
+            rating: 4,
+            pickupTime: '10m',
+            description: '',
+            icon: Icons.restaurant,
+            bgColor: const Color(0xFFF0F2F1),
+            sellerUpiId: 'seller@upi',
+          ),
+        ),
+      ],
+      date: 'Today',
+      status: 'accepted',
+      statusStep: 1,
+      orderTotal: 100,
+      subtotal: 95,
+      communityFee: 5,
+      paymentMethod: 'upi',
+      paymentStatus: 'pending',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PaymentScreen(
+          order: orderWithUpi,
+          fetchOrder: (_) async => _orderJson(),
+          fetchPaymentInfo: (_) async => {
+            'sellerUpiId': 'seller@upi',
+            'sellerUpiDisplayName': 'Test Seller',
+          },
+          pollInterval: const Duration(hours: 1),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Loading payment details…'), findsNothing);
+    expect(find.text("I've Paid via UPI"), findsOneWidget);
+    await tester.pump();
+  });
+
   testWidgets('PaymentScreen immediately fetches the latest order', (
     tester,
   ) async {

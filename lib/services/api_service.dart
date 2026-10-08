@@ -1607,6 +1607,8 @@ class ApiService {
 
   static double? _cachedPlatformFee;
 
+  static double? get cachedPlatformFee => _cachedPlatformFee;
+
   static Future<double> getPlatformFee() async {
     if (_cachedPlatformFee != null) return _cachedPlatformFee!;
     final response = await http.get(Uri.parse('$baseUrl/settings'));
