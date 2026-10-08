@@ -6,6 +6,7 @@ import '../config/launch_config.dart';
 import '../models/guest_discovery.dart';
 import '../web/web_breakpoints.dart';
 import '../widgets/app_header.dart';
+import '../widgets/serving_city_ticker.dart';
 import 'guest_kitchens_screen.dart';
 import 'login_screen.dart';
 
@@ -102,6 +103,7 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
                         child: _HeroSection(
                           onExplore: () => _openRealMarketplace(),
                           onBrowseGuest: () => _openRealMarketplace(),
+                          onSignUp: _openSignIn,
                         ),
                       ),
                       Expanded(
@@ -120,6 +122,7 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
                   _HeroSection(
                     onExplore: () => _openRealMarketplace(),
                     onBrowseGuest: () => _openRealMarketplace(),
+                    onSignUp: _openSignIn,
                   ),
                   _HeroCarousel(
                     controller: _pageController,
@@ -174,6 +177,7 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
               child: _HeroSection(
                 onExplore: () => _openRealMarketplace(),
                 onBrowseGuest: () => _openRealMarketplace(),
+                onSignUp: _openSignIn,
               ),
             ),
             SliverToBoxAdapter(
@@ -278,10 +282,9 @@ class _SocietyBitesHeader extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Flexible(
-                    child: Text(
-                      'Now serving $currentServingCity',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: ServingCityTicker(
+                      key: const Key('serving-city-ticker'),
+                      text: 'Now serving $currentServingCity',
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -323,10 +326,12 @@ class _HeroSection extends StatelessWidget {
   const _HeroSection({
     required this.onExplore,
     required this.onBrowseGuest,
+    required this.onSignUp,
   });
 
   final VoidCallback onExplore;
   final VoidCallback onBrowseGuest;
+  final VoidCallback onSignUp;
 
   @override
   Widget build(BuildContext context) {
@@ -355,41 +360,87 @@ class _HeroSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: onExplore,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0E5A47),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    key: const Key('guest-hero-explore-menus'),
+                    onPressed: onExplore,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0E5A47),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Explore Menus →',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              child: const Text(
-                'Explore Menus →',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: OutlinedButton(
+                    key: const Key('guest-hero-browse-guest'),
+                    onPressed: onBrowseGuest,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0E5A47),
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(
+                        color: Color(0xFF0E5A47),
+                        width: 1.4,
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Browse as Guest',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             height: 52,
             child: OutlinedButton(
-              onPressed: onBrowseGuest,
+              key: const Key('guest-hero-sign-up'),
+              onPressed: onSignUp,
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF0E5A47),
-                backgroundColor: Colors.white,
+                backgroundColor: const Color(0xFFE8F3EE),
                 side: const BorderSide(color: Color(0xFF0E5A47), width: 1.4),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
               child: const Text(
-                'Browse as Guest',
+                'Sign Up',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
               ),
             ),

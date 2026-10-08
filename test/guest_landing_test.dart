@@ -31,7 +31,8 @@ void main() {
     await tester.pump();
 
     expect(find.text(kAppDisplayName), findsOneWidget);
-    expect(find.textContaining('Now serving $currentServingCity'), findsOneWidget);
+    expect(find.byKey(const Key('serving-city-ticker')), findsOneWidget);
+    expect(find.textContaining('Now serving $currentServingCity'), findsWidgets);
     expect(find.text('Sign In'), findsOneWidget);
     expect(
       find.text('Taste what your neighbors are cooking today.'),
