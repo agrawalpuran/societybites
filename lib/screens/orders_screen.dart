@@ -257,6 +257,65 @@ class OrdersScreenState extends State<OrdersScreen>
   }
 
   void _mergeOrderFromPayment(Order updated) {
+    _mergeBuyerOrder(updated);
+  }
+
+  Order? _findBuyerOrder(String id) {
+    for (final order in [..._buyer.active, ..._buyer.past]) {
+      if (order.id == id) return order;
+    }
+    return null;
+  }
+
+  Order _optimisticBuyerCancel(Order order, CancelOrderResult choice) {
+    final stored = BuyerOrderVisibility.formatStoredCancelReason(
+      reason: choice.reason,
+      note: choice.note,
+    );
+    return Order.mergeStatusPatch(order, {
+      'statusPatch': true,
+      'status': 'cancelled',
+      'statusStep': orderStatusStepFor('cancelled'),
+      'cancelledAt': DateTime.now().toUtc().toIso8601String(),
+      'cancelReason': stored,
+    });
+  }
+
+  Future<void> buyerCancelOrder(
+    Order order,
+    CancelOrderResult choice, {
+    void Function(Order updated)? onLocal,
+  }) async {
+    final snapshot = _findBuyerOrder(order.id) ?? order;
+    final optimistic = _optimisticBuyerCancel(snapshot, choice);
+    _mergeBuyerOrder(optimistic);
+    onLocal?.call(optimistic);
+
+    final orderId =
+        order.id.isNotEmpty ? order.id : order.orderId;
+    try {
+      final json = await ApiService.updateOrderStatus(
+        orderId: orderId,
+        status: 'cancelled',
+        reason: choice.reason,
+        otherText: choice.note,
+      );
+      if (!mounted) return;
+      final merged = Order.mergeStatusPatch(
+        _findBuyerOrder(order.id) ?? optimistic,
+        json,
+      );
+      _mergeBuyerOrder(merged);
+      onLocal?.call(merged);
+    } catch (e) {
+      _mergeBuyerOrder(snapshot);
+      onLocal?.call(snapshot);
+      rethrow;
+    }
+    unawaited(_loadOrders(fetchCampaignMetadata: false));
+  }
+
+  void _mergeBuyerOrder(Order updated) {
     final combined = <Order>[..._buyer.active, ..._buyer.past];
     final index = combined.indexWhere((order) => order.id == updated.id);
     if (index >= 0) {
@@ -268,6 +327,7 @@ class OrdersScreenState extends State<OrdersScreen>
         combined.where((order) => order.isInBuyerActiveTab()).toList();
     _buyer.past =
         combined.where((order) => !order.isInBuyerActiveTab()).toList();
+    if (mounted) setState(() {});
   }
 
   static int _orderStatusRank(String status) {
@@ -605,6 +665,7 @@ class OrdersScreenState extends State<OrdersScreen>
           _ActiveTab(
             orders: _buyer.active,
             onRefresh: _loadOrders,
+            onBuyerCancel: buyerCancelOrder,
             onPaymentClosed: _onPaymentScreenClosed,
             onPull: () => _pullRefresh.run(_loadOrders),
             onReturnToTop: _showActiveOrdersAtTop,
@@ -661,10 +722,17 @@ class OrdersScreenState extends State<OrdersScreen>
   }
 }
 
+typedef BuyerCancelOrderHandler = Future<void> Function(
+  Order order,
+  CancelOrderResult choice, {
+  void Function(Order updated)? onLocal,
+});
+
 class _ActiveTab extends StatelessWidget {
   const _ActiveTab({
     required this.orders,
     required this.onRefresh,
+    this.onBuyerCancel,
     this.onPaymentClosed,
     this.onPull,
     this.onReturnToTop,
@@ -674,6 +742,7 @@ class _ActiveTab extends StatelessWidget {
 
   final List<Order> orders;
   final Future<void> Function() onRefresh;
+  final BuyerCancelOrderHandler? onBuyerCancel;
   final Future<void> Function(Object? result)? onPaymentClosed;
   final Future<void> Function()? onPull;
   final VoidCallback? onReturnToTop;
@@ -709,6 +778,7 @@ class _ActiveTab extends StatelessWidget {
                       : _ActiveOrderCard(
                           order: order,
                           onRefresh: onRefresh,
+                          onBuyerCancel: onBuyerCancel,
                           onPaymentClosed: onPaymentClosed,
                           onReturnToTop: onReturnToTop,
                           isSellerView: isSellerView,
@@ -735,6 +805,7 @@ class _ActiveTab extends StatelessWidget {
                   : _ActiveOrderCard(
                       order: o,
                       onRefresh: onRefresh,
+                      onBuyerCancel: onBuyerCancel,
                       onPaymentClosed: onPaymentClosed,
                       onReturnToTop: onReturnToTop,
                       isSellerView: isSellerView,
@@ -750,6 +821,7 @@ class _ActiveOrderCard extends StatelessWidget {
   const _ActiveOrderCard({
     required this.order,
     required this.onRefresh,
+    this.onBuyerCancel,
     this.onPaymentClosed,
     this.onReturnToTop,
     this.isSellerView = false,
@@ -758,6 +830,7 @@ class _ActiveOrderCard extends StatelessWidget {
 
   final Order order;
   final Future<void> Function() onRefresh;
+  final BuyerCancelOrderHandler? onBuyerCancel;
   final Future<void> Function(Object? result)? onPaymentClosed;
   final VoidCallback? onReturnToTop;
   final bool isSellerView;
@@ -1082,13 +1155,10 @@ class _ActiveOrderCard extends StatelessWidget {
                       confirmMessage: order.buyerCancelConfirmMessage,
                     );
                     if (cancelChoice == null || !context.mounted) return;
+                    final cancel = onBuyerCancel;
+                    if (cancel == null) return;
                     try {
-                      await ApiService.updateOrderStatus(
-                        orderId: order.id.isNotEmpty ? order.id : order.orderId,
-                        status: 'cancelled',
-                        reason: cancelChoice.reason,
-                        otherText: cancelChoice.note,
-                      );
+                      await cancel(order, cancelChoice);
                     } catch (e) {
                       if (!context.mounted) return;
                       final raw = e.toString().toLowerCase();
@@ -1103,9 +1173,6 @@ class _ActiveOrderCard extends StatelessWidget {
                       );
                       return;
                     }
-                    try {
-                      await onRefresh();
-                    } catch (_) {}
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -1247,23 +1314,62 @@ void _openBuyerOrderDetails({
   required BuildContext context,
   required Order order,
   required Future<void> Function() onRefresh,
+  BuyerCancelOrderHandler? onBuyerCancel,
 }) {
   Navigator.push<void>(
     context,
     MaterialPageRoute(
-      builder: (_) =>
-          _BuyerOrderDetailScreen(order: order, onRefresh: onRefresh),
+      builder: (_) => _BuyerOrderDetailScreen(
+        order: order,
+        onRefresh: onRefresh,
+        onBuyerCancel: onBuyerCancel,
+      ),
     ),
   );
 }
 
-class _BuyerOrderDetailScreen extends StatelessWidget {
-  const _BuyerOrderDetailScreen({required this.order, required this.onRefresh});
+class _BuyerOrderDetailScreen extends StatefulWidget {
+  const _BuyerOrderDetailScreen({
+    required this.order,
+    required this.onRefresh,
+    this.onBuyerCancel,
+  });
 
   final Order order;
   final Future<void> Function() onRefresh;
+  final BuyerCancelOrderHandler? onBuyerCancel;
+
+  @override
+  State<_BuyerOrderDetailScreen> createState() => _BuyerOrderDetailScreenState();
+}
+
+class _BuyerOrderDetailScreenState extends State<_BuyerOrderDetailScreen> {
+  late Order _order;
 
   static const _webCardMaxWidth = 680.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _order = widget.order;
+  }
+
+  Future<void> _handleBuyerCancel(
+    Order order,
+    CancelOrderResult choice, {
+    void Function(Order updated)? onLocal,
+  }) async {
+    final cancel = widget.onBuyerCancel;
+    if (cancel == null) return;
+    await cancel(
+      order,
+      choice,
+      onLocal: (updated) {
+        if (mounted) setState(() => _order = updated);
+        onLocal?.call(updated);
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1275,14 +1381,19 @@ class _BuyerOrderDetailScreen extends StatelessWidget {
         foregroundColor: const Color(0xFF101617),
         elevation: 0,
         title: Text(
-          order.orderId,
+          _order.orderId,
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
         children: [
-          _ActiveOrderCard(order: order, onRefresh: onRefresh, readOnly: true),
+          _ActiveOrderCard(
+            order: _order,
+            onRefresh: widget.onRefresh,
+            onBuyerCancel: _handleBuyerCancel,
+            readOnly: true,
+          ),
         ],
       ),
     );
@@ -1310,7 +1421,7 @@ class _BuyerOrderDetailScreen extends StatelessWidget {
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        order.orderId,
+                        _order.orderId,
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
@@ -1333,8 +1444,9 @@ class _BuyerOrderDetailScreen extends StatelessWidget {
                           maxWidth: _webCardMaxWidth,
                         ),
                         child: _ActiveOrderCard(
-                          order: order,
-                          onRefresh: onRefresh,
+                          order: _order,
+                          onRefresh: widget.onRefresh,
+                          onBuyerCancel: _handleBuyerCancel,
                           readOnly: true,
                         ),
                       ),

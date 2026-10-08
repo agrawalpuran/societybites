@@ -108,6 +108,18 @@ void main() {
     expect(merged.expectedReadyAt, readyBy);
   });
 
+  test('mergeStatusPatch applies buyer cancel reason', () {
+    final prior = _order(id: 'o6', status: 'pending');
+    final merged = Order.mergeStatusPatch(prior, {
+      'statusPatch': true,
+      'status': 'cancelled',
+      'statusStep': -1,
+      'cancelReason': 'Changed my mind',
+    });
+    expect(merged.status, 'cancelled');
+    expect(merged.cancelReason, 'Changed my mind');
+  });
+
   test('order_created yields hint for kitchen prefetch', () {
     final hint = OrderPushHint.fromMessageData({
       'orderId': 'o3',

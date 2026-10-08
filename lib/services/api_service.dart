@@ -1605,13 +1605,24 @@ class ApiService {
 
   // ─── Admin APIs ───────────────────────────────────────────────────────
 
+  static double? _cachedPlatformFee;
+
   static Future<double> getPlatformFee() async {
+    if (_cachedPlatformFee != null) return _cachedPlatformFee!;
     final response = await http.get(Uri.parse('$baseUrl/settings'));
     if (response.statusCode == 200) {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
-      return (data['platformFee'] as num?)?.toDouble() ?? 0;
+      final fee = (data['platformFee'] as num?)?.toDouble() ?? 0;
+      _cachedPlatformFee = fee;
+      return fee;
     }
     _throwFromResponse(response);
+  }
+
+  /// Warm checkout totals while the buyer is still browsing.
+  static void prefetchPlatformFee() {
+    if (_cachedPlatformFee != null) return;
+    getPlatformFee().catchError((_) => 0.0);
   }
 
   static Future<SellerFssaiRegistration> getMyFssai() async {

@@ -20,14 +20,16 @@ bool kitchenOrderAllowsReadyBy(Order order) {
 /// Pass every order the screen can show, Active and Past alike. A tab that is
 /// hidden also hides its orders from Past, so narrowing this to active orders
 /// strands finished ones with no tab to reach them from.
-/// Pre-orders tab: pre-order orders **or** kitchen campaigns (including closed).
+/// Pre-orders tab: pre-order orders, campaigns, or PREORDER catalog listings.
 List<KitchenOrderCategory> visibleKitchenCategories({
   required List<Order> orders,
   List<PreOrderCampaign> campaigns = const [],
+  List<FoodItem> listings = const [],
 }) {
   var hasOrders = false;
   var hasMadeToOrder = false;
   var hasPreorderOrders = false;
+  var hasPreorderCatalog = false;
   for (final order in orders) {
     switch (kitchenCategoryForOrder(order)) {
       case KitchenOrderCategory.orders:
@@ -38,7 +40,20 @@ List<KitchenOrderCategory> visibleKitchenCategories({
         hasPreorderOrders = true;
     }
   }
-  final hasPreorders = hasPreorderOrders || campaigns.isNotEmpty;
+  for (final listing in listings) {
+    if (listing.status == 'inactive') continue;
+    if (listing.isPreOrderCatalog) {
+      hasPreorderCatalog = true;
+      continue;
+    }
+    if (listing.isMadeToOrder) {
+      hasMadeToOrder = true;
+    } else {
+      hasOrders = true;
+    }
+  }
+  final hasPreorders =
+      hasPreorderOrders || campaigns.isNotEmpty || hasPreorderCatalog;
   return [
     if (hasOrders) KitchenOrderCategory.orders,
     if (hasMadeToOrder) KitchenOrderCategory.madeToOrder,

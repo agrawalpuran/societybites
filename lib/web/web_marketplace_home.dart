@@ -387,28 +387,6 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
             color: Color(0xFF3E514B),
           ),
         ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            if (widget.readyNow.isNotEmpty)
-              _JumpChip(
-                label: 'Available now',
-                onTap: () => _reveal(_readyKey),
-              ),
-            if (widget.madeToOrder.isNotEmpty)
-              _JumpChip(label: 'Made to order', onTap: () => _reveal(_madeKey)),
-            if (widget.inSocietyPreorders.isNotEmpty)
-              _JumpChip(
-                label: 'Pre-orders',
-                onTap: () => _reveal(_preorderKey),
-              ),
-            if (widget.nearbyListings.isNotEmpty ||
-                widget.nearbySellers.isNotEmpty)
-              _JumpChip(label: 'Nearby', onTap: () => _reveal(_nearbyKey)),
-          ],
-        ),
       ],
     );
     final visual = _HeroVisual(foods: widget.heroFoods);
@@ -814,40 +792,6 @@ class WebSectionHeader extends StatelessWidget {
         ),
         ?trailing,
       ],
-    );
-  }
-}
-
-class _JumpChip extends StatelessWidget {
-  const _JumpChip({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: const Color(0xFFD5E4DB)),
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: webGreenDark,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

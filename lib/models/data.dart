@@ -1130,7 +1130,7 @@ class Order {
       hasReview: prior.hasReview,
       rejectReason: prior.rejectReason,
       rejectedAt: at('rejectedAt') ?? prior.rejectedAt,
-      cancelReason: prior.cancelReason,
+      cancelReason: json['cancelReason'] as String? ?? prior.cancelReason,
       refundDue: json.containsKey('refundDue')
           ? json['refundDue'] == true
           : prior.refundDue,

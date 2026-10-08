@@ -204,6 +204,15 @@ class BuyerOrderVisibility {
   static String? cancelReasonLabel(String? raw) => storedReasonLabel(raw);
 
   static String? cancelNote(String? raw) => storedReasonNote(raw);
+
+  /// Matches backend [formatStoredReason] for buyer cancel PATCH.
+  static String formatStoredCancelReason({
+    required String reason,
+    String? note,
+  }) {
+    final trimmed = note?.trim() ?? '';
+    return trimmed.isEmpty ? reason : '$reason\n$trimmed';
+  }
 }
 
 class BuyerOrderLifecycle {

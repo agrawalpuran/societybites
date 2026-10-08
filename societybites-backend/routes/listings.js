@@ -49,6 +49,7 @@ const {
   recurringUpdateFields,
   attachRecurringAvailability,
 } = require("../lib/recurringAvailability");
+const { withoutAutomatedTestListings } = require("../lib/testListingNames");
 
 async function jsonListings(listings) {
   const withCapacity = await attachMadeToOrderCapacity(prisma, listings);
@@ -218,7 +219,10 @@ router.get(
       }
     }
 
-    const payload = await jsonListings(listings);
+    const buyerVisible = isDiscoverableBuyerFeed
+      ? withoutAutomatedTestListings(listings)
+      : listings;
+    const payload = await jsonListings(buyerVisible);
     res.json(payload);
   })
 );

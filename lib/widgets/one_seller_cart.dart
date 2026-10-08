@@ -43,6 +43,23 @@ String cartSellerName(List<CartItem> cart) {
   return name.isEmpty ? 'this seller' : name;
 }
 
+/// Cart lines for checkout when ordering [food], keeping same-seller items already in cart.
+List<CartItem> checkoutLinesForFood({
+  required FoodItem food,
+  required List<CartItem> globalCart,
+}) {
+  if (globalCart.isNotEmpty && canAddItemFromSeller(globalCart, food.sellerId)) {
+    final lines = globalCart
+        .map((item) => CartItem(food: item.food, quantity: item.quantity))
+        .toList();
+    if (!lines.any((item) => item.food.id == food.id)) {
+      lines.add(CartItem(food: food));
+    }
+    return lines;
+  }
+  return [CartItem(food: food)];
+}
+
 /// Returns true when [sellerId] may be added or ordered.
 /// A different seller shows the restriction sheet and does not change [cart].
 Future<bool> confirmCartSellerAllowed(

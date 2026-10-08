@@ -2,6 +2,7 @@ const prisma = require("./prisma");
 const { listingCategoriesFromRecord } = require("../utils/listingCategories");
 const { canonicalCityKey } = require("./launchCity");
 const { expireDueListings, DISCOVERABLE_STATUSES } = require("../utils/listingExpiry");
+const { withoutAutomatedTestListings } = require("./testListingNames");
 const { evaluateRecurringAvailability, attachRecurringAvailability } = require("./recurringAvailability");
 
 const GUEST_REACH_LEVELS = ["NEARBY", "EXTENDED"];
@@ -84,7 +85,10 @@ function serializeGuestListing(listing, seller) {
 
 async function serializeGuestKitchen(seller) {
   const listings = (
-    await attachRecurringAvailability(prisma, seller.listings || [])
+    await attachRecurringAvailability(
+      prisma,
+      withoutAutomatedTestListings(seller.listings || [])
+    )
   ).map((listing) => serializeGuestListing(listing, seller));
   const categories = [
     ...new Set(listings.flatMap((item) => item.categories || []).filter(Boolean)),
@@ -108,7 +112,7 @@ function matchesGuestEligibility(seller, cityKey) {
   if (canonicalCityKey(seller.society && seller.society.city) !== cityKey) {
     return false;
   }
-  return Array.isArray(seller.listings) && seller.listings.length > 0;
+  return withoutAutomatedTestListings(seller.listings || []).length > 0;
 }
 
 async function societyIdsForCity(cityKey) {

@@ -892,12 +892,16 @@ class _BottomCta extends StatelessWidget {
                               CartController.instance.openCheckout(context),
                         );
                         if (!allowed || !context.mounted) return;
+                        ApiService.prefetchPlatformFee();
+                        final lines = checkoutLinesForFood(
+                          food: food,
+                          globalCart: CartController.instance.items,
+                        );
+                        if (!context.mounted) return;
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => CheckoutScreen(
-                              cartItems: [CartItem(food: food)],
-                            ),
+                            builder: (_) => CheckoutScreen(cartItems: lines),
                           ),
                         );
                       },

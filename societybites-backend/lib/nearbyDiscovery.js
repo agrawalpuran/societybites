@@ -16,6 +16,7 @@ const {
 const { expireDueListings, DISCOVERABLE_STATUSES } = require("../utils/listingExpiry");
 const { attachRecurringAvailability } = require("./recurringAvailability");
 const { serializeListingsWithSellerOrderability } = require("./listingOrderability");
+const { withoutAutomatedTestListings } = require("./testListingNames");
 
 const ACTIVE_LISTING_WHERE = {
   status: { in: DISCOVERABLE_STATUSES },
@@ -208,7 +209,8 @@ async function discoverNearbySellers({ buyer, query } = {}) {
 
   const eligible = [];
   for (const candidate of candidates) {
-    if (!candidate.listings || candidate.listings.length === 0) continue;
+    candidate.listings = withoutAutomatedTestListings(candidate.listings || []);
+    if (candidate.listings.length === 0) continue;
     const eligibility = evaluateSellerDiscoveryEligibility({
       buyerSociety,
       sellerSociety: candidate.society,
@@ -307,7 +309,8 @@ async function getNearbySellerStorefront({ buyer, sellerId, query } = {}) {
     distanceKm: query && query.distanceKm,
   });
 
-  if (!eligibility.eligible || !seller.listings || seller.listings.length === 0) {
+  seller.listings = withoutAutomatedTestListings(seller.listings || []);
+  if (!eligibility.eligible || seller.listings.length === 0) {
     const err = new Error("Seller not found");
     err.statusCode = 404;
     throw err;

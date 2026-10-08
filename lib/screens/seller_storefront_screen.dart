@@ -355,15 +355,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       onViewCart: () => CartController.instance.openCheckout(context),
     );
     if (!allowed || !mounted) return;
-    if (!await SessionService.isSignedIn()) {
-      if (!mounted) return;
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-      return;
-    }
-    if (!mounted) return;
+    ApiService.prefetchPlatformFee();
     final placed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(

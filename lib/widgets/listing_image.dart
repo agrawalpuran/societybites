@@ -59,10 +59,14 @@ class ListingImage extends StatelessWidget {
                     width: width,
                     height: height,
                     fit: BoxFit.cover,
-                    gaplessPlayback: false,
+                    gaplessPlayback: true,
                     // Canvas images stay in the scroll view. HTML image
                     // elements on web sit above the page and swallow taps.
                     webHtmlElementStrategy: WebHtmlElementStrategy.never,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return _iconFallback();
+                    },
                     errorBuilder: (_, _, _) => _iconFallback(),
                   )
                 : _iconFallback(),

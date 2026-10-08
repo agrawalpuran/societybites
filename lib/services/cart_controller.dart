@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../screens/checkout_screen.dart';
-import '../screens/login_screen.dart';
-import 'session_service.dart';
+import 'api_service.dart';
 
 /// Shared in-memory cart for buyer tabs. Not persisted; no extra API calls.
 class CartController extends ChangeNotifier {
@@ -76,15 +75,7 @@ class CartController extends ChangeNotifier {
   }
 
   Future<bool> openCheckout(BuildContext context) async {
-    final signedIn = await SessionService.isSignedIn();
-    if (!context.mounted) return false;
-    if (!signedIn) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-      return false;
-    }
+    if (!context.mounted || items.isEmpty) return false;
     final placed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(

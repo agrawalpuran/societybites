@@ -10,6 +10,7 @@ import '../widgets/one_seller_cart.dart';
 import '../widgets/order_timing_notice.dart';
 import '../widgets/checkout_coupon_section.dart';
 import '../models/coupon.dart';
+import '../widgets/required_field_label.dart';
 import '../widgets/requested_ready_summary.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/status_banner.dart';
@@ -184,6 +185,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   bool get _showNeedBy => _items.any((item) => item.food.isMadeToOrder);
 
+  bool get _fulfilmentChoiceRequired =>
+      _sellerFulfilment?.mode == FulfilmentMode.both;
+
   /// Ready-now UPI orders are already accepted, so checkout can open the QR.
   bool get _orderAndPay =>
       _payment == PaymentMethod.upi && !_showNeedBy;
@@ -192,11 +196,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (_isSubmitting || _items.isEmpty || _totalQuantity <= 0) return false;
     if (cartHasMixedAvailability(_items)) return false;
     if (_showNeedBy && _needBySpecified && _needBy == null) return false;
-    if (_isCrossSociety &&
-        _sellerFulfilment?.mode == FulfilmentMode.both &&
-        _fulfilmentMethod == null) {
-      return false;
-    }
+    if (_fulfilmentChoiceRequired && _fulfilmentMethod == null) return false;
     return true;
   }
 
@@ -751,15 +751,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildFulfilmentSection() {
     final fulfilment = _sellerFulfilment ?? const SellerFulfilment();
     final society = widget.sellerSocietyName;
+    final choiceRequired = _fulfilmentChoiceRequired;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Delivery Mechanism',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF101617),
+        Text.rich(
+          TextSpan(
+            text: 'Delivery Mechanism',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF101617),
+            ),
+            children: [
+              if (choiceRequired)
+                const TextSpan(
+                  text: ' *',
+                  style: TextStyle(
+                    color: requiredFieldAsteriskColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+            ],
           ),
         ),
         const SizedBox(height: 4),

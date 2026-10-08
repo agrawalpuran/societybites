@@ -15,6 +15,7 @@ import '../models/seller_order_history.dart';
 import '../services/api_service.dart';
 import '../services/order_push_coordinator.dart';
 import '../widgets/order_lifecycle_dialogs.dart';
+import '../services/my_listings_cache.dart';
 import '../services/my_listings_prefetch.dart';
 import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
@@ -347,6 +348,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     if (societyId == null || societyId.isEmpty) return;
     try {
       await MyListingsPrefetch.warm();
+      if (mounted) setState(() {});
     } catch (_) {}
   }
 
@@ -393,9 +395,15 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     }
   }
 
-  /// Always show Regular / MTO / Pre-orders so those panes can load on tap.
-  List<KitchenOrderCategory> get _visibleKitchenCategories =>
-      KitchenOrderCategory.values;
+  List<KitchenOrderCategory> get _visibleKitchenCategories {
+    final List<FoodItem> listings =
+        MyListingsCache.hasSnapshot ? MyListingsCache.listings : const [];
+    return visibleKitchenCategories(
+      orders: [..._activeOrders, ..._pastOrders],
+      campaigns: _preOrderCampaigns,
+      listings: listings,
+    );
+  }
 
   KitchenOrderCategory? get _resolvedKitchenCategory => resolveKitchenCategory(
         visible: _visibleKitchenCategories,
@@ -639,8 +647,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     }
 
     try {
-      late final List<Order> active;
-      late final List<Order> past;
+      late List<Order> active;
+      late List<Order> past;
       var hasOlderPast = false;
       var hasOlderActive = false;
       var pendingAttention = 0;
@@ -1652,10 +1660,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     final active = _ordersForCategory(_activeOrders);
     final past = _ordersForCategory(_pastOrders);
     final orders = showingPast ? past : active;
-    final occupiedTypes = visibleKitchenCategories(
-      orders: [..._activeOrders, ..._pastOrders],
-      campaigns: _preOrderCampaigns,
-    );
+    final occupiedTypes = _visibleKitchenCategories;
     final typedEmpty = occupiedTypes.length > 1;
     final orderTabs = Container(
       height: 44,
@@ -1899,7 +1904,12 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       context,
       MaterialPageRoute(builder: (_) => const MyListingsScreen()),
     );
-    if (mounted) _loadOrders();
+    if (!mounted) return;
+    _loadOrders();
+    try {
+      await MyListingsPrefetch.warm();
+      if (mounted) setState(() {});
+    } catch (_) {}
   }
 
   Future<void> _openAddListing() async {
@@ -1914,6 +1924,10 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       _loadOrders();
       _loadPreOrders();
       widget.onListingCreated?.call();
+      try {
+        await MyListingsPrefetch.warm();
+        if (mounted) setState(() {});
+      } catch (_) {}
     }
   }
 

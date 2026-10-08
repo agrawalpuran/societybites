@@ -527,6 +527,7 @@ class HomeScreenState extends State<HomeScreen> {
       }
     });
     CartController.instance.notify();
+    ApiService.prefetchPlatformFee();
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

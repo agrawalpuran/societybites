@@ -300,6 +300,7 @@ function serializeOrderStatusPatch(order) {
     expectedReadyAt: order.expectedReadyAt || null,
     sellerConfirmedPaidAt: order.sellerConfirmedPaidAt || null,
     buyerMarkedPaidAt: order.buyerMarkedPaidAt || null,
+    cancelReason: order.cancelReason || null,
   };
 }
 
