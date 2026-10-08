@@ -63,6 +63,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   PaymentMethod _payment = PaymentMethod.upi;
   double _platformFee = 0;
   bool _isSubmitting = false;
+  /// One key per Place Order attempt (retries reuse; cleared after success).
+  String? _submitIdempotencyKey;
   String? _fulfilmentMethod;
   late bool _isCrossSociety;
   SellerFulfilment? _sellerFulfilment;
@@ -351,6 +353,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         throw Exception('Join your society before placing an order.');
       }
 
+      final idempotencyKey =
+          _submitIdempotencyKey ??= ApiService.newOrderIdempotencyKey();
+
       final place =
           widget.placeOrder ??
           ({
@@ -368,6 +373,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               fulfilmentMethod: fulfilmentMethod,
               requestedReadyAt: requestedReadyAt,
               couponCode: couponCode,
+              idempotencyKey: idempotencyKey,
             );
           };
 
@@ -391,6 +397,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _showNeedBy && _needBySpecified ? _needBy : null,
         couponCode: _couponQuote?.code,
       );
+
+      _submitIdempotencyKey = null;
 
       if (!mounted) return;
       final order = Order.withCartLineItemsIfMissing(

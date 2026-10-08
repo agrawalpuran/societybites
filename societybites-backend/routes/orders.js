@@ -66,6 +66,11 @@ const {
   couponErrorMessage,
   money: couponMoney,
 } = require("../lib/coupons");
+const {
+  parseIdempotencyKey,
+  findCompletedIdempotentOrder,
+  runWithOrderIdempotency,
+} = require("../lib/orderIdempotency");
 
 const router = express.Router();
 
@@ -543,6 +548,17 @@ router.post(
       return res.status(400).json({ error: "paymentMethod must be 'upi' or 'cash'" });
     }
 
+    const idempotencyKey = parseIdempotencyKey(req);
+    const replayOrder = await findCompletedIdempotentOrder(
+      prisma,
+      req.user.id,
+      idempotencyKey,
+      orderIncludeForCreate
+    );
+    if (replayOrder) {
+      return res.status(201).json(serializeOrder(replayOrder));
+    }
+
     if (orderType === "regular" && req.body.campaignId) {
       return res.status(400).json({
         error: "Regular orders cannot include a pre-order campaign",
@@ -891,8 +907,13 @@ router.post(
     }
 
     let order;
+    let idempotentReplay = false;
     try {
-      order = await prisma.$transaction(async (tx) => {
+      const idempotentResult = await runWithOrderIdempotency(prisma, {
+        buyerId: req.user.id,
+        idempotencyKey,
+        orderInclude: orderIncludeForCreate,
+        createOrderInTransaction: async (tx) => {
         for (const { listing, quantity } of preparedItems) {
           const reserveStock =
             (orderType === "regular" || listing.inventoryMode === "limited") &&
@@ -990,7 +1011,10 @@ router.post(
           data: { total: discountedTotal },
           include: orderIncludeForCreate,
         });
+        },
       });
+      order = idempotentResult.order;
+      idempotentReplay = idempotentResult.replay;
     } catch (err) {
       if (err.statusCode === 409) {
         return res.status(409).json({
@@ -1007,11 +1031,12 @@ router.post(
       throw err;
     }
 
-    logger.info("order", `Created ${order.orderNumber} by ${req.user.phone}`);
+    if (!idempotentReplay) {
+      logger.info("order", `Created ${order.orderNumber} by ${req.user.phone}`);
+      void flushNotification(notifyOrderCreated(order));
+    }
 
     res.status(201).json(serializeOrder(order));
-
-    void flushNotification(notifyOrderCreated(order));
   })
 );
 

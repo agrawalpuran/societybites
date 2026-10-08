@@ -60,6 +60,7 @@ model User {
   issueMessages           IssueMessage[]
   couponRedemptions       CouponRedemption[]
   couponEligibilities     CouponEligibleUser[]
+  orderIdempotencies      OrderIdempotency[]
   sellerFssai             SellerFssai?
   fssaiAssistanceRequests FssaiAssistanceRequest[]
   fssaiReviews            SellerFssai[]           @relation("FssaiReviewedBy")
@@ -309,6 +310,7 @@ model Order {
   reviews               Review[]
   messages              Message[]
   couponRedemptions     CouponRedemption[]
+  idempotencyRecord     OrderIdempotency?
 
   @@index([buyerId, createdAt])
   @@index([societyId, status])
@@ -327,6 +329,23 @@ model OrderItem {
 
   @@index([orderId])
   @@index([listingId])
+}
+
+/// One row per buyer + Idempotency-Key; completed rows replay the linked order.
+model OrderIdempotency {
+  id             String   @id @default(uuid())
+  buyerId        String
+  idempotencyKey String
+  orderId        String?  @unique
+  /// PENDING | COMPLETED | FAILED
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  buyer          User     @relation(fields: [buyerId], references: [id])
+  order          Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([buyerId, idempotencyKey])
+  @@index([buyerId])
 }
 
 model Review {

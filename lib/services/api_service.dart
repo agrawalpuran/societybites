@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:http/http.dart' as http_client;
@@ -198,12 +199,23 @@ class ApiService {
     } catch (_) {}
   }
 
-  static Future<Map<String, String>> _authHeaders() async {
+  static Future<Map<String, String>> _authHeaders({
+    String? idempotencyKey,
+  }) async {
     final token = await SessionService.getToken();
     return {
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
+      if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+        'Idempotency-Key': idempotencyKey,
     };
+  }
+
+  /// Unique key for one intentional Place Order submission (server dedupes retries).
+  static String newOrderIdempotencyKey() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    return base64Url.encode(bytes).replaceAll('=', '');
   }
 
   static dynamic _decodeResponse(http_client.Response response) {
@@ -867,10 +879,13 @@ class ApiService {
     String? fulfilmentNotes,
     DateTime? requestedReadyAt,
     String? couponCode,
+    String? idempotencyKey,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/orders'),
-      headers: await _authHeaders(),
+      headers: await _authHeaders(
+        idempotencyKey: idempotencyKey ?? newOrderIdempotencyKey(),
+      ),
       body: jsonEncode({
         'societyId': societyId,
         'paymentMethod': paymentMethod,
