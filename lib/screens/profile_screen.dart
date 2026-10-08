@@ -2679,7 +2679,7 @@ class _ProfileCard extends StatelessWidget {
                 if (societyName != null) ...[
                   const SizedBox(height: 8),
                   const Text(
-                    'Society cannot be changed after joining',
+                    '',
                     style: TextStyle(
                       fontSize: 11,
                       color: Color(0xFF8A9491),

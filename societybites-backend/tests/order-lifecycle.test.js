@@ -69,12 +69,15 @@ async function createOrder(server, { token, listingId, paymentMethod }) {
   return created.json;
 }
 
-async function patchStatus(server, { token, orderId, status }) {
+async function patchStatus(server, { token, orderId, status, reason }) {
   return jsonRequest(server, {
     method: "PATCH",
     path: `/orders/${orderId}/status`,
     token,
-    body: { status },
+    body: {
+      status,
+      ...(status === "cancelled" ? { reason: reason || "Changed my mind" } : {}),
+    },
   });
 }
 

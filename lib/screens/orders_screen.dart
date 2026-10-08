@@ -19,6 +19,7 @@ import '../models/data.dart';
 import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
 import '../services/cart_controller.dart';
+import '../services/order_push_coordinator.dart';
 import 'feedback_screen.dart';
 import 'food_detail_screen.dart';
 import 'seller_storefront_screen.dart';
@@ -88,12 +89,115 @@ class OrdersScreenState extends State<OrdersScreen>
   bool get hasSuccessfullyLoaded => _buyer.hasSuccessfullyLoaded;
 
   /// Called by MainShell on failed first-load retry, app resume, and FCM.
-  void refresh() => _loadOrders();
+  void refresh({bool lightweight = false}) =>
+      _loadOrders(fetchCampaignMetadata: !lightweight);
+
+  /// Apply FCM status hints immediately so Pay Now / trackers update with the notification.
+  Future<void> applyPushHints(List<OrderPushHint> hints) async {
+    if (hints.isEmpty || !mounted) return;
+    _applyPushHintsNow(hints);
+    await _prefetchOrdersForPush(hints);
+    if (!mounted) return;
+    final pending = OrderPushCoordinator.pendingHints;
+    if (pending.isNotEmpty) _applyPushHintsNow(pending);
+  }
+
+  void _applyPushHintsNow(List<OrderPushHint> hints) {
+    if (hints.isEmpty || !mounted) return;
+    final pending = OrderPushCoordinator.pendingHints;
+    final toApply = pending.isNotEmpty ? pending : hints;
+    final combined = applyOrderPushHints(
+      [..._buyer.active, ..._buyer.past],
+      toApply,
+    );
+    setState(() {
+      _buyer.active =
+          combined.where((order) => order.isInBuyerActiveTab()).toList();
+      _buyer.past =
+          combined.where((order) => !order.isInBuyerActiveTab()).toList();
+      _buyer.isLoading = false;
+      _buyer.hasSuccessfullyLoaded = true;
+    });
+    OrderPushCoordinator.clearHintsReconciled(combined);
+  }
+
+  /// Prime a focused or hinted order before GET /orders when opened from a notification.
+  Future<void> prefetchOrdersFromPush({String? focusOrderId}) async {
+    final hints = OrderPushCoordinator.pendingHints;
+    if (hints.isEmpty && (focusOrderId == null || focusOrderId.isEmpty)) {
+      return;
+    }
+    await _prefetchOrdersForPush(hints, focusOrderId: focusOrderId);
+  }
+
+  Future<void> _prefetchOrdersForPush(
+    List<OrderPushHint> hints, {
+    String? focusOrderId,
+  }) async {
+    final ids = <String>{};
+    if (focusOrderId != null && focusOrderId.isNotEmpty) {
+      ids.add(focusOrderId);
+    }
+    for (final hint in hints) {
+      if (hint.orderId.isNotEmpty) ids.add(hint.orderId);
+    }
+    final combined = [..._buyer.active, ..._buyer.past];
+    final missing =
+        ids.where((id) => !combined.any((order) => order.id == id)).toList();
+    if (missing.isEmpty) return;
+
+    final fetched = await Future.wait(
+      missing.map((id) async {
+        try {
+          return await ApiService.getOrderById(id);
+        } catch (_) {
+          return null;
+        }
+      }),
+    );
+    if (!mounted) return;
+
+    var changed = false;
+    for (final json in fetched) {
+      if (json == null) continue;
+      _mergePrefetchedOrder(Order.fromJson(json));
+      changed = true;
+    }
+    if (changed) {
+      setState(() {
+        _buyer.isLoading = false;
+        _buyer.hasSuccessfullyLoaded = true;
+      });
+      _stopSlowTimer();
+    }
+  }
+
+  void _mergePrefetchedOrder(Order order) {
+    final combined = <Order>[..._buyer.active, ..._buyer.past];
+    final index = combined.indexWhere((o) => o.id == order.id);
+    if (index >= 0) {
+      combined[index] = _preserveOrderMetadata(combined[index], order);
+    } else {
+      combined.insert(0, order);
+    }
+    _buyer.active =
+        combined.where((o) => o.isInBuyerActiveTab()).toList();
+    _buyer.past =
+        combined.where((o) => !o.isInBuyerActiveTab()).toList();
+  }
+
+  void _applyPendingPushHints() {
+    final hints = OrderPushCoordinator.pendingHints;
+    if (hints.isNotEmpty) unawaited(applyPushHints(hints));
+  }
 
   /// Apply mark-paid response before a network refresh so Pay Now does not flash.
   void applyOrderFromPayment(Order updated) {
     _rememberPaymentStatusPatch(updated);
     _mergeOrderFromPayment(updated);
+    _buyer.hasSuccessfullyLoaded = true;
+    _buyer.isLoading = false;
+    _stopSlowTimer();
     if (mounted) setState(() {});
   }
 
@@ -166,49 +270,39 @@ class OrdersScreenState extends State<OrdersScreen>
         combined.where((order) => !order.isInBuyerActiveTab()).toList();
   }
 
+  static int _orderStatusRank(String status) {
+    switch (status) {
+      case 'pending':
+        return 0;
+      case 'accepted':
+      case 'preparing':
+        return 1;
+      case 'ready':
+      case 'picked_up':
+        return 2;
+      case 'completed':
+        return 3;
+      default:
+        return -2;
+    }
+  }
+
   Order _preserveOrderMetadata(Order prior, Order updated) {
-    return Order(
-      id: updated.id,
-      orderId: updated.orderId,
-      items: updated.items.isNotEmpty ? updated.items : prior.items,
-      date: updated.date,
-      status: updated.status,
-      statusStep: updated.statusStep,
-      orderTotal: updated.orderTotal,
-      subtotal: updated.subtotal,
-      communityFee: updated.communityFee,
-      deliveryCharge: updated.deliveryCharge,
-      couponCode: updated.couponCode,
-      couponDiscount: updated.couponDiscount,
-      type: updated.type,
-      campaignId: updated.campaignId ?? prior.campaignId,
-      fulfilmentMethod: updated.fulfilmentMethod ?? prior.fulfilmentMethod,
-      fulfilmentNotes: updated.fulfilmentNotes ?? prior.fulfilmentNotes,
-      fulfilmentAt: updated.fulfilmentAt ?? prior.fulfilmentAt,
-      campaignTitle: updated.campaignTitle ?? prior.campaignTitle,
-      campaignOrderCutoffAt:
-          updated.campaignOrderCutoffAt ?? prior.campaignOrderCutoffAt,
-      paymentMethod: updated.paymentMethod ?? prior.paymentMethod,
-      paymentStatus: updated.paymentStatus,
-      hasReview: updated.hasReview,
-      rejectReason: updated.rejectReason,
-      rejectedAt: updated.rejectedAt,
-      refundDue: updated.refundDue,
-      sellerCanDecline: updated.sellerCanDecline,
-      completedAt: updated.completedAt,
-      cancelledAt: updated.cancelledAt,
-      expectedReadyAt: updated.expectedReadyAt ?? prior.expectedReadyAt,
-      requestedReadyAt: updated.requestedReadyAt ?? prior.requestedReadyAt,
-      createdAt: updated.createdAt ?? prior.createdAt,
-      buyerName: updated.buyerName ?? prior.buyerName,
-      buyerPhone: updated.buyerPhone ?? prior.buyerPhone,
-      buyerFlatNumber: updated.buyerFlatNumber ?? prior.buyerFlatNumber,
-      buyerBlock: updated.buyerBlock ?? prior.buyerBlock,
-      buyerSocietyName: updated.buyerSocietyName ?? prior.buyerSocietyName,
-      sellerSocietyName: updated.sellerSocietyName ?? prior.sellerSocietyName,
-      distanceKm: updated.distanceKm ?? prior.distanceKm,
-      unreadMessageCount: updated.unreadMessageCount,
-    );
+    var merged = Order.mergePreservingDetails(prior, updated);
+    if (_orderStatusRank(prior.status) > _orderStatusRank(merged.status)) {
+      merged = applyOrderPushHint(
+        merged,
+        OrderPushHint(orderId: merged.id, status: prior.status),
+      );
+    }
+    if (_paymentStatusRank(prior.paymentStatus) >
+        _paymentStatusRank(merged.paymentStatus)) {
+      merged = applyOrderPushHint(
+        merged,
+        OrderPushHint(orderId: merged.id, paymentStatus: prior.paymentStatus),
+      );
+    }
+    return merged;
   }
 
   Future<void> _onPaymentScreenClosed(Object? result) async {
@@ -280,6 +374,7 @@ class OrdersScreenState extends State<OrdersScreen>
       }
 
       parsed = _applyPaymentStatusPatches(parsed);
+      parsed = applyOrderPushHints(parsed, OrderPushCoordinator.pendingHints);
 
       if (!mounted) return;
 
@@ -291,6 +386,8 @@ class OrdersScreenState extends State<OrdersScreen>
         bucket.hasSuccessfullyLoaded = true;
         bucket.error = null;
       });
+      OrderPushCoordinator.clearHintsReconciled(parsed);
+      _applyPendingPushHints();
     } catch (e) {
       if (!mounted) return;
 
@@ -855,6 +952,10 @@ class _ActiveOrderCard extends StatelessWidget {
               ),
             ],
           ],
+          if (!isSellerView && order.isCancelled)
+            OrderCancelReasonBlock(order: order),
+          if (order.isRejected && !isSellerView)
+            OrderRejectReasonBlock(order: order),
           if (order.showExpectedReadyAt) ...[
             const SizedBox(height: 14),
             Container(
@@ -976,32 +1077,17 @@ class _ActiveOrderCard extends StatelessWidget {
                 height: 48,
                 child: OutlinedButton.icon(
                   onPressed: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        scrollable: true,
-                        title: const Text('Cancel order?'),
-                        content: Text(order.buyerCancelConfirmMessage),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('Keep order'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            style: TextButton.styleFrom(
-                              foregroundColor: const Color(0xFFD94F4F),
-                            ),
-                            child: const Text('Cancel order'),
-                          ),
-                        ],
-                      ),
+                    final cancelChoice = await confirmCancelOrder(
+                      context,
+                      confirmMessage: order.buyerCancelConfirmMessage,
                     );
-                    if (confirmed != true || !context.mounted) return;
+                    if (cancelChoice == null || !context.mounted) return;
                     try {
                       await ApiService.updateOrderStatus(
                         orderId: order.id.isNotEmpty ? order.id : order.orderId,
                         status: 'cancelled',
+                        reason: cancelChoice.reason,
+                        otherText: cancelChoice.note,
                       );
                     } catch (e) {
                       if (!context.mounted) return;
@@ -1461,6 +1547,7 @@ class _PastOrderTile extends StatelessWidget {
                     ),
                   ),
                   if (isRejected) OrderRejectReasonBlock(order: order),
+                  if (isCancelled) OrderCancelReasonBlock(order: order),
                 ] else ...[
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -1482,6 +1569,7 @@ class _PastOrderTile extends StatelessWidget {
                     ),
                   ),
                   if (isRejected) OrderRejectReasonBlock(order: order),
+                  if (isCancelled) OrderCancelReasonBlock(order: order),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,

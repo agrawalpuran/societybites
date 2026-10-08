@@ -28,6 +28,9 @@ class CartController extends ChangeNotifier {
     _buyerOrderPaymentPatch = order;
   }
 
+  /// Show this order on the Orders tab before GET /orders returns (checkout, pre-order).
+  void stashPlacedBuyerOrder(Order order) => stashBuyerOrderPaymentPatch(order);
+
   Order? takeBuyerOrderPaymentPatch() {
     final order = _buyerOrderPaymentPatch;
     _buyerOrderPaymentPatch = null;

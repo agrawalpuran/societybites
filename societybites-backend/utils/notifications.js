@@ -170,6 +170,11 @@ function notifyOrderCreated(order) {
       body: `Order ${order.orderNumber} is waiting for you`,
       notificationType: "order_created",
       orderId: order.id,
+      extra: {
+        status: String(order.status || "pending"),
+        paymentStatus: String(order.paymentStatus || "pending"),
+        recipientRole: "seller",
+      },
     })
   );
 }
@@ -194,7 +199,9 @@ function notifyStatusChange(order, status) {
     cancelled: {
       userId: sellerId,
       title: "Order cancelled",
-      body: `Order ${order.orderNumber} was cancelled`,
+      body: order.cancelReason
+        ? `Order ${order.orderNumber} was cancelled: ${String(order.cancelReason).split("\n")[0]}`
+        : `Order ${order.orderNumber} was cancelled`,
       notificationType: "order_cancelled",
     },
     completed: {
@@ -214,6 +221,7 @@ function notifyStatusChange(order, status) {
       body: cfg.body,
       notificationType: cfg.notificationType,
       orderId: order.id,
+      extra: { status: String(status) },
     })
   );
 }
@@ -225,6 +233,7 @@ function notifyOrderRejected(order) {
       body: "Unfortunately, the seller could not fulfil your order.",
       notificationType: "order_rejected",
       orderId: order.id,
+      extra: { status: "rejected" },
     })
   );
 }
@@ -255,6 +264,7 @@ function notifyBuyerMarkedPaid(order) {
       body: `Payment marked for order ${order.orderNumber}`,
       notificationType: "buyer_marked_paid",
       orderId: order.id,
+      extra: { paymentStatus: "buyer_marked_paid" },
     })
   );
 }
@@ -262,6 +272,7 @@ function notifyBuyerMarkedPaid(order) {
 /** Payment confirmation does not change order status. */
 function notifyPaymentConfirmed(order) {
   const isCash = order.paymentMethod === "cash";
+  const paymentStatus = order.paymentStatus || "seller_confirmed";
   return notifyAsync(() =>
     sendToUser(order.buyerId, {
       title: isCash ? "Payment received" : "Payment confirmed",
@@ -270,6 +281,7 @@ function notifyPaymentConfirmed(order) {
         : `Payment confirmed for order ${order.orderNumber}`,
       notificationType: "payment_confirmed",
       orderId: order.id,
+      extra: { paymentStatus: String(paymentStatus) },
     })
   );
 }

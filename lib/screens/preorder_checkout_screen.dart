@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/data.dart';
@@ -31,6 +33,7 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
   double _platformFee = 0;
   bool _submitting = false;
   bool _sameSociety = true;
+  String? _buyerSocietyId;
 
   @override
   void initState() {
@@ -40,18 +43,24 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
         ? 'pickup'
         : 'seller_delivery';
     _applyDefaultPaymentMethod();
-    _loadPlatformFee();
-    _resolveSameSociety();
+    unawaited(_bootstrapCheckout());
   }
 
-  Future<void> _resolveSameSociety() async {
-    final buyerSociety = await SessionService.getSocietyId();
+  Future<void> _bootstrapCheckout() async {
+    final results = await Future.wait<Object?>([
+      SessionService.getSocietyId(),
+      ApiService.getPlatformFee().catchError((_) => 0.0),
+    ]);
+    if (!mounted) return;
+    final buyerSociety = results[0] as String?;
+    final fee = (results[1] as num?)?.toDouble() ?? 0.0;
     final sellerSociety = widget.campaign.societyId;
     final same = sellerSociety == null ||
         sellerSociety.isEmpty ||
         buyerSociety == sellerSociety;
-    if (!mounted) return;
     setState(() {
+      _buyerSocietyId = buyerSociety;
+      _platformFee = fee;
       _sameSociety = same;
       _applyDefaultPaymentMethod();
     });
@@ -73,13 +82,6 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
       parseSellerPaymentPreference(widget.campaign.sellerPaymentPreference)
           .allowsUpiFor(sameSociety: _sameSociety);
 
-  Future<void> _loadPlatformFee() async {
-    try {
-      final fee = await ApiService.getPlatformFee();
-      if (mounted) setState(() => _platformFee = fee);
-    } catch (_) {}
-  }
-
   double get _subtotal => widget.selectedItems.entries.fold<double>(
     0,
     (sum, entry) => sum + entry.key.price * entry.value,
@@ -100,7 +102,8 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
     }
     setState(() => _submitting = true);
     try {
-      final societyId = await SessionService.getSocietyId();
+      final societyId =
+          _buyerSocietyId ?? await SessionService.getSocietyId();
       if (societyId == null || societyId.isEmpty) {
         throw Exception('Join your society before placing an order.');
       }
@@ -131,6 +134,9 @@ class _PreOrderCheckoutScreenState extends State<PreOrderCheckoutScreen> {
         ),
       );
       if (confirmed == true && mounted) {
+        CartController.instance.stashPlacedBuyerOrder(
+          order.withCampaign(widget.campaign),
+        );
         CartController.instance.finishPlacedOrder(context);
       }
     } catch (e) {

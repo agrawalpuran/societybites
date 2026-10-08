@@ -270,7 +270,7 @@ async function main() {
       method: "PATCH",
       path: `/orders/${pickupOrder.json.id}/status`,
       token: buyerToken,
-      body: { status: "cancelled" },
+      body: { status: "cancelled", reason: "No longer needed" },
     });
     assert(cancelBefore.status === 200, "cancel before cutoff should succeed");
 
@@ -282,7 +282,7 @@ async function main() {
       method: "PATCH",
       path: `/orders/${demandOrder.json.id}/status`,
       token: buyerToken,
-      body: { status: "cancelled" },
+      body: { status: "cancelled", reason: "Changed my mind" },
     });
     assert(cancelAfter.status === 400, "cancel after cutoff must be rejected");
 

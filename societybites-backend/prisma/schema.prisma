@@ -295,6 +295,8 @@ model Order {
   rejectReason          String?
   rejectedAt            DateTime?
   rejectedBy            String?
+  /// Buyer cancellation reason (reason line, optional note on second line).
+  cancelReason          String?
   buyer                 User               @relation("BuyerOrders", fields: [buyerId], references: [id])
   society               Society            @relation(fields: [societyId], references: [id])
   campaign              PreOrderCampaign?  @relation(fields: [campaignId], references: [id])

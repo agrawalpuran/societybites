@@ -52,7 +52,6 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
 
   List<Map<String, dynamic>> _results = [];
   Map<String, dynamic>? _selectedSociety;
-  String? _selectedBlock;
   String? _error;
   String _appliedQuery = '';
   bool _isSearching = false;
@@ -73,27 +72,7 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
     super.dispose();
   }
 
-  List<String> get _blockOptions {
-    final blocks = _selectedSociety?['blocks'];
-    if (blocks is! List) return const [];
-    return blocks
-        .map((b) => (b is Map ? b['name'] : null)?.toString().trim() ?? '')
-        .where((n) => n.isNotEmpty)
-        .toList();
-  }
-
-  String get _unitLabel {
-    final label = _selectedSociety?['unitLabel']?.toString().trim();
-    if (label == null || label.isEmpty) return 'Block';
-    return label;
-  }
-
-  String get _resolvedBlock {
-    if (_blockOptions.isNotEmpty) {
-      return (_selectedBlock ?? '').trim();
-    }
-    return _customBlockController.text.trim();
-  }
+  String get _resolvedBlock => _customBlockController.text.trim();
 
   bool get _isValid =>
       _nameController.text.trim().isNotEmpty &&
@@ -177,7 +156,6 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
     FocusScope.of(context).unfocus();
     setState(() {
       _selectedSociety = society;
-      _selectedBlock = null;
       _customBlockController.clear();
       _flatController.clear();
       _error = null;
@@ -192,7 +170,6 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
     if (placeId.isEmpty) {
       setState(() {
         _error = null;
-        _selectedBlock = _blockOptions.length == 1 ? _blockOptions.first : null;
         _step = _OnboardingStep.details;
       });
       return;
@@ -222,11 +199,6 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
           ...?society,
           'placeId': placeId,
         };
-        _selectedBlock = null;
-        if ((_selectedSociety!['blocks'] is List) &&
-            _blockOptions.length == 1) {
-          _selectedBlock = _blockOptions.first;
-        }
         _isConfirming = false;
         _step = _OnboardingStep.details;
       });
@@ -242,7 +214,6 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
   void _chooseDifferentSociety() {
     setState(() {
       _selectedSociety = null;
-      _selectedBlock = null;
       _customBlockController.clear();
       _error = null;
       _isConfirming = false;
@@ -601,7 +572,7 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
       ),
       const SizedBox(height: 8),
       const Text(
-        'Add your block/tower and flat number.',
+        'Add your block, tower, wing, or villa — and your flat or villa number.',
         style: TextStyle(
           fontSize: 15,
           color: Color(0xFF4A5A57),
@@ -609,27 +580,19 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
         ),
       ),
       const SizedBox(height: 24),
-      _FieldLabel(_unitLabel),
+      const _FieldLabel('Block / tower / wing / villa'),
       const SizedBox(height: 6),
-      if (_blockOptions.isNotEmpty)
-        _BlockDropdown(
-          unitLabel: _unitLabel,
-          options: _blockOptions,
-          value: _selectedBlock,
-          onChanged: (value) => setState(() => _selectedBlock = value),
-        )
-      else
-        _TextFieldBox(
-          controller: _customBlockController,
-          hintText: _unitLabel == 'Wing' ? 'e.g. East' : 'e.g. C',
-          onChanged: (_) => setState(() {}),
-        ),
+      _TextFieldBox(
+        controller: _customBlockController,
+        hintText: 'e.g. Block C, Tower 3, East wing',
+        onChanged: (_) => setState(() {}),
+      ),
       const SizedBox(height: 18),
-      const _FieldLabel('Flat / House No.'),
+      const _FieldLabel('Flat or villa number'),
       const SizedBox(height: 6),
       _TextFieldBox(
         controller: _flatController,
-        hintText: 'e.g. 3062',
+        hintText: 'e.g. 3062 or Villa 12',
         keyboardType: TextInputType.text,
         onChanged: (_) => setState(() {}),
       ),
@@ -846,67 +809,6 @@ class _SocietyResultCard extends StatelessWidget {
   }
 }
 
-class _BlockDropdown extends StatelessWidget {
-  const _BlockDropdown({
-    required this.unitLabel,
-    required this.options,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String unitLabel;
-  final List<String> options;
-  final String? value;
-  final ValueChanged<String?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F7F6),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE6EBE9)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          isExpanded: true,
-          value: value != null && options.contains(value) ? value : null,
-          hint: Text(
-            'Select $unitLabel',
-            style: const TextStyle(
-              color: Color(0xFFBCC4C1),
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          icon: const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: Color(0xFF0E5A47),
-          ),
-          items: options
-              .map(
-                (b) => DropdownMenuItem<String>(
-                  value: b,
-                  child: Text(
-                    '$unitLabel $b',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFF223531),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-}
-
 class _HintCard extends StatelessWidget {
   const _HintCard({required this.icon, required this.title, this.subtitle});
 
@@ -1025,7 +927,7 @@ class _PrivacyCard extends StatelessWidget {
                 ),
                 SizedBox(height: 3),
                 Text(
-                  'Your flat number is only shared with verified vendors within your society circle.',
+                  'Your flat or villa number is only shared with verified vendors within your society circle.',
                   style: TextStyle(
                     fontSize: 13,
                     height: 1.4,

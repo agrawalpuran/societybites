@@ -382,7 +382,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
 
       if (!mounted) return;
-      final order = Order.fromJson(created);
+      final order = Order.withCartLineItemsIfMissing(
+        Order.fromJson(created),
+        _items,
+      );
       final payNow = order.paymentMethod == 'upi' &&
           BuyerOrderLifecycle.canPayNow(
             status: order.status,
@@ -390,6 +393,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             paymentMethod: order.paymentMethod,
           );
       if (!payNow) {
+        CartController.instance.stashPlacedBuyerOrder(order);
         CartController.instance.finishPlacedOrder(context);
         return;
       }

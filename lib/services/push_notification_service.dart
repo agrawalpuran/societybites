@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
@@ -8,12 +9,14 @@ import 'package:flutter/services.dart';
 
 import '../firebase_options.dart';
 import 'api_service.dart';
+import 'order_push_coordinator.dart';
 import '../screens/main_shell_screen.dart';
 
 /// Top-level background handler (must be a top-level or static function).
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await OrderPushCoordinator.recordFromMessage(message);
 }
 
 /// iOS FCM tokens are unavailable until APNs has registered.
@@ -76,7 +79,7 @@ class PushNotificationService {
             '[push] onMessage type=${message.data['notificationType'] ?? 'none'}',
           );
         }
-        onForegroundOrderUpdate?.call();
+        unawaited(_onOrderPushMessage(message));
         _showAndroidForegroundNotification(message);
       });
 
@@ -211,21 +214,33 @@ class PushNotificationService {
     }
   }
 
+  static Future<void> _onOrderPushMessage(RemoteMessage message) async {
+    await OrderPushCoordinator.recordFromMessage(message);
+    onForegroundOrderUpdate?.call();
+  }
+
   static void _handleOpen(RemoteMessage message) {
     final type = message.data['notificationType'] ?? '';
     final recipientRole = message.data['recipientRole'] ?? '';
     final tabIndex = type == 'order_message'
         ? (recipientRole == 'seller' ? 2 : 1)
         : (_sellerTypes.contains(type) ? 2 : 1);
-    onForegroundOrderUpdate?.call();
+    unawaited(_onOrderPushMessage(message));
     final nav = navigatorKey.currentState;
     if (nav == null) return;
 
+    final orderId = message.data['orderId']?.toString().trim() ?? '';
     nav.pushAndRemoveUntil(
       MaterialPageRoute(
-        builder: (_) => MainShellScreen(initialIndex: tabIndex),
+        builder: (_) => MainShellScreen(
+          initialIndex: tabIndex,
+          focusOrderId: orderId.isEmpty ? null : orderId,
+        ),
       ),
       (_) => false,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PushNotificationService.onForegroundOrderUpdate?.call();
+    });
   }
 }

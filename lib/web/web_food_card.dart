@@ -181,16 +181,7 @@ class WebFoodCard extends StatelessWidget {
                               color: webMuted,
                             ),
                           ),
-                          if (food.quantity > 0 && !food.isExpired)
-                            Text(
-                              '${food.quantity} left',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: webMuted,
-                              ),
-                            )
-                          else if (listingSoldCaption(food.quantitySold)
+                          if (listingSoldCaption(food.quantitySold)
                               .isNotEmpty)
                             Text(
                               listingSoldCaption(food.quantitySold),

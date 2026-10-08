@@ -134,6 +134,14 @@ class BuyerOrderVisibility {
     'Other',
   ];
 
+  static const buyerCancelReasons = [
+    'Changed my mind',
+    'Ordered by mistake',
+    'No longer needed',
+    'Delivery or timing issue',
+    'Other',
+  ];
+
   static DateTime? terminalAt({
     required String status,
     DateTime? completedAt,
@@ -176,18 +184,26 @@ class BuyerOrderVisibility {
     return n.difference(at) < recentTerminalWindow;
   }
 
-  static String? rejectReasonLabel(String? raw) {
+  static String? storedReasonLabel(String? raw) {
     if (raw == null || raw.trim().isEmpty) return null;
     return raw.split('\n').first.trim();
   }
 
-  static String? rejectNote(String? raw) {
+  static String? storedReasonNote(String? raw) {
     if (raw == null) return null;
     final index = raw.indexOf('\n');
     if (index < 0) return null;
     final note = raw.substring(index + 1).trim();
     return note.isEmpty ? null : note;
   }
+
+  static String? rejectReasonLabel(String? raw) => storedReasonLabel(raw);
+
+  static String? rejectNote(String? raw) => storedReasonNote(raw);
+
+  static String? cancelReasonLabel(String? raw) => storedReasonLabel(raw);
+
+  static String? cancelNote(String? raw) => storedReasonNote(raw);
 }
 
 class BuyerOrderLifecycle {
@@ -280,6 +296,8 @@ class BuyerOrderLifecycle {
         return 'Please collect your order from the seller.';
       case 'rejected':
         return 'Unfortunately, the seller could not fulfil this order.';
+      case 'cancelled':
+        return 'You cancelled this order.';
       default:
         return null;
     }

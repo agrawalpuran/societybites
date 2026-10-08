@@ -2,7 +2,10 @@ const express = require("express");
 const prisma = require("../lib/prisma");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser } = require("../middleware/requireUser");
-const { serializeOrder } = require("../utils/listingSerializer");
+const {
+  serializeOrder,
+  serializeOrderStatusPatch,
+} = require("../utils/listingSerializer");
 const {
   notifyBuyerMarkedPaid,
   notifyPaymentConfirmed,
@@ -78,7 +81,7 @@ router.post(
 
     res.json(serializeOrder(updated));
 
-    await flushNotification(notifyBuyerMarkedPaid(updated));
+    void flushNotification(notifyBuyerMarkedPaid(updated));
   })
 );
 
@@ -131,11 +134,11 @@ router.post(
 
     console.log(`[PAYMENT] Confirmed for ${order.orderNumber} by seller ${req.user.phone}`);
 
-    res.json(serializeOrder(updated));
+    res.json(serializeOrderStatusPatch(updated));
 
-    await flushNotification(notifyPaymentConfirmed(updated));
+    void flushNotification(notifyPaymentConfirmed(updated));
     if (Object.prototype.hasOwnProperty.call(readyPatch, "expectedReadyAt")) {
-      await flushNotification(
+      void flushNotification(
         notifyReadyBy(updated, readyPatch.expectedReadyAt == null)
       );
     }
@@ -180,7 +183,7 @@ router.post(
 
     // Idempotent: already paid → return current order, keep original timestamp.
     if (order.paymentStatus === "paid") {
-      return res.json(serializeOrder(order));
+      return res.json(serializeOrderStatusPatch(order));
     }
 
     if (!["ready", "picked_up"].includes(order.status)) {
@@ -211,9 +214,9 @@ router.post(
       `[PAYMENT] Cash confirmed for ${order.orderNumber} by seller ${req.user.phone}`
     );
 
-    res.json(serializeOrder(updated));
+    res.json(serializeOrderStatusPatch(updated));
 
-    await flushNotification(notifyPaymentConfirmed(updated));
+    void flushNotification(notifyPaymentConfirmed(updated));
   })
 );
 

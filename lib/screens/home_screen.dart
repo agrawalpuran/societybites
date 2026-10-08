@@ -2146,17 +2146,6 @@ class _SpecialCard extends StatelessWidget {
                                     : const Color(0xFF101617),
                               ),
                             ),
-                            if (food.quantity > 0 && !food.isExpired)
-                              Text(
-                                '${food.quantity} left',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark
-                                      ? Colors.white70
-                                      : const Color(0xFF6A7774),
-                                ),
-                              ),
                           ],
                         ),
                         ListingPortionCaption(food: food, isDark: isDark),
@@ -2356,17 +2345,6 @@ class _AvailableItemTile extends StatelessWidget {
                             ),
                           ),
                           ListingPortionCaption(food: food),
-                          if (food.quantity > 0 && !food.isExpired) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              '${food.quantity} left',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF6A7774),
-                              ),
-                            ),
-                          ],
                           if (listingSoldCaption(
                             food.quantitySold,
                           ).isNotEmpty) ...[

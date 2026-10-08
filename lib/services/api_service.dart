@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http_client;
 
 import '../models/coupon.dart';
 import '../models/issue_report.dart';
-import '../models/order_lifecycle.dart';
 import '../models/seller_order_history.dart';
 import '../models/seller_fssai.dart';
 import '../models/selling_reach.dart';
@@ -1155,11 +1154,18 @@ class ApiService {
   static Future<Map<String, dynamic>> updateOrderStatus({
     required String orderId,
     required String status,
+    String? reason,
+    String? otherText,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/orders/$orderId/status'),
       headers: await _authHeaders(),
-      body: jsonEncode({'status': status}),
+      body: jsonEncode({
+        'status': status,
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+        if (otherText != null && otherText.trim().isNotEmpty)
+          'otherText': otherText.trim(),
+      }),
     );
 
     if (response.statusCode == 200) {
@@ -1168,37 +1174,13 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  /// Mark Ready against current and legacy order APIs.
-  ///
-  /// New API accepts accepted → ready. Legacy API only accepted preparing
-  /// after UPI confirm, then preparing → ready. Mixed versions left orders
-  /// stuck on Mark Ready after payment confirm.
+  /// Seller status step (accept, mark ready, complete). One PATCH per action.
   static Future<Map<String, dynamic>> advanceOrderStatus({
     required String orderId,
     required String currentStatus,
     required String nextStatus,
   }) async {
-    if (nextStatus != 'ready') {
-      return updateOrderStatus(orderId: orderId, status: nextStatus);
-    }
-
-    Object? lastError;
-    for (final path in markReadyStatusPaths(currentStatus)) {
-      try {
-        Map<String, dynamic>? result;
-        for (final step in path) {
-          result = await updateOrderStatus(orderId: orderId, status: step);
-        }
-        return result!;
-      } catch (e) {
-        lastError = e;
-        final msg = e.toString();
-        final retryable = msg.contains('Cannot transition') ||
-            msg.contains('cannot be assigned');
-        if (!retryable) rethrow;
-      }
-    }
-    throw lastError ?? Exception('Could not mark order ready');
+    return updateOrderStatus(orderId: orderId, status: nextStatus);
   }
 
   /// Set or clear optional Ready-by estimate. Pass null to clear.

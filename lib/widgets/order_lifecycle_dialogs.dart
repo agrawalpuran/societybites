@@ -10,6 +10,38 @@ class RejectOrderResult {
   final String? note;
 }
 
+class CancelOrderResult {
+  const CancelOrderResult({required this.reason, this.note});
+
+  final String reason;
+  final String? note;
+}
+
+Future<CancelOrderResult?> confirmCancelOrder(
+  BuildContext context, {
+  required String confirmMessage,
+}) async {
+  CancelOrderResult? selected;
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetContext) => _CancelOrderSheet(
+      confirmMessage: confirmMessage,
+      onDismiss: () => Navigator.pop(sheetContext),
+      onConfirm: (value) {
+        selected = value;
+        Navigator.pop(sheetContext);
+      },
+    ),
+  );
+  return selected;
+}
+
 Future<RejectOrderResult?> confirmRejectOrder(
   BuildContext context, {
   Order? order,
@@ -34,6 +66,159 @@ Future<RejectOrderResult?> confirmRejectOrder(
     ),
   );
   return selected;
+}
+
+class _CancelOrderSheet extends StatefulWidget {
+  const _CancelOrderSheet({
+    required this.confirmMessage,
+    required this.onDismiss,
+    required this.onConfirm,
+  });
+
+  final String confirmMessage;
+  final VoidCallback onDismiss;
+  final ValueChanged<CancelOrderResult> onConfirm;
+
+  @override
+  State<_CancelOrderSheet> createState() => _CancelOrderSheetState();
+}
+
+class _CancelOrderSheetState extends State<_CancelOrderSheet> {
+  String? _reason;
+  final _note = TextEditingController();
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  bool get _canConfirm {
+    if (_reason == null) return false;
+    if (_reason == 'Other') return _note.text.trim().isNotEmpty;
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final bottomPad =
+        16 + media.viewInsets.bottom + media.viewPadding.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, bottomPad),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Cancel order?',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF101617),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.confirmMessage,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF3A4644),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Why are you cancelling?',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF3A4644),
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final reason in BuyerOrderVisibility.buyerCancelReasons)
+              ListTile(
+                key: Key('cancel-reason-$reason'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                leading: Icon(
+                  _reason == reason
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  color: const Color(0xFF0E5A47),
+                  size: 22,
+                ),
+                title: Text(
+                  reason,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () => setState(() => _reason = reason),
+              ),
+            if (_reason == 'Other') ...[
+              const SizedBox(height: 8),
+              TextField(
+                key: const Key('cancel-note-field'),
+                controller: _note,
+                maxLength: 200,
+                maxLines: 2,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Add a short note',
+                  counterText: '',
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAF9),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFEAEFED)),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: widget.onDismiss,
+                    child: const Text('Keep order'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    key: const Key('cancel-order-confirm'),
+                    onPressed: !_canConfirm
+                        ? null
+                        : () {
+                            final note = _note.text.trim();
+                            widget.onConfirm(
+                              CancelOrderResult(
+                                reason: _reason!,
+                                note: note.isEmpty ? null : note,
+                              ),
+                            );
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD94F4F),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: const Color(0xFFE8EDEB),
+                    ),
+                    child: const Text('Cancel order'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _RejectOrderSheet extends StatefulWidget {
@@ -226,6 +411,78 @@ Future<bool> confirmCompleteOrder(BuildContext context) async {
     ),
   );
   return result == true;
+}
+
+class OrderCancelReasonBlock extends StatelessWidget {
+  const OrderCancelReasonBlock({
+    super.key,
+    required this.order,
+    this.isSellerView = false,
+  });
+
+  final Order order;
+  final bool isSellerView;
+
+  @override
+  Widget build(BuildContext context) {
+    final reason = BuyerOrderVisibility.cancelReasonLabel(order.cancelReason);
+    final note = BuyerOrderVisibility.cancelNote(order.cancelReason);
+    if (reason == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isSellerView) ...[
+            const Text(
+              'The buyer cancelled this order.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF8A3030),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF5F5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFFD4D4)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isSellerView
+                      ? 'Reason:\n$reason'
+                      : 'Your reason:\n$reason',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF8A3030),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (note != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    isSellerView ? 'Buyer note:\n$note' : 'Your note:\n$note',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF8A3030),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class OrderRejectReasonBlock extends StatelessWidget {

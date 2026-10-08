@@ -13,6 +13,7 @@ import '../models/kitchen_order_category.dart';
 import '../models/order_lifecycle.dart';
 import '../models/seller_order_history.dart';
 import '../services/api_service.dart';
+import '../services/order_push_coordinator.dart';
 import '../widgets/order_lifecycle_dialogs.dart';
 import '../services/my_listings_prefetch.dart';
 import '../services/seller_onboarding.dart';
@@ -37,6 +38,7 @@ import 'seller_older_orders_screen.dart';
 class SellerDashboardScreen extends StatefulWidget {
   const SellerDashboardScreen({
     super.key,
+    this.priorityOrderId,
     this.onInitialLoadSettled,
     this.onKitchenAttentionCount,
     this.onListingCreated,
@@ -44,6 +46,9 @@ class SellerDashboardScreen extends StatefulWidget {
     this.fetchOrders,
     this.fetchCampaigns,
   });
+
+  /// From notification tap — fetch this order before the kitchen list returns.
+  final String? priorityOrderId;
 
   /// Fired once when the first orders load finishes (success or failure).
   final VoidCallback? onInitialLoadSettled;
@@ -110,6 +115,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   void initState() {
     super.initState();
     _loadRole();
+    unawaited(_primeOrdersFromPush());
     _loadOrders();
   }
 
@@ -121,11 +127,11 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     super.dispose();
   }
 
-  /// Debounced full refresh (e.g. after closing order messages), not status actions.
+  /// After messages, refresh badges without replacing the whole kitchen list.
   Future<void> _scheduleBackgroundOrdersRefresh() async {
     _ordersBackgroundRefreshTimer?.cancel();
     _ordersBackgroundRefreshTimer = Timer(const Duration(milliseconds: 500), () {
-      if (mounted) unawaited(_loadOrders());
+      if (mounted) unawaited(refreshUnread());
     });
   }
 
@@ -147,11 +153,127 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   bool get hasSuccessfullyLoaded => _hasSuccessfullyLoaded;
 
   /// Called by MainShell on failed first-load retry, app resume, and FCM.
-  void refresh() {
+  void refresh({bool lightweight = false}) {
+    if (lightweight) {
+      unawaited(refreshUnread());
+      return;
+    }
     _loadRole();
     _loadOrders();
     if (_statsLoadRequested) unawaited(_loadStats());
     if (_preOrdersLoadRequested) unawaited(_loadPreOrders());
+  }
+
+  /// Fast path when opening My Kitchen from a push — show the order before buckets load.
+  Future<void> prefetchOrdersFromPush({String? focusOrderId}) async {
+    await _primeOrdersFromPush(focusOrderId: focusOrderId);
+  }
+
+  Future<void> _primeOrdersFromPush({String? focusOrderId}) async {
+    if (widget.fetchOrders != null) return;
+    await OrderPushCoordinator.hydrateFromStore();
+    final ids = <String>{};
+    final focus = focusOrderId ?? widget.priorityOrderId;
+    if (focus != null && focus.isNotEmpty) ids.add(focus);
+    for (final hint in OrderPushCoordinator.pendingHints) {
+      if (hint.orderId.isNotEmpty) ids.add(hint.orderId);
+    }
+    if (ids.isEmpty) return;
+
+    final missing = ids.where(_orderIdMissing).toList();
+    if (missing.isEmpty) {
+      _applyPendingPushHints();
+      return;
+    }
+
+    try {
+      final fetched = await Future.wait(
+        missing.map((id) async {
+          try {
+            return await ApiService.getOrderById(id);
+          } catch (_) {
+            return null;
+          }
+        }),
+      );
+      if (!mounted) return;
+
+      var inserted = false;
+      for (final json in fetched) {
+        if (json == null) continue;
+        _mergeOrderFromPrefetch(Order.fromJson(json));
+        inserted = true;
+      }
+      if (!inserted) return;
+
+      setState(() {
+        _isLoading = false;
+        _hasSuccessfullyLoaded = true;
+        _error = null;
+      });
+      _ordersSlowTimer?.cancel();
+      _publishKitchenAttention();
+      _applyPendingPushHints();
+    } catch (_) {}
+  }
+
+  bool _orderIdMissing(String id) {
+    return !_activeOrders.any((order) => order.id == id) &&
+        !_pastOrders.any((order) => order.id == id);
+  }
+
+  void _mergeOrderFromPrefetch(Order updated) {
+    final staysActive = isSellerRecentOpenOrder(
+      isTerminal: updated.isTerminal,
+      createdAt: updated.createdAt,
+      completedAt: updated.completedAt,
+      cancelledAt: updated.cancelledAt,
+      rejectedAt: updated.rejectedAt,
+    );
+    if (updated.isTerminal && !staysActive) {
+      _pastOrders = [
+        updated,
+        ..._pastOrders.where((order) => order.id != updated.id),
+      ];
+      _activeOrders =
+          _activeOrders.where((order) => order.id != updated.id).toList();
+      return;
+    }
+    _pastOrders =
+        _pastOrders.where((order) => order.id != updated.id).toList();
+    final index = _activeOrders.indexWhere((order) => order.id == updated.id);
+    if (index >= 0) {
+      final next = [..._activeOrders];
+      next[index] = updated;
+      _activeOrders = next;
+    } else {
+      _activeOrders = [updated, ..._activeOrders];
+    }
+    _pendingAttentionCount = _activeOrders
+        .where((order) => order.status == 'pending')
+        .length;
+  }
+
+  void applyPushHints(List<OrderPushHint> hints) {
+    if (hints.isEmpty || !mounted) return;
+    final pending = OrderPushCoordinator.pendingHints;
+    final toApply = pending.isNotEmpty ? pending : hints;
+    setState(() {
+      _activeOrders = applyOrderPushHints(_activeOrders, toApply);
+      _pastOrders = applyOrderPushHints(_pastOrders, toApply);
+      _isLoading = false;
+      _hasSuccessfullyLoaded = true;
+    });
+    OrderPushCoordinator.clearHintsReconciled([
+      ..._activeOrders,
+      ..._pastOrders,
+    ]);
+    _publishKitchenAttention();
+  }
+
+  void _applyPendingPushHints() {
+    final hints = OrderPushCoordinator.pendingHints;
+    if (hints.isNotEmpty) applyPushHints(hints);
   }
 
   /// Lightweight poll: refresh unread badges without a full kitchen reload.
@@ -583,6 +705,11 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
       if (!mounted || gen != _ordersLoadGen) return;
 
+      active = _mergeOrderListsPreservingDetails(_activeOrders, active);
+      past = _mergeOrderListsPreservingDetails(_pastOrders, past);
+      active = applyOrderPushHints(active, OrderPushCoordinator.pendingHints);
+      past = applyOrderPushHints(past, OrderPushCoordinator.pendingHints);
+
       setState(() {
         _activeOrders = active;
         _pastOrders = past;
@@ -596,6 +723,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       });
       _ordersSlowTimer?.cancel();
       _publishKitchenAttention();
+      OrderPushCoordinator.clearHintsReconciled([...active, ...past]);
+      _applyPendingPushHints();
     } catch (e) {
       if (!mounted || gen != _ordersLoadGen) return;
 
@@ -610,9 +739,41 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     _notifyInitialLoadSettled();
   }
 
-  void _upsertOrder(Order updated) {
+  Order? _findOrder(String id) {
+    for (final order in _activeOrders) {
+      if (order.id == id) return order;
+    }
+    for (final order in _pastOrders) {
+      if (order.id == id) return order;
+    }
+    return null;
+  }
+
+  void _mergeKitchenOrder(Order updated) {
+    final prior = _findOrder(updated.id);
+    if (prior != null) {
+      updated = Order.mergePreservingDetails(prior, updated);
+    }
+    _upsertOrder(updated, bumpLoadGen: false);
+  }
+
+  List<Order> _mergeOrderListsPreservingDetails(
+    List<Order> prior,
+    List<Order> incoming,
+  ) {
+    final byId = {for (final order in prior) order.id: order};
+    return incoming
+        .map(
+          (order) => byId.containsKey(order.id)
+              ? Order.mergePreservingDetails(byId[order.id]!, order)
+              : order,
+        )
+        .toList();
+  }
+
+  void _upsertOrder(Order updated, {bool bumpLoadGen = true}) {
     if (!mounted) return;
-    _ordersLoadGen++;
+    if (bumpLoadGen) _ordersLoadGen++;
     setState(() {
       // A just-finished order keeps its place in Active for the grace period,
       // so the seller sees the outcome instead of it vanishing into Past.
@@ -666,6 +827,13 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     debugPrint(
       'SELLER STATUS ${order.orderId} ${order.status} → $nextStatus via ${ApiService.baseUrl}',
     );
+    final snapshot = _findOrder(order.id) ?? order;
+    final optimistic = applyOrderPushHint(
+      snapshot,
+      OrderPushHint(orderId: snapshot.id, status: nextStatus),
+    );
+    _mergeKitchenOrder(optimistic);
+
     try {
       final json = await ApiService.advanceOrderStatus(
         orderId: order.id,
@@ -674,7 +842,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       );
       if (!mounted) return;
 
-      _upsertOrder(Order.fromJson(json));
+      _mergeKitchenOrder(
+        Order.mergeStatusPatch(_findOrder(order.id) ?? snapshot, json),
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -701,6 +871,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     } catch (e) {
       debugPrint('SELLER STATUS FAILED ${order.orderId}: $e');
       if (!mounted) return;
+
+      _mergeKitchenOrder(snapshot);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1573,7 +1745,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                       key: ValueKey(order.id),
                       order: order,
                       onAction: _updateStatus,
-                      onOrderUpdated: _upsertOrder,
+                      onOrderUpdated: _mergeKitchenOrder,
                       onPaymentConfirmed: _scheduleBackgroundOrdersRefresh,
                       onReject: _rejectOrder,
                       onReadyBy: _editReadyBy,
@@ -1594,7 +1766,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 key: ValueKey(order.id),
                 order: order,
                 onAction: _updateStatus,
-                onOrderUpdated: _upsertOrder,
+                onOrderUpdated: _mergeKitchenOrder,
                 onPaymentConfirmed: _scheduleBackgroundOrdersRefresh,
                 onReject: _rejectOrder,
                 onReadyBy: _editReadyBy,
@@ -1639,7 +1811,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           fetchOrders: widget.fetchOrders,
           onOrderRefresh: _loadOrders,
           onAction: openOrders ? _updateStatus : null,
-          onOrderUpdated: openOrders ? _upsertOrder : null,
+          onOrderUpdated: openOrders ? _mergeKitchenOrder : null,
           onPaymentConfirmed:
               openOrders ? _scheduleBackgroundOrdersRefresh : null,
           onReject: openOrders ? _rejectOrder : null,
@@ -1911,6 +2083,30 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
   bool _isUpdating = false;
   bool _isConfirmingPayment = false;
 
+  @override
+  void didUpdateWidget(covariant SellerActiveOrderCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.order.status != widget.order.status && _isUpdating) {
+      _isUpdating = false;
+    }
+    if (oldWidget.order.paymentStatus != widget.order.paymentStatus &&
+        _isConfirmingPayment) {
+      _isConfirmingPayment = false;
+    }
+  }
+
+  Map<String, dynamic> _paymentOptimisticPatch({
+    required String paymentStatus,
+    DateTime? expectedReadyAt,
+  }) {
+    return {
+      'statusPatch': true,
+      'paymentStatus': paymentStatus,
+      if (expectedReadyAt != null)
+        'expectedReadyAt': expectedReadyAt.toUtc().toIso8601String(),
+    };
+  }
+
   Future<void> _handleAction(String nextStatus) async {
     if (_isUpdating) return;
     final order = widget.order;
@@ -1956,25 +2152,41 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
       if (!mounted || result == null) return;
     }
 
+    final snapshot = widget.order;
+    DateTime? expectedReadyAt;
+    num? readyInMinutes;
+    if (result is DateTime) {
+      expectedReadyAt = result;
+    } else if (result is num) {
+      readyInMinutes = result;
+      expectedReadyAt = DateTime.now().add(
+        Duration(minutes: readyInMinutes.round()),
+      );
+    }
+
+    widget.onOrderUpdated(
+      Order.mergeStatusPatch(
+        snapshot,
+        _paymentOptimisticPatch(
+          paymentStatus: 'seller_confirmed',
+          expectedReadyAt: expectedReadyAt,
+        ),
+      ),
+    );
+
     setState(() => _isConfirmingPayment = true);
     try {
-      DateTime? expectedReadyAt;
-      num? readyInMinutes;
-      if (result is DateTime) {
-        expectedReadyAt = result;
-      } else if (result is num) {
-        readyInMinutes = result;
-      }
       final json = await ApiService.confirmPayment(
-        orderId: widget.order.id,
-        expectedReadyAt: expectedReadyAt,
+        orderId: snapshot.id,
+        expectedReadyAt: result is DateTime ? expectedReadyAt : null,
         readyInMinutes: readyInMinutes,
       );
-      widget.onOrderUpdated(Order.fromJson(json));
+      widget.onOrderUpdated(Order.mergeStatusPatch(snapshot, json));
       if (!mounted) return;
       _showCompactPaymentNotice(context, 'Payment confirmed');
     } catch (e) {
       if (!mounted) return;
+      widget.onOrderUpdated(snapshot);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not confirm payment: $e')));
@@ -2009,14 +2221,23 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     );
     if (confirmed != true || !mounted) return;
 
+    final snapshot = order;
+    widget.onOrderUpdated(
+      Order.mergeStatusPatch(
+        snapshot,
+        _paymentOptimisticPatch(paymentStatus: 'paid'),
+      ),
+    );
+
     setState(() => _isConfirmingPayment = true);
     try {
       final json = await ApiService.confirmCashPayment(orderId: order.id);
-      widget.onOrderUpdated(Order.fromJson(json));
+      widget.onOrderUpdated(Order.mergeStatusPatch(snapshot, json));
       if (!mounted) return;
       _showCompactPaymentNotice(context, 'Payment received');
     } catch (e) {
       if (!mounted) return;
+      widget.onOrderUpdated(snapshot);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not confirm cash payment: $e')),
       );
@@ -2232,6 +2453,8 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
             ],
           ),
           if (isRejected) OrderRejectReasonBlock(order: order, isSellerView: true),
+          if (order.status == 'cancelled')
+            OrderCancelReasonBlock(order: order, isSellerView: true),
           if (showStatusCopy) ...[
             const SizedBox(height: 12),
             Text(
@@ -2851,6 +3074,7 @@ class SellerPastOrderCard extends StatelessWidget {
             ],
           ),
           if (isRejected) OrderRejectReasonBlock(order: order, isSellerView: true),
+          if (isCancelled) OrderCancelReasonBlock(order: order, isSellerView: true),
         ],
       ),
     );

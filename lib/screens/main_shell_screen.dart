@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../services/cart_controller.dart';
 import '../services/listing_publish_navigation.dart';
+import '../services/order_push_coordinator.dart';
 import '../services/push_notification_service.dart';
 import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
@@ -21,9 +22,16 @@ import 'tab_preload.dart';
 import 'tab_select_load.dart';
 
 class MainShellScreen extends StatefulWidget {
-  const MainShellScreen({super.key, this.initialIndex = 0});
+  const MainShellScreen({
+    super.key,
+    this.initialIndex = 0,
+    this.focusOrderId,
+  });
 
   final int initialIndex;
+
+  /// Order from a notification tap — kitchen prefetches it before the full list.
+  final String? focusOrderId;
 
   @override
   State<MainShellScreen> createState() => _MainShellScreenState();
@@ -58,7 +66,7 @@ class _MainShellScreenState extends State<MainShellScreen>
       onMountOrders: _mountOrders,
       onMountDashboard: _mountDashboard,
     );
-    PushNotificationService.onForegroundOrderUpdate = _refreshVisibleTab;
+    PushNotificationService.onForegroundOrderUpdate = _syncOrdersFromPush;
     CartController.instance.onShowOrdersAfterPlace = _showOrdersAfterCheckout;
     CartController.instance.onSelectShellTab = _selectTab;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -70,6 +78,13 @@ class _MainShellScreenState extends State<MainShellScreen>
     _unreadPoll = Timer.periodic(const Duration(seconds: 12), (_) {
       _pollUnread();
     });
+    if (widget.focusOrderId != null ||
+        widget.initialIndex == 1 ||
+        widget.initialIndex == 2) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncOrdersFromPush();
+      });
+    }
   }
 
   Future<void> _refreshSignedIn() async {
@@ -113,7 +128,7 @@ class _MainShellScreenState extends State<MainShellScreen>
     }
     _preload.dispose();
     _unreadPoll?.cancel();
-    if (PushNotificationService.onForegroundOrderUpdate == _refreshVisibleTab) {
+    if (PushNotificationService.onForegroundOrderUpdate == _syncOrdersFromPush) {
       PushNotificationService.onForegroundOrderUpdate = null;
     }
     if (identical(
@@ -133,7 +148,7 @@ class _MainShellScreenState extends State<MainShellScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       PushNotificationService.registerIfPossible();
-      _refreshVisibleTab();
+      _syncOrdersFromPush();
     }
   }
 
@@ -150,18 +165,17 @@ class _MainShellScreenState extends State<MainShellScreen>
   /// After checkout from Home or a listing/storefront, land on Orders.
   void _showOrdersAfterCheckout() {
     if (!mounted) return;
-    final wasMounted = _ordersMounted;
     setState(() {
       _navIndex = 1;
       _ordersMounted = true;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final paymentPatch = CartController.instance.takeBuyerOrderPaymentPatch();
-      if (paymentPatch != null) {
-        _ordersKey.currentState?.applyOrderFromPayment(paymentPatch);
+      final placed = CartController.instance.takeBuyerOrderPaymentPatch();
+      if (placed != null) {
+        _ordersKey.currentState?.applyOrderFromPayment(placed);
       }
-      if (wasMounted) _ordersKey.currentState?.refresh();
+      _ordersKey.currentState?.refresh(lightweight: true);
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(
@@ -189,10 +203,80 @@ class _MainShellScreenState extends State<MainShellScreen>
     _dashboardKey.currentState?.refreshUnread();
   }
 
-  void _refreshVisibleTab() {
-    _homeKey.currentState?.refresh();
-    _ordersKey.currentState?.refresh();
-    _dashboardKey.currentState?.refresh();
+  void _syncOrdersFromPush() {
+    unawaited(_syncOrdersFromPushAsync());
+  }
+
+  Future<void> _syncOrdersFromPushAsync() async {
+    await OrderPushCoordinator.ensureHydrated();
+    if (!mounted) return;
+
+    final hints = OrderPushCoordinator.pendingHints;
+    final mountOrders =
+        hints.isNotEmpty || (widget.focusOrderId?.isNotEmpty ?? false);
+    final mountKitchen = mountOrders ||
+        widget.initialIndex == 2 ||
+        hints.any(_hintTargetsSellerKitchen);
+
+    if (!_ordersMounted && mountOrders) {
+      setState(() => _ordersMounted = true);
+    }
+    if (!_dashboardMounted && mountKitchen) {
+      setState(() => _dashboardMounted = true);
+    }
+
+    if (mountOrders) await _awaitOrdersScreenState();
+    if (mountKitchen) await _awaitDashboardScreenState();
+
+    if (hints.isNotEmpty) {
+      await _ordersKey.currentState?.applyPushHints(hints);
+      _dashboardKey.currentState?.applyPushHints(hints);
+    }
+
+    unawaited(
+      _ordersKey.currentState?.prefetchOrdersFromPush(
+        focusOrderId: widget.focusOrderId,
+      ),
+    );
+    unawaited(
+      _dashboardKey.currentState?.prefetchOrdersFromPush(
+        focusOrderId: widget.focusOrderId,
+      ),
+    );
+
+    if (hints.isEmpty) {
+      _homeKey.currentState?.refresh();
+    }
+    if (_ordersKey.currentState?.hasSuccessfullyLoaded == true) {
+      _ordersKey.currentState?.refresh(lightweight: true);
+    }
+    final kitchen = _dashboardKey.currentState;
+    if (kitchen != null && kitchen.hasSuccessfullyLoaded) {
+      kitchen.refresh(lightweight: true);
+    }
+  }
+
+  static bool _hintTargetsSellerKitchen(OrderPushHint hint) {
+    final status = hint.status;
+    if (status == 'pending') return true;
+    if (hint.paymentStatus == 'buyer_marked_paid') return true;
+    return status == 'cancelled' || status == 'picked_up';
+  }
+
+  Future<void> _awaitOrdersScreenState() async {
+    for (var i = 0; i < 12; i++) {
+      if (!mounted) return;
+      if (_ordersKey.currentState != null) return;
+      await WidgetsBinding.instance.endOfFrame;
+    }
+  }
+
+  Future<void> _awaitDashboardScreenState() async {
+    for (var i = 0; i < 12; i++) {
+      if (!mounted) return;
+      if (_dashboardKey.currentState != null) return;
+      await WidgetsBinding.instance.endOfFrame;
+    }
   }
 
   void _selectTab(int index) {
@@ -299,6 +383,7 @@ class _MainShellScreenState extends State<MainShellScreen>
           _dashboardMounted
               ? SellerDashboardScreen(
                   key: _dashboardKey,
+                  priorityOrderId: widget.focusOrderId,
                   onInitialLoadSettled: _preload.onDashboardInitialLoadSettled,
                   onListingCreated: _onListingPublishedToHome,
                   onStartSelling: _onMarketplaceStartSelling,

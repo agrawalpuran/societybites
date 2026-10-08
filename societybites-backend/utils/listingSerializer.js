@@ -248,6 +248,7 @@ function serializeOrder(order) {
     rejectReason: order.rejectReason || null,
     rejectedAt: order.rejectedAt || null,
     rejectedBy: order.rejectedBy || null,
+    cancelReason: order.cancelReason || null,
     refundDue: isRefundDue(order),
     sellerCanDecline: sellerCanDecline(order),
     completedAt: order.completedAt || null,
@@ -277,6 +278,31 @@ function serializeOrder(order) {
   };
 }
 
+/** Small PATCH /orders/:id/status payload — client merges onto the cached order. */
+function serializeOrderStatusPatch(order) {
+  return {
+    statusPatch: true,
+    id: order.id,
+    orderId: order.orderNumber,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    statusStep: ORDER_STATUS_TO_STEP[order.status] ?? 0,
+    paymentStatus: order.paymentStatus || "pending",
+    refundDue: isRefundDue(order),
+    sellerCanDecline: sellerCanDecline(order),
+    completedAt: order.completedAt || null,
+    cancelledAt: order.cancelledAt || null,
+    rejectedAt: order.rejectedAt || null,
+    acceptedAt: order.acceptedAt || null,
+    preparingAt: order.preparingAt || null,
+    readyAt: order.readyAt || null,
+    pickedUpAt: order.pickedUpAt || null,
+    expectedReadyAt: order.expectedReadyAt || null,
+    sellerConfirmedPaidAt: order.sellerConfirmedPaidAt || null,
+    buyerMarkedPaidAt: order.buyerMarkedPaidAt || null,
+  };
+}
+
 function serializeReview(review) {
   const reviewer = review.reviewer || {};
   const flat = reviewer.flat;
@@ -303,6 +329,7 @@ module.exports = {
   ORDER_STATUS_TO_STEP,
   serializeListing,
   serializeOrder,
+  serializeOrderStatusPatch,
   serializeReview,
   attachQuantitySold,
   attachListingReviewAggregates,

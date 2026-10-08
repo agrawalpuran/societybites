@@ -2,19 +2,36 @@ const prisma = require("./prisma");
 
 const PLATFORM_FEE_KEY = "platform_fee";
 const DEFAULT_PLATFORM_FEE = 0;
+const CACHE_MS = 60_000;
+
+let cachedFee = null;
+let cachedAt = 0;
 
 async function getPlatformFee() {
+  const now = Date.now();
+  if (cachedFee !== null && now - cachedAt < CACHE_MS) {
+    return cachedFee;
+  }
+
   const row = await prisma.appSetting.findUnique({
     where: { key: PLATFORM_FEE_KEY },
   });
 
-  if (!row) return DEFAULT_PLATFORM_FEE;
-
-  const value = parseFloat(row.value);
-  if (!Number.isFinite(value) || value < 0) {
+  if (!row) {
+    cachedFee = DEFAULT_PLATFORM_FEE;
+    cachedAt = now;
     return DEFAULT_PLATFORM_FEE;
   }
 
+  const value = parseFloat(row.value);
+  if (!Number.isFinite(value) || value < 0) {
+    cachedFee = DEFAULT_PLATFORM_FEE;
+    cachedAt = now;
+    return DEFAULT_PLATFORM_FEE;
+  }
+
+  cachedFee = value;
+  cachedAt = now;
   return value;
 }
 
@@ -32,7 +49,9 @@ async function setPlatformFee(fee) {
     create: { key: PLATFORM_FEE_KEY, value: String(value) },
   });
 
-  return parseFloat(row.value);
+  cachedFee = parseFloat(row.value);
+  cachedAt = Date.now();
+  return cachedFee;
 }
 
 module.exports = {

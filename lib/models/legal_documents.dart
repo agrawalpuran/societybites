@@ -102,7 +102,7 @@ Do not misuse the platform, including for harassment, fake listings, fraud, or a
 
 You may order from cooks in your society and, where a seller has opted in, from nearby societies in the same city. A cart holds items from one seller at a time.
 
-Payment is UPI or cash, according to the seller's settings and whether you are in the same society. You can cancel from the order while the app still allows it; otherwise ask the seller or email support.societyeats@gmail.com.
+Payment is UPI or cash, according to the seller's settings and whether you are in the same society. There is no in-app cancel button for buyers. Ask the seller, or write to support.societyeats@gmail.com, if you need help.
 
 4. Selling
 

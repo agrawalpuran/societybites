@@ -69,12 +69,19 @@ async function createOrder(server, { token, listingId, paymentMethod }) {
   return created.json;
 }
 
-async function patchStatus(server, { token, orderId, status }) {
+async function patchStatus(
+  server,
+  { token, orderId, status, reason = "Changed my mind", otherText }
+) {
   return jsonRequest(server, {
     method: "PATCH",
     path: `/orders/${orderId}/status`,
     token,
-    body: { status },
+    body: {
+      status,
+      reason,
+      ...(otherText !== undefined ? { otherText } : {}),
+    },
   });
 }
 
@@ -185,6 +192,24 @@ async function main() {
       status: "cancelled",
     });
     assert(upiPendingCancel.status === 200, "UPI pending unpaid must cancel");
+    assert(
+      upiPendingCancel.json.cancelReason === "Changed my mind",
+      `cancelReason stored: ${upiPendingCancel.json.cancelReason}`
+    );
+
+    const noReasonOrder = await createOrder(server, {
+      token: buyerToken,
+      listingId: listing.id,
+      paymentMethod: "upi",
+    });
+    orderIds.push(noReasonOrder.id);
+    const missingReason = await patchStatus(server, {
+      token: buyerToken,
+      orderId: noReasonOrder.id,
+      status: "cancelled",
+      reason: "",
+    });
+    assert(missingReason.status === 400, "buyer cancel without reason must fail");
 
     const upiAccepted = await createOrder(server, {
       token: buyerToken,

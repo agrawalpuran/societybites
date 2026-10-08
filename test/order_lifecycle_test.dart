@@ -143,11 +143,8 @@ void main() {
     expect(seller.showComplete, isFalse);
   });
 
-  test('Mark Ready tries ready first, then legacy preparing path', () {
-    expect(markReadyStatusPaths('accepted'), [
-      ['ready'],
-      ['preparing', 'ready'],
-    ]);
+  test('Mark Ready uses single accepted or preparing to ready step', () {
+    expect(markReadyStatusPaths('accepted').first, ['ready']);
     expect(markReadyStatusPaths('preparing'), [
       ['ready'],
     ]);

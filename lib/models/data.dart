@@ -607,6 +607,7 @@ class Order {
   final bool hasReview;
   final String? rejectReason;
   final DateTime? rejectedAt;
+  final String? cancelReason;
 
   /// Seller owes the buyer this order's money back: UPI was marked paid but the
   /// order ended without food. The platform never holds funds, so settlement is
@@ -655,6 +656,7 @@ class Order {
     this.hasReview = false,
     this.rejectReason,
     this.rejectedAt,
+    this.cancelReason,
     this.refundDue = false,
     this.sellerCanDecline = false,
     this.completedAt,
@@ -866,6 +868,7 @@ class Order {
       hasReview: hasReview,
       rejectReason: rejectReason,
       rejectedAt: rejectedAt,
+      cancelReason: cancelReason,
       refundDue: refundDue,
       sellerCanDecline: sellerCanDecline,
       completedAt: completedAt,
@@ -911,6 +914,7 @@ class Order {
       hasReview: hasReview,
       rejectReason: rejectReason,
       rejectedAt: rejectedAt,
+      cancelReason: cancelReason,
       refundDue: refundDue,
       sellerCanDecline: sellerCanDecline,
       completedAt: completedAt,
@@ -992,6 +996,7 @@ class Order {
       hasReview: json['hasReview'] == true,
       rejectReason: json['rejectReason'] as String?,
       rejectedAt: _jsonDate(json, 'rejectedAt'),
+      cancelReason: json['cancelReason'] as String?,
       refundDue: json['refundDue'] == true,
       sellerCanDecline: json['sellerCanDecline'] == true,
       completedAt: _jsonDate(json, 'completedAt'),
@@ -1008,6 +1013,147 @@ class Order {
       distanceKm: (json['distanceKm'] as num?)?.toDouble(),
       unreadMessageCount: (json['unreadMessageCount'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  /// Fills line items from checkout cart when create-order JSON omits them.
+  static Order withCartLineItemsIfMissing(
+    Order order,
+    List<CartItem> cart,
+  ) {
+    if (order.items.isNotEmpty || cart.isEmpty) return order;
+    final items = cart
+        .map(
+          (item) => OrderLineItem(
+            food: item.food,
+            quantity: item.quantity,
+            unitPrice: item.food.price,
+          ),
+        )
+        .toList();
+    return mergePreservingDetails(
+      order,
+      Order(
+        id: order.id,
+        orderId: order.orderId,
+        items: items,
+        date: order.date,
+        status: order.status,
+        statusStep: order.statusStep,
+        orderTotal: order.orderTotal,
+        subtotal: order.subtotal,
+        communityFee: order.communityFee,
+      ),
+    );
+  }
+
+  /// Keeps line items and display fields when [updated] is a partial API row.
+  static Order mergePreservingDetails(Order prior, Order updated) {
+    return Order(
+      id: updated.id,
+      orderId: updated.orderId,
+      items: updated.items.isNotEmpty ? updated.items : prior.items,
+      date: updated.date,
+      status: updated.status,
+      statusStep: updated.statusStep,
+      orderTotal: updated.orderTotal > 0 ? updated.orderTotal : prior.orderTotal,
+      subtotal: updated.subtotal > 0 ? updated.subtotal : prior.subtotal,
+      communityFee: updated.communityFee,
+      deliveryCharge: updated.deliveryCharge,
+      couponCode: updated.couponCode ?? prior.couponCode,
+      couponDiscount: updated.couponDiscount ?? prior.couponDiscount,
+      type: updated.type,
+      campaignId: updated.campaignId ?? prior.campaignId,
+      fulfilmentMethod: updated.fulfilmentMethod ?? prior.fulfilmentMethod,
+      fulfilmentNotes: updated.fulfilmentNotes ?? prior.fulfilmentNotes,
+      fulfilmentAt: updated.fulfilmentAt ?? prior.fulfilmentAt,
+      campaignTitle: updated.campaignTitle ?? prior.campaignTitle,
+      campaignOrderCutoffAt:
+          updated.campaignOrderCutoffAt ?? prior.campaignOrderCutoffAt,
+      paymentMethod: updated.paymentMethod ?? prior.paymentMethod,
+      paymentStatus: updated.paymentStatus,
+      hasReview: updated.hasReview,
+      rejectReason: updated.rejectReason ?? prior.rejectReason,
+      rejectedAt: updated.rejectedAt ?? prior.rejectedAt,
+      cancelReason: updated.cancelReason ?? prior.cancelReason,
+      refundDue: updated.refundDue,
+      sellerCanDecline: updated.sellerCanDecline,
+      completedAt: updated.completedAt ?? prior.completedAt,
+      cancelledAt: updated.cancelledAt ?? prior.cancelledAt,
+      expectedReadyAt: updated.expectedReadyAt ?? prior.expectedReadyAt,
+      requestedReadyAt: updated.requestedReadyAt ?? prior.requestedReadyAt,
+      createdAt: updated.createdAt ?? prior.createdAt,
+      buyerName: updated.buyerName ?? prior.buyerName,
+      buyerPhone: updated.buyerPhone ?? prior.buyerPhone,
+      buyerFlatNumber: updated.buyerFlatNumber ?? prior.buyerFlatNumber,
+      buyerBlock: updated.buyerBlock ?? prior.buyerBlock,
+      buyerSocietyName: updated.buyerSocietyName ?? prior.buyerSocietyName,
+      sellerSocietyName: updated.sellerSocietyName ?? prior.sellerSocietyName,
+      distanceKm: updated.distanceKm ?? prior.distanceKm,
+      unreadMessageCount: updated.unreadMessageCount,
+    );
+  }
+
+  /// Merges lightweight PATCH /orders/:id/status JSON onto a cached order.
+  static Order mergeStatusPatch(Order prior, Map<String, dynamic> json) {
+    if (json['statusPatch'] != true) {
+      final full = Order.fromJson(json);
+      if (full.items.isNotEmpty) return full;
+    }
+
+    DateTime? at(String key) {
+      if (!json.containsKey(key)) return null;
+      return _jsonDate(json, key);
+    }
+
+    final patched = Order(
+      id: prior.id,
+      orderId: prior.orderId,
+      items: prior.items,
+      date: prior.date,
+      status: json['status'] as String? ?? prior.status,
+      statusStep: (json['statusStep'] as num?)?.toInt() ?? prior.statusStep,
+      orderTotal: prior.orderTotal,
+      subtotal: prior.subtotal,
+      communityFee: prior.communityFee,
+      deliveryCharge: prior.deliveryCharge,
+      couponCode: prior.couponCode,
+      couponDiscount: prior.couponDiscount,
+      type: prior.type,
+      campaignId: prior.campaignId,
+      fulfilmentMethod: prior.fulfilmentMethod,
+      fulfilmentNotes: prior.fulfilmentNotes,
+      fulfilmentAt: prior.fulfilmentAt,
+      campaignTitle: prior.campaignTitle,
+      campaignOrderCutoffAt: prior.campaignOrderCutoffAt,
+      paymentMethod: prior.paymentMethod,
+      paymentStatus: json['paymentStatus'] as String? ?? prior.paymentStatus,
+      hasReview: prior.hasReview,
+      rejectReason: prior.rejectReason,
+      rejectedAt: at('rejectedAt') ?? prior.rejectedAt,
+      cancelReason: prior.cancelReason,
+      refundDue: json.containsKey('refundDue')
+          ? json['refundDue'] == true
+          : prior.refundDue,
+      sellerCanDecline: json.containsKey('sellerCanDecline')
+          ? json['sellerCanDecline'] == true
+          : prior.sellerCanDecline,
+      completedAt: at('completedAt') ?? prior.completedAt,
+      cancelledAt: at('cancelledAt') ?? prior.cancelledAt,
+      expectedReadyAt: json.containsKey('expectedReadyAt')
+          ? at('expectedReadyAt')
+          : prior.expectedReadyAt,
+      requestedReadyAt: prior.requestedReadyAt,
+      createdAt: prior.createdAt,
+      buyerName: prior.buyerName,
+      buyerPhone: prior.buyerPhone,
+      buyerFlatNumber: prior.buyerFlatNumber,
+      buyerBlock: prior.buyerBlock,
+      buyerSocietyName: prior.buyerSocietyName,
+      sellerSocietyName: prior.sellerSocietyName,
+      distanceKm: prior.distanceKm,
+      unreadMessageCount: prior.unreadMessageCount,
+    );
+    return mergePreservingDetails(prior, patched);
   }
 
   /// Order placed stamp, e.g. "Today, 10:37 AM" or "12 Sep, 3:30 PM".

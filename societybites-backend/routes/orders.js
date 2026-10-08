@@ -4,7 +4,10 @@ const logger = require("../lib/logger");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser } = require("../middleware/requireUser");
 const { generateOrderNumber } = require("../utils/orderNumber");
-const { serializeOrder } = require("../utils/listingSerializer");
+const {
+  serializeOrder,
+  serializeOrderStatusPatch,
+} = require("../utils/listingSerializer");
 const { loadSellerInsights } = require("../lib/sellerInsights");
 const { getPlatformFee } = require("../lib/platformFee");
 const { expireListingIfDue } = require("../utils/listingExpiry");
@@ -87,6 +90,32 @@ const REJECT_REASONS = [
   "Unable to fulfil by requested date",
   "Other",
 ];
+
+const BUYER_CANCEL_REASONS = [
+  "Changed my mind",
+  "Ordered by mistake",
+  "No longer needed",
+  "Delivery or timing issue",
+  "Other",
+];
+
+function parseReasonChoice(rawReason, allowedReasons) {
+  const trimmed = String(rawReason || "").trim();
+  const matched = allowedReasons.includes(trimmed)
+    ? trimmed
+    : allowedReasons.find((item) => trimmed.startsWith(item)) || "";
+  return matched;
+}
+
+function formatStoredReason(matchedReason, note) {
+  const trimmedNote = String(note || "").trim();
+  if (trimmedNote.length > 200) {
+    const err = new Error("otherText must be at most 200 characters");
+    err.statusCode = 400;
+    throw err;
+  }
+  return trimmedNote ? `${matchedReason}\n${trimmedNote}` : matchedReason;
+}
 
 const TRANSITIONS = {
   pending: ["accepted", "cancelled"],
@@ -186,6 +215,22 @@ const orderInclude = {
     include: { coupon: { select: { code: true } } },
     take: 1,
   },
+};
+
+/** Same shape as [orderInclude] but skips per-listing review aggregates on create. */
+const orderIncludeForCreate = {
+  buyer: orderInclude.buyer,
+  items: {
+    include: {
+      listing: {
+        include: {
+          seller: { include: { flat: true, society: true } },
+        },
+      },
+    },
+  },
+  reviews: orderInclude.reviews,
+  couponRedemptions: orderInclude.couponRedemptions,
 };
 
 router.get(
@@ -506,15 +551,23 @@ router.post(
 
     const preparedItems = [];
     const kitchenChecked = new Set();
+    const listingAccessCache = new Map();
+
+    const listingIds = items.map((item) => item.listingId).filter(Boolean);
+    const listingsById = new Map(
+      (
+        await prisma.listing.findMany({
+          where: { id: { in: listingIds } },
+        })
+      ).map((listing) => [listing.id, listing])
+    );
 
     for (const item of items) {
       if (!item.listingId) {
         return res.status(400).json({ error: "Each item must have a listingId" });
       }
 
-      const listing = await prisma.listing.findUnique({
-        where: { id: item.listingId },
-      });
+      const listing = listingsById.get(item.listingId);
 
       if (!listing) {
         return res.status(400).json({
@@ -542,19 +595,22 @@ router.post(
         kitchenChecked.add(listing.sellerId);
       }
 
-      let listingAccess;
-      try {
-        listingAccess = await authorizeListingForBuyer({
-          buyer: req.user,
-          listing,
-          clientRadiusKm: req.body.nearbyRadiusKm,
-          clientDistanceKm: req.body.distanceKm,
-        });
-      } catch (err) {
-        return res.status(err.statusCode || 400).json({
-          error: err.message,
-          code: err.code,
-        });
+      let listingAccess = listingAccessCache.get(item.listingId);
+      if (!listingAccess) {
+        try {
+          listingAccess = await authorizeListingForBuyer({
+            buyer: req.user,
+            listing,
+            clientRadiusKm: req.body.nearbyRadiusKm,
+            clientDistanceKm: req.body.distanceKm,
+          });
+          listingAccessCache.set(item.listingId, listingAccess);
+        } catch (err) {
+          return res.status(err.statusCode || 400).json({
+            error: err.message,
+            code: err.code,
+          });
+        }
       }
 
       if (orderType === "regular" && listing.campaignId) {
@@ -906,7 +962,7 @@ router.post(
               })),
             },
           },
-          include: orderInclude,
+          include: orderIncludeForCreate,
         });
 
         if (!couponCode) return created;
@@ -932,7 +988,7 @@ router.post(
         return tx.order.update({
           where: { id: created.id },
           data: { total: discountedTotal },
-          include: orderInclude,
+          include: orderIncludeForCreate,
         });
       });
     } catch (err) {
@@ -955,7 +1011,7 @@ router.post(
 
     res.status(201).json(serializeOrder(order));
 
-    await flushNotification(notifyOrderCreated(order));
+    void flushNotification(notifyOrderCreated(order));
   })
 );
 
@@ -1061,6 +1117,28 @@ router.patch(
       }
     }
 
+    let cancelReasonStored = null;
+    if (status === "cancelled" && isBuyer) {
+      const { reason, otherText, cancelReason } = req.body || {};
+      const matched = parseReasonChoice(reason || cancelReason, BUYER_CANCEL_REASONS);
+      if (!matched) {
+        return res.status(400).json({
+          error: `reason is required and must be one of: ${BUYER_CANCEL_REASONS.join(", ")}`,
+        });
+      }
+      const note = typeof otherText === "string" ? otherText : "";
+      if (matched === "Other" && !note.trim()) {
+        return res.status(400).json({
+          error: "Please add a short note when you choose Other",
+        });
+      }
+      try {
+        cancelReasonStored = formatStoredReason(matched, note);
+      } catch (err) {
+        return res.status(err.statusCode || 400).json({ error: err.message });
+      }
+    }
+
     const updateData = {
       status,
       ...(TIMESTAMP_FIELDS[status] && { [TIMESTAMP_FIELDS[status]]: new Date() }),
@@ -1071,7 +1149,11 @@ router.patch(
     // The order graph was already loaded for the permission checks. Writing the
     // changed fields onto it avoids a second identical query before we answer.
     if (status === "cancelled") {
-      const written = { ...updateData, paymentStatus: "failed" };
+      const written = {
+        ...updateData,
+        paymentStatus: "failed",
+        ...(cancelReasonStored ? { cancelReason: cancelReasonStored } : {}),
+      };
       await prisma.$transaction(async (tx) => {
         await updateOrderIfCurrentStatus(tx, {
           id: order.id,
@@ -1098,9 +1180,9 @@ router.patch(
       logger.info("order", `${order.orderNumber} → ${status}`);
     }
 
-    res.json(serializeOrder(updated));
+    res.json(serializeOrderStatusPatch(updated));
 
-    await flushNotification(notifyStatusChange(updated, status));
+    void flushNotification(notifyStatusChange(updated, status));
   })
 );
 
