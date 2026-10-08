@@ -10,11 +10,15 @@ class KitchenHoursInlineEditor extends StatefulWidget {
     super.key,
     this.opensAt,
     this.closesAt,
+    this.explicitAlwaysOpen = false,
     required this.onChanged,
   });
 
   final String? opensAt;
   final String? closesAt;
+
+  /// True when the seller chose “always open” (cleared hours), not merely unset.
+  final bool explicitAlwaysOpen;
   final ValueChanged<KitchenHoursDraft> onChanged;
 
   @override
@@ -30,20 +34,23 @@ class _KitchenHoursInlineEditorState extends State<KitchenHoursInlineEditor> {
   @override
   void initState() {
     super.initState();
-    _alwaysOpen = widget.opensAt == null && widget.closesAt == null;
-    _opensAt = widget.opensAt ?? '08:00';
-    _closesAt = widget.closesAt ?? '20:00';
+    _syncFromWidget();
   }
 
   @override
   void didUpdateWidget(covariant KitchenHoursInlineEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.opensAt != widget.opensAt ||
-        oldWidget.closesAt != widget.closesAt) {
-      _alwaysOpen = widget.opensAt == null && widget.closesAt == null;
-      _opensAt = widget.opensAt ?? '08:00';
-      _closesAt = widget.closesAt ?? '20:00';
+        oldWidget.closesAt != widget.closesAt ||
+        oldWidget.explicitAlwaysOpen != widget.explicitAlwaysOpen) {
+      _syncFromWidget();
     }
+  }
+
+  void _syncFromWidget() {
+    _alwaysOpen = widget.explicitAlwaysOpen;
+    _opensAt = widget.opensAt ?? defaultKitchenOpensAt;
+    _closesAt = widget.closesAt ?? defaultKitchenClosesAt;
   }
 
   void _emitScheduled() {

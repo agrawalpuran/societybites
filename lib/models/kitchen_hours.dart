@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 const kitchenClosedMessage = 'Kitchen closed';
 
+/// Default window for new sellers (first-time setup); not the same as “always open”.
+const defaultKitchenOpensAt = '08:00';
+const defaultKitchenClosesAt = '20:00';
+
 const _istOffset = Duration(hours: 5, minutes: 30);
 
 int? clockToMinutes(String? value) {

@@ -162,13 +162,7 @@ async function getMyFssai(user) {
   }
   const row = await ensureSellerFssaiRow(user.id);
   const requirementEnabled = await isFssaiSellingRequirementEnabled();
-  const assistance = await prisma.fssaiAssistanceRequest.findFirst({
-    where: {
-      userId: user.id,
-      status: { in: ["NEW", "CONTACTED", "IN_PROGRESS"] },
-    },
-    orderBy: { requestedAt: "desc" },
-  });
+  const assistance = await findActiveFssaiAssistance(user.id);
   return {
     ...serializeSellerFssai(row),
     requirementEnabled,
@@ -299,11 +293,22 @@ async function getMyFssaiDocumentUrl(user) {
   return { url, expiresInSeconds: 300 };
 }
 
+async function findActiveFssaiAssistance(userId) {
+  return prisma.fssaiAssistanceRequest.findFirst({
+    where: {
+      userId,
+      status: { in: ["NEW", "CONTACTED", "IN_PROGRESS"] },
+    },
+    orderBy: { requestedAt: "desc" },
+  });
+}
+
 async function requestFssaiAssistance(user) {
   if (!canManageOwnFssai(user)) {
     throw httpError(400, "Join your society before managing FSSAI registration");
   }
-  await prisma.sellerFssai.updateMany({
+  await ensureSellerFssaiRow(user.id);
+  await prisma.sellerFssai.update({
     where: { userId: user.id },
     data: { needsAssistance: true },
   });

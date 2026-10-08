@@ -124,11 +124,20 @@ async function attachSellingReach(user, prismaClient) {
   const sellerFssai = await prismaClient.sellerFssai.findUnique({
     where: { userId: user.id },
   });
+  const assistance = await prismaClient.fssaiAssistanceRequest.findFirst({
+    where: {
+      userId: user.id,
+      status: { in: ["NEW", "CONTACTED", "IN_PROGRESS"] },
+    },
+    orderBy: { requestedAt: "desc" },
+  });
   const requirementEnabled = await isFssaiSellingRequirementEnabled();
   const fssaiStatus = sellerFssai ? sellerFssai.status : "NOT_SUBMITTED";
   const fssaiPayload = {
     ...serializeSellerFssai(sellerFssai),
     requirementEnabled,
+    assistanceRequested: Boolean(assistance),
+    assistanceStatus: assistance ? assistance.status : null,
     canSellDespiteFssai: !requirementEnabled || fssaiStatus === "APPROVED",
     canEnableSellingDespiteFssai: canEnableSellingDespiteFssai(
       fssaiStatus,

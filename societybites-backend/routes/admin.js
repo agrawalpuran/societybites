@@ -34,6 +34,11 @@ const {
   setFssaiSellingRequirement,
 } = require("../lib/fssaiRequirement");
 const { listCouponSellerPayouts } = require("../lib/couponRecon");
+const {
+  listAddressProofs,
+  getAddressProof,
+  reviewAddressProof,
+} = require("../lib/addressProofReview");
 
 const router = express.Router();
 
@@ -131,6 +136,34 @@ router.post(
   asyncHandler(async (req, res) => {
     const fssai = await rejectAdminFssai(req.user, req.params.sellerId, req.body);
     res.json({ fssai, rejectionPresets: REJECTION_PRESETS });
+  })
+);
+
+router.get(
+  "/address-proofs",
+  asyncHandler(async (req, res) => {
+    const records = await listAddressProofs({ status: req.query.status });
+    res.json({ records });
+  })
+);
+
+router.get(
+  "/address-proofs/:userId",
+  asyncHandler(async (req, res) => {
+    const record = await getAddressProof(req.params.userId);
+    res.json({ record });
+  })
+);
+
+router.post(
+  "/address-proofs/:userId/review",
+  asyncHandler(async (req, res) => {
+    const record = await reviewAddressProof({
+      adminUser: req.user,
+      userId: req.params.userId,
+      status: req.body && req.body.status,
+    });
+    res.json({ record });
   })
 );
 

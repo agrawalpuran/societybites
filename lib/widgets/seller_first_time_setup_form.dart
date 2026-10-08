@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
 import '../models/selling_reach.dart';
+import 'confirm_upi_id_dialog.dart';
 import 'kitchen_hours_inline_editor.dart';
 import 'kitchen_hours_sheet.dart';
 
@@ -14,6 +17,8 @@ class SellerFirstTimeSetupForm extends StatefulWidget {
     required this.upiId,
     required this.upiDisplayName,
     required this.onUpiChanged,
+    this.onUpiConfirmed,
+    this.onUpiConfirmationInvalidated,
     required this.sellingReachLevel,
     required this.sellingReach,
     required this.onReachChanged,
@@ -21,11 +26,8 @@ class SellerFirstTimeSetupForm extends StatefulWidget {
     required this.onFulfilmentChanged,
     required this.kitchenOpensAt,
     required this.kitchenClosesAt,
+    this.kitchenExplicitAlwaysOpen = false,
     required this.onKitchenChanged,
-    required this.fssaiSubtitle,
-    required this.fssaiRequirementEnabled,
-    required this.fssaiAllowsEnableSelling,
-    required this.onOpenFssai,
   });
 
   final SellerPaymentPreference paymentPreference;
@@ -33,6 +35,8 @@ class SellerFirstTimeSetupForm extends StatefulWidget {
   final String? upiId;
   final String? upiDisplayName;
   final void Function(String upiId, String displayName) onUpiChanged;
+  final VoidCallback? onUpiConfirmed;
+  final VoidCallback? onUpiConfirmationInvalidated;
   final SellingReachLevel sellingReachLevel;
   final SellingReach sellingReach;
   final ValueChanged<SellingReachLevel> onReachChanged;
@@ -40,11 +44,8 @@ class SellerFirstTimeSetupForm extends StatefulWidget {
   final ValueChanged<SellerFulfilment> onFulfilmentChanged;
   final String? kitchenOpensAt;
   final String? kitchenClosesAt;
+  final bool kitchenExplicitAlwaysOpen;
   final ValueChanged<KitchenHoursDraft> onKitchenChanged;
-  final String fssaiSubtitle;
-  final bool fssaiRequirementEnabled;
-  final bool fssaiAllowsEnableSelling;
-  final VoidCallback onOpenFssai;
 
   @override
   State<SellerFirstTimeSetupForm> createState() =>
@@ -54,6 +55,9 @@ class SellerFirstTimeSetupForm extends StatefulWidget {
 class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
   late final TextEditingController _upiController;
   late final TextEditingController _upiNameController;
+  late final FocusNode _upiFocus;
+  String? _confirmedUpiSnapshot;
+  bool _confirmingUpi = false;
   late FulfilmentMode _fulfilmentMode;
   late final TextEditingController _inSocietyCharge;
   late final TextEditingController _nearbyCharge;
@@ -76,6 +80,18 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
     _extendedCharge = TextEditingController(
       text: _chargeText(widget.fulfilment.extendedCharge),
     );
+    _upiFocus = FocusNode();
+    _upiFocus.addListener(_handleUpiFocusChange);
+    final initialUpi = widget.upiId?.trim() ?? '';
+    if (initialUpi.isNotEmpty && initialUpi.contains('@')) {
+      _confirmedUpiSnapshot = initialUpi;
+    }
+  }
+
+  void _handleUpiFocusChange() {
+    if (!_upiFocus.hasFocus) {
+      unawaited(_confirmUpiOnBlur());
+    }
   }
 
   @override
@@ -101,6 +117,8 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
 
   @override
   void dispose() {
+    _upiFocus.removeListener(_handleUpiFocusChange);
+    _upiFocus.dispose();
     _upiController.dispose();
     _upiNameController.dispose();
     _inSocietyCharge.dispose();
@@ -115,11 +133,56 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
         : amount.toString();
   }
 
-  void _commitUpi() {
-    widget.onUpiChanged(
-      _upiController.text.trim(),
-      _upiNameController.text.trim(),
-    );
+  void _handleUpiTextChanged(String _) {
+    final upi = _upiController.text.trim();
+    if (_confirmedUpiSnapshot != null && upi != _confirmedUpiSnapshot) {
+      _confirmedUpiSnapshot = null;
+      widget.onUpiConfirmationInvalidated?.call();
+      setState(() {});
+    }
+  }
+
+  Future<void> _confirmUpiOnBlur() async {
+    if (_confirmingUpi) return;
+    final upi = _upiController.text.trim();
+    final displayName = _upiNameController.text.trim();
+    if (upi.isEmpty) {
+      _confirmedUpiSnapshot = null;
+      widget.onUpiChanged('', displayName);
+      return;
+    }
+    if (!upi.contains('@')) return;
+    if (upi == _confirmedUpiSnapshot) {
+      widget.onUpiChanged(upi, displayName);
+      return;
+    }
+    _confirmingUpi = true;
+    final confirmed = await confirmUpiIdBeforeSave(context, upiId: upi);
+    _confirmingUpi = false;
+    if (!mounted) return;
+    if (!confirmed) {
+      _upiController.text = _confirmedUpiSnapshot ?? '';
+      widget.onUpiConfirmationInvalidated?.call();
+      FocusScope.of(context).requestFocus(_upiFocus);
+      setState(() {});
+      return;
+    }
+    _confirmedUpiSnapshot = upi;
+    widget.onUpiChanged(upi, displayName);
+    widget.onUpiConfirmed?.call();
+    setState(() {});
+  }
+
+  void _commitDisplayNameOnly() {
+    final upi = _upiController.text.trim();
+    final displayName = _upiNameController.text.trim();
+    if (upi.isEmpty) {
+      widget.onUpiChanged('', displayName);
+      return;
+    }
+    if (_confirmedUpiSnapshot == upi) {
+      widget.onUpiChanged(upi, displayName);
+    }
   }
 
   void _commitFulfilment() {
@@ -166,19 +229,38 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
         const SizedBox(height: 12),
         TextField(
           controller: _upiController,
+          focusNode: _upiFocus,
           keyboardType: TextInputType.emailAddress,
-          onEditingComplete: _commitUpi,
-          onTapOutside: (_) => _commitUpi(),
+          onChanged: _handleUpiTextChanged,
+          onEditingComplete: () => unawaited(_confirmUpiOnBlur()),
           decoration: _fieldDecoration(
             label: 'UPI ID',
             hint: 'yourname@oksbi',
           ),
         ),
+        if (_confirmedUpiSnapshot != null &&
+            _upiController.text.trim() == _confirmedUpiSnapshot) ...[
+          const SizedBox(height: 6),
+          const Row(
+            children: [
+              Icon(Icons.check_circle, size: 16, color: Color(0xFF0E5A47)),
+              SizedBox(width: 6),
+              Text(
+                'UPI ID confirmed',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0E5A47),
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 10),
         TextField(
           controller: _upiNameController,
-          onEditingComplete: _commitUpi,
-          onTapOutside: (_) => _commitUpi(),
+          onEditingComplete: _commitDisplayNameOnly,
+          onTapOutside: (_) => _commitDisplayNameOnly(),
           decoration: _fieldDecoration(
             label: 'Display name on UPI (optional)',
           ),
@@ -253,90 +335,8 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
         KitchenHoursInlineEditor(
           opensAt: widget.kitchenOpensAt,
           closesAt: widget.kitchenClosesAt,
+          explicitAlwaysOpen: widget.kitchenExplicitAlwaysOpen,
           onChanged: widget.onKitchenChanged,
-        ),
-        const SizedBox(height: 24),
-        const _SectionLabel('FOOD & COMPLIANCE'),
-        const SizedBox(height: 10),
-        Material(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFEAEFED)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.badge_outlined, color: Color(0xFF0E5A47)),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        'FSSAI details',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    _FssaiRequirementChip(
-                      required: widget.fssaiRequirementEnabled,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.fssaiRequirementEnabled
-                      ? 'FSSAI is required on SocietyBites before you can enable selling. '
-                          'Submit your registration for review, then return here.'
-                      : 'FSSAI is optional for now. You can enable selling and add or defer '
-                          'details later.',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF8A9491),
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  widget.fssaiSubtitle,
-                  style: const TextStyle(
-                    color: Color(0xFF6A7774),
-                    height: 1.35,
-                  ),
-                ),
-                if (widget.fssaiRequirementEnabled &&
-                    !widget.fssaiAllowsEnableSelling) ...[
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Submit your FSSAI registration for review before you can enable selling.',
-                    style: TextStyle(
-                      color: Color(0xFFC62828),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: widget.onOpenFssai,
-                    child: Text(
-                      widget.fssaiRequirementEnabled
-                          ? 'Complete FSSAI'
-                          : 'Add or update FSSAI',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ],
     );
@@ -381,35 +381,6 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: Color(0xFF0E5A47)),
-      ),
-    );
-  }
-}
-
-class _FssaiRequirementChip extends StatelessWidget {
-  const _FssaiRequirementChip({required this.required});
-
-  final bool required;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = required ? const Color(0xFFFDECEC) : const Color(0xFFE8F5EE);
-    final fg = required ? const Color(0xFFC62828) : const Color(0xFF0E5A47);
-    final label = required ? 'Required' : 'Optional';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
-          color: fg,
-        ),
       ),
     );
   }

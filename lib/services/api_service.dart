@@ -1761,6 +1761,50 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<List<Map<String, dynamic>>> getAdminAddressProofs({
+    String status = 'PENDING',
+  }) async {
+    final uri = Uri.parse('$baseUrl/admin/address-proofs').replace(
+      queryParameters: {'status': status},
+    );
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return (data['records'] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getAdminAddressProof(String userId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/address-proofs/$userId'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return Map<String, dynamic>.from(data['record'] as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> reviewAdminAddressProof(
+    String userId, {
+    required String status,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/address-proofs/$userId/review'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'status': status}),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return Map<String, dynamic>.from(data['record'] as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<String> getAdminFssaiDocumentUrl(String sellerId) async {
     final response = await http.get(
       Uri.parse('$baseUrl/admin/fssai/submissions/$sellerId/document-url'),

@@ -36,6 +36,8 @@ class SellerSettingsScreen extends StatelessWidget {
     this.upiId,
     this.upiDisplayName,
     this.onUpiDetailsChanged,
+    this.onUpiConfirmed,
+    this.onUpiConfirmationInvalidated,
     this.sellingReachLevel,
     this.sellingReach,
     this.onSellingReachChanged,
@@ -43,6 +45,7 @@ class SellerSettingsScreen extends StatelessWidget {
     this.onFulfilmentChanged,
     this.kitchenOpensAt,
     this.kitchenClosesAt,
+    this.kitchenExplicitAlwaysOpen = false,
     this.onKitchenHoursChanged,
   });
 
@@ -69,6 +72,8 @@ class SellerSettingsScreen extends StatelessWidget {
   final String? upiId;
   final String? upiDisplayName;
   final void Function(String upiId, String displayName)? onUpiDetailsChanged;
+  final VoidCallback? onUpiConfirmed;
+  final VoidCallback? onUpiConfirmationInvalidated;
   final SellingReachLevel? sellingReachLevel;
   final SellingReach? sellingReach;
   final ValueChanged<SellingReachLevel>? onSellingReachChanged;
@@ -76,6 +81,7 @@ class SellerSettingsScreen extends StatelessWidget {
   final ValueChanged<SellerFulfilment>? onFulfilmentChanged;
   final String? kitchenOpensAt;
   final String? kitchenClosesAt;
+  final bool kitchenExplicitAlwaysOpen;
   final ValueChanged<KitchenHoursDraft>? onKitchenHoursChanged;
 
   @override
@@ -128,13 +134,55 @@ class SellerSettingsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    if (inlineSetup)
+                    if (inlineSetup) ...[
+                      const _SectionLabel('FOOD & COMPLIANCE'),
+                      const SizedBox(height: 6),
+                      Text(
+                        fssaiRequirementEnabled
+                            ? 'FSSAI is required before you can enable selling.'
+                            : 'Recommended: open FSSAI registration. You can add details now, '
+                                'say you do not have them yet, or request assistance.',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF6A7774),
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ProfileMenuTile(
+                        key: const Key('seller-setup-fssai-entry'),
+                        icon: Icons.badge_outlined,
+                        title: 'FSSAI details',
+                        subtitle: fssaiRequirementEnabled
+                            ? 'Required · $fssaiSubtitle'
+                            : fssaiSubtitle,
+                        trailingLabel: fssaiRequirementEnabled ? 'Complete' : 'Open',
+                        onTap: onEditFssai,
+                      ),
+                      if (fssaiRequirementEnabled && !fssaiAllowsEnableSelling)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            'Submit your FSSAI registration for review before you can enable selling.',
+                            style: TextStyle(
+                              color: Color(0xFFC62828),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 20),
                       SellerFirstTimeSetupForm(
                         paymentPreference: paymentPreference!,
                         onPaymentChanged: onPaymentPreferenceChanged!,
                         upiId: upiId,
                         upiDisplayName: upiDisplayName,
                         onUpiChanged: onUpiDetailsChanged!,
+                        onUpiConfirmed: onUpiConfirmed,
+                        onUpiConfirmationInvalidated:
+                            onUpiConfirmationInvalidated,
                         sellingReachLevel: sellingReachLevel!,
                         sellingReach: sellingReach!,
                         onReachChanged: onSellingReachChanged!,
@@ -142,13 +190,10 @@ class SellerSettingsScreen extends StatelessWidget {
                         onFulfilmentChanged: onFulfilmentChanged!,
                         kitchenOpensAt: kitchenOpensAt,
                         kitchenClosesAt: kitchenClosesAt,
+                        kitchenExplicitAlwaysOpen: kitchenExplicitAlwaysOpen,
                         onKitchenChanged: onKitchenHoursChanged!,
-                        fssaiSubtitle: fssaiSubtitle,
-                        fssaiRequirementEnabled: fssaiRequirementEnabled,
-                        fssaiAllowsEnableSelling: fssaiAllowsEnableSelling,
-                        onOpenFssai: onEditFssai,
-                      )
-                    else ...[
+                      ),
+                    ] else ...[
                       const _SectionLabel('PAYMENTS'),
                       const SizedBox(height: 6),
                       const Text(

@@ -200,14 +200,8 @@ void main() {
     expect(sent!.containsKey('acceptedAt'), isFalse);
     expect(sent!['paymentPreference'], 'UPI_ONLY');
     expect(find.byType(SellerTermsScreen), findsNothing);
-    expect(find.text('Save / Enable Selling'), findsNothing);
-
-    await tester.tap(find.text('Payment Methods'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('UPI + Cash on Delivery'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Save'));
-    await tester.pumpAndSettle();
+    expect(find.byType(SellerSettingsScreen), findsNothing);
+    expect(find.textContaining('Selling enabled'), findsOneWidget);
     expect(profileSaves, 1);
   });
 

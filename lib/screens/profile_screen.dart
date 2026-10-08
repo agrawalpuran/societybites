@@ -267,6 +267,18 @@ class ProfileScreenState extends State<ProfileScreen> {
         ..deliveryChargeNearby = _fulfilment.nearbyCharge
         ..deliveryChargeExtended = _fulfilment.extendedCharge;
     }
+    if (!pending.includeKitchenHours &&
+        !pending.clearKitchenHours &&
+        _kitchenOpensAt == null &&
+        _kitchenClosesAt == null) {
+      _kitchenOpensAt = defaultKitchenOpensAt;
+      _kitchenClosesAt = defaultKitchenClosesAt;
+      pending
+        ..includeKitchenHours = true
+        ..clearKitchenHours = false
+        ..kitchenOpensAt = defaultKitchenOpensAt
+        ..kitchenClosesAt = defaultKitchenClosesAt;
+    }
   }
 
   void _onPendingPaymentPreferenceChanged(SellerPaymentPreference selected) {
@@ -289,12 +301,31 @@ class ProfileScreenState extends State<ProfileScreen> {
         pending.includeUpi = false;
         pending.upiId = null;
         pending.upiDisplayName = null;
+        pending.upiIdConfirmed = false;
       } else {
         pending
           ..includeUpi = true
           ..upiId = upiId
           ..upiDisplayName = displayName.isEmpty ? null : displayName;
       }
+    });
+    _refreshSellerSettings();
+  }
+
+  void _onPendingUpiConfirmed() {
+    final pending = _pendingSellerEnable;
+    if (pending == null) return;
+    setState(() {
+      pending.upiIdConfirmed = true;
+    });
+  }
+
+  void _onPendingUpiConfirmationInvalidated() {
+    final pending = _pendingSellerEnable;
+    if (pending == null) return;
+    setState(() {
+      pending.upiIdConfirmed = false;
+      pending.includeUpi = false;
     });
     _refreshSellerSettings();
   }
@@ -569,6 +600,11 @@ class ProfileScreenState extends State<ProfileScreen> {
               upiDisplayName: holdingSetup ? _upiDisplayName : null,
               onUpiDetailsChanged:
                   holdingSetup ? _onPendingUpiDetailsChanged : null,
+              onUpiConfirmed:
+                  holdingSetup ? _onPendingUpiConfirmed : null,
+              onUpiConfirmationInvalidated: holdingSetup
+                  ? _onPendingUpiConfirmationInvalidated
+                  : null,
               sellingReachLevel:
                   holdingSetup ? _sellingReachLevel : null,
               sellingReach: holdingSetup ? _sellingReach : null,
@@ -580,6 +616,8 @@ class ProfileScreenState extends State<ProfileScreen> {
                   holdingSetup ? _onPendingFulfilmentChanged : null,
               kitchenOpensAt: holdingSetup ? _kitchenOpensAt : null,
               kitchenClosesAt: holdingSetup ? _kitchenClosesAt : null,
+              kitchenExplicitAlwaysOpen: holdingSetup &&
+                  (_pendingSellerEnable?.clearKitchenHours ?? false),
               onKitchenHoursChanged: holdingSetup
                   ? _onPendingKitchenHoursChanged
                   : null,
@@ -915,7 +953,8 @@ class ProfileScreenState extends State<ProfileScreen> {
         pending
           ..includeUpi = true
           ..upiId = upi
-          ..upiDisplayName = displayName.isEmpty ? null : displayName;
+          ..upiDisplayName = displayName.isEmpty ? null : displayName
+          ..upiIdConfirmed = true;
       });
       _refreshSellerSettings();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -974,6 +1013,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     _fssaiRequirementEnabled = fssai['requirementEnabled'] == true;
     _fssaiStatus = fssai['status']?.toString();
     _fssaiDetailsDeferred = fssai['detailsDeferred'] == true;
+    _fssaiAssistanceRequested = fssai['assistanceRequested'] == true;
     _fssaiCanEnableSellingFlag = _fssaiRequirementEnabled
         ? fssai['canEnableSellingDespiteFssai'] == true
         : true;
@@ -1008,6 +1048,7 @@ class ProfileScreenState extends State<ProfileScreen> {
 
   String? _fssaiStatus;
   bool _fssaiDetailsDeferred = false;
+  bool _fssaiAssistanceRequested = false;
   bool _fssaiCanEnableSellingFlag = true;
   bool _fssaiCanSellDespiteFssai = true;
 
@@ -1050,6 +1091,9 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   String get _fssaiSubtitle {
+    if (_fssaiAssistanceRequested) {
+      return 'Assistance requested — we will reach out';
+    }
     final deferred = _fssaiDetailsDeferred;
     if (!_fssaiRequirementEnabled && deferred) {
       return 'No details yet — add when ready';
@@ -1073,13 +1117,22 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _editFssai() async {
-    await Navigator.push(
+    final assistanceRequested = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => const SellerFssaiScreen()),
     );
     if (!mounted) return;
     await _loadProfile();
     _refreshSellerSettings();
+    if (assistanceRequested == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'FSSAI assistance requested — you can continue seller setup',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _enableSelling() async {
@@ -1113,8 +1166,11 @@ class ProfileScreenState extends State<ProfileScreen> {
         );
         return;
       }
-      final confirmed = await confirmUpiIdBeforeSave(context, upiId: upi);
-      if (!confirmed || !mounted) return;
+      if (!pending.upiIdConfirmed) {
+        final confirmed = await confirmUpiIdBeforeSave(context, upiId: upi);
+        if (!confirmed || !mounted) return;
+        pending.upiIdConfirmed = true;
+      }
     }
     if (!_fssaiAllowsEnableSelling) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1176,13 +1232,23 @@ class ProfileScreenState extends State<ProfileScreen> {
         await SessionService.cacheProfileFromApi(updated);
       } catch (_) {}
       if (!mounted) return;
-      setState(() {
-        _applySellerEnableResult(updated);
-        _pendingSellerEnable = null;
-      });
-      _refreshSellerSettings();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selling enabled')),
+      _applySellerEnableResult(updated);
+      _pendingSellerEnable = null;
+      final messenger = ScaffoldMessenger.of(context);
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      widget.onSelectTab?.call(0);
+      if (!mounted) return;
+      setState(() {});
+      unawaited(SellerOnboarding.refreshListingGateCache());
+      messenger.showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('Selling enabled — you’re ready to list food'),
+          backgroundColor: Color(0xFF0E5A47),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -2732,6 +2798,7 @@ class _Chip extends StatelessWidget {
 
 class _PendingSellerEnable {
   bool includeUpi = false;
+  bool upiIdConfirmed = false;
   String? upiId;
   String? upiDisplayName;
   String? paymentPreference;

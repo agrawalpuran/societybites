@@ -38,6 +38,11 @@ model User {
   fssaiRegisteredName     String?
   /// Seller address verification document (URL from media upload).
   addressProofUrl         String?
+  /// PENDING | OK | FOLLOW_UP. Null with a photo means not reviewed yet.
+  addressProofStatus      String?
+  addressProofReviewedAt  DateTime?
+  /// Admin user id that last marked the photo. Does not change selling.
+  addressProofReviewedBy  String?
   suspended               Boolean                 @default(false)
   createdAt               DateTime                @default(now())
   societyId               String?

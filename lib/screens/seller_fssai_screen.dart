@@ -239,7 +239,10 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
           _buildHelpSection(),
         ],
         const SizedBox(height: 16),
-        if (_noDetailsNow && _showNoDetailsCheckbox)
+        if (_noDetailsNow && _showNoDetailsCheckbox) ...[
+          const SizedBox(height: 8),
+          _buildHelpSection(),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -248,9 +251,10 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF0E5A47),
               ),
-              child: const Text('Continue'),
+              child: const Text('Continue without details'),
             ),
-          )
+          ),
+        ]
         else ...[
           if (!fieldsRequired) ...[
             SizedBox(
@@ -451,8 +455,9 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
             width: double.infinity,
             height: 48,
             child: OutlinedButton(
+              key: const Key('fssai-request-assistance'),
               onPressed: _requestAssistance,
-              child: const Text('Yes, I need help'),
+              child: const Text('Need assistance'),
             ),
           ),
       ],
@@ -463,12 +468,7 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
     try {
       await ApiService.requestFssaiAssistance();
       if (!mounted) return;
-      if (!mounted) return;
-      await _load();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('FSSAI assistance requested')),
-      );
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

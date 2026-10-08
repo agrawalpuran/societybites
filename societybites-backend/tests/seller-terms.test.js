@@ -194,6 +194,7 @@ async function main() {
     assert(accepted.json.user.role === "seller", "acceptance enables selling");
     assert(accepted.json.user.paymentPreference === "UPI_ONLY", "pending settings save with acceptance");
     assert(accepted.json.user.addressProofUrl === proofUrl, "address proof URL is stored");
+    assert(accepted.json.user.addressProofStatus === "PENDING", "new proof waits for admin review");
     assert(accepted.json.sellerTerms.termsVersion === "1.0", "response records termsVersion 1.0");
     const acceptedAt = new Date(accepted.json.sellerTerms.acceptedAt).getTime();
     assert(

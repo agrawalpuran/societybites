@@ -4,6 +4,7 @@ import '../../web/admin_content_frame.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_societies_screen.dart';
 import 'admin_fssai_screen.dart';
+import 'admin_address_proof_screen.dart';
 import 'admin_listings_screen.dart';
 import 'admin_orders_screen.dart';
 import 'admin_reviews_screen.dart';
@@ -26,6 +27,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     _NavItem(icon: Icons.dashboard_rounded, label: 'Dashboard'),
     _NavItem(icon: Icons.apartment_rounded, label: 'Societies'),
     _NavItem(icon: Icons.badge_outlined, label: 'FSSAI'),
+    _NavItem(icon: Icons.photo_camera_outlined, label: 'Address proof'),
     _NavItem(icon: Icons.fastfood_rounded, label: 'Listings'),
     _NavItem(icon: Icons.shopping_bag_rounded, label: 'Orders'),
     _NavItem(icon: Icons.star_rounded, label: 'Reviews'),
@@ -50,16 +52,18 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       case 2:
         return const AdminFssaiScreen();
       case 3:
-        return const AdminListingsScreen();
+        return const AdminAddressProofScreen();
       case 4:
-        return const AdminOrdersScreen();
+        return const AdminListingsScreen();
       case 5:
-        return const AdminReviewsScreen();
+        return const AdminOrdersScreen();
       case 6:
-        return const AdminIssuesScreen();
+        return const AdminReviewsScreen();
       case 7:
-        return const AdminCouponsScreen();
+        return const AdminIssuesScreen();
       case 8:
+        return const AdminCouponsScreen();
+      case 9:
         return const AdminAuditScreen();
       default:
         return const AdminDashboardScreen();

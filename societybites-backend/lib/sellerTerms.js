@@ -65,6 +65,11 @@ async function acceptSellerTermsAndEnable({ prisma, user, body }) {
   });
   if (proofUrl !== undefined) {
     data.addressProofUrl = proofUrl;
+    if (proofUrl !== user.addressProofUrl) {
+      data.addressProofStatus = "PENDING";
+      data.addressProofReviewedAt = null;
+      data.addressProofReviewedBy = null;
+    }
   }
 
   if (body.sellingReachLevel !== undefined) {

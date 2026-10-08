@@ -69,5 +69,9 @@ void main() {
       kitchenHoursSubtitle('09:00', '21:00'),
       'Open 9:00 AM · Close 9:00 PM',
     );
+    expect(
+      kitchenHoursSubtitle(defaultKitchenOpensAt, defaultKitchenClosesAt),
+      'Open 8:00 AM · Close 8:00 PM',
+    );
   });
 }

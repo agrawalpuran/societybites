@@ -26,14 +26,16 @@ class KitchenHoursSheet extends StatefulWidget {
 }
 
 class _KitchenHoursSheetState extends State<KitchenHoursSheet> {
+  late bool _alwaysOpen;
   late String _opensAt;
   late String _closesAt;
 
   @override
   void initState() {
     super.initState();
-    _opensAt = widget.opensAt ?? '08:00';
-    _closesAt = widget.closesAt ?? '20:00';
+    _alwaysOpen = widget.opensAt == null && widget.closesAt == null;
+    _opensAt = widget.opensAt ?? defaultKitchenOpensAt;
+    _closesAt = widget.closesAt ?? defaultKitchenClosesAt;
   }
 
   Future<void> _pick({required bool open}) async {
@@ -47,6 +49,7 @@ class _KitchenHoursSheetState extends State<KitchenHoursSheet> {
     );
     if (picked == null) return;
     setState(() {
+      _alwaysOpen = false;
       if (open) {
         _opensAt = clockFromTimeOfDay(picked);
       } else {
@@ -56,6 +59,10 @@ class _KitchenHoursSheetState extends State<KitchenHoursSheet> {
   }
 
   void _save() {
+    if (_alwaysOpen) {
+      Navigator.pop(context, const KitchenHoursDraft(clear: true));
+      return;
+    }
     if (_opensAt == _closesAt) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Close time must be different from open time')),
@@ -94,27 +101,46 @@ class _KitchenHoursSheetState extends State<KitchenHoursSheet> {
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 16),
-          _TimeRow(
-            label: 'Open time',
-            value: formatKitchenClock(_opensAt),
-            onTap: () => _pick(open: true),
-          ),
-          const SizedBox(height: 10),
-          _TimeRow(
-            label: 'Close time',
-            value: formatKitchenClock(_closesAt),
-            onTap: () => _pick(open: false),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'If close is earlier than open, the kitchen stays open past midnight.',
-            style: TextStyle(
-              fontSize: 12,
-              color: Color(0xFF8A9491),
-              fontWeight: FontWeight.w500,
+          const SizedBox(height: 12),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Always open',
+              style: TextStyle(fontWeight: FontWeight.w600),
             ),
+            subtitle: Text(
+              _alwaysOpen
+                  ? 'ON — no fixed kitchen hours'
+                  : 'OFF — set open and close times below',
+              style: const TextStyle(fontSize: 13, color: Color(0xFF6A7774)),
+            ),
+            value: _alwaysOpen,
+            activeColor: const Color(0xFF0E5A47),
+            onChanged: (value) => setState(() => _alwaysOpen = value),
           ),
+          if (!_alwaysOpen) ...[
+            const SizedBox(height: 8),
+            _TimeRow(
+              label: 'Open time',
+              value: formatKitchenClock(_opensAt),
+              onTap: () => _pick(open: true),
+            ),
+            const SizedBox(height: 10),
+            _TimeRow(
+              label: 'Close time',
+              value: formatKitchenClock(_closesAt),
+              onTap: () => _pick(open: false),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'If close is earlier than open, the kitchen stays open past midnight.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF8A9491),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
@@ -132,24 +158,6 @@ class _KitchenHoursSheetState extends State<KitchenHoursSheet> {
               child: const Text(
                 'Save hours',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: TextButton(
-              onPressed: () => Navigator.pop(
-                context,
-                const KitchenHoursDraft(clear: true),
-              ),
-              child: const Text(
-                'Always open',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0E5A47),
-                ),
               ),
             ),
           ),
