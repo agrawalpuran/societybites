@@ -388,7 +388,7 @@ class _OtpScreenState extends State<OtpScreen> {
           const SizedBox(height: 32),
           Padding(
             // Use more horizontal space on phones so digit cells can scale up.
-            padding: const EdgeInsets.symmetric(horizontal: -16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: _OtpDigitRow(
               compact: false,
               controllers: _controllers,
