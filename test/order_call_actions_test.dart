@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -102,6 +104,45 @@ void main() {
     expect(find.text('Order Accepted'), findsNothing);
     expect(find.textContaining('buyer marked paid'), findsNothing);
     expect(_callActions, findsNothing);
+  });
+
+  testWidgets('Mark Ready shows Complete before parent order list updates', (
+    tester,
+  ) async {
+    final seed = Order.fromJson(
+      _orderJson(status: 'accepted', paymentStatus: 'seller_confirmed'),
+    );
+    var held = seed;
+    final completer = Completer<void>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              return SellerActiveOrderCard(
+                order: held,
+                onAction: (_, _) => completer.future,
+                onOrderUpdated: (updated) => setState(() => held = updated),
+                onPaymentConfirmed: () async {},
+                onReject: (_) async {},
+                onReadyBy: (_) async {},
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Mark Ready'), findsOneWidget);
+    await tester.tap(find.text('Mark Ready'));
+    await tester.pump();
+
+    expect(find.text('Complete Order'), findsOneWidget);
+    expect(find.text('Mark Ready'), findsNothing);
+
+    completer.complete();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('UPI payment confirmed seller card has no call button', (tester) async {

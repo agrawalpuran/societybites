@@ -2107,15 +2107,144 @@ class SellerActiveOrderCard extends StatefulWidget {
   State<SellerActiveOrderCard> createState() => _SellerActiveOrderCardState();
 }
 
+class _PendingPaymentOverride {
+  const _PendingPaymentOverride({
+    required this.paymentStatus,
+    this.expectedReadyAt,
+  });
+
+  final String paymentStatus;
+  final DateTime? expectedReadyAt;
+}
+
 class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
   bool _isUpdating = false;
   bool _isConfirmingPayment = false;
+  /// Local status override until [widget.order] catches up (iOS frame timing).
+  String? _pendingStatusOverride;
+  /// Local payment override until [widget.order] catches up (same pattern).
+  _PendingPaymentOverride? _pendingPaymentOverride;
+
+  Order _orderForDisplay() {
+    var order = widget.order;
+    final statusPending = _pendingStatusOverride;
+    if (statusPending != null) {
+      order = applyOrderPushHint(
+        order,
+        OrderPushHint(orderId: order.id, status: statusPending),
+      );
+    }
+    final paymentPending = _pendingPaymentOverride;
+    if (paymentPending != null) {
+      order = Order.mergeStatusPatch(
+        order,
+        _paymentOptimisticPatch(
+          paymentStatus: paymentPending.paymentStatus,
+          expectedReadyAt: paymentPending.expectedReadyAt,
+        ),
+      );
+    }
+    return order;
+  }
+
+  void _stageLocalStatus(String nextStatus) {
+    final snapshot = widget.order;
+    final hint = OrderPushHint(orderId: snapshot.id, status: nextStatus);
+    OrderPushCoordinator.stageHint(hint);
+    setState(() => _pendingStatusOverride = nextStatus);
+    widget.onOrderUpdated(applyOrderPushHint(snapshot, hint));
+  }
+
+  void _stageLocalPayment({
+    required String paymentStatus,
+    DateTime? expectedReadyAt,
+  }) {
+    final snapshot = widget.order;
+    OrderPushCoordinator.stageHint(
+      OrderPushHint(orderId: snapshot.id, paymentStatus: paymentStatus),
+    );
+    final patched = Order.mergeStatusPatch(
+      snapshot,
+      _paymentOptimisticPatch(
+        paymentStatus: paymentStatus,
+        expectedReadyAt: expectedReadyAt,
+      ),
+    );
+    setState(
+      () => _pendingPaymentOverride = _PendingPaymentOverride(
+        paymentStatus: paymentStatus,
+        expectedReadyAt: expectedReadyAt,
+      ),
+    );
+    widget.onOrderUpdated(patched);
+  }
+
+  bool _displayCaughtUp(String targetStatus) {
+    return _orderStatusRank(widget.order.status) >= _orderStatusRank(targetStatus);
+  }
+
+  bool _paymentDisplayCaughtUp(String targetPaymentStatus) {
+    return _paymentStatusRank(widget.order.paymentStatus) >=
+        _paymentStatusRank(targetPaymentStatus);
+  }
+
+  int _paymentStatusRank(String status) {
+    switch (status) {
+      case 'pending':
+        return 0;
+      case 'buyer_marked_paid':
+        return 1;
+      case 'seller_confirmed':
+        return 2;
+      case 'paid':
+        return 3;
+      default:
+        return 0;
+    }
+  }
+
+  int _orderStatusRank(String status) {
+    switch (status) {
+      case 'pending':
+        return 0;
+      case 'accepted':
+      case 'preparing':
+        return 1;
+      case 'ready':
+      case 'picked_up':
+        return 2;
+      case 'completed':
+        return 3;
+      default:
+        return -2;
+    }
+  }
 
   @override
   void didUpdateWidget(covariant SellerActiveOrderCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final pending = _pendingStatusOverride;
+    if (pending != null) {
+      if (_displayCaughtUp(pending)) {
+        _pendingStatusOverride = null;
+      } else if (_orderStatusRank(widget.order.status) <
+          _orderStatusRank(pending)) {
+        _pendingStatusOverride = null;
+        _isUpdating = false;
+      }
+    }
     if (oldWidget.order.status != widget.order.status && _isUpdating) {
       _isUpdating = false;
+    }
+    final paymentPending = _pendingPaymentOverride;
+    if (paymentPending != null) {
+      if (_paymentDisplayCaughtUp(paymentPending.paymentStatus)) {
+        _pendingPaymentOverride = null;
+      } else if (_paymentStatusRank(widget.order.paymentStatus) <
+          _paymentStatusRank(paymentPending.paymentStatus)) {
+        _pendingPaymentOverride = null;
+        _isConfirmingPayment = false;
+      }
     }
     if (oldWidget.order.paymentStatus != widget.order.paymentStatus &&
         _isConfirmingPayment) {
@@ -2151,11 +2280,16 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
       if (!confirmed) return;
     }
     setState(() => _isUpdating = true);
+    _stageLocalStatus(nextStatus);
     try {
       await widget.onAction(order, nextStatus);
     } finally {
       if (mounted) {
-        setState(() => _isUpdating = false);
+        setState(() {
+          if (_pendingStatusOverride == null || _displayCaughtUp(nextStatus)) {
+            _isUpdating = false;
+          }
+        });
       }
     }
   }
@@ -2192,23 +2326,11 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
       );
     }
 
-    OrderPushCoordinator.stageHint(
-      OrderPushHint(
-        orderId: snapshot.id,
-        paymentStatus: 'seller_confirmed',
-      ),
-    );
-    widget.onOrderUpdated(
-      Order.mergeStatusPatch(
-        snapshot,
-        _paymentOptimisticPatch(
-          paymentStatus: 'seller_confirmed',
-          expectedReadyAt: expectedReadyAt,
-        ),
-      ),
-    );
-
     setState(() => _isConfirmingPayment = true);
+    _stageLocalPayment(
+      paymentStatus: 'seller_confirmed',
+      expectedReadyAt: expectedReadyAt,
+    );
     try {
       final json = await ApiService.confirmPayment(
         orderId: snapshot.id,
@@ -2221,12 +2343,21 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     } catch (e) {
       if (!mounted) return;
       OrderPushCoordinator.dropHint(snapshot.id);
+      setState(() => _pendingPaymentOverride = null);
       widget.onOrderUpdated(snapshot);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not confirm payment: $e')));
     } finally {
-      if (mounted) setState(() => _isConfirmingPayment = false);
+      if (mounted) {
+        setState(() {
+          final pending = _pendingPaymentOverride;
+          if (pending == null ||
+              _paymentDisplayCaughtUp(pending.paymentStatus)) {
+            _isConfirmingPayment = false;
+          }
+        });
+      }
     }
   }
 
@@ -2257,17 +2388,8 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     if (confirmed != true || !mounted) return;
 
     final snapshot = order;
-    OrderPushCoordinator.stageHint(
-      OrderPushHint(orderId: snapshot.id, paymentStatus: 'paid'),
-    );
-    widget.onOrderUpdated(
-      Order.mergeStatusPatch(
-        snapshot,
-        _paymentOptimisticPatch(paymentStatus: 'paid'),
-      ),
-    );
-
     setState(() => _isConfirmingPayment = true);
+    _stageLocalPayment(paymentStatus: 'paid');
     try {
       final json = await ApiService.confirmCashPayment(orderId: order.id);
       widget.onOrderUpdated(Order.mergeStatusPatch(snapshot, json));
@@ -2276,12 +2398,21 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     } catch (e) {
       if (!mounted) return;
       OrderPushCoordinator.dropHint(snapshot.id);
+      setState(() => _pendingPaymentOverride = null);
       widget.onOrderUpdated(snapshot);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not confirm cash payment: $e')),
       );
     } finally {
-      if (mounted) setState(() => _isConfirmingPayment = false);
+      if (mounted) {
+        setState(() {
+          final pending = _pendingPaymentOverride;
+          if (pending == null ||
+              _paymentDisplayCaughtUp(pending.paymentStatus)) {
+            _isConfirmingPayment = false;
+          }
+        });
+      }
     }
   }
 
@@ -2291,16 +2422,23 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     if (!confirmed || !mounted) return;
 
     setState(() => _isUpdating = true);
+    _stageLocalStatus('completed');
     try {
       await widget.onAction(widget.order, 'completed');
     } finally {
-      if (mounted) setState(() => _isUpdating = false);
+      if (mounted) {
+        setState(() {
+          if (_pendingStatusOverride == null || _displayCaughtUp('completed')) {
+            _isUpdating = false;
+          }
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final order = widget.order;
+    final order = _orderForDisplay();
     final isRejected = order.isRejected;
     final lifecycle = SellerOrderLifecycle.forStatus(order.status);
     final allowReadyBy = kitchenOrderAllowsReadyBy(order);
