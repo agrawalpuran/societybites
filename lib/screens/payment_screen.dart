@@ -56,7 +56,7 @@ class PaymentScreen extends StatefulWidget {
     this.launchUpi,
     this.canLaunchUpi,
     this.pollInterval = const Duration(seconds: 8),
-    this.awaitingSellerPause = const Duration(seconds: 1),
+    this.awaitingSellerPause = const Duration(milliseconds: 300),
   });
 
   /// Pop result after the buyer has marked a UPI payment and seen the
