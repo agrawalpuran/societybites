@@ -561,7 +561,6 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _openSellerSettings({bool firstTime = false}) async {
-    await _loadProfile();
     if (!mounted) return;
     if (firstTime) {
       _pendingSellerEnable = _PendingSellerEnable()
@@ -569,7 +568,8 @@ class ProfileScreenState extends State<ProfileScreen> {
       _paymentPreference = defaultSellerPaymentPreference;
       _syncPendingSellerEnableDefaults();
     }
-    Navigator.push(
+    unawaited(_loadProfile());
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ValueListenableBuilder<int>(

@@ -2304,7 +2304,15 @@ class _AvailableItemTile extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 2),
-                            ListingTypeBadge(food: food, dense: true),
+                            Row(
+                              children: [
+                                ListingTypeBadge(food: food, dense: true),
+                                if (food.isNewListing()) ...[
+                                  const SizedBox(width: 6),
+                                  const ListingNewChip(),
+                                ],
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -2342,78 +2350,87 @@ class _AvailableItemTile extends StatelessWidget {
                   RecurringAvailabilityHint(food: food, compact: true),
                   const SizedBox(height: 4),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Flexible(
-                        child: GestureDetector(
-                          onTap: onSellerTap,
-                          child: Text(
-                            food.sellerName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF0E5A47),
-                              decoration: TextDecoration.underline,
-                              decorationColor: Color(0xFF0E5A47),
-                              fontWeight: FontWeight.w700,
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: GestureDetector(
+                                onTap: onSellerTap,
+                                child: Text(
+                                  food.sellerName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF0E5A47),
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: Color(0xFF0E5A47),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                            Flexible(
+                              child: Text(
+                                ', ${food.homePlaceLabel}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF6A7774),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Flexible(
-                        child: Text(
-                          ', ${food.homePlaceLabel}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF6A7774),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Flexible(child: ListingRatingMark(food: food)),
+                      const SizedBox(width: 8),
+                      ListingRatingMark(food: food, showNewBadge: false),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE8F5EE),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.schedule_rounded,
-                                size: 13,
-                                color: Color(0xFF0E5A47),
-                              ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  listingScheduleCaption(food),
-                                  softWrap: true,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    height: 1.25,
-                                    color: Color(0xFF0E5A47),
-                                    fontWeight: FontWeight.w600,
+                      if (showListingScheduleChipOnHomeCard(food)) ...[
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5EE),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.schedule_rounded,
+                                  size: 13,
+                                  color: Color(0xFF0E5A47),
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    listingScheduleCaption(food),
+                                    softWrap: true,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      height: 1.25,
+                                      color: Color(0xFF0E5A47),
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
+                        const SizedBox(width: 8),
+                      ],
                       Flexible(
                         child: Align(
                           alignment: Alignment.centerRight,

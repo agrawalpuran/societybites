@@ -32,7 +32,7 @@ class WebFoodCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ratingLabel = food.reviewCount > 0
         ? food.rating.toStringAsFixed(1)
-        : 'No reviews yet';
+        : '0 review';
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),

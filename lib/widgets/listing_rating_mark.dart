@@ -4,36 +4,46 @@ import '../models/data.dart';
 
 /// New means listed in the last 48 hours. Rating is shown only when reviews exist.
 class ListingRatingMark extends StatelessWidget {
-  const ListingRatingMark({super.key, required this.food});
+  const ListingRatingMark({
+    super.key,
+    required this.food,
+    this.showNewBadge = true,
+  });
 
   final FoodItem food;
 
+  /// Home list cards show [ListingNewChip] beside the type badge instead.
+  final bool showNewBadge;
+
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        if (food.isNewListing()) const _NewChip(),
-        if (food.reviewCount > 0)
-          _ScoreChip(label: food.rating.toString())
-        else
-          const Text(
-            'No reviews yet',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF8A9491),
-            ),
+    final children = <Widget>[];
+    if (showNewBadge && food.isNewListing()) {
+      children.add(const ListingNewChip());
+    }
+    if (food.reviewCount > 0) {
+      if (children.isNotEmpty) children.add(const SizedBox(width: 6));
+      children.add(_ScoreChip(label: food.rating.toString()));
+    } else if (children.isEmpty) {
+      children.add(
+        const Text(
+          '0 review',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF8A9491),
           ),
-      ],
-    );
+        ),
+      );
+    }
+
+    return Row(mainAxisSize: MainAxisSize.min, children: children);
   }
 }
 
-class _NewChip extends StatelessWidget {
-  const _NewChip();
+/// Green NEW pill — use beside type badge on home list cards or inside [ListingRatingMark].
+class ListingNewChip extends StatelessWidget {
+  const ListingNewChip();
 
   @override
   Widget build(BuildContext context) {

@@ -102,7 +102,7 @@ void main() {
       ),
     );
     expect(find.text('NEW'), findsOneWidget);
-    expect(find.text('No reviews yet'), findsOneWidget);
+    expect(find.text('0 review'), findsNothing);
 
     await pump(
       _food(
@@ -114,13 +114,13 @@ void main() {
     );
     expect(find.text('NEW'), findsOneWidget);
     expect(find.text('4.8'), findsOneWidget);
-    expect(find.text('No reviews yet'), findsNothing);
+    expect(find.text('0 review'), findsNothing);
 
     await pump(
       _food('Old', createdAt: DateTime.now().subtract(const Duration(days: 3))),
     );
     expect(find.text('NEW'), findsNothing);
-    expect(find.text('No reviews yet'), findsOneWidget);
+    expect(find.text('0 review'), findsOneWidget);
   });
 
   test('paused, sold out, and expired leave the home feed', () {

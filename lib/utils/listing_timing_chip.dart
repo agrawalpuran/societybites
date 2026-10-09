@@ -31,6 +31,14 @@ bool _treatAvailableAtAsBuyerDeadline(FoodItem food) {
   return food.availableAt != null;
 }
 
+/// Home list cards already show prep / hours via [MadeToOrderHint] and
+/// [RecurringAvailabilityHint]; skip the duplicate schedule chip there.
+bool showListingScheduleChipOnHomeCard(FoodItem food) {
+  if (food.isMadeToOrder) return false;
+  if (food.showsBuyerAvailabilityHint) return false;
+  return true;
+}
+
 String listingScheduleCaption(FoodItem food) {
   if (food.isMadeToOrder) {
     final short = formatPreparationShort(food.preparationTimeMinutes);
