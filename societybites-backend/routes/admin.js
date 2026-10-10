@@ -2,7 +2,8 @@ const express = require("express");
 const prisma = require("../lib/prisma");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser } = require("../middleware/requireUser");
-const { requireAdmin } = require("../middleware/requireAdmin");
+const { requireAdmin, requireSuperAdmin } = require("../middleware/requireAdmin");
+const { normalizeIndianPhone } = require("../utils/phone");
 const {
   listAdminIssues,
   getAdminIssue,
@@ -43,6 +44,109 @@ const {
 const router = express.Router();
 
 router.use(requireUser, requireAdmin);
+
+router.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") {
+    return next();
+  }
+  return requireSuperAdmin(req, res, next);
+});
+
+// GET /admin/console-admins — super admin only (not exposed to view-only admins)
+router.get(
+  "/console-admins",
+  requireSuperAdmin,
+  asyncHandler(async (_req, res) => {
+    const admins = await prisma.user.findMany({
+      where: { role: "admin" },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        suspended: true,
+        createdAt: true,
+        society: { select: { name: true } },
+      },
+    });
+    res.json({ admins });
+  })
+);
+
+// POST /admin/console-admins { phone } — grant view-only console access
+router.post(
+  "/console-admins",
+  asyncHandler(async (req, res) => {
+    const phone = normalizeIndianPhone(req.body && req.body.phone);
+    if (!phone) {
+      return res.status(400).json({ error: "Valid Indian mobile number required" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { phone } });
+    if (!user) {
+      return res.status(404).json({ error: "No user found with this mobile number" });
+    }
+    if (user.role === "super_admin") {
+      return res.status(400).json({ error: "User is already a super admin" });
+    }
+    if (user.suspended) {
+      return res.status(400).json({
+        error: "Cannot grant console access to a suspended user",
+      });
+    }
+    if (user.role === "admin") {
+      return res.json({ user, alreadyAdmin: true });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: { role: "admin" },
+      include: { society: true, flat: true },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user.id,
+        action: "grant_console_admin",
+        target: user.id,
+        details: JSON.stringify({ phone }),
+      },
+    });
+
+    res.json({ user: updated });
+  })
+);
+
+// DELETE /admin/console-admins/:userId — revoke view-only console access
+router.delete(
+  "/console-admins/:userId",
+  asyncHandler(async (req, res) => {
+    const user = await prisma.user.findUnique({ where: { id: req.params.userId } });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (user.role !== "admin") {
+      return res.status(400).json({ error: "User is not a console admin" });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: { role: "buyer" },
+      include: { society: true, flat: true },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user.id,
+        action: "revoke_console_admin",
+        target: user.id,
+        details: JSON.stringify({ phone: user.phone }),
+      },
+    });
+
+    res.json({ user: updated });
+  })
+);
 
 // GET /admin/dashboard
 router.get(
@@ -238,9 +342,24 @@ router.patch(
     const data = {};
 
     if (role !== undefined) {
-      const validRoles = ["buyer", "seller", "super_admin"];
+      const validRoles = ["buyer", "seller", "admin"];
       if (!validRoles.includes(role)) {
-        return res.status(400).json({ error: "Invalid role. Must be one of: buyer, seller, super_admin" });
+        return res.status(400).json({
+          error: "Invalid role. Must be one of: buyer, seller, admin",
+        });
+      }
+      if (req.user.role !== "super_admin") {
+        return res.status(403).json({ error: "Super admin access required" });
+      }
+      const target = await prisma.user.findUnique({
+        where: { id: req.params.id },
+        select: { role: true },
+      });
+      if (!target) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      if (target.role === "super_admin") {
+        return res.status(400).json({ error: "Cannot change a super admin role" });
       }
       data.role = role;
     }

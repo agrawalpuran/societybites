@@ -64,6 +64,8 @@ Widget signedOutStartScreen() {
 
 /// Normal auth/session routing. Throws are handled by [AuthGate].
 Future<Widget> resolveAuthStartScreen() async {
+  final warmTokens = SessionService.warmAuthCache();
+
   if (AuthConfig.usesTwoFactor) {
     final sessionProvider = await SessionService.getAuthProvider();
     if (sessionProvider != '2factor') {
@@ -89,7 +91,7 @@ Future<Widget> resolveAuthStartScreen() async {
   }
 
   if (await SessionService.isOnboarded()) {
-    await SessionService.warmAuthCache();
+    await warmTokens;
     return const MainShellScreen();
   }
 
@@ -117,6 +119,7 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
+    unawaited(SessionService.warmAuthCache());
     _startup = _safeResolve();
   }
 

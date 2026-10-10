@@ -16,11 +16,13 @@ import 'web_footer.dart';
 import 'web_marketplace_states.dart';
 import 'web_seller_card.dart';
 import 'web_trust_band.dart';
+import '../widgets/feed_refresh_bar.dart';
 
 class WebMarketplaceHome extends StatefulWidget {
   const WebMarketplaceHome({
     super.key,
     required this.isInitialLoading,
+    this.isBackgroundRefreshing = false,
     required this.isSlow,
     required this.errorMessage,
     required this.showEmptySociety,
@@ -74,6 +76,7 @@ class WebMarketplaceHome extends StatefulWidget {
   });
 
   final bool isInitialLoading;
+  final bool isBackgroundRefreshing;
   final bool isSlow;
   final String? errorMessage;
   final bool showEmptySociety;
@@ -151,6 +154,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.fromLTRB(pad, 22, pad, 48),
               children: [
+                FeedRefreshBar(visible: widget.isBackgroundRefreshing),
                 Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(

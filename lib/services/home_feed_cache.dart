@@ -24,6 +24,9 @@ class HomeFeedCache {
 
   static const _keyPrefix = 'home_feed_cache_v1_';
 
+  /// Avoid showing very old marketplace snapshots after long offline periods.
+  static const maxSnapshotAge = Duration(hours: 72);
+
   static String _storageKey(String societyId) => '$_keyPrefix$societyId';
 
   static Future<void> save({
@@ -69,6 +72,11 @@ class HomeFeedCache {
           : const SellingReach();
       final savedAt =
           DateTime.tryParse(map['savedAt']?.toString() ?? '') ?? DateTime.now();
+      final age = DateTime.now().toUtc().difference(savedAt.toUtc());
+      if (age > maxSnapshotAge) {
+        await prefs.remove(_storageKey(societyId));
+        return null;
+      }
       return HomeFeedSnapshot(
         societyId: societyId,
         listingMaps: listingMaps,

@@ -137,7 +137,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   ),
                 ),
               ),
-              ...['buyer', 'seller', 'super_admin'].map((role) {
+              ...['buyer', 'seller', 'admin'].map((role) {
                 return ListTile(
                   leading: Icon(
                     role == currentRole
@@ -281,7 +281,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
-            children: ['', 'buyer', 'seller', 'super_admin'].map((role) {
+            children: ['', 'buyer', 'seller', 'admin'].map((role) {
               final isActive = _roleFilter == role;
               final label =
                   role.isEmpty ? 'All' : role[0].toUpperCase() + role.substring(1);

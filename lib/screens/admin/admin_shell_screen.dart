@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../services/session_service.dart';
 import '../../web/admin_content_frame.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_societies_screen.dart';
@@ -11,6 +14,7 @@ import 'admin_reviews_screen.dart';
 import 'admin_issues_screen.dart';
 import 'admin_coupons_screen.dart';
 import 'admin_audit_screen.dart';
+import 'admin_console_access_screen.dart';
 
 class AdminShellScreen extends StatefulWidget {
   const AdminShellScreen({super.key});
@@ -21,9 +25,11 @@ class AdminShellScreen extends StatefulWidget {
 
 class _AdminShellScreenState extends State<AdminShellScreen> {
   int _selectedIndex = 0;
-  late final List<Widget?> _pageCache;
+  List<Widget?> _pageCache = [];
+  bool _isSuperAdmin = false;
+  bool _roleLoaded = false;
 
-  static const _navItems = <_NavItem>[
+  static const _baseNavItems = <_NavItem>[
     _NavItem(icon: Icons.dashboard_rounded, label: 'Dashboard'),
     _NavItem(icon: Icons.apartment_rounded, label: 'Societies'),
     _NavItem(icon: Icons.badge_outlined, label: 'FSSAI'),
@@ -36,14 +42,41 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     _NavItem(icon: Icons.history_rounded, label: 'Audit Log'),
   ];
 
+  static const _consoleAccessNav = _NavItem(
+    icon: Icons.manage_accounts_rounded,
+    label: 'Console access',
+  );
+
+  List<_NavItem> get _navItems => _isSuperAdmin
+      ? [..._baseNavItems, _consoleAccessNav]
+      : _baseNavItems;
+
   @override
   void initState() {
     super.initState();
-    _pageCache = List<Widget?>.filled(_navItems.length, null);
+    _pageCache = List<Widget?>.filled(_baseNavItems.length, null);
     _pageCache[0] = _createPage(0);
+    unawaited(_loadRole());
+  }
+
+  Future<void> _loadRole() async {
+    final role = await SessionService.getRole();
+    if (!mounted) return;
+    final superAdmin = role == 'super_admin';
+    setState(() {
+      _isSuperAdmin = superAdmin;
+      _roleLoaded = true;
+      if (superAdmin) {
+        _pageCache = List<Widget?>.filled(_navItems.length, null);
+        _pageCache[0] = _createPage(0);
+      }
+    });
   }
 
   Widget _createPage(int index) {
+    if (_isSuperAdmin && index == _baseNavItems.length) {
+      return const AdminConsoleAccessScreen();
+    }
     switch (index) {
       case 0:
         return const AdminDashboardScreen();
@@ -73,7 +106,9 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   void _selectTab(int index) {
     setState(() {
       _selectedIndex = index;
-      _pageCache[index] ??= _createPage(index);
+      if (index < _pageCache.length) {
+        _pageCache[index] ??= _createPage(index);
+      }
     });
   }
 
@@ -82,14 +117,52 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       index: _selectedIndex,
       sizing: StackFit.expand,
       children: List.generate(
-        _navItems.length,
+        _pageCache.length,
         (i) => _pageCache[i] ?? const SizedBox.shrink(),
       ),
     );
   }
 
+  Widget _framedContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_roleLoaded && !_isSuperAdmin)
+          const Material(
+            color: Color(0xFFE8F5EE),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.visibility_outlined,
+                    size: 18,
+                    color: Color(0xFF0E5A47),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'View only — you can browse data but cannot make changes.',
+                      style: TextStyle(
+                        color: Color(0xFF0E5A47),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        Expanded(child: AdminContentFrame(child: _buildBody())),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final navItems = _navItems;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 800;
@@ -100,14 +173,12 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
             body: Row(
               children: [
                 _SideNav(
-                  items: _navItems,
+                  items: navItems,
                   selectedIndex: _selectedIndex,
                   onSelected: _selectTab,
                   onBack: () => Navigator.pop(context),
                 ),
-                Expanded(
-                  child: AdminContentFrame(child: _buildBody()),
-                ),
+                Expanded(child: _framedContent()),
               ],
             ),
           );
@@ -127,7 +198,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
               onPressed: () => Navigator.pop(context),
             ),
           ),
-          body: AdminContentFrame(child: _buildBody()),
+          body: _framedContent(),
           bottomNavigationBar: Material(
             color: Colors.white,
             child: SafeArea(
@@ -135,9 +206,9 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                 height: 64,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  itemCount: _navItems.length,
+                  itemCount: navItems.length,
                   itemBuilder: (context, index) {
-                    final item = _navItems[index];
+                    final item = navItems[index];
                     final selected = index == _selectedIndex;
                     final color = selected
                         ? const Color(0xFF0E5A47)

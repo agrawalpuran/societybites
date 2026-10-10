@@ -74,4 +74,20 @@ void main() {
     expect(await HomeFeedCache.load('old-society'), isNull);
     expect(await HomeFeedCache.load('new-society'), isNotNull);
   });
+
+  test('load drops snapshots older than maxSnapshotAge', () async {
+    final prefs = await SharedPreferences.getInstance();
+    final staleAt = DateTime.now()
+        .toUtc()
+        .subtract(HomeFeedCache.maxSnapshotAge + const Duration(hours: 1));
+    await prefs.setString(
+      'home_feed_cache_v1_stale-society',
+      '{"societyId":"stale-society","savedAt":"${staleAt.toIso8601String()}",'
+      '"listings":[{"id":"l1","name":"Old","sellerId":"s1","sellerName":"A",'
+      '"price":10,"status":"active"}],"cityReach":{"cityKey":"","nearbyRadiusKm":null,"extendedRadiusKm":null}}',
+    );
+
+    expect(await HomeFeedCache.load('stale-society'), isNull);
+    expect(prefs.getString('home_feed_cache_v1_stale-society'), isNull);
+  });
 }

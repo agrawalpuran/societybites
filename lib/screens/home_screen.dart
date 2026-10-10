@@ -42,6 +42,8 @@ import '../widgets/status_banner.dart';
 import '../widgets/listing_rating_mark.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/seller_avatar.dart';
+import '../widgets/feed_refresh_bar.dart';
+import '../utils/listing_image_precache.dart';
 import '../web/web_breakpoints.dart';
 import '../web/web_marketplace_home.dart';
 
@@ -90,6 +92,7 @@ class HomeScreenState extends State<HomeScreen> {
   bool _webGuestBrowse = false;
   bool _homeSlow = false;
   Timer? _homeSlowTimer;
+  bool _feedRefreshing = false;
   String? _error;
   String _searchQuery = '';
   String? _selectedCategory;
@@ -154,6 +157,15 @@ class HomeScreenState extends State<HomeScreen> {
       _error = null;
     });
     _notifyInitialLoadSuccess();
+    _scheduleListingImagePrecache(listings);
+  }
+
+  void _scheduleListingImagePrecache(List<FoodItem> listings) {
+    if (!mounted || listings.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(precacheHomeListingImages(context, listings));
+    });
   }
 
   Future<void> _persistHomeFeedCache(
@@ -316,6 +328,7 @@ class HomeScreenState extends State<HomeScreen> {
       _notifyInitialLoadSuccess();
       await _syncBuyerSocietyId();
     }
+    _scheduleListingImagePrecache(listings);
     unawaited(_persistHomeFeedCache(raw, cityReach));
   }
 
@@ -341,6 +354,7 @@ class HomeScreenState extends State<HomeScreen> {
   Future<void> _loadListings() async {
     final showSpinner = !_hasSuccessfullyLoaded;
     final generation = ++_listingsLoadGeneration;
+    final trackBackgroundRefresh = !showSpinner;
     if (showSpinner) {
       _armHomeSlowTimer();
       setState(() {
@@ -348,6 +362,8 @@ class HomeScreenState extends State<HomeScreen> {
         _error = null;
         _homeSlow = false;
       });
+    } else if (mounted) {
+      setState(() => _feedRefreshing = true);
     }
 
     try {
@@ -468,6 +484,12 @@ class HomeScreenState extends State<HomeScreen> {
           _isLoading = false;
           _homeSlow = false;
         });
+      }
+    } finally {
+      if (trackBackgroundRefresh &&
+          mounted &&
+          generation == _listingsLoadGeneration) {
+        setState(() => _feedRefreshing = false);
       }
     }
   }
@@ -856,6 +878,7 @@ class HomeScreenState extends State<HomeScreen> {
   Widget _buildWebMarketplace() {
     return WebMarketplaceHome(
       isInitialLoading: _isLoading && !_hasSuccessfullyLoaded,
+      isBackgroundRefreshing: _feedRefreshing,
       isSlow: _homeSlow,
       errorMessage: _error,
       showEmptySociety: _showEmptySocietyState,
@@ -929,6 +952,9 @@ class HomeScreenState extends State<HomeScreen> {
             ),
             slivers: [
               SliverToBoxAdapter(child: _buildHeader()),
+              SliverToBoxAdapter(
+                child: FeedRefreshBar(visible: _feedRefreshing),
+              ),
               if (_isLoading && !_hasSuccessfullyLoaded) ...[
                 SliverToBoxAdapter(child: _buildSearchBar()),
                 if (_searchQuery.isEmpty)

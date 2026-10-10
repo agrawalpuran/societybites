@@ -22,9 +22,24 @@ class ListingImage extends StatelessWidget {
   final double iconSize;
   final bool showTypeBadge;
 
+  int? _cachePixelSize(BuildContext context, double? logical) {
+    if (logical == null || !logical.isFinite || logical <= 0) return null;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return (logical * dpr).round().clamp(1, 2048);
+  }
+
+  /// Decode cache for [BoxFit.cover]: only one axis — both axes distort aspect ratio.
+  (int? cacheWidth, int? cacheHeight) _decodeCacheSize(BuildContext context) {
+    final w = _cachePixelSize(context, width);
+    if (w != null) return (w, null);
+    final h = _cachePixelSize(context, height);
+    return (null, h);
+  }
+
   @override
   Widget build(BuildContext context) {
     final imageUrl = food.imageUrl?.trim();
+    final (cacheWidth, cacheHeight) = _decodeCacheSize(context);
     final hasUrl = imageUrl != null && imageUrl.isNotEmpty && imageUrl != 'null';
     final isAsset = hasUrl &&
         (imageUrl.startsWith('asset:') ||
@@ -47,6 +62,8 @@ class ListingImage extends StatelessWidget {
                 assetPath!,
                 width: width,
                 height: height,
+                cacheWidth: cacheWidth,
+                cacheHeight: cacheHeight,
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => _iconFallback(),
               )
@@ -58,6 +75,8 @@ class ListingImage extends StatelessWidget {
                     ),
                     width: width,
                     height: height,
+                    cacheWidth: cacheWidth,
+                    cacheHeight: cacheHeight,
                     fit: BoxFit.cover,
                     gaplessPlayback: true,
                     // Canvas images stay in the scroll view. HTML image

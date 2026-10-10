@@ -404,10 +404,17 @@ class ProfileScreenState extends State<ProfileScreen> {
         return 'Seller';
       case 'buyer':
         return 'Buyer';
+      case 'admin':
+        return 'Console admin';
+      case 'super_admin':
+        return 'Super admin';
       default:
         return 'Resident';
     }
   }
+
+  bool get _canOpenAdminPortal =>
+      _role == 'super_admin' || _role == 'admin';
 
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
@@ -1855,7 +1862,10 @@ class ProfileScreenState extends State<ProfileScreen> {
       onEdit: _openProfileEditor,
     );
     final account = <Widget>[
-      if (_role == 'buyer' || _role == null || _role == 'super_admin') ...[
+      if (_role == 'buyer' ||
+          _role == null ||
+          _role == 'admin' ||
+          _role == 'super_admin') ...[
         const _WebSectionLabel('ACCOUNT'),
         if (_role == 'buyer' || _role == null)
           ProfileMenuTile(
@@ -1864,11 +1874,13 @@ class ProfileScreenState extends State<ProfileScreen> {
             subtitle: 'List food for neighbors in your society',
             onTap: _enableSelling,
           ),
-        if (_role == 'super_admin')
+        if (_canOpenAdminPortal)
           ProfileMenuTile(
             icon: Icons.admin_panel_settings_rounded,
             title: 'Admin Portal',
-            subtitle: 'Manage platform settings',
+            subtitle: _role == 'super_admin'
+                ? 'Manage platform settings'
+                : 'View platform data (read only)',
             onTap: () {
               Navigator.push(
                 context,
@@ -2103,6 +2115,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                           ],
                           if (_role == 'buyer' ||
                               _role == null ||
+                              _role == 'admin' ||
                               _role == 'super_admin') ...[
                             const SizedBox(height: 24),
                             const Text(
@@ -2123,11 +2136,13 @@ class ProfileScreenState extends State<ProfileScreen> {
                                     'List food for neighbors in your society',
                                 onTap: _enableSelling,
                               ),
-                            if (_role == 'super_admin')
+                            if (_canOpenAdminPortal)
                               ProfileMenuTile(
                                 icon: Icons.admin_panel_settings_rounded,
                                 title: 'Admin Portal',
-                                subtitle: 'Manage platform settings',
+                                subtitle: _role == 'super_admin'
+                                    ? 'Manage platform settings'
+                                    : 'View platform data (read only)',
                                 onTap: () {
                                   Navigator.push(
                                     context,

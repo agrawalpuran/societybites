@@ -1977,6 +1977,45 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<List<Map<String, dynamic>>> getAdminConsoleAdmins() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/console-admins'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      if (data is Map && data['admins'] is List) {
+        return (data['admins'] as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> grantAdminConsoleAccess(
+    String phone,
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/console-admins'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'phone': phone}),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<void> revokeAdminConsoleAccess(String userId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/admin/console-admins/$userId'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) return;
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> getAdminDashboard() async {
     final response = await http.get(
       Uri.parse('$baseUrl/admin/dashboard'),
