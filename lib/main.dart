@@ -10,8 +10,8 @@ import 'screens/login_screen.dart';
 import 'screens/society_selection_screen.dart';
 import 'theme/app_theme.dart';
 import 'web/web_marketplace_states.dart';
-import 'widgets/app_header.dart';
-import 'widgets/content_skeleton.dart';
+import 'widgets/app_header.dart' show kAppDisplayName;
+import 'widgets/mobile_startup_frame.dart';
 import 'services/api_service.dart';
 import 'services/auth_config.dart';
 import 'services/session_service.dart';
@@ -141,18 +141,7 @@ class _AuthGateState extends State<AuthGate> {
         }
         if (!snapshot.hasData) {
           if (kIsWeb) return const WebStartupFrame();
-          return const Scaffold(
-            backgroundColor: Color(0xFFF8FAF9),
-            body: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppHeader(),
-                  HomeFeedSkeleton(),
-                ],
-              ),
-            ),
-          );
+          return const MobileStartupFrame();
         }
 
         return snapshot.data!;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/data.dart';
+import 'listing_rating_mark.dart';
 import 'listing_type_badge.dart';
 
 /// Top of narrow home / nearby carousel cards: type badge + NEW / rating.
@@ -45,7 +46,7 @@ class _ListingTrustTrail extends StatelessWidget {
   Widget build(BuildContext context) {
     final children = <Widget>[];
     if (food.isNewListing()) {
-      children.add(const _CompactNewMark());
+      children.add(const ListingNewChip(dense: true));
     }
     if (food.reviewCount > 0) {
       if (children.isNotEmpty) children.add(const SizedBox(width: 4));
@@ -55,31 +56,6 @@ class _ListingTrustTrail extends StatelessWidget {
     if (children.isEmpty) return const SizedBox.shrink();
 
     return Row(mainAxisSize: MainAxisSize.min, children: children);
-  }
-}
-
-class _CompactNewMark extends StatelessWidget {
-  const _CompactNewMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E5A47),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: const Text(
-        'NEW',
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.35,
-          color: Colors.white,
-          height: 1,
-        ),
-      ),
-    );
   }
 }
 

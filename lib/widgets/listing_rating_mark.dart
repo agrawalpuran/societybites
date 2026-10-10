@@ -41,25 +41,32 @@ class ListingRatingMark extends StatelessWidget {
   }
 }
 
-/// Green NEW pill — use beside type badge on home list cards or inside [ListingRatingMark].
+/// Small label beside type badges — not a filled CTA like Add.
 class ListingNewChip extends StatelessWidget {
-  const ListingNewChip();
+  const ListingNewChip({this.dense = false});
+
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E5A47),
-        borderRadius: BorderRadius.circular(8),
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 4 : 5,
+        vertical: dense ? 1 : 2,
       ),
-      child: const Text(
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F5EE),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFC5DDD2)),
+      ),
+      child: Text(
         'NEW',
         style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.4,
-          color: Colors.white,
+          fontSize: dense ? 8 : 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.25,
+          color: const Color(0xFF0E5A47),
+          height: 1.1,
         ),
       ),
     );

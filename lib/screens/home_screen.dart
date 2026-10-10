@@ -16,6 +16,7 @@ import '../models/food_type.dart';
 import '../models/listing_categories.dart';
 import '../services/api_service.dart';
 import '../services/cart_controller.dart';
+import '../services/home_feed_cache.dart';
 import '../services/session_service.dart';
 import '../widgets/content_skeleton.dart';
 import '../widgets/pull_refresh_gate.dart';
@@ -101,6 +102,7 @@ class HomeScreenState extends State<HomeScreen> {
   BuyerDistanceChoice? _distanceChoice;
   HomeListingType _listingType = HomeListingType.all;
   bool _justAdded = false;
+  int _listingsLoadGeneration = 0;
   final _reachSectionKeys = <HomeListingReach, GlobalKey>{
     HomeListingReach.inSociety: GlobalKey(),
     HomeListingReach.nearby: GlobalKey(),
@@ -118,8 +120,54 @@ class HomeScreenState extends State<HomeScreen> {
     _searchController.addListener(_onSearchChanged);
     CartController.instance.addListener(_onCartUpdated);
     CartController.instance.onOrderPlaced = _onCartOrderPlaced;
-    _loadListings();
+    unawaited(_bootstrapHome());
     _loadPreOrders();
+  }
+
+  Future<void> _bootstrapHome() async {
+    await _restoreHomeFeedFromDisk();
+    if (!mounted) return;
+    await _loadListings();
+  }
+
+  Future<void> _restoreHomeFeedFromDisk() async {
+    final societyId = await SessionService.getSocietyId();
+    if (societyId == null || societyId.isEmpty) return;
+    final snapshot = await HomeFeedCache.load(societyId);
+    if (snapshot == null || !mounted || _hasSuccessfullyLoaded) return;
+
+    final listings = <FoodItem>[];
+    for (final map in snapshot.listingMaps) {
+      try {
+        listings.add(FoodItem.fromJson(map));
+      } catch (_) {}
+    }
+    if (listings.isEmpty) return;
+
+    setState(() {
+      _listings = listings;
+      _cityReach = snapshot.cityReach;
+      _buyerSocietyId = societyId;
+      _webGuestBrowse = false;
+      _isLoading = false;
+      _hasSuccessfullyLoaded = true;
+      _error = null;
+    });
+    _notifyInitialLoadSuccess();
+  }
+
+  Future<void> _persistHomeFeedCache(
+    List<Map<String, dynamic>> raw,
+    SellingReach cityReach,
+  ) async {
+    if (widget.fetchListings != null || raw.isEmpty) return;
+    final societyId = await SessionService.getSocietyId();
+    if (societyId == null || societyId.isEmpty) return;
+    await HomeFeedCache.save(
+      societyId: societyId,
+      listingMaps: raw,
+      cityReach: cityReach,
+    );
   }
 
   void _armHomeSlowTimer() {
@@ -235,8 +283,64 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _syncBuyerSocietyId() async {
+    try {
+      final societyId = await SessionService.getSocietyId();
+      if (!mounted) return;
+      if (societyId != _buyerSocietyId) {
+        setState(() => _buyerSocietyId = societyId);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _paintListings(
+    List<Map<String, dynamic>> raw,
+    SellingReach cityReach, {
+    required bool endInitialLoad,
+  }) async {
+    if (!mounted) return;
+    final listings = raw.map(FoodItem.fromJson).toList();
+    if (endInitialLoad) _stopHomeSlowTimer();
+    setState(() {
+      _listings = listings;
+      _webGuestBrowse = false;
+      _cityReach = cityReach;
+      if (endInitialLoad) {
+        _isLoading = false;
+        _hasSuccessfullyLoaded = true;
+        _homeSlow = false;
+        _error = null;
+      }
+    });
+    if (endInitialLoad) {
+      _notifyInitialLoadSuccess();
+      await _syncBuyerSocietyId();
+    }
+    unawaited(_persistHomeFeedCache(raw, cityReach));
+  }
+
+  Future<void> _mergeNearbyIntoListings({
+    required int generation,
+    required List<Map<String, dynamic>> societyRaw,
+    required Future<Map<String, dynamic>> nearbyFuture,
+  }) async {
+    try {
+      final nearbyRaw = await nearbyFuture;
+      if (!mounted || generation != _listingsLoadGeneration) return;
+      final cityReach = SellingReach.fromAuthMe(nearbyRaw);
+      final merged = mergeSocietyAndNearbyListingMaps(
+        societyRaw,
+        listingMapsFromNearbyPayload(nearbyRaw),
+      );
+      await _paintListings(merged, cityReach, endInitialLoad: false);
+    } catch (_) {
+      // Society feed is already visible.
+    }
+  }
+
   Future<void> _loadListings() async {
     final showSpinner = !_hasSuccessfullyLoaded;
+    final generation = ++_listingsLoadGeneration;
     if (showSpinner) {
       _armHomeSlowTimer();
       setState(() {
@@ -264,6 +368,19 @@ class HomeScreenState extends State<HomeScreen> {
 
       if (fetchListings != null) {
         nearbyFuture = startNearbyRequest();
+        if (nearbyFuture != null && showSpinner) {
+          raw = await fetchListings();
+          if (!mounted || generation != _listingsLoadGeneration) return;
+          await _paintListings(raw, cityReach, endInitialLoad: true);
+          unawaited(
+            _mergeNearbyIntoListings(
+              generation: generation,
+              societyRaw: raw,
+              nearbyFuture: nearbyFuture,
+            ),
+          );
+          return;
+        }
         if (nearbyFuture != null) {
           final results = await Future.wait<Object>([
             fetchListings(),
@@ -305,6 +422,19 @@ class HomeScreenState extends State<HomeScreen> {
           status: 'discoverable',
         );
         nearbyFuture = startNearbyRequest();
+        if (nearbyFuture != null && showSpinner) {
+          raw = await societyListingsFuture;
+          if (!mounted || generation != _listingsLoadGeneration) return;
+          await _paintListings(raw, cityReach, endInitialLoad: true);
+          unawaited(
+            _mergeNearbyIntoListings(
+              generation: generation,
+              societyRaw: raw,
+              nearbyFuture: nearbyFuture,
+            ),
+          );
+          return;
+        }
         if (nearbyFuture != null) {
           final results = await Future.wait<Object>([
             societyListingsFuture,
@@ -326,30 +456,10 @@ class HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      final listings = raw.map(FoodItem.fromJson).toList();
-
-      if (!mounted) return;
-      _stopHomeSlowTimer();
-
-      setState(() {
-        _listings = listings;
-        _webGuestBrowse = false;
-        _cityReach = cityReach;
-        _isLoading = false;
-        _hasSuccessfullyLoaded = true;
-        _homeSlow = false;
-        _error = null;
-      });
-      _notifyInitialLoadSuccess();
-      try {
-        final societyId = await SessionService.getSocietyId();
-        if (!mounted) return;
-        if (societyId != _buyerSocietyId) {
-          setState(() => _buyerSocietyId = societyId);
-        }
-      } catch (_) {}
+      if (!mounted || generation != _listingsLoadGeneration) return;
+      await _paintListings(raw, cityReach, endInitialLoad: showSpinner);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _listingsLoadGeneration) return;
       _stopHomeSlowTimer();
       if (!_hasSuccessfullyLoaded) {
         setState(() {
@@ -2309,7 +2419,7 @@ class _AvailableItemTile extends StatelessWidget {
                                 ListingTypeBadge(food: food, dense: true),
                                 if (food.isNewListing()) ...[
                                   const SizedBox(width: 6),
-                                  const ListingNewChip(),
+                                  const ListingNewChip(dense: true),
                                 ],
                               ],
                             ),

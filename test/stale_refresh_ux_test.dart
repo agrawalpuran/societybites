@@ -12,6 +12,8 @@ import 'package:societybites/screens/profile_screen.dart';
 import 'package:societybites/screens/seller_feedback_screen.dart';
 import 'package:societybites/screens/seller_preorders_screen.dart';
 import 'package:societybites/screens/seller_storefront_screen.dart';
+import 'package:societybites/models/selling_reach.dart';
+import 'package:societybites/services/home_feed_cache.dart';
 import 'package:societybites/services/my_listings_cache.dart';
 
 Map<String, dynamic> _listingJson(String name) {
@@ -81,6 +83,32 @@ void main() {
       'phone': '9999999999',
       'society_name': 'Green Heights',
     });
+  });
+
+  testWidgets('Home reopen shows cached feed while network refresh is pending', (
+    tester,
+  ) async {
+    _ignoreKnownLayoutNoise();
+    SharedPreferences.setMockInitialValues({'society_id': 'mine'});
+    await HomeFeedCache.save(
+      societyId: 'mine',
+      listingMaps: [_listingJson('Cached Biryani')..['societyId'] = 'mine'],
+      cityReach: const SellingReach(),
+    );
+    final pending = Completer<List<Map<String, dynamic>>>();
+    await tester.pumpWidget(
+      MaterialApp(home: HomeScreen(fetchListings: () => pending.future)),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Cached Biryani'), findsOneWidget);
+    expect(find.byKey(const Key('home-feed-skeletons')), findsNothing);
+
+    pending.complete([_listingJson('Fresh Biryani')..['societyId'] = 'mine']);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Fresh Biryani'), findsOneWidget);
   });
 
   testWidgets('Home first load shows chrome and loading copy, not a spinner', (tester) async {

@@ -4,6 +4,7 @@ import '../models/data.dart';
 import '../models/food_type.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/listing_purchase_slot.dart';
+import '../widgets/listing_rating_mark.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/listing_portion_caption.dart';
 import '../widgets/made_to_order_hint.dart';
@@ -76,7 +77,7 @@ class WebFoodCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (food.isNewListing()) ...[
-                            const _RatingPill(label: 'NEW', showStar: false),
+                            const ListingNewChip(dense: true),
                             const SizedBox(width: 6),
                           ],
                           _RatingPill(

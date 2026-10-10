@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'home_feed_cache.dart';
 import 'my_listings_cache.dart';
 import 'order_message_cache.dart';
 
@@ -76,6 +77,7 @@ class SessionService {
     if (flatNumber != null) {
       await prefs.setString(_flatNumberKey, flatNumber);
     }
+    await HomeFeedCache.retainOnly(societyId);
   }
 
   static Future<void> saveUserName(String name) async {

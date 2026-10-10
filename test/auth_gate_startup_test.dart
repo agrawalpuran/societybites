@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/main.dart';
 import 'package:societybites/screens/guest_landing_screen.dart';
 import 'package:societybites/widgets/app_header.dart';
+import 'package:societybites/widgets/mobile_startup_frame.dart';
 import 'package:societybites/widgets/screen_loading_note.dart';
 
 void main() {
@@ -28,8 +29,9 @@ void main() {
       ),
     );
 
+    expect(find.byType(MobileStartupFrame), findsOneWidget);
     expect(find.byType(AppHeader), findsOneWidget);
-    expect(find.byKey(const Key('home-feed-skeletons')), findsOneWidget);
+    expect(find.byKey(const Key('home-feed-skeletons')), findsNothing);
     expect(find.text('Loading…'), findsNothing);
 
     await tester.pumpAndSettle();
@@ -59,7 +61,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 20));
     await tester.pump(const Duration(milliseconds: 20));
     expect(calls, 1);
-    expect(find.byKey(const Key('home-feed-skeletons')), findsOneWidget);
+    expect(find.byType(MobileStartupFrame), findsOneWidget);
 
     await tester.pumpAndSettle();
     expect(find.text('ready'), findsOneWidget);
