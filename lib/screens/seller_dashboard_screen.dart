@@ -35,6 +35,7 @@ import 'preorder_detail_screen.dart';
 import 'seller_preorders_screen.dart';
 import 'seller_feedback_screen.dart';
 import 'seller_older_orders_screen.dart';
+import 'seller_enable_welcome_screen.dart';
 
 class SellerDashboardScreen extends StatefulWidget {
   const SellerDashboardScreen({
@@ -109,6 +110,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   bool _roleLoaded = false;
   bool _sellerWarmStarted = false;
   bool _listingAssetsPrecacheScheduled = false;
+  bool _sellerWelcomePopupInFlight = false;
 
   bool get _canSell => _role == 'seller' || _role == 'super_admin';
 
@@ -322,15 +324,57 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     setState(() => _areaTab = 0);
   }
 
+  /// After first-time enable selling, shows a one-shot welcome on My Kitchen.
+  void showNewSellerWelcomeIfPending() {
+    if (!SellerOnboarding.peekPendingKitchenWelcome()) return;
+    unawaited(_loadRole());
+    _tryShowPendingKitchenWelcome();
+  }
+
+  void _tryShowPendingKitchenWelcome() {
+    if (_sellerWelcomePopupInFlight ||
+        !_canSell ||
+        !SellerOnboarding.peekPendingKitchenWelcome()) {
+      return;
+    }
+    if (!SellerOnboarding.consumePendingKitchenWelcome()) return;
+    _sellerWelcomePopupInFlight = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_presentSellerWelcomePopup());
+    });
+  }
+
+  Future<void> _presentSellerWelcomePopup() async {
+    if (!mounted) {
+      _sellerWelcomePopupInFlight = false;
+      return;
+    }
+    try {
+      final openListing = await SellerEnableWelcomeScreen.show(context);
+      if (!mounted) return;
+      if (openListing) {
+        await _openAddListing();
+      }
+    } finally {
+      if (mounted) {
+        _sellerWelcomePopupInFlight = false;
+      }
+    }
+  }
+
   Future<void> _loadRole() async {
     final role = await SessionService.getRole();
     if (!mounted) return;
-    if (_roleLoaded && role == _role) return;
+    if (_roleLoaded && role == _role) {
+      _tryShowPendingKitchenWelcome();
+      return;
+    }
     setState(() {
       _role = role;
       _roleLoaded = true;
     });
     _warmSellerSurfaces(role);
+    _tryShowPendingKitchenWelcome();
   }
 
   void _warmSellerSurfaces(String? role) {

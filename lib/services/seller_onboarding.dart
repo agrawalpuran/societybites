@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'api_service.dart';
@@ -8,6 +9,26 @@ import 'session_service.dart';
 /// Ensures the current user can create listings (seller role + UPI).
 /// Shows a snackbar / dialog guidance when not ready.
 class SellerOnboarding {
+  static const sellerKitchenWelcomeTitle = 'Welcome to SocietyEats';
+  static const sellerKitchenWelcomeMessage =
+      'Your seller profile is enabled. Start selling to your society and '
+      'neighborhood. Click Add listing under My Kitchen.';
+
+  static bool _pendingKitchenWelcome = false;
+
+  static void markPendingKitchenWelcome() => _pendingKitchenWelcome = true;
+
+  static bool peekPendingKitchenWelcome() => _pendingKitchenWelcome;
+
+  static bool consumePendingKitchenWelcome() {
+    if (!_pendingKitchenWelcome) return false;
+    _pendingKitchenWelcome = false;
+    return true;
+  }
+
+  @visibleForTesting
+  static void resetPendingKitchenWelcome() => _pendingKitchenWelcome = false;
+
   /// Existing Start Selling confirmation + role enable. Used by Profile and Home.
   static Future<bool> startSelling(BuildContext context) async {
     final confirmed = await showDialog<bool>(

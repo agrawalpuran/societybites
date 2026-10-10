@@ -245,17 +245,12 @@ class ProfileScreenState extends State<ProfileScreen> {
     if (navigator.canPop()) {
       navigator.pop();
     }
+    SellerOnboarding.markPendingKitchenWelcome();
     widget.onSelectTab?.call(_myKitchenTabIndex);
     if (!mounted) return;
     setState(() {});
     unawaited(SellerOnboarding.refreshListingGateCache());
-    messenger.showSnackBar(
-      const SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text('Click Add listing under My Kitchen'),
-        backgroundColor: Color(0xFF0E5A47),
-      ),
-    );
+    messenger.clearSnackBars();
   }
 
   void _refreshSellerSettings() {

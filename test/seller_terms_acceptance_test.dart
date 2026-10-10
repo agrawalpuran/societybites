@@ -7,6 +7,7 @@ import 'package:societybites/models/seller_terms.dart';
 import 'package:societybites/screens/profile_screen.dart';
 import 'package:societybites/screens/seller_settings_screen.dart';
 import 'package:societybites/screens/seller_terms_screen.dart';
+import 'package:societybites/services/seller_onboarding.dart';
 
 void _ignoreKnownLayoutNoise() {
   final original = FlutterError.onError;
@@ -63,6 +64,7 @@ void main() {
 
   setUp(() {
     _ignoreKnownLayoutNoise();
+    SellerOnboarding.resetPendingKitchenWelcome();
     SharedPreferences.setMockInitialValues({
       'user_id': 'buyer-1',
       'user_role': 'buyer',
@@ -230,10 +232,7 @@ void main() {
     expect(sent!['paymentPreference'], 'UPI_ONLY');
     expect(find.byType(SellerTermsScreen), findsNothing);
     expect(find.byType(SellerSettingsScreen), findsNothing);
-    expect(
-      find.textContaining('Click Add listing under My Kitchen'),
-      findsOneWidget,
-    );
+    expect(SellerOnboarding.peekPendingKitchenWelcome(), isTrue);
     expect(profileSaves, 1);
   });
 

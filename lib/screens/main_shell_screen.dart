@@ -333,6 +333,7 @@ class _MainShellScreenState extends State<MainShellScreen>
       case 2:
         final dashboard = _dashboardKey.currentState;
         dashboard?.showKitchenOrders();
+        dashboard?.showNewSellerWelcomeIfPending();
         if (!wasDashboardMounted) break;
         if (dashboard != null &&
             shouldFetchOnTabSelect(
