@@ -19,6 +19,7 @@ class SellerFirstTimeSetupForm extends StatefulWidget {
     required this.onUpiChanged,
     this.onUpiConfirmed,
     this.onUpiConfirmationInvalidated,
+    this.upiIdConfirmed = false,
     required this.sellingReachLevel,
     required this.sellingReach,
     required this.onReachChanged,
@@ -37,6 +38,7 @@ class SellerFirstTimeSetupForm extends StatefulWidget {
   final void Function(String upiId, String displayName) onUpiChanged;
   final VoidCallback? onUpiConfirmed;
   final VoidCallback? onUpiConfirmationInvalidated;
+  final bool upiIdConfirmed;
   final SellingReachLevel sellingReachLevel;
   final SellingReach sellingReach;
   final ValueChanged<SellingReachLevel> onReachChanged;
@@ -82,8 +84,14 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
     );
     _upiFocus = FocusNode();
     _upiFocus.addListener(_handleUpiFocusChange);
+    _syncConfirmedUpiFromWidget();
+  }
+
+  void _syncConfirmedUpiFromWidget() {
     final initialUpi = widget.upiId?.trim() ?? '';
-    if (initialUpi.isNotEmpty && initialUpi.contains('@')) {
+    if (widget.upiIdConfirmed &&
+        initialUpi.isNotEmpty &&
+        initialUpi.contains('@')) {
       _confirmedUpiSnapshot = initialUpi;
     }
   }
@@ -112,6 +120,10 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
       _nearbyCharge.text = _chargeText(widget.fulfilment.nearbyCharge);
       _extendedCharge.text =
           _chargeText(widget.fulfilment.extendedCharge);
+    }
+    if (oldWidget.upiIdConfirmed != widget.upiIdConfirmed ||
+        oldWidget.upiId != widget.upiId) {
+      _syncConfirmedUpiFromWidget();
     }
   }
 

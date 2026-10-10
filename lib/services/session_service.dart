@@ -18,6 +18,7 @@ class SessionService {
   static const _flatIdKey = 'flat_id';
   static const _flatNumberKey = 'flat_number';
   static const _roleKey = 'user_role';
+  static const _consoleAdminKey = 'user_console_admin';
   static const _upiIdKey = 'seller_upi_id';
   static const _upiIdCachedKey = 'seller_upi_id_cached';
   static const _jwtKey = 'auth_token';
@@ -115,6 +116,12 @@ class SessionService {
     if (profile['role'] != null) {
       await prefs.setString(_roleKey, profile['role'] as String);
     }
+    if (profile.containsKey('consoleAdmin')) {
+      await prefs.setBool(
+        _consoleAdminKey,
+        profile['consoleAdmin'] == true,
+      );
+    }
     if (profile.containsKey('upiId')) {
       await prefs.setString(
         _upiIdKey,
@@ -162,6 +169,11 @@ class SessionService {
   static Future<String?> getRole() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_roleKey);
+  }
+
+  static Future<bool> isConsoleAdmin() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_consoleAdminKey) ?? false;
   }
 
   /// Cached from the last profile sync. Null when UPI has never been synced.

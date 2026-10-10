@@ -94,9 +94,10 @@ async function main() {
       body: { phone: "9800000503" },
     });
     assert(grant.status === 200, `grant failed: ${JSON.stringify(grant.json)}`);
-    assert(grant.json.user.role === "admin", "role should be admin");
+    assert(grant.json.user.consoleAdmin === true, "consoleAdmin should be set");
+    assert(grant.json.user.role === "buyer", "buyer role preserved");
 
-    const consoleUser = await prisma.user.findUnique({
+    let consoleUser = await prisma.user.findUnique({
       where: { phone: CONSOLE_PHONE },
     });
     const consoleToken = signToken(consoleUser);
@@ -131,7 +132,8 @@ async function main() {
     assert(revoke.status === 200, "revoke failed");
 
     const after = await prisma.user.findUnique({ where: { phone: CONSOLE_PHONE } });
-    assert(after.role === "buyer", "revoked user becomes buyer");
+    assert(after.role === "buyer", "revoked user stays buyer");
+    assert(after.consoleAdmin === false, "consoleAdmin cleared");
 
     console.log("console-admins.test.js OK");
   } finally {

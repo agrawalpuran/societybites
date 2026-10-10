@@ -297,9 +297,15 @@ class _AdminSocietiesScreenState extends State<AdminSocietiesScreen> {
           final s = _societies[index];
           final name = s['name']?.toString() ?? 'Unknown';
           final inviteCode = s['inviteCode']?.toString() ?? '—';
-          final memberCount = s['memberCount'] ?? s['_count']?['members'] ?? 0;
-          final listingCount =
-              s['listingCount'] ?? s['_count']?['listings'] ?? 0;
+          final memberCount = s['membersCount'] ??
+              s['memberCount'] ??
+              s['_count']?['users'] ??
+              s['_count']?['members'] ??
+              0;
+          final listingCount = s['listingsCount'] ??
+              s['listingCount'] ??
+              s['_count']?['listings'] ??
+              0;
           final city = s['city']?.toString() ?? '';
 
           return Card(

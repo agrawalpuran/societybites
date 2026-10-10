@@ -15,6 +15,7 @@ import 'admin_issues_screen.dart';
 import 'admin_coupons_screen.dart';
 import 'admin_audit_screen.dart';
 import 'admin_console_access_screen.dart';
+import 'admin_users_screen.dart';
 
 class AdminShellScreen extends StatefulWidget {
   const AdminShellScreen({super.key});
@@ -42,13 +43,18 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     _NavItem(icon: Icons.history_rounded, label: 'Audit Log'),
   ];
 
+  static const _usersNav = _NavItem(
+    icon: Icons.people_outline_rounded,
+    label: 'Users',
+  );
+
   static const _consoleAccessNav = _NavItem(
     icon: Icons.manage_accounts_rounded,
     label: 'Console access',
   );
 
   List<_NavItem> get _navItems => _isSuperAdmin
-      ? [..._baseNavItems, _consoleAccessNav]
+      ? [..._baseNavItems, _usersNav, _consoleAccessNav]
       : _baseNavItems;
 
   @override
@@ -61,6 +67,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
 
   Future<void> _loadRole() async {
     final role = await SessionService.getRole();
+    final consoleAdmin = await SessionService.isConsoleAdmin();
     if (!mounted) return;
     final superAdmin = role == 'super_admin';
     setState(() {
@@ -74,8 +81,13 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   }
 
   Widget _createPage(int index) {
-    if (_isSuperAdmin && index == _baseNavItems.length) {
-      return const AdminConsoleAccessScreen();
+    if (_isSuperAdmin) {
+      if (index == _baseNavItems.length) {
+        return const AdminUsersScreen();
+      }
+      if (index == _baseNavItems.length + 1) {
+        return const AdminConsoleAccessScreen();
+      }
     }
     switch (index) {
       case 0:
@@ -127,7 +139,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_roleLoaded && !_isSuperAdmin)
+        if (_roleLoaded && !_isSuperAdmin) // view-only: consoleAdmin or legacy admin role
           const Material(
             color: Color(0xFFE8F5EE),
             child: Padding(

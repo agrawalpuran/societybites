@@ -97,8 +97,10 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
 
           final review = _reviews[index];
           final reviewer =
+              (review['reviewer'] as Map<String, dynamic>?)?['name']
+                  ?.toString() ??
               (review['user'] as Map<String, dynamic>?)?['name']?.toString() ??
-                  'Anonymous';
+              'Anonymous';
           final listing = (review['listing'] as Map<String, dynamic>?)
                   ?['name']
                   ?.toString() ??
@@ -122,7 +124,9 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
                     children: [
                       ...List.generate(5, (i) {
                         return Icon(
-                          i < (rating as int) ? Icons.star : Icons.star_border,
+                          i < (rating as num).round()
+                              ? Icons.star
+                              : Icons.star_border,
                           size: 16,
                           color: const Color(0xFFF9A825),
                         );

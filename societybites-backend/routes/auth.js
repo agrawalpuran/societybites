@@ -45,6 +45,7 @@ function serializeAuthUser(user) {
     phone: user.phone,
     name: user.name,
     role: user.role,
+    consoleAdmin: user.consoleAdmin === true,
     profilePhotoUrl: user.profilePhotoUrl,
     upiId: user.upiId,
     societyId: user.societyId,

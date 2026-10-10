@@ -44,6 +44,8 @@ model User {
   /// Admin user id that last marked the photo. Does not change selling.
   addressProofReviewedBy  String?
   suspended               Boolean                 @default(false)
+  /// View-only admin portal access without replacing seller/buyer role.
+  consoleAdmin            Boolean                 @default(false)
   createdAt               DateTime                @default(now())
   societyId               String?
   flatId                  String?

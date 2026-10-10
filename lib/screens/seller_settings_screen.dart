@@ -30,8 +30,10 @@ class SellerSettingsScreen extends StatelessWidget {
     required this.onChangeKitchenHours,
     required this.onEditFssai,
     this.onSaveAndEnable,
+    this.saveAndEnableInProgress = false,
     this.upiReadyForEnableSelling = true,
     this.isFirstTimeSetup = false,
+    this.upiIdConfirmed = false,
     this.paymentPreference,
     this.onPaymentPreferenceChanged,
     this.upiId,
@@ -66,8 +68,10 @@ class SellerSettingsScreen extends StatelessWidget {
   final VoidCallback onChangeKitchenHours;
   final VoidCallback onEditFssai;
   final VoidCallback? onSaveAndEnable;
+  final bool saveAndEnableInProgress;
   final bool upiReadyForEnableSelling;
   final bool isFirstTimeSetup;
+  final bool upiIdConfirmed;
 
   final SellerPaymentPreference? paymentPreference;
   final ValueChanged<SellerPaymentPreference>? onPaymentPreferenceChanged;
@@ -185,6 +189,7 @@ class SellerSettingsScreen extends StatelessWidget {
                         onUpiConfirmed: onUpiConfirmed,
                         onUpiConfirmationInvalidated:
                             onUpiConfirmationInvalidated,
+                        upiIdConfirmed: upiIdConfirmed,
                         sellingReachLevel: sellingReachLevel!,
                         sellingReach: sellingReach!,
                         onReachChanged: onSellingReachChanged!,
@@ -264,7 +269,9 @@ class SellerSettingsScreen extends StatelessWidget {
               if (onSaveAndEnable != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                  child: Column(
+                  child: AbsorbPointer(
+                    absorbing: saveAndEnableInProgress,
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (fssaiRequirementEnabled && !fssaiAllowsEnableSelling)
@@ -301,7 +308,8 @@ class SellerSettingsScreen extends StatelessWidget {
                         child: ElevatedButton(
                           key: const Key('seller-settings-enable'),
                           onPressed:
-                              fssaiAllowsEnableSelling &&
+                              !saveAndEnableInProgress &&
+                                      fssaiAllowsEnableSelling &&
                                       upiReadyForEnableSelling
                                   ? onSaveAndEnable
                                   : null,
@@ -315,16 +323,37 @@ class SellerSettingsScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
-                            'Save / Enable Selling',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (saveAndEnableInProgress) ...[
+                                const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                              ],
+                              Text(
+                                saveAndEnableInProgress
+                                    ? 'Opening next step…'
+                                    : (isFirstTimeSetup
+                                        ? 'Continue'
+                                        : 'Save / Enable Selling'),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ],
+                    ),
                   ),
                 ),
             ],

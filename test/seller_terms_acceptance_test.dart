@@ -165,7 +165,7 @@ void main() {
     expect(find.byKey(const Key('seller-setup-upi-id')), findsOneWidget);
     expect(find.text('My Society'), findsOneWidget);
     expect(find.text('FSSAI details'), findsOneWidget);
-    expect(find.text('Save / Enable Selling'), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
     expect(find.text('Payment Methods'), findsNothing);
     expect(profileSaves, 0);
 
@@ -230,7 +230,10 @@ void main() {
     expect(sent!['paymentPreference'], 'UPI_ONLY');
     expect(find.byType(SellerTermsScreen), findsNothing);
     expect(find.byType(SellerSettingsScreen), findsNothing);
-    expect(find.textContaining('Selling enabled'), findsOneWidget);
+    expect(
+      find.textContaining('Click Add listing under My Kitchen'),
+      findsOneWidget,
+    );
     expect(profileSaves, 1);
   });
 

@@ -424,7 +424,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               _StatCard(
                 label: 'Today',
-                value: '${stats['ordersToday'] ?? 0}',
+                value:
+                    '${stats['todayOrders'] ?? stats['ordersToday'] ?? 0}',
                 icon: Icons.today_rounded,
                 color: const Color(0xFF1565C0),
               ),
@@ -459,7 +460,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               _StatCard(
                 label: 'Avg Rating',
-                value: (stats['avgRating'] as num?)?.toStringAsFixed(1) ?? '—',
+                value:
+                    (stats['avgPlatformRating'] as num? ??
+                            stats['avgRating'] as num?)
+                        ?.toStringAsFixed(1) ??
+                    '—',
                 icon: Icons.trending_up_rounded,
                 color: const Color(0xFFF9A825),
               ),

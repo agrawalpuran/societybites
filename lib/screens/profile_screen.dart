@@ -144,6 +144,9 @@ class ProfileScreenState extends State<ProfileScreen> {
   DateTime? _fssaiExpiry;
   final _sellerSettingsTick = ValueNotifier(0);
   _PendingSellerEnable? _pendingSellerEnable;
+  bool _enableSellingInFlight = false;
+  bool _sellerEnableProgressDialogOpen = false;
+  final _sellerEnableProgressMessage = ValueNotifier<String?>(null);
 
   @override
   void initState() {
@@ -154,7 +157,105 @@ class ProfileScreenState extends State<ProfileScreen> {
   @override
   void dispose() {
     _sellerSettingsTick.dispose();
+    _sellerEnableProgressMessage.dispose();
     super.dispose();
+  }
+
+  static const int _myKitchenTabIndex = 2;
+
+  void _setSellerEnableProgressMessage(String? message) {
+    _sellerEnableProgressMessage.value = message;
+  }
+
+  void _beginSellerEnableProgressOverlay() {
+    if (!mounted || _sellerEnableProgressDialogOpen) return;
+    _setSellerEnableProgressMessage('Uploading address proof…');
+    _sellerEnableProgressDialogOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sellerEnableProgressDialogOpen) return;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        useRootNavigator: true,
+        builder: (dialogContext) {
+          return PopScope(
+            canPop: false,
+            child: AlertDialog(
+              content: ValueListenableBuilder<String?>(
+                valueListenable: _sellerEnableProgressMessage,
+                builder: (_, message, __) {
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: CircularProgressIndicator(strokeWidth: 3),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        message ?? 'Enabling selling…',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF223531),
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ).whenComplete(() {
+        _sellerEnableProgressDialogOpen = false;
+      });
+    });
+  }
+
+  void _dismissSellerEnableProgressOverlay() {
+    if (!_sellerEnableProgressDialogOpen || !mounted) return;
+    _setSellerEnableProgressMessage(null);
+    Navigator.of(context, rootNavigator: true).pop();
+    _sellerEnableProgressDialogOpen = false;
+  }
+
+  void _releaseEnableSellingInFlight() {
+    if (!_enableSellingInFlight) return;
+    _enableSellingInFlight = false;
+    if (!mounted) return;
+    setState(() {});
+    _refreshSellerSettings();
+  }
+
+  void _lockEnableSellingInFlight() {
+    if (_enableSellingInFlight) return;
+    _enableSellingInFlight = true;
+    if (!mounted) return;
+    setState(() {});
+    _refreshSellerSettings();
+  }
+
+  void _finishFirstTimeSellerEnableSuccess() {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+    }
+    widget.onSelectTab?.call(_myKitchenTabIndex);
+    if (!mounted) return;
+    setState(() {});
+    unawaited(SellerOnboarding.refreshListingGateCache());
+    messenger.showSnackBar(
+      const SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text('Click Add listing under My Kitchen'),
+        backgroundColor: Color(0xFF0E5A47),
+      ),
+    );
   }
 
   void _refreshSellerSettings() {
@@ -167,6 +268,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     _phone = await SessionService.getPhone();
     _name = await SessionService.getUserName();
     _role = await SessionService.getRole();
+    _consoleAdmin = await SessionService.isConsoleAdmin();
     _societyName = await SessionService.getSocietyName();
     _flatNumber = await SessionService.getFlatNumber();
   }
@@ -186,6 +288,9 @@ class ProfileScreenState extends State<ProfileScreen> {
         } catch (_) {}
         _name = profile['name'] as String? ?? _name;
         _role = profile['role'] as String? ?? _role;
+        if (profile.containsKey('consoleAdmin')) {
+          _consoleAdmin = profile['consoleAdmin'] == true;
+        }
         _phone = profile['phone'] as String? ?? _phone;
         _upiId = profile['upiId'] as String? ?? _upiId;
         _upiDisplayName =
@@ -413,8 +518,10 @@ class ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  bool _consoleAdmin = false;
+
   bool get _canOpenAdminPortal =>
-      _role == 'super_admin' || _role == 'admin';
+      _role == 'super_admin' || _role == 'admin' || _consoleAdmin;
 
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
@@ -575,7 +682,13 @@ class ProfileScreenState extends State<ProfileScreen> {
       _paymentPreference = defaultSellerPaymentPreference;
       _syncPendingSellerEnableDefaults();
     }
-    unawaited(_loadProfile());
+    if (firstTime) {
+      unawaited(_readSessionCache().then((_) {
+        if (mounted) setState(() {});
+      }));
+    } else {
+      unawaited(_loadProfile());
+    }
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -607,8 +720,13 @@ class ProfileScreenState extends State<ProfileScreen> {
               onChangeKitchenHours: _changeKitchenHours,
               onEditFssai: _editFssai,
               onSaveAndEnable: holdingSetup ? _saveAndEnableSelling : null,
+              saveAndEnableInProgress:
+                  holdingSetup ? _enableSellingInFlight : false,
               upiReadyForEnableSelling:
                   holdingSetup ? _pendingUpiReadyForEnable : true,
+              upiIdConfirmed: holdingSetup
+                  ? (_pendingSellerEnable?.upiIdConfirmed ?? false)
+                  : false,
               paymentPreference:
                   holdingSetup ? _paymentPreference : null,
               onPaymentPreferenceChanged: holdingSetup
@@ -1170,12 +1288,30 @@ class ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _saveAndEnableSelling() async {
     final pending = _pendingSellerEnable;
-    if (pending == null || !mounted) return;
-    await _loadProfile();
+    if (pending == null || !mounted || _enableSellingInFlight) return;
+
+    _lockEnableSellingInFlight();
+
+    try {
+      final liveProfile = widget.fetchProfile != null
+          ? await widget.fetchProfile!()
+          : await ApiService.getMe();
+      if (!mounted) return;
+      if (liveProfile['role'] == 'seller' ||
+          liveProfile['role'] == 'super_admin') {
+        _applySellerEnableResult(liveProfile);
+        _pendingSellerEnable = null;
+        _releaseEnableSellingInFlight();
+        _finishFirstTimeSellerEnableSuccess();
+        return;
+      }
+    } catch (_) {}
+
     if (!mounted) return;
-    _refreshSellerSettings();
+
     final upi = pending.upiId?.trim() ?? _upiId?.trim() ?? '';
     if (upi.isEmpty || !upi.contains('@')) {
+      _releaseEnableSellingInFlight();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -1186,15 +1322,19 @@ class ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     if (!pending.upiIdConfirmed) {
+      _releaseEnableSellingInFlight();
       final confirmed = await confirmUpiIdBeforeSave(context, upiId: upi);
       if (!confirmed || !mounted) return;
+      _lockEnableSellingInFlight();
       pending.upiIdConfirmed = true;
       pending
         ..includeUpi = true
         ..upiId = upi
         ..upiDisplayName = pending.upiDisplayName ?? _upiDisplayName;
+      _refreshSellerSettings();
     }
     if (!_fssaiAllowsEnableSelling) {
+      _releaseEnableSellingInFlight();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -1211,6 +1351,7 @@ class ProfileScreenState extends State<ProfileScreen> {
             clear: pending.clearKitchenHours,
           )
         : null;
+
     final termsResult = await Navigator.push<SellerTermsAcceptResult>(
       context,
       MaterialPageRoute(
@@ -1218,7 +1359,13 @@ class ProfileScreenState extends State<ProfileScreen> {
             widget.buildSellerTermsScreen?.call() ?? const SellerTermsScreen(),
       ),
     );
-    if (termsResult == null || !mounted) return;
+    if (termsResult == null || !mounted) {
+      _releaseEnableSellingInFlight();
+      return;
+    }
+
+    _beginSellerEnableProgressOverlay();
+    var progressStarted = true;
     try {
       final proofUrl = widget.uploadAddressProof != null
           ? await widget.uploadAddressProof!(
@@ -1231,23 +1378,27 @@ class ProfileScreenState extends State<ProfileScreen> {
               purpose: 'address-proof',
             );
       if (!mounted) return;
+      _setSellerEnableProgressMessage('Accepting seller terms…');
       final body = pending.toJson()..['addressProofUrl'] = proofUrl;
       var updated = widget.acceptSellerTerms != null
           ? await widget.acceptSellerTerms!(body)
           : await ApiService.acceptSellerTerms(body);
       if (!mounted) return;
-      if (kitchenDraft != null && widget.updateProfile == null) {
-        updated = await ApiService.updateMyProfile(
-          kitchenOpensAt: kitchenDraft.opens,
-          kitchenClosesAt: kitchenDraft.closes,
-          clearKitchenHours: kitchenDraft.clear,
-        );
-      } else if (kitchenDraft != null && widget.updateProfile != null) {
-        updated = await widget.updateProfile!(
-          kitchenOpensAt: kitchenDraft.opens,
-          kitchenClosesAt: kitchenDraft.closes,
-          clearKitchenHours: kitchenDraft.clear,
-        );
+      if (kitchenDraft != null) {
+        _setSellerEnableProgressMessage('Saving kitchen hours…');
+        if (widget.updateProfile == null) {
+          updated = await ApiService.updateMyProfile(
+            kitchenOpensAt: kitchenDraft.opens,
+            kitchenClosesAt: kitchenDraft.closes,
+            clearKitchenHours: kitchenDraft.clear,
+          );
+        } else {
+          updated = await widget.updateProfile!(
+            kitchenOpensAt: kitchenDraft.opens,
+            kitchenClosesAt: kitchenDraft.closes,
+            clearKitchenHours: kitchenDraft.clear,
+          );
+        }
       }
       if (!mounted) return;
       try {
@@ -1256,27 +1407,22 @@ class ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
       _applySellerEnableResult(updated);
       _pendingSellerEnable = null;
-      final messenger = ScaffoldMessenger.of(context);
-      final navigator = Navigator.of(context);
-      if (navigator.canPop()) {
-        navigator.pop();
-      }
-      widget.onSelectTab?.call(0);
-      if (!mounted) return;
-      setState(() {});
-      unawaited(SellerOnboarding.refreshListingGateCache());
-      messenger.showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text('Selling enabled — you’re ready to list food'),
-          backgroundColor: Color(0xFF0E5A47),
-        ),
-      );
+      progressStarted = false;
+      _dismissSellerEnableProgressOverlay();
+      _finishFirstTimeSellerEnableSuccess();
+      unawaited(_loadProfile());
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not enable selling: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not enable selling: $e')),
+        );
+        unawaited(_loadProfile());
+      }
+    } finally {
+      if (progressStarted) {
+        _dismissSellerEnableProgressOverlay();
+      }
+      _releaseEnableSellingInFlight();
     }
   }
 

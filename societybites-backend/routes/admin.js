@@ -5,6 +5,10 @@ const { requireUser } = require("../middleware/requireUser");
 const { requireAdmin, requireSuperAdmin } = require("../middleware/requireAdmin");
 const { normalizeIndianPhone } = require("../utils/phone");
 const {
+  repairLegacyConsoleAdminSeller,
+  isConsoleAdminUser,
+} = require("../lib/consoleAdmin");
+const {
   listAdminIssues,
   getAdminIssue,
   updateAdminIssue,
@@ -58,17 +62,28 @@ router.get(
   requireSuperAdmin,
   asyncHandler(async (_req, res) => {
     const admins = await prisma.user.findMany({
-      where: { role: "admin" },
+      where: {
+        OR: [{ consoleAdmin: true }, { role: "admin" }],
+      },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
         name: true,
         phone: true,
+        role: true,
+        consoleAdmin: true,
         suspended: true,
         createdAt: true,
         society: { select: { name: true } },
       },
     });
+    for (let i = 0; i < admins.length; i++) {
+      if (admins[i].role === "admin" && !admins[i].consoleAdmin) {
+        admins[i] = await repairLegacyConsoleAdminSeller(admins[i], {
+          society: { select: { name: true } },
+        });
+      }
+    }
     res.json({ admins });
   })
 );
@@ -94,13 +109,20 @@ router.post(
         error: "Cannot grant console access to a suspended user",
       });
     }
-    if (user.role === "admin") {
+    if (user.consoleAdmin) {
       return res.json({ user, alreadyAdmin: true });
+    }
+    if (user.role === "admin") {
+      const repaired = await repairLegacyConsoleAdminSeller(user, {
+        society: true,
+        flat: true,
+      });
+      return res.json({ user: repaired, alreadyAdmin: true });
     }
 
     const updated = await prisma.user.update({
       where: { id: user.id },
-      data: { role: "admin" },
+      data: { consoleAdmin: true },
       include: { society: true, flat: true },
     });
 
@@ -125,13 +147,18 @@ router.delete(
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    if (user.role !== "admin") {
+    if (!isConsoleAdminUser(user)) {
       return res.status(400).json({ error: "User is not a console admin" });
+    }
+
+    const data = { consoleAdmin: false };
+    if (user.role === "admin") {
+      data.role = "buyer";
     }
 
     const updated = await prisma.user.update({
       where: { id: user.id },
-      data: { role: "buyer" },
+      data,
       include: { society: true, flat: true },
     });
 
@@ -609,7 +636,18 @@ router.get(
         where,
         include: {
           buyer: { select: { id: true, name: true, phone: true } },
-          items: { include: { listing: { select: { id: true, name: true, sellerId: true } } } },
+          items: {
+            include: {
+              listing: {
+                select: {
+                  id: true,
+                  name: true,
+                  sellerId: true,
+                  seller: { select: { id: true, name: true, phone: true } },
+                },
+              },
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
         skip,

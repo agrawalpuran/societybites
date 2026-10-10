@@ -4,6 +4,26 @@ import '../../services/api_service.dart';
 import '../../widgets/admin_loading_panel.dart';
 import '../../widgets/screen_loading_note.dart';
 
+String? _sellerNameFromAdminOrder(Map<String, dynamic> order) {
+  final direct = (order['seller'] as Map<String, dynamic>?)?['name'];
+  if (direct != null && direct.toString().isNotEmpty) {
+    return direct.toString();
+  }
+  final items = order['items'];
+  if (items is! List) return null;
+  for (final item in items) {
+    if (item is! Map) continue;
+    final listing = item['listing'];
+    if (listing is! Map) continue;
+    final seller = listing['seller'];
+    if (seller is Map) {
+      final name = seller['name']?.toString();
+      if (name != null && name.isNotEmpty) return name;
+    }
+  }
+  return null;
+}
+
 class AdminOrdersScreen extends StatefulWidget {
   const AdminOrdersScreen({super.key});
 
@@ -149,9 +169,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           final buyer =
               (order['buyer'] as Map<String, dynamic>?)?['name']?.toString() ??
                   '—';
-          final seller =
-              (order['seller'] as Map<String, dynamic>?)?['name']?.toString() ??
-                  '—';
+          final seller = _sellerNameFromAdminOrder(order) ?? '—';
           final total = order['total'] ?? order['totalAmount'] ?? 0;
           final status = order['status']?.toString() ?? 'pending';
           final createdAt = order['createdAt']?.toString() ?? '';

@@ -204,7 +204,7 @@ class _SellerTermsScreenState extends State<SellerTermsScreen> {
                           ),
                         ),
                         child: const Text(
-                          'Submit & Enable Selling',
+                          'Continue',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                         ),
                       ),
