@@ -35,6 +35,7 @@ import '../widgets/food_type_selector.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/floating_cart_bar.dart';
+import '../widgets/listing_cart_controls.dart';
 import '../widgets/carousel_page_dots.dart';
 import '../widgets/home_distance_chip.dart';
 import '../widgets/guest_order_auth.dart';
@@ -582,6 +583,63 @@ class HomeScreenState extends State<HomeScreen> {
     return true;
   }
 
+  Future<void> _adjustCartQuantity(FoodItem food, int delta) async {
+    if (delta < 0) {
+      _removeFromCart(food);
+      return;
+    }
+    if (_cartQtyFor(food) > 0) {
+      await _incrementCartLine(food);
+      return;
+    }
+    await _addToCart(food);
+  }
+
+  Future<void> _incrementCartLine(FoodItem food) async {
+    if (food.isKitchenClosed) {
+      showKitchenClosedMessage(context);
+      return;
+    }
+    if (!food.canAddToCart) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(food.addToCartBlockedMessage()),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          backgroundColor: const Color(0xFFD94F4F),
+        ),
+      );
+      return;
+    }
+    final currentInCart = _cartQtyFor(food);
+    if (currentInCart >= food.quantity) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Only ${food.quantity} available for ${food.name}'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          backgroundColor: const Color(0xFFD94F4F),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      final existing = _cart.indexWhere((c) => c.food.id == food.id);
+      if (existing != -1) {
+        _cart[existing].quantity++;
+      }
+    });
+    CartController.instance.notify();
+  }
+
   Future<void> _addToCart(FoodItem food) async {
     if (food.isKitchenClosed) {
       showKitchenClosedMessage(context);
@@ -908,8 +966,8 @@ class HomeScreenState extends State<HomeScreen> {
       viewerUserId: _viewerUserId,
       expandedReach: _expandedReach,
       cartQtyFor: _cartQtyFor,
-      onAdd: _addToCart,
-      onRemove: _removeFromCart,
+      onAdd: (food) => _adjustCartQuantity(food, 1),
+      onRemove: (food) => _adjustCartQuantity(food, -1),
       onOpenFood: _openDetail,
       onOpenSeller: (seller) =>
           _openSeller(seller, hideUnavailableDishes: !seller.hasOrderableItems),
@@ -1662,8 +1720,8 @@ class HomeScreenState extends State<HomeScreen> {
       showSeeAll: listings.length > homeReachPreviewCount,
       onSeeAll: () => _expandReach(HomeListingReach.inSociety),
       cartQtyFor: _cartQtyFor,
-      onAdd: _addToCart,
-      onRemove: _removeFromCart,
+      onAdd: (food) => _adjustCartQuantity(food, 1),
+      onRemove: (food) => _adjustCartQuantity(food, -1),
       onTap: _openDetail,
       onSellerTap: (food) => _openSeller(sellerFromListing(food)),
     );
@@ -1778,8 +1836,8 @@ class HomeScreenState extends State<HomeScreen> {
               key: ValueKey('home-reach-tile-${food.id}'),
               food: food,
               cartQty: _cartQtyFor(food),
-              onAdd: () => _addToCart(food),
-              onRemove: () => _removeFromCart(food),
+              onAdd: () => _adjustCartQuantity(food, 1),
+              onRemove: () => _adjustCartQuantity(food, -1),
               onTap: () => _openDetail(food),
               onSellerTap: () => _openSeller(sellerFromListing(food)),
             ),
@@ -1794,8 +1852,8 @@ class HomeScreenState extends State<HomeScreen> {
                 key: ValueKey('home-reach-card-${food.id}'),
                 food: food,
                 cartQty: _cartQtyFor(food),
-                onAdd: () => _addToCart(food),
-                onRemove: () => _removeFromCart(food),
+                onAdd: () => _adjustCartQuantity(food, 1),
+                onRemove: () => _adjustCartQuantity(food, -1),
                 onTap: () => _openDetail(food),
                 onSellerTap: () => _openSeller(sellerFromListing(food)),
               );
@@ -1948,8 +2006,8 @@ class HomeScreenState extends State<HomeScreen> {
           key: ValueKey('home-all-item-${_visibleAvailable[i].id}'),
           food: _visibleAvailable[i],
           cartQty: _cartQtyFor(_visibleAvailable[i]),
-          onAdd: () => _addToCart(_visibleAvailable[i]),
-          onRemove: () => _removeFromCart(_visibleAvailable[i]),
+          onAdd: () => _adjustCartQuantity(_visibleAvailable[i], 1),
+          onRemove: () => _adjustCartQuantity(_visibleAvailable[i], -1),
           onTap: () => _openDetail(_visibleAvailable[i]),
           onSellerTap: () =>
               _openSeller(sellerFromListing(_visibleAvailable[i])),
@@ -2306,71 +2364,11 @@ class _SpecialCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        addButton: GestureDetector(
-                          onTap: onAdd,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0E5A47),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Text(
-                              'Add',
-                              softWrap: false,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        qtyStepper: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0E5A47),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              GestureDetector(
-                                onTap: onRemove,
-                                child: const Icon(
-                                  Icons.remove,
-                                  size: 18,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                                child: Text(
-                                  '$cartQty',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: onAdd,
-                                child: const Icon(
-                                  Icons.add,
-                                  size: 18,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
+                        addButton: ListingCartAddButton(onPressed: onAdd),
+                        qtyStepper: ListingCartQtyStepper(
+                          qty: cartQty,
+                          onIncrement: onAdd,
+                          onDecrement: onRemove,
                         ),
                   ),
                 ],
@@ -2592,70 +2590,15 @@ class _AvailableItemTile extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            addButton: GestureDetector(
-                              onTap: onAdd,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0E5A47),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Text(
-                                  'Add',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
+                            addButton: ListingCartAddButton(
+                              onPressed: onAdd,
+                              compact: true,
                             ),
-                            qtyStepper: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0E5A47),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  GestureDetector(
-                                    onTap: onRemove,
-                                    child: const Icon(
-                                      Icons.remove,
-                                      size: 16,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    child: Text(
-                                      '$cartQty',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                  GestureDetector(
-                                    onTap: onAdd,
-                                    child: const Icon(
-                                      Icons.add,
-                                      size: 16,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            qtyStepper: ListingCartQtyStepper(
+                              qty: cartQty,
+                              onIncrement: onAdd,
+                              onDecrement: onRemove,
+                              compact: true,
                             ),
                           ),
                         ),

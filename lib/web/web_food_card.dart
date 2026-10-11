@@ -9,6 +9,7 @@ import '../widgets/listing_type_badge.dart';
 import '../widgets/listing_portion_caption.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/recurring_availability_hint.dart';
+import '../widgets/listing_cart_controls.dart';
 import 'web_breakpoints.dart';
 
 class WebFoodCard extends StatelessWidget {
@@ -195,16 +196,18 @@ class WebFoodCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    MarketplacePurchaseSlot(
-                      food: food,
-                      cartQty: cartQty,
-                      addButton: _AddButton(label: 'Add', onTap: onAdd),
-                      qtyStepper: _QtyStepper(
-                        qty: cartQty,
-                        onAdd: onAdd,
-                        onRemove: onRemove,
+                    ListingCartTapShield(
+                      child: MarketplacePurchaseSlot(
+                        food: food,
+                        cartQty: cartQty,
+                        addButton: ListingCartAddButton(onPressed: onAdd),
+                        qtyStepper: ListingCartQtyStepper(
+                          qty: cartQty,
+                          onIncrement: onAdd,
+                          onDecrement: onRemove,
+                        ),
+                        soldOut: const _SoldOutMark(),
                       ),
-                      soldOut: const _SoldOutMark(),
                     ),
                   ],
                 ),
@@ -391,16 +394,18 @@ class _ReadyCard extends StatelessWidget {
                             ),
                           ),
                           const Spacer(),
-                          MarketplacePurchaseSlot(
-                            food: food,
-                            cartQty: cartQty,
-                            addButton: _AddButton(label: 'Add', onTap: onAdd),
-                            qtyStepper: _QtyStepper(
-                              qty: cartQty,
-                              onAdd: onAdd,
-                              onRemove: onRemove,
+                          ListingCartTapShield(
+                            child: MarketplacePurchaseSlot(
+                              food: food,
+                              cartQty: cartQty,
+                              addButton: ListingCartAddButton(onPressed: onAdd),
+                              qtyStepper: ListingCartQtyStepper(
+                                qty: cartQty,
+                                onIncrement: onAdd,
+                                onDecrement: onRemove,
+                              ),
+                              soldOut: const _SoldOutMark(),
                             ),
-                            soldOut: const _SoldOutMark(),
                           ),
                         ],
                       ),
@@ -471,82 +476,6 @@ class _RatingPill extends StatelessWidget {
               fontWeight: FontWeight.w800,
               color: webInk,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AddButton extends StatelessWidget {
-  const _AddButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: webGreen,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QtyStepper extends StatelessWidget {
-  const _QtyStepper({
-    required this.qty,
-    required this.onAdd,
-    required this.onRemove,
-  });
-
-  final int qty;
-  final VoidCallback onAdd;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: webGreen,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onTap: onRemove,
-            child: const Icon(Icons.remove, size: 16, color: Colors.white),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Text(
-              '$qty',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 13,
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: onAdd,
-            child: const Icon(Icons.add, size: 16, color: Colors.white),
           ),
         ],
       ),
