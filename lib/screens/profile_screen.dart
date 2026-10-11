@@ -2005,8 +2005,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     final account = <Widget>[
       if (_role == 'buyer' ||
           _role == null ||
-          _role == 'admin' ||
-          _role == 'super_admin') ...[
+          _canOpenAdminPortal) ...[
         const _WebSectionLabel('ACCOUNT'),
         if (_role == 'buyer' || _role == null)
           ProfileMenuTile(
@@ -2256,8 +2255,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                           ],
                           if (_role == 'buyer' ||
                               _role == null ||
-                              _role == 'admin' ||
-                              _role == 'super_admin') ...[
+                              _canOpenAdminPortal) ...[
                             const SizedBox(height: 24),
                             const Text(
                               'ACCOUNT',
