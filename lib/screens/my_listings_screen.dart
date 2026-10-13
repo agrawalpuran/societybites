@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../web/web_breakpoints.dart';
 import '../web/web_page_frame.dart';
 
 import '../models/data.dart';
@@ -635,6 +636,7 @@ class MyListingsScreenState extends State<MyListingsScreen>
         ),
       ),
     ),
+      maxWidth: webSellerContentMaxWidth,
     );
   }
 

@@ -6,6 +6,9 @@ const webCompactMinWidth = 768.0;
 const webDesktopMinWidth = 1200.0;
 const webFrameMaxWidth = 1180.0;
 
+/// Seller tools (My Kitchen, My Listings, add listing form) — avoids stretched mobile layout on desktop.
+const webSellerContentMaxWidth = 840.0;
+
 const webPageBackground = Color(0xFFF3F6F1);
 const webInk = Color(0xFF172421);
 const webMuted = Color(0xFF6B7874);

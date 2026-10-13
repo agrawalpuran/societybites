@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../web/web_breakpoints.dart';
 import '../web/web_page_frame.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -1368,7 +1369,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
         ),
       ),
     ),
-      maxWidth: 840,
+      maxWidth: webSellerContentMaxWidth,
     );
   }
 

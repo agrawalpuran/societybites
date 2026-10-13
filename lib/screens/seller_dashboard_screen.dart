@@ -1208,7 +1208,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: webFrameMaxWidth),
+          constraints: const BoxConstraints(maxWidth: webSellerContentMaxWidth),
           child: Column(
             children: [
               const Padding(
@@ -1300,11 +1300,11 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                                 ),
                               ),
                             SliverToBoxAdapter(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Expanded(child: _buildExpandCard()),
-                                  Expanded(child: _buildAddListingCta(context)),
+                                  _buildExpandCard(),
+                                  _buildAddListingCta(context),
                                 ],
                               ),
                             ),
