@@ -263,6 +263,9 @@ async function getAdminGrowth(prisma, range, now = new Date()) {
 
   const summary = await countGrowthForWindow(prisma, rangeStart, rangeEnd);
 
+  // Latest period first (e.g. today on top for daily view).
+  series.reverse();
+
   return {
     range,
     timezone: "Asia/Kolkata",
@@ -339,7 +342,9 @@ async function listAdminGrowthMembers(prisma, metric, start, end) {
       orderBy: { createdAt: "desc" },
       take: MEMBERS_LIMIT,
     });
-    return users.map((u) => mapUserContact(u, u.createdAt));
+    return users.map((u) =>
+      mapUserContact(u, u.createdAt, { includeSociety: true })
+    );
   }
 
   if (metric === "buyers") {

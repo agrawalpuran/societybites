@@ -264,9 +264,9 @@ class _GrowthMembersSheetState extends State<_GrowthMembersSheet> {
     final role = member['role']?.toString();
     final parts = <String>[phone];
 
-    final showSociety =
-        widget.metric == 'buyers' || widget.metric == 'sellers';
-    if (showSociety) {
+    if (widget.metric == 'accounts' ||
+        widget.metric == 'buyers' ||
+        widget.metric == 'sellers') {
       final societyName = member['societyName']?.toString().trim();
       final societyCity = member['societyCity']?.toString().trim();
       if (societyName != null && societyName.isNotEmpty) {
