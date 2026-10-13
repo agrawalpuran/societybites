@@ -243,7 +243,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _updateQuantity(int index, int delta) {
-    final maxAvailable = _items[index].food.quantity;
+    final maxAvailable = _items[index].food.buyerMaxCartQuantity;
     final proposed = _items[index].quantity + delta;
     if (delta > 0 && proposed > maxAvailable) {
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -1230,18 +1230,19 @@ class _OrderItemCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Text(
-                item.food.quantity <= 0
-                    ? 'Sold out'
-                    : '${item.food.quantity} left',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: item.food.quantity <= 0
-                      ? const Color(0xFFD94F4F)
-                      : const Color(0xFF6A7774),
+              if (item.food.showsBuyerPortionStock)
+                Text(
+                  item.food.quantity <= 0
+                      ? 'Sold out'
+                      : '${item.food.quantity} left',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: item.food.quantity <= 0
+                        ? const Color(0xFFD94F4F)
+                        : const Color(0xFF6A7774),
+                  ),
                 ),
-              ),
             ],
           ),
         ],

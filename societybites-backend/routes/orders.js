@@ -711,7 +711,6 @@ router.post(
 
       const enforceStock =
         (orderType === "regular" || current.inventoryMode === "limited") &&
-        !isMadeToOrderListing(current) &&
         !isRecurringReadyNowListing(current);
       if (enforceStock && quantity > current.quantity) {
         return res.status(409).json({
@@ -917,7 +916,6 @@ router.post(
         for (const { listing, quantity } of preparedItems) {
           const reserveStock =
             (orderType === "regular" || listing.inventoryMode === "limited") &&
-            !isMadeToOrderListing(listing) &&
             !isRecurringReadyNowListing(listing);
           if (!reserveStock) continue;
 

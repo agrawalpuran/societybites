@@ -616,11 +616,13 @@ class HomeScreenState extends State<HomeScreen> {
       return;
     }
     final currentInCart = _cartQtyFor(food);
-    if (currentInCart >= food.quantity) {
+    if (currentInCart >= food.buyerMaxCartQuantity) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Only ${food.quantity} available for ${food.name}'),
+          content: Text(
+            'Only ${food.buyerMaxCartQuantity} available for ${food.name}',
+          ),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -694,11 +696,13 @@ class HomeScreenState extends State<HomeScreen> {
     final currentInCart = _cart
         .where((c) => c.food.id == food.id)
         .fold<int>(0, (sum, c) => sum + c.quantity);
-    if (currentInCart >= food.quantity) {
+    if (currentInCart >= food.buyerMaxCartQuantity) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Only ${food.quantity} available for ${food.name}'),
+          content: Text(
+            'Only ${food.buyerMaxCartQuantity} available for ${food.name}',
+          ),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(

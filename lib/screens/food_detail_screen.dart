@@ -284,7 +284,11 @@ class _QuickInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final soldOut = food.quantity <= 0;
+    final soldOut = food.isMadeToOrder
+        ? food.madeToOrderUnavailableToday ||
+            food.isExpired ||
+            food.quantity <= 0
+        : food.quantity <= 0;
     final portion = portionLabelForFood(food);
     final timing = listingTimingChipFor(food);
     return Padding(
@@ -296,8 +300,16 @@ class _QuickInfoRow extends StatelessWidget {
             Expanded(
               child: _InfoChip(
                 label: 'AVAILABILITY',
-                value: soldOut ? 'Sold out' : '${food.quantity}',
-                sub: soldOut ? 'currently unavailable' : 'portions left',
+                value: soldOut
+                    ? (food.madeToOrderUnavailableToday
+                        ? 'Unavailable'
+                        : 'Sold out')
+                    : '${food.quantity}',
+                sub: soldOut
+                    ? 'currently unavailable'
+                    : food.isMadeToOrder
+                        ? 'portions · made to order'
+                        : 'portions left',
               ),
             ),
             const SizedBox(width: 12),

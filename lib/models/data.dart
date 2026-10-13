@@ -184,6 +184,16 @@ class FoodItem {
       !isPreOrder &&
       availabilityMode == listingAvailabilityMadeToOrder;
 
+  bool get showsBuyerPortionStock => !isPreOrderCatalog;
+
+  int get buyerMaxCartQuantity => quantity;
+
+  String? get buyerPortionStockShortLabel {
+    if (!showsBuyerPortionStock) return null;
+    if (quantity <= 0 || isExpired) return null;
+    return '$quantity left';
+  }
+
   bool get isPreOrder {
     final id = campaignId?.trim();
     return id != null && id.isNotEmpty;

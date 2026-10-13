@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/screens/seller_list_screen.dart';
 import 'package:societybites/screens/seller_storefront_screen.dart';
@@ -630,6 +631,36 @@ void main() {
     expect(find.text('Tender coconut'), findsOneWidget);
     expect(find.text('Out of stock'), findsOneWidget);
     expect(find.text('FSSAI pending'), findsOneWidget);
+  });
+
+  testWidgets('own storefront shows edit on product cards', (tester) async {
+    SharedPreferences.setMockInitialValues({'user_id': 'seller-a'});
+    await _openStorefront(
+      tester,
+      seller: _seller('seller-a', 'Seller A'),
+      fetchListings: () async => [
+        _listingJson(id: 'a1', name: 'A Idli', sellerId: 'seller-a'),
+      ],
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('storefront-edit-listing-a1')), findsOneWidget);
+  });
+
+  testWidgets('neighbor storefront hides edit on product cards', (tester) async {
+    SharedPreferences.setMockInitialValues({'user_id': 'buyer-1'});
+    await _openStorefront(
+      tester,
+      seller: _seller('seller-a', 'Seller A'),
+      fetchListings: () async => [
+        _listingJson(id: 'a1', name: 'A Idli', sellerId: 'seller-a'),
+      ],
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('storefront-edit-listing-a1')), findsNothing);
   });
 }
 

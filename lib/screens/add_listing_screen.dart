@@ -86,6 +86,9 @@ class _AddListingScreenState extends State<AddListingScreen> {
   bool get _isJustToday => !_repeatSchedule && !_untilStockLasts;
   bool get _showStockAndExpiryFields =>
       !_isMadeToOrder && !_isPreorderCatalog && !_repeatSchedule;
+
+  bool get _showQuantityAvailableField =>
+      !_isPreorderCatalog && (_isMadeToOrder || _showStockAndExpiryFields);
   bool get _showRecurringSection => !_isMadeToOrder && !_isPreorderCatalog;
   /// Just today already ends today, so an extra stop date is not offered.
   bool get _showUntilField => false;
@@ -791,11 +794,13 @@ class _AddListingScreenState extends State<AddListingScreen> {
         );
       }
 
-      final quantity = (_isMadeToOrder || _isPreorderCatalog || useRecurring)
-          ? (_isEditing && widget.existingListing!.quantity > 0
-              ? widget.existingListing!.quantity
-              : 99)
-          : int.parse(_qtyController.text.trim());
+      final quantity = _showQuantityAvailableField
+          ? int.parse(_qtyController.text.trim())
+          : (_isPreorderCatalog || useRecurring)
+              ? (_isEditing && widget.existingListing!.quantity > 0
+                  ? widget.existingListing!.quantity
+                  : 99)
+              : int.parse(_qtyController.text.trim());
       final recurringStartMinute = timeOfDayToMinute(
         _recurringStart.hour,
         _recurringStart.minute,
@@ -1024,33 +1029,55 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         const SizedBox(height: 18),
                         _buildRecurringSection(),
                       ],
-                      if (_showStockAndExpiryFields) ...[
+                      if (_showQuantityAvailableField) ...[
                         const SizedBox(height: 18),
                         _buildField(
-                          label: 'QUANTITY AVAILABLE',
+                          label: 'PORTIONS AVAILABLE',
                           isRequired: true,
-                          child: TextFormField(
-                            controller: _qtyController,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextFormField(
+                                key: const Key('listing-portions-available'),
+                                controller: _qtyController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) {
+                                    return 'Required';
+                                  }
+                                  final n = int.tryParse(v.trim());
+                                  if (n == null || n < 1) {
+                                    return 'Enter at least 1';
+                                  }
+                                  return null;
+                                },
+                                decoration: _inputDeco(
+                                  _isEditing
+                                      ? 'How many portions you can take now'
+                                      : 'e.g. 10',
+                                ),
+                              ),
+                              if (_isMadeToOrder) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Counts down as neighbors order. Update anytime '
+                                  'if you can take more or need to pause new orders.',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    height: 1.35,
+                                    color: Color(0xFF6A7774),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ],
-                            validator: (v) {
-                              if (v == null || v.trim().isEmpty) {
-                                return 'Required';
-                              }
-                              final n = int.tryParse(v.trim());
-                              if (n == null || n < 1) return 'Enter at least 1';
-                              return null;
-                            },
-                            decoration: _inputDeco(
-                              _isEditing
-                                  ? 'Remaining portions (current stock)'
-                                  : '1',
-                            ),
                           ),
                         ),
                       ],
+                      if (_showStockAndExpiryFields) ...[
                       const SizedBox(height: 18),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1211,6 +1238,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                             ),
                           ),
                         ),
+                      ],
                       ],
                       const SizedBox(height: 18),
                       _buildField(

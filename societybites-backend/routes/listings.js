@@ -43,6 +43,7 @@ const {
   availabilityWriteFields,
   availabilityUpdateFields,
   attachMadeToOrderCapacity,
+  resolveListingQuantity,
 } = require("../lib/listingAvailability");
 const {
   recurringWriteFields,
@@ -330,6 +331,13 @@ router.post(
       return res.status(err.statusCode || 400).json({ error: err.message });
     }
 
+    let storedQuantity;
+    try {
+      storedQuantity = resolveListingQuantity(quantity);
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+
     const listing = await prisma.listing.create({
       data: {
         sellerId: req.user.id,
@@ -337,7 +345,7 @@ router.post(
         name,
         description,
         price: parseFloat(price),
-        quantity: parseInt(quantity, 10),
+        quantity: storedQuantity,
         availableAt: availableAtDate,
         pickupLocation: pickupLocation || "My Home (Verified)",
         imageUrl,
@@ -463,7 +471,6 @@ router.patch(
       ...(name !== undefined && { name }),
       ...(description !== undefined && { description }),
       ...(price !== undefined && { price: parseFloat(price) }),
-      ...(quantity !== undefined && { quantity: parseInt(quantity, 10) }),
       ...(pickupLocation !== undefined && { pickupLocation }),
       ...(imageUrl !== undefined && { imageUrl }),
       ...(weightUnit !== undefined && { weightUnit: weightUnit || null }),
@@ -490,6 +497,14 @@ router.patch(
       if (recurringFields) Object.assign(data, recurringFields);
       if (recurringFields && recurringFields.recurringEnabled) {
         data.availableAt = null;
+      }
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+
+    try {
+      if (quantity !== undefined) {
+        data.quantity = resolveListingQuantity(quantity);
       }
     } catch (err) {
       return res.status(err.statusCode || 400).json({ error: err.message });

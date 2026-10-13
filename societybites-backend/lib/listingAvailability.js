@@ -88,6 +88,16 @@ function assertRegularOrderAvailabilityMix(listings) {
   }
 }
 
+function resolveListingQuantity(quantity) {
+  const parsed = parseInt(quantity, 10);
+  if (!parsed || parsed < 1) {
+    const err = new Error("quantity must be at least 1");
+    err.statusCode = 400;
+    throw err;
+  }
+  return parsed;
+}
+
 const MULTIPLE_MADE_TO_ORDER_CART_MESSAGE =
   "This cart can hold one Made to order item at a time so the ready time stays clear. Checkout this one first, then order the other.";
 
@@ -229,6 +239,7 @@ async function attachMadeToOrderCapacity(prisma, listings) {
 
 module.exports = {
   AVAILABILITY_MODES,
+  resolveListingQuantity,
   parseAvailabilityMode,
   parsePreparationTimeMinutes,
   parseMaxDailyOrders,

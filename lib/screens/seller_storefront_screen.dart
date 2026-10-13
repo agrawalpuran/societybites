@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../web/web_page_frame.dart';
@@ -8,6 +10,7 @@ import '../models/nearby_seller.dart';
 import '../models/seller_fulfilment.dart';
 import '../services/api_service.dart';
 import '../services/cart_controller.dart';
+import '../services/my_listings_prefetch.dart';
 import '../services/session_service.dart';
 import '../widgets/guest_order_auth.dart';
 import '../widgets/listing_image.dart';
@@ -18,6 +21,7 @@ import '../widgets/one_seller_cart.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/seller_avatar.dart';
 import 'buyer_preorder_detail_screen.dart';
+import 'add_listing_screen.dart';
 import 'checkout_screen.dart';
 import 'food_detail_screen.dart';
 import 'home_listing_filter.dart';
@@ -111,6 +115,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
   bool _loading = true;
   bool _hasSuccessfullyLoaded = false;
   String? _error;
+  bool _isOwnStorefront = false;
 
   List<CartItem> get _cart => widget.cartItems ?? _localCart;
 
@@ -144,7 +149,35 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       _hasSuccessfullyLoaded = true;
       _loading = false;
     }
+    unawaited(_resolveOwnStorefront());
     _load();
+  }
+
+  Future<void> _resolveOwnStorefront() async {
+    if (widget.guestBrowse) return;
+    final viewerId = await SessionService.getUserId();
+    if (!mounted) return;
+    setState(() {
+      _isOwnStorefront =
+          viewerId != null && viewerId == widget.seller.id;
+    });
+  }
+
+  Future<void> _openListingEditor(FoodItem listing) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddListingScreen(
+          existingListing: listing,
+          catalogType: listing.catalogType,
+        ),
+      ),
+    );
+    if (changed != true || !mounted) return;
+    try {
+      await MyListingsPrefetch.warm();
+    } catch (_) {}
+    await _load();
   }
 
   Future<void> reload() => _load();
@@ -320,8 +353,10 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       }
     }
     final current = _cartQuantity(food);
-    if (delta > 0 && current >= food.quantity) {
-      _show('Only ${food.quantity} available for ${food.name}.');
+    if (delta > 0 && current >= food.buyerMaxCartQuantity) {
+      _show(
+        'Only ${food.buyerMaxCartQuantity} available for ${food.name}.',
+      );
       return;
     }
     setState(() {
@@ -750,12 +785,40 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: ListingImage(
-                  food: food,
-                  width: double.infinity,
-                  height: double.infinity,
-                  borderRadius: 14,
-                  showTypeBadge: true,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ListingImage(
+                      food: food,
+                      width: double.infinity,
+                      height: double.infinity,
+                      borderRadius: 14,
+                      showTypeBadge: true,
+                    ),
+                    if (_isOwnStorefront)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Material(
+                          color: Colors.white.withValues(alpha: 0.94),
+                          shape: const CircleBorder(),
+                          elevation: 1,
+                          child: InkWell(
+                            key: Key('storefront-edit-listing-${food.id}'),
+                            customBorder: const CircleBorder(),
+                            onTap: () => _openListingEditor(food),
+                            child: const Padding(
+                              padding: EdgeInsets.all(7),
+                              child: Icon(
+                                Icons.edit_outlined,
+                                size: 18,
+                                color: Color(0xFF0E5A47),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(height: 10),
@@ -846,10 +909,10 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                     ),
                 ],
               ),
-              if (food.quantity > 0 && !food.isExpired) ...[
+              if (food.buyerPortionStockShortLabel != null) ...[
                 const SizedBox(height: 5),
                 Text(
-                  '${food.quantity} available',
+                  food.buyerPortionStockShortLabel!,
                   style: const TextStyle(color: preorderMuted, fontSize: 11),
                 ),
               ],
