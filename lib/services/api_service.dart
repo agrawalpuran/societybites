@@ -2027,6 +2027,42 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> getAdminGrowth({
+    String range = 'week',
+  }) async {
+    final uri = Uri.parse('$baseUrl/admin/growth').replace(
+      queryParameters: {'range': range},
+    );
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminGrowthMembers({
+    required String metric,
+    required String start,
+    required String end,
+  }) async {
+    final uri = Uri.parse('$baseUrl/admin/growth/members').replace(
+      queryParameters: {
+        'metric': metric,
+        'start': start,
+        'end': end,
+      },
+    );
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      final body = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      final members = body['members'] as List<dynamic>? ?? [];
+      return members
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<List<Map<String, dynamic>>> getAdminUsers({
     String? search,
     String? role,

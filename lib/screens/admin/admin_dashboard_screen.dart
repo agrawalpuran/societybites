@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../widgets/admin_growth_panel.dart';
 import '../../widgets/admin_loading_panel.dart';
 import 'admin_city_reach_screen.dart';
 import 'admin_fssai_screen.dart';
@@ -371,6 +372,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+            const AdminGrowthPanel(),
             const SizedBox(height: 24),
             _SectionTitle(title: 'USERS'),
             const SizedBox(height: 10),

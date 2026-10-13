@@ -44,6 +44,13 @@ const {
   getAddressProof,
   reviewAddressProof,
 } = require("../lib/addressProofReview");
+const {
+  getAdminGrowth,
+  normalizeGrowthRange,
+  normalizeGrowthMetric,
+  parseGrowthWindow,
+  listAdminGrowthMembers,
+} = require("../lib/adminGrowth");
 
 const router = express.Router();
 
@@ -226,6 +233,53 @@ router.get(
       cancelledOrders,
       totalReviews,
       avgPlatformRating: ratingAgg._avg.rating || 0,
+    });
+  })
+);
+
+// GET /admin/growth?range=day|week|month|quarter|half_year|year — read-only (console + super admin)
+router.get(
+  "/growth",
+  asyncHandler(async (req, res) => {
+    const range = normalizeGrowthRange(req.query.range);
+    if (!range) {
+      return res.status(400).json({
+        error:
+          "Invalid range. Use day, week, month, quarter, half_year, or year.",
+      });
+    }
+    const payload = await getAdminGrowth(prisma, range);
+    res.json(payload);
+  })
+);
+
+// GET /admin/growth/members?metric=accounts|buyers|sellers&start=&end= — contact list for a bucket
+router.get(
+  "/growth/members",
+  asyncHandler(async (req, res) => {
+    const metric = normalizeGrowthMetric(req.query.metric);
+    if (!metric) {
+      return res.status(400).json({
+        error: "Invalid metric. Use accounts, buyers, or sellers.",
+      });
+    }
+    const window = parseGrowthWindow(req.query.start, req.query.end);
+    if (!window) {
+      return res.status(400).json({
+        error: "Invalid start/end ISO datetimes (end must be after start).",
+      });
+    }
+    const members = await listAdminGrowthMembers(
+      prisma,
+      metric,
+      window.start,
+      window.end
+    );
+    res.json({
+      metric,
+      start: window.start.toISOString(),
+      end: window.end.toISOString(),
+      members,
     });
   })
 );

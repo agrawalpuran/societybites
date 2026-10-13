@@ -109,6 +109,24 @@ async function main() {
     });
     assert(dash.status === 200, "console admin can read dashboard");
 
+    const growth = await jsonRequest(server, {
+      method: "GET",
+      path: "/admin/growth?range=week",
+      token: consoleToken,
+    });
+    assert(growth.status === 200, "console admin can read growth");
+    assert(Array.isArray(growth.json.series), "growth series array");
+    assert(growth.json.summary != null, "growth summary");
+
+    const firstBucket = growth.json.series[0];
+    const members = await jsonRequest(server, {
+      method: "GET",
+      path: `/admin/growth/members?metric=accounts&start=${encodeURIComponent(firstBucket.start)}&end=${encodeURIComponent(firstBucket.end)}`,
+      token: consoleToken,
+    });
+    assert(members.status === 200, "console admin can read growth members");
+    assert(Array.isArray(members.json.members), "growth members array");
+
     const writeBlocked = await jsonRequest(server, {
       method: "POST",
       path: "/admin/societies",
