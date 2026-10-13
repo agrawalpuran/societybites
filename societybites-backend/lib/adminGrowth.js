@@ -290,6 +290,7 @@ const USER_CONTACT_SELECT = {
   role: true,
   createdAt: true,
   suspended: true,
+  society: { select: { name: true, city: true } },
 };
 
 function normalizeGrowthMetric(raw) {
@@ -309,13 +310,21 @@ function parseGrowthWindow(startRaw, endRaw) {
   return { start, end };
 }
 
-function mapUserContact(user, eventAt) {
-  return {
+function mapUserContact(user, eventAt, { includeSociety = false } = {}) {
+  const base = {
     id: user.id,
     name: user.name,
     phone: user.phone,
     role: user.role,
     eventAt: eventAt.toISOString(),
+  };
+  if (!includeSociety) return base;
+  const societyName = user.society?.name?.trim() || null;
+  const societyCity = user.society?.city?.trim() || null;
+  return {
+    ...base,
+    societyName,
+    societyCity,
   };
 }
 
@@ -344,7 +353,9 @@ async function listAdminGrowthMembers(prisma, metric, start, end) {
       orderBy: { createdAt: "desc" },
       take: MEMBERS_LIMIT,
     });
-    return users.map((u) => mapUserContact(u, u.createdAt));
+    return users.map((u) =>
+      mapUserContact(u, u.createdAt, { includeSociety: true })
+    );
   }
 
   const acceptances = await prisma.sellerTermsAcceptance.findMany({
@@ -360,7 +371,9 @@ async function listAdminGrowthMembers(prisma, metric, start, end) {
     const user = row.user;
     if (!user || user.role === "super_admin" || seen.has(user.id)) continue;
     seen.add(user.id);
-    members.push(mapUserContact(user, row.acceptedAt));
+    members.push(
+      mapUserContact(user, row.acceptedAt, { includeSociety: true })
+    );
     if (members.length >= MEMBERS_LIMIT) break;
   }
   return members;

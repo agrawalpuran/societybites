@@ -259,6 +259,33 @@ class _GrowthMembersSheetState extends State<_GrowthMembersSheet> {
     }
   }
 
+  String _memberSubtitle(Map<String, dynamic> member) {
+    final phone = member['phone']?.toString() ?? '—';
+    final role = member['role']?.toString();
+    final parts = <String>[phone];
+
+    final showSociety =
+        widget.metric == 'buyers' || widget.metric == 'sellers';
+    if (showSociety) {
+      final societyName = member['societyName']?.toString().trim();
+      final societyCity = member['societyCity']?.toString().trim();
+      if (societyName != null && societyName.isNotEmpty) {
+        if (societyCity != null && societyCity.isNotEmpty) {
+          parts.add('$societyName, $societyCity');
+        } else {
+          parts.add(societyName);
+        }
+      } else {
+        parts.add('Society not set');
+      }
+    }
+
+    if (role != null && role.isNotEmpty) {
+      parts.add(role);
+    }
+    return parts.join(' • ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.sizeOf(context).height;
@@ -350,7 +377,6 @@ class _GrowthMembersSheetState extends State<_GrowthMembersSheet> {
                               ? m['name'].toString()
                               : 'No name';
                           final phone = m['phone']?.toString() ?? '—';
-                          final role = m['role']?.toString();
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
                             title: Text(
@@ -361,11 +387,7 @@ class _GrowthMembersSheetState extends State<_GrowthMembersSheet> {
                               ),
                             ),
                             subtitle: Text(
-                              [
-                                phone,
-                                if (role != null && role.isNotEmpty)
-                                  role,
-                              ].join(' • '),
+                              _memberSubtitle(m),
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF6A7774),
