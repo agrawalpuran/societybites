@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -146,6 +147,15 @@ class _AdminGrowthPanelState extends State<AdminGrowthPanel> {
   }
 }
 
+double _growthMembersSheetBottomInset(BuildContext context) {
+  final media = MediaQuery.of(context);
+  final systemBottom = media.padding.bottom + media.viewPadding.bottom;
+  // Browser viewport often extends behind the Windows taskbar on web/desktop.
+  final desktopLike = kIsWeb || media.size.width >= 520;
+  final taskbarClearance = desktopLike ? 56.0 : 0.0;
+  return systemBottom + taskbarClearance;
+}
+
 Future<void> _showGrowthMembersSheet({
   required BuildContext context,
   required String metric,
@@ -157,16 +167,21 @@ Future<void> _showGrowthMembersSheet({
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (ctx) {
-      return _GrowthMembersSheet(
-        metric: metric,
-        title: title,
-        periodLabel: periodLabel,
-        start: start,
-        end: end,
+      final bottomInset = _growthMembersSheetBottomInset(ctx);
+      return Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: _GrowthMembersSheet(
+          metric: metric,
+          title: title,
+          periodLabel: periodLabel,
+          start: start,
+          end: end,
+        ),
       );
     },
   );
@@ -246,11 +261,11 @@ class _GrowthMembersSheetState extends State<_GrowthMembersSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.75;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final maxHeight = (screenHeight * 0.62).clamp(240.0, 520.0);
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -326,7 +341,7 @@ class _GrowthMembersSheetState extends State<_GrowthMembersSheet> {
                     : ListView.separated(
                         shrinkWrap: true,
                         itemCount: _members!.length,
-                        separatorBuilder: (_, __) =>
+                        separatorBuilder: (context, index) =>
                             const Divider(height: 1, color: Color(0xFFF0F2F1)),
                         itemBuilder: (context, index) {
                           final m = _members![index];
@@ -385,7 +400,6 @@ class _GrowthMembersSheetState extends State<_GrowthMembersSheet> {
               ),
           ],
         ),
-      ),
     );
   }
 }
