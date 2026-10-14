@@ -88,6 +88,10 @@ void main() {
     expect(find.text('HOW WILL YOU FULFIL THIS?'), findsNothing);
     expect(find.text('Made to order'), findsOneWidget);
     expect(find.text('PREPARATION TIME'), findsOneWidget);
+    expect(find.text('PORTIONS AVAILABLE'), findsOneWidget);
+    expect(find.text('WEIGHT'), findsOneWidget);
+    expect(find.text('UNIT'), findsOneWidget);
+    expect(find.byKey(const Key('listing-weight-unit-row')), findsOneWidget);
     expect(find.text('QUANTITY AVAILABLE'), findsNothing);
     expect(find.text('DATE/TIME AVAILABLE UNTIL'), findsNothing);
     expect(find.text('AVAILABLE UNTIL (OPTIONAL)'), findsNothing);

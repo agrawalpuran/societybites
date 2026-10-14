@@ -1958,6 +1958,14 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   Future<void> _openMyListings() async {
+    if (!MyListingsCache.hasSnapshot) {
+      try {
+        await MyListingsPrefetch.warm();
+      } catch (_) {
+        // Screen shows error if fetch failed.
+      }
+    }
+    if (!mounted) return;
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const MyListingsScreen()),

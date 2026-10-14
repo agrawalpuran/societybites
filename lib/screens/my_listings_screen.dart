@@ -15,7 +15,7 @@ import '../widgets/listing_type_badge.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/made_to_order_hint.dart';
-import '../widgets/screen_loading_note.dart';
+import '../widgets/content_skeleton.dart';
 import '../widgets/status_banner.dart';
 import 'add_listing_screen.dart';
 import 'add_listing_type_screen.dart';
@@ -555,7 +555,7 @@ class MyListingsScreenState extends State<MyListingsScreen>
             ),
             Expanded(
               child: _isLoading
-                  ? const ScreenLoadingNote(message: 'Loading listings…')
+                  ? const MyListingsCatalogSkeleton()
                   : _error != null
                       ? Align(
                           alignment: Alignment.topCenter,

@@ -89,6 +89,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   bool get _showQuantityAvailableField =>
       !_isPreorderCatalog && (_isMadeToOrder || _showStockAndExpiryFields);
+
+  bool get _showWeightAndUnitFields =>
+      _isMadeToOrder || _showStockAndExpiryFields;
+
   bool get _showRecurringSection => !_isMadeToOrder && !_isPreorderCatalog;
   /// Just today already ends today, so an extra stop date is not offered.
   bool get _showUntilField => false;
@@ -97,6 +101,15 @@ class _AddListingScreenState extends State<AddListingScreen> {
     if (_isPreorderCatalog) return 'Pre-order Catalog';
     if (_isMadeToOrder) return 'Made to order';
     return 'Available now order';
+  }
+
+  (String? value, String? unit) _weightFieldsForApi() {
+    final trimmed = _weightPerUnitController.text.trim();
+    if (trimmed.isEmpty) {
+      if (_isEditing) return ('', '');
+      return (null, null);
+    }
+    return (trimmed, _weightUnit);
   }
 
   int? get _selectedPrepMinutes {
@@ -419,6 +432,122 @@ class _AddListingScreenState extends State<AddListingScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildWeightAndUnitRow() {
+    const weightLabel = 'WEIGHT';
+    const unitLabel = 'UNIT';
+    return Row(
+      key: const Key('listing-weight-unit-row'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: _buildField(
+            label: weightLabel,
+            labelStyle: _pairedFieldLabelStyle,
+            child: TextFormField(
+              key: const Key('listing-weight-field'),
+              controller: _weightPerUnitController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+              ],
+              decoration: _inputDeco('e.g. 250'),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 3,
+          child: _buildField(
+            label: unitLabel,
+            labelStyle: _pairedFieldLabelStyle,
+            child: Container(
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE0E5E3)),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  key: const Key('listing-weight-unit'),
+                  value: _weightUnit,
+                  isExpanded: true,
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Color(0xFF8A9491),
+                  ),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: Color(0xFF3A4644),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'portions',
+                      child: Text(
+                        'Portions / Servings',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'grams',
+                      child: Text(
+                        'Grams (g)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'kg',
+                      child: Text(
+                        'Kilograms (kg)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'ml',
+                      child: Text(
+                        'Millilitres (ml)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'litres',
+                      child: Text(
+                        'Litres (L)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'pieces',
+                      child: Text(
+                        'Pieces',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'packs',
+                      child: Text(
+                        'Packs',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() => _weightUnit = v);
+                    }
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -826,6 +955,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
           ? sameDayEnd
           : (justToday ? _endOfToday() : null);
 
+      final (weightValue, weightUnit) = _weightFieldsForApi();
+
       if (_isEditing) {
         await ApiService.updateListing(
           listingId: widget.existingListing!.id,
@@ -837,8 +968,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
           clearAvailableAt: availableAt == null && !_showUntilField,
           pickupLocation: _pickup,
           imageUrl: imageUrl,
-          weightUnit: _weightUnit,
-          weightValue: _weightPerUnitController.text.trim(),
+          weightUnit: weightUnit,
+          weightValue: weightValue,
           tags: _selectedTags,
           categories: [..._selectedCategories, ..._legacyCategories],
           foodType: _foodType!,
@@ -867,8 +998,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
           availableAt: availableAt,
           pickupLocation: _pickup,
           imageUrl: imageUrl,
-          weightUnit: _weightUnit,
-          weightValue: _weightPerUnitController.text.trim(),
+          weightUnit: weightUnit,
+          weightValue: weightValue,
           tags: _selectedTags,
           categories: [..._selectedCategories, ..._legacyCategories],
           foodType: _foodType!,
@@ -1077,118 +1208,11 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           ),
                         ),
                       ],
+                      if (_showWeightAndUnitFields) ...[
+                        const SizedBox(height: 18),
+                        _buildWeightAndUnitRow(),
+                      ],
                       if (_showStockAndExpiryFields) ...[
-                      const SizedBox(height: 18),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: _buildField(
-                              label: 'WEIGHT',
-                              labelStyle: _pairedFieldLabelStyle,
-                              child: TextFormField(
-                                controller: _weightPerUnitController,
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(
-                                      RegExp(r'[\d.]')),
-                                ],
-                                decoration: _inputDeco('e.g. 250'),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 3,
-                            child: _buildField(
-                              label: 'UNIT',
-                              labelStyle: _pairedFieldLabelStyle,
-                              child: Container(
-                                height: 52,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                      color: const Color(0xFFE0E5E3)),
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _weightUnit,
-                                    isExpanded: true,
-                                    icon: const Icon(
-                                        Icons.keyboard_arrow_down_rounded,
-                                        color: Color(0xFF8A9491)),
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      color: Color(0xFF3A4644),
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    items: const [
-                                      DropdownMenuItem(
-                                        value: 'portions',
-                                        child: Text(
-                                          'Portions / Servings',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'grams',
-                                        child: Text(
-                                          'Grams (g)',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'kg',
-                                        child: Text(
-                                          'Kilograms (kg)',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'ml',
-                                        child: Text(
-                                          'Millilitres (ml)',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'litres',
-                                        child: Text(
-                                          'Litres (L)',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'pieces',
-                                        child: Text(
-                                          'Pieces',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'packs',
-                                        child: Text(
-                                          'Packs',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                    onChanged: (v) {
-                                      if (v != null) {
-                                        setState(() => _weightUnit = v);
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
                       if (_showUntilField) ...[
                         const SizedBox(height: 18),
                         _buildField(

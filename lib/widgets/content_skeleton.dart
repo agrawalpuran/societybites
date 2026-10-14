@@ -98,6 +98,55 @@ class _HomeListingSkeleton extends StatelessWidget {
   }
 }
 
+class MyListingsCatalogSkeleton extends StatelessWidget {
+  const MyListingsCatalogSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('my-listings-catalog-skeletons'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F2F1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Row(
+              children: [
+                SkeletonBlock(width: 52, height: 28, radius: 10),
+                SizedBox(width: 8),
+                SkeletonBlock(width: 64, height: 28, radius: 10),
+                SizedBox(width: 8),
+                SkeletonBlock(width: 88, height: 28, radius: 10),
+              ],
+            ),
+          ),
+        ),
+        const Expanded(
+          child: SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Column(
+              children: [
+                _HomeListingSkeleton(),
+                SizedBox(height: 12),
+                _HomeListingSkeleton(),
+                SizedBox(height: 12),
+                _HomeListingSkeleton(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class KitchenOrdersSkeleton extends StatelessWidget {
   const KitchenOrdersSkeleton({super.key});
 
