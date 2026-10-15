@@ -957,7 +957,11 @@ class _ActiveOrderCard extends StatelessWidget {
           ],
           const SizedBox(height: 14),
           OrderFulfilmentBanner(order: order, isSellerView: isSellerView),
-          OrderItemsList(items: order.items),
+          OrderItemsList(
+            items: order.items,
+            order: order,
+            showDeliveryBelowLineItems: !isSellerView,
+          ),
           if (order.requestedReadyAt != null) ...[
             const SizedBox(height: 10),
             RequestedReadySummary(order: order, isSellerView: isSellerView),

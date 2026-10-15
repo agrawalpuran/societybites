@@ -94,19 +94,6 @@ class OrderFulfilmentBanner extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Color(0xFF3A4644)),
                 ),
-              if (order.deliveryChargePending) ...[
-                const SizedBox(height: 6),
-                const Text(
-                  'Delivery charge will be confirmed by the seller when your order is ready.',
-                  style: TextStyle(color: Color(0xFF3A4644)),
-                ),
-              ] else if (order.deliveryCharge > 0) ...[
-                const SizedBox(height: 6),
-                Text(
-                  'Delivery charge: ₹${chargeLabel}',
-                  style: const TextStyle(color: Color(0xFF3A4644)),
-                ),
-              ],
             ],
             if (!delivery && order.fulfilmentAt != null) ...[
               const SizedBox(height: 4),

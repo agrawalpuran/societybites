@@ -10,11 +10,16 @@ class OrderItemsList extends StatelessWidget {
     required this.items,
     this.compact = false,
     this.showSellerName = true,
+    this.order,
+    this.showDeliveryBelowLineItems = false,
   });
 
   final List<OrderLineItem> items;
   final bool compact;
   final bool showSellerName;
+  /// When set with [showDeliveryBelowLineItems], delivery shows under item prices.
+  final Order? order;
+  final bool showDeliveryBelowLineItems;
 
   @override
   Widget build(BuildContext context) {
@@ -23,62 +28,135 @@ class OrderItemsList extends StatelessWidget {
     }
 
     return Column(
-      children: items.map((item) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: compact ? 8 : 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ListingImage(
-                food: item.food,
-                width: compact ? 44 : 52,
-                height: compact ? 44 : 52,
-                borderRadius: compact ? 12 : 14,
-                iconSize: compact ? 22 : 26,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.food.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: compact ? 14 : 15,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF101617),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      showSellerName
-                          ? 'Qty ${item.quantity} • ${item.food.sellerName}'
-                          : 'Qty ${item.quantity}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF8A9491),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+      children: [
+        ...items.map((item) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: compact ? 8 : 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListingImage(
+                  food: item.food,
+                  width: compact ? 44 : 52,
+                  height: compact ? 44 : 52,
+                  borderRadius: compact ? 12 : 14,
+                  iconSize: compact ? 22 : 26,
                 ),
-              ),
-              Text(
-                '₹${item.lineTotal.toStringAsFixed(0)}',
-                style: TextStyle(
-                  fontSize: compact ? 14 : 15,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF101617),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.food.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: compact ? 14 : 15,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF101617),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        showSellerName
+                            ? 'Qty ${item.quantity} • ${item.food.sellerName}'
+                            : 'Qty ${item.quantity}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF8A9491),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
+                Text(
+                  '₹${item.lineTotal.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontSize: compact ? 14 : 15,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF101617),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        ..._deliveryBelowItems(
+          order: order,
+          enabled: showDeliveryBelowLineItems && !compact,
+          itemCount: items.length,
+        ),
+      ],
     );
   }
+}
+
+List<Widget> _deliveryBelowItems({
+  required Order? order,
+  required bool enabled,
+  required int itemCount,
+}) {
+  if (!enabled || order == null || itemCount != 1) return const [];
+
+  const amountStyle = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w800,
+    color: Color(0xFF101617),
+  );
+  const labelStyle = TextStyle(
+    fontSize: 11,
+    color: Color(0xFF8A9491),
+    fontWeight: FontWeight.w600,
+  );
+
+  if (order.deliveryChargePending) {
+    return [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            const Spacer(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: const [
+                Text('Pending', style: amountStyle),
+                SizedBox(height: 2),
+                Text('Delivery charge', style: labelStyle),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  if (order.deliveryCharge <= 0) return const [];
+
+  final charge = order.deliveryCharge;
+  final chargeText = charge == charge.roundToDouble()
+      ? charge.toInt().toString()
+      : charge.toStringAsFixed(0);
+
+  return [
+    Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          const Spacer(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('₹$chargeText', style: amountStyle),
+              const SizedBox(height: 2),
+              const Text('Delivery charge', style: labelStyle),
+            ],
+          ),
+        ],
+      ),
+    ),
+  ];
 }
 
 class OrderTotalRow extends StatelessWidget {
