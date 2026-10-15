@@ -9,11 +9,11 @@ class BuyerDeliveryCollectHint extends StatelessWidget {
 
   final Order order;
 
-  static const _hintStyle = TextStyle(
+  static const _noteStyle = TextStyle(
     fontSize: 11,
     height: 1.35,
-    color: Color(0xFF6A7774),
-    fontWeight: FontWeight.w500,
+    color: Color(0xFF101617),
+    fontWeight: FontWeight.w700,
   );
 
   @override
@@ -24,8 +24,8 @@ class BuyerDeliveryCollectHint extends StatelessWidget {
 
     if (order.deliveryFeeCollectedByPartner) {
       return const Text(
-        'Delivery charge to be paid to partner directly',
-        style: _hintStyle,
+        'Please note: Delivery charge to be paid to delivery partner directly',
+        style: _noteStyle,
       );
     }
 
@@ -34,29 +34,25 @@ class BuyerDeliveryCollectHint extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Delivery charge to be paid to seller',
-          style: _hintStyle,
+          'Please note: Delivery charge to be paid to seller',
+          style: _noteStyle,
         ),
         if (upi != null) ...[
           const SizedBox(height: 4),
-          Row(
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 4,
+            runSpacing: 2,
             children: [
-              Expanded(
-                child: Text(
-                  upi,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: _hintStyle.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF3A4644),
-                  ),
-                ),
+              Text(
+                upi,
+                style: _noteStyle,
               ),
               InkWell(
                 onTap: () => _copyUpi(context, upi),
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(4),
                 child: const Padding(
-                  padding: EdgeInsets.all(4),
+                  padding: EdgeInsets.all(2),
                   child: Icon(
                     Icons.copy_rounded,
                     size: 16,
@@ -81,14 +77,4 @@ class BuyerDeliveryCollectHint extends StatelessWidget {
       ),
     );
   }
-}
-
-String buyerDeliveryChargeAmountLabel(Order order) {
-  if (order.deliveryChargePending) return 'On actuals';
-  final charge = order.deliveryCharge;
-  if (charge <= 0) return '₹0';
-  final label = charge == charge.roundToDouble()
-      ? charge.toInt().toString()
-      : charge.toStringAsFixed(0);
-  return '₹$label';
 }

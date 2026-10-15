@@ -97,11 +97,6 @@ class OrderFulfilmentBanner extends StatelessWidget {
                 ),
               if (order.buyerShowsDeliveryCollectGuidance) ...[
                 const SizedBox(height: 6),
-                Text(
-                  'Delivery charge: ${buyerDeliveryChargeAmountLabel(order)}',
-                  style: const TextStyle(color: Color(0xFF3A4644)),
-                ),
-                const SizedBox(height: 4),
                 BuyerDeliveryCollectHint(order: order),
               ],
             ],
