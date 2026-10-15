@@ -107,6 +107,7 @@ class HomeScreenState extends State<HomeScreen> {
   HomeListingType _listingType = HomeListingType.all;
   bool _justAdded = false;
   int _listingsLoadGeneration = 0;
+  final Set<String> _homePrecachedImageUrls = {};
   final _reachSectionKeys = <HomeListingReach, GlobalKey>{
     HomeListingReach.inSociety: GlobalKey(),
     HomeListingReach.nearby: GlobalKey(),
@@ -165,7 +166,14 @@ class HomeScreenState extends State<HomeScreen> {
     if (!mounted || listings.isEmpty) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaited(precacheHomeListingImages(context, listings));
+      unawaited(
+        precacheHomeListingImages(
+          context,
+          listings,
+          buyerSocietyId: _buyerSocietyId,
+          warmedUrls: _homePrecachedImageUrls,
+        ),
+      );
     });
   }
 

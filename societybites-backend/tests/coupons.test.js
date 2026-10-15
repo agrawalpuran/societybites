@@ -262,6 +262,42 @@ async function main() {
     assert(created.status === 201, `admin can create ${created.status}`);
     codes.push(created.json.code);
     assert(created.json.fundedBy === "SOCIETYEATS", "funding source is SocietyEats");
+
+    const percentCode = `pct${stamp}`;
+    const percentCoupon = await jsonRequest(server, {
+      method: "POST",
+      path: "/admin/coupons",
+      token: signToken(admin),
+      body: {
+        code: percentCode,
+        name: "Ten percent",
+        discountType: "PERCENTAGE",
+        discountValue: 10,
+        maximumDiscount: 80,
+        minimumOrderValue: 0,
+        validFrom: new Date(Date.now() - 1000).toISOString(),
+        validUntil: new Date(Date.now() + 86400000).toISOString(),
+        audienceType: "ALL",
+        status: "ACTIVE",
+      },
+    });
+    assert(percentCoupon.status === 201, `admin can create percentage coupon ${percentCoupon.status}`);
+    codes.push(percentCoupon.json.code);
+    const pctQuote = await validateCoupon({
+      code: percentCode,
+      userId: buyer.id,
+      orderSubtotal: 500,
+    });
+    assert(pctQuote.valid === true && pctQuote.discountAmount === 50, "10% of 500 is 50");
+    const pctCapped = await validateCoupon({
+      code: percentCode,
+      userId: buyer.id,
+      orderSubtotal: 1000,
+    });
+    assert(
+      pctCapped.valid === true && pctCapped.discountAmount === 80,
+      "percentage discount respects maximum cap"
+    );
     assert(created.json.sellerGrossAmount === undefined, "list payload has no checkout quote");
     const listed = await jsonRequest(server, {
       method: "GET",

@@ -246,7 +246,9 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
   final _name = TextEditingController();
   final _description = TextEditingController();
   final _discount = TextEditingController();
+  final _maxDiscount = TextEditingController();
   final _minimum = TextEditingController(text: '0');
+  String _discountType = 'FIXED';
   final _totalLimit = TextEditingController();
   final _buyerLimit = TextEditingController(text: '1');
   final _budget = TextEditingController();
@@ -280,6 +282,7 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
     _name.dispose();
     _description.dispose();
     _discount.dispose();
+    _maxDiscount.dispose();
     _minimum.dispose();
     _totalLimit.dispose();
     _buyerLimit.dispose();
@@ -293,7 +296,10 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
     _code.text = coupon.code;
     _name.text = coupon.name;
     _description.text = coupon.description ?? '';
+    _discountType = coupon.discountType;
     _discount.text = _trim(coupon.discountValue);
+    _maxDiscount.text =
+        coupon.maximumDiscount == null ? '' : _trim(coupon.maximumDiscount!);
     _minimum.text = _trim(coupon.minimumOrderValue);
     _totalLimit.text = coupon.totalUsageLimit?.toString() ?? '';
     _buyerLimit.text = coupon.usagePerBuyerLimit?.toString() ?? '';
@@ -351,7 +357,17 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
     if (code.isEmpty) return _fail('Enter a coupon code');
     if (name.isEmpty) return _fail('Enter a coupon name');
     if (discount == null || discount <= 0) return _fail('Enter a discount greater than zero');
+    if (_discountType == 'PERCENTAGE' && discount > 100) {
+      return _fail('Percentage cannot be more than 100');
+    }
     if (minimum == null || minimum < 0) return _fail('Enter a valid minimum order');
+    double? maxDiscount;
+    if (_maxDiscount.text.trim().isNotEmpty) {
+      maxDiscount = double.tryParse(_maxDiscount.text.trim());
+      if (maxDiscount == null || maxDiscount <= 0) {
+        return _fail('Enter a valid maximum discount cap');
+      }
+    }
     final from = DateTime(_validFrom.year, _validFrom.month, _validFrom.day);
     final until = DateTime(_validUntil.year, _validUntil.month, _validUntil.day, 23, 59, 59);
     if (!until.isAfter(from)) return _fail('The end date must be after the start date');
@@ -380,8 +396,9 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
       if (!_locked) 'code': code,
       'name': name,
       'description': _description.text.trim(),
-      if (!_locked) 'discountType': 'FIXED',
+      if (!_locked) 'discountType': _discountType,
       if (!_locked) 'discountValue': discount,
+      if (!_locked && maxDiscount != null) 'maximumDiscount': maxDiscount,
       'minimumOrderValue': minimum,
       'validFrom': from.toUtc().toIso8601String(),
       'validUntil': until.toUtc().toIso8601String(),
@@ -516,15 +533,17 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
           foregroundColor: Colors.white,
           title: Text(_editing ? (_coupon?.code ?? 'Coupon') : 'New coupon'),
         ),
-        body: _loading
-            ? const AdminLoadingPanel(
-                message: 'Loading coupon…',
-                showSkeleton: false,
-              )
-            : ListView(
-                key: const Key('coupon-editor-list'),
-                padding: const EdgeInsets.all(16),
-                children: [
+        body: SafeArea(
+          top: false,
+          child: _loading
+              ? const AdminLoadingPanel(
+                  message: 'Loading coupon…',
+                  showSkeleton: false,
+                )
+              : ListView(
+                  key: const Key('coupon-editor-list'),
+                  padding: const EdgeInsets.all(16),
+                  children: [
                   if (_coupon != null) ...[
                     Text(
                       '${_coupon!.statusLabel} · Used ${_coupon!.totalUsage}'
@@ -586,16 +605,62 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    key: const Key('coupon-discount-type'),
+                    value: _discountType,
+                    decoration: const InputDecoration(
+                      labelText: 'Discount type',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'FIXED',
+                        child: Text('Fixed amount (₹ off food)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'PERCENTAGE',
+                        child: Text('Percentage (% off food)'),
+                      ),
+                    ],
+                    onChanged: _locked
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+                            setState(() => _discountType = value);
+                          },
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: _discount,
                     enabled: !_locked,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-                    decoration: const InputDecoration(
-                      labelText: 'Fixed discount (₹)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: _discountType == 'PERCENTAGE'
+                          ? 'Discount (%)'
+                          : 'Discount (₹)',
+                      helperText: _discountType == 'PERCENTAGE'
+                          ? 'Applied to the food subtotal before fees and delivery'
+                          : 'Rupee amount off the food subtotal',
+                      border: const OutlineInputBorder(),
                     ),
                   ),
+                  if (_discountType == 'PERCENTAGE') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _maxDiscount,
+                      enabled: !_locked,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                      ],
+                      decoration: const InputDecoration(
+                        labelText: 'Maximum discount (₹, optional)',
+                        helperText: 'Cap the rupee discount, e.g. 10% up to ₹100',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   TextField(
                     controller: _minimum,
@@ -795,8 +860,10 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
                     style: FilledButton.styleFrom(backgroundColor: _green),
                     child: Text(_saving ? 'Saving…' : 'Save coupon'),
                   ),
+                  const SizedBox(height: 8),
                 ],
               ),
+        ),
       ),
     );
   }

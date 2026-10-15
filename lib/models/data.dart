@@ -405,8 +405,14 @@ class FoodItem {
         if (raw == null || raw.isEmpty || raw == 'null') return null;
         return raw;
       }(),
-      imageCacheKey:
-          json['updatedAt']?.toString() ?? json['imageCacheKey']?.toString(),
+      imageCacheKey: () {
+        final url = json['imageUrl']?.toString().trim();
+        if (url != null && url.isNotEmpty && url != 'null') {
+          return url;
+        }
+        return json['updatedAt']?.toString() ??
+            json['imageCacheKey']?.toString();
+      }(),
       quantity: _asInt(json['quantity'], 1),
       weightUnit: json['weightUnit']?.toString(),
       weightValue: json['weightValue']?.toString(),

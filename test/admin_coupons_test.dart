@@ -53,6 +53,24 @@ void main() {
     });
 
     expect(coupon.discountLabel, '₹100 off');
+
+    final percent = AdminCoupon.fromJson({
+      'id': 'c2',
+      'code': 'SAVE10',
+      'name': 'Ten off',
+      'discountType': 'PERCENTAGE',
+      'discountValue': 10,
+      'maximumDiscount': 100,
+      'minimumOrderValue': 0,
+      'validFrom': '2026-10-05T00:00:00.000Z',
+      'validUntil': '2026-11-04T18:29:59.000Z',
+      'audienceType': 'ALL',
+      'status': 'ACTIVE',
+      'fundedBy': 'SOCIETYEATS',
+      'totalUsage': 0,
+      'amountUsed': 0,
+    });
+    expect(percent.discountLabel, '10% up to ₹100 off');
     expect(coupon.amountUsed, 200);
     expect(coupon.remainingBudget, 9800);
     expect(coupon.fundedBy, 'SOCIETYEATS');
@@ -107,5 +125,28 @@ void main() {
     await tester.pump();
 
     expect(find.text('Enter a coupon code'), findsOneWidget);
+  });
+
+  testWidgets('new coupon form shows discount type and percentage fields', (tester) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: AdminCouponEditorScreen()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('coupon-discount-type')), findsOneWidget);
+    expect(find.text('Discount (₹)'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('coupon-discount-type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Percentage (% off food)').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discount (%)'), findsOneWidget);
+    expect(find.text('Maximum discount (₹, optional)'), findsOneWidget);
   });
 }

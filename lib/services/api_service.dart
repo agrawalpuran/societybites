@@ -168,8 +168,10 @@ class ApiService {
   static String imageUrl(String path, {String? cacheKey}) {
     final url = absoluteUrl(path);
     if (cacheKey == null || cacheKey.isEmpty) return url;
+    final key = cacheKey.trim();
+    if (key.isEmpty || key == path.trim() || key == url) return url;
     final separator = url.contains('?') ? '&' : '?';
-    return '$url${separator}v=${Uri.encodeComponent(cacheKey)}';
+    return '$url${separator}v=${Uri.encodeComponent(key)}';
   }
 
   static Future<Map<String, String>> captureAuthHeaders() => _authHeaders();

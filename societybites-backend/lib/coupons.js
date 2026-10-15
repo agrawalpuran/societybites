@@ -335,15 +335,19 @@ function parseCouponWrite(body, { partial = false } = {}) {
   }
   if (!partial || source.discountType != null || source.discountValue != null) {
     const discountType = String(source.discountType || "FIXED").trim().toUpperCase();
-    if (discountType !== "FIXED") {
-      throw httpError(400, "Only fixed discounts can be created right now");
+    if (discountType !== "FIXED" && discountType !== "PERCENTAGE") {
+      throw httpError(400, "Discount type must be FIXED or PERCENTAGE");
     }
     const discountValue = Number(source.discountValue);
     if (!Number.isFinite(discountValue) || discountValue <= 0) {
       throw httpError(400, "Discount value must be greater than zero");
     }
-    data.discountType = "FIXED";
-    data.discountValue = money(discountValue);
+    if (discountType === "PERCENTAGE" && discountValue > 100) {
+      throw httpError(400, "Percentage discount cannot exceed 100");
+    }
+    data.discountType = discountType;
+    data.discountValue =
+      discountType === "PERCENTAGE" ? discountValue : money(discountValue);
   }
   if (source.maximumDiscount != null && source.maximumDiscount !== "") {
     const cap = Number(source.maximumDiscount);
