@@ -175,10 +175,12 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   Future<void> _primeOrdersFromPush({String? focusOrderId}) async {
     if (widget.fetchOrders != null) return;
     await OrderPushCoordinator.hydrateFromStore();
+    final sellerId = await SessionService.getUserId();
     final ids = <String>{};
     final focus = focusOrderId ?? widget.priorityOrderId;
     if (focus != null && focus.isNotEmpty) ids.add(focus);
     for (final hint in OrderPushCoordinator.pendingHints) {
+      if (!orderPushHintTargetsSellerKitchen(hint)) continue;
       if (hint.orderId.isNotEmpty) ids.add(hint.orderId);
     }
     if (ids.isEmpty) return;
@@ -204,7 +206,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       var inserted = false;
       for (final json in fetched) {
         if (json == null) continue;
-        _mergeOrderFromPrefetch(Order.fromJson(json));
+        final order = Order.fromJson(json);
+        if (!order.isSellerKitchenOrderFor(sellerId)) continue;
+        _mergeOrderFromPrefetch(order, sellerUserId: sellerId);
         inserted = true;
       }
       if (!inserted) return;
@@ -225,7 +229,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         !_pastOrders.any((order) => order.id == id);
   }
 
-  void _mergeOrderFromPrefetch(Order updated) {
+  void _mergeOrderFromPrefetch(Order updated, {String? sellerUserId}) {
+    if (!updated.isSellerKitchenOrderFor(sellerUserId)) return;
     final staysActive = isSellerRecentOpenOrder(
       isTerminal: updated.isTerminal,
       createdAt: updated.createdAt,

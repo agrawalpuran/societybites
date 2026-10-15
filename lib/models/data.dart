@@ -861,11 +861,17 @@ class Order {
     return 'Neighbor';
   }
 
+  /// True when [userId] sells at least one line on this order.
+  bool isSellerKitchenOrderFor(String? userId) {
+    if (userId == null || userId.isEmpty) return false;
+    return items.any((item) => item.food.sellerId == userId);
+  }
+
   /// On seller kitchen cards, the fulfilment banner holds the address.
   String get sellerKitchenBuyerLine {
     final method = fulfilmentMethod?.trim() ?? '';
-    if (method.isNotEmpty) return buyerNameLabel;
-    return buyerLabel;
+    final label = method.isNotEmpty ? buyerNameLabel : buyerLabel;
+    return 'Buyer · $label';
   }
 
   /// Rough society-to-society distance. Empty for same-society orders.

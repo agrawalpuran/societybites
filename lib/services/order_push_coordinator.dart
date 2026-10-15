@@ -89,6 +89,14 @@ class OrderPushHint {
   }
 }
 
+/// Push hints meant for the seller My Kitchen tab (not buyer Orders).
+bool orderPushHintTargetsSellerKitchen(OrderPushHint hint) {
+  final status = hint.status;
+  if (status == 'pending') return true;
+  if (hint.paymentStatus == 'buyer_marked_paid') return true;
+  return status == 'cancelled' || status == 'picked_up';
+}
+
 int orderStatusStepFor(String status) {
   switch (status) {
     case 'pending':

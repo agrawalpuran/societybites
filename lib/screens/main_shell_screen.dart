@@ -214,9 +214,10 @@ class _MainShellScreenState extends State<MainShellScreen>
     final hints = OrderPushCoordinator.pendingHints;
     final mountOrders =
         hints.isNotEmpty || (widget.focusOrderId?.isNotEmpty ?? false);
-    final mountKitchen = mountOrders ||
-        widget.initialIndex == 2 ||
-        hints.any(_hintTargetsSellerKitchen);
+    final sellerKitchenHints =
+        hints.where(orderPushHintTargetsSellerKitchen).toList();
+    final mountKitchen = widget.initialIndex == 2 ||
+        sellerKitchenHints.isNotEmpty;
 
     if (!_ordersMounted && mountOrders) {
       setState(() => _ordersMounted = true);
@@ -230,7 +231,9 @@ class _MainShellScreenState extends State<MainShellScreen>
 
     if (hints.isNotEmpty) {
       await _ordersKey.currentState?.applyPushHints(hints);
-      _dashboardKey.currentState?.applyPushHints(hints);
+      if (sellerKitchenHints.isNotEmpty) {
+        _dashboardKey.currentState?.applyPushHints(sellerKitchenHints);
+      }
     }
 
     unawaited(
@@ -238,11 +241,14 @@ class _MainShellScreenState extends State<MainShellScreen>
         focusOrderId: widget.focusOrderId,
       ),
     );
-    unawaited(
-      _dashboardKey.currentState?.prefetchOrdersFromPush(
-        focusOrderId: widget.focusOrderId,
-      ),
-    );
+    if (mountKitchen) {
+      final kitchenFocus = widget.initialIndex == 2 ? widget.focusOrderId : null;
+      unawaited(
+        _dashboardKey.currentState?.prefetchOrdersFromPush(
+          focusOrderId: kitchenFocus,
+        ),
+      );
+    }
 
     if (hints.isEmpty) {
       _homeKey.currentState?.refresh();
@@ -254,13 +260,6 @@ class _MainShellScreenState extends State<MainShellScreen>
     if (kitchen != null && kitchen.hasSuccessfullyLoaded) {
       kitchen.refresh(lightweight: true);
     }
-  }
-
-  static bool _hintTargetsSellerKitchen(OrderPushHint hint) {
-    final status = hint.status;
-    if (status == 'pending') return true;
-    if (hint.paymentStatus == 'buyer_marked_paid') return true;
-    return status == 'cancelled' || status == 'picked_up';
   }
 
   Future<void> _awaitOrdersScreenState() async {
@@ -384,7 +383,8 @@ class _MainShellScreenState extends State<MainShellScreen>
           _dashboardMounted
               ? SellerDashboardScreen(
                   key: _dashboardKey,
-                  priorityOrderId: widget.focusOrderId,
+                  priorityOrderId:
+                      widget.initialIndex == 2 ? widget.focusOrderId : null,
                   onInitialLoadSettled: _preload.onDashboardInitialLoadSettled,
                   onListingCreated: _onListingPublishedToHome,
                   onStartSelling: _onMarketplaceStartSelling,
