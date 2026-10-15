@@ -29,7 +29,12 @@ class SellerOlderOrdersScreen extends StatefulWidget {
   /// Same test seam as My Kitchen. Production uses the scoped Orders API.
   final Future<List<Map<String, dynamic>>> Function()? fetchOrders;
   final Future<void> Function()? onOrderRefresh;
-  final Future<void> Function(Order order, String nextStatus)? onAction;
+  final Future<void> Function(
+    Order order,
+    String nextStatus, {
+    double? deliveryCharge,
+    String? deliveryCollectBy,
+  })? onAction;
   final void Function(Order order)? onOrderUpdated;
   final Future<void> Function()? onPaymentConfirmed;
   final Future<void> Function(Order order)? onReject;
@@ -242,7 +247,8 @@ class _SellerOlderOrdersScreenState extends State<SellerOlderOrdersScreen> {
             return SellerActiveOrderCard(
               key: ValueKey(order.id),
               order: order,
-              onAction: widget.onAction ?? (_, __) async {},
+              onAction: widget.onAction ??
+                  (_, __, {deliveryCharge, deliveryCollectBy}) async {},
               onOrderUpdated: widget.onOrderUpdated ?? (_) {},
               onPaymentConfirmed: widget.onPaymentConfirmed ?? () async {},
               onReject: _reject,

@@ -73,6 +73,7 @@ async function createUser({ phone, societyId, role, reach, fulfilmentMode, deliv
       sellingReachLevel: reach || "MY_SOCIETY",
       fulfilmentMode: fulfilmentMode || "BUYER_PICKUP",
       deliveryCharge: deliveryCharge == null ? 0 : deliveryCharge,
+      paymentPreference: role === "buyer" ? undefined : "UPI_AND_COD",
       upiId: role === "buyer" ? null : "seller@upi",
     },
   });
@@ -296,7 +297,8 @@ async function main() {
     assert(nearbyDelivery.status === 201, "NEARBY delivery accepted");
     orderIds.push(nearbyDelivery.json.id);
     assert(nearbyDelivery.json.fulfilmentMethod === "seller_delivery", "snapshots seller_delivery");
-    assert(nearbyDelivery.json.deliveryCharge === 30, "uses current seller charge not client 1");
+    assert(nearbyDelivery.json.deliveryCharge === 0, "cross-society COD delivery charge deferred");
+    assert(nearbyDelivery.json.deliveryChargePending === true, "delivery charge pending until ready");
 
     const farNearby = await place(farNearbyListing.id, { fulfilmentMethod: "seller_delivery" });
     assert(farNearby.status === 400, "NEARBY outside radius rejected");
@@ -348,7 +350,8 @@ async function main() {
     const newCharge = await place(nearbyListing.id, { fulfilmentMethod: "seller_delivery" });
     assert(newCharge.status === 201, "current charge used after profile change");
     orderIds.push(newCharge.json.id);
-    assert(newCharge.json.deliveryCharge === 40, "authoritative charge is 40");
+    assert(newCharge.json.deliveryCharge === 0, "cross-society COD defers charge at create");
+    assert(newCharge.json.deliveryChargePending === true, "charge pending until ready");
 
     const placedId = newCharge.json.id;
     await prisma.user.update({
@@ -357,7 +360,7 @@ async function main() {
     });
     const stored = await prisma.order.findUnique({ where: { id: placedId } });
     assert(stored.fulfilmentMethod === "seller_delivery", "historical method unchanged");
-    assert(stored.deliveryCharge === 40, "historical charge unchanged");
+    assert(stored.deliveryCharge === 0, "historical deferred charge unchanged at create");
 
     const pickupDelivery = await place(pickupListing.id, { fulfilmentMethod: "seller_delivery" });
     assert(pickupDelivery.status === 400, "pickup-only rejects delivery");
@@ -372,7 +375,8 @@ async function main() {
     const deliveryOk = await place(deliveryListing.id, { fulfilmentMethod: "seller_delivery" });
     assert(deliveryOk.status === 201, "delivery-only accepts delivery");
     orderIds.push(deliveryOk.json.id);
-    assert(deliveryOk.json.deliveryCharge === 25, "delivery-only snapshots 25");
+    assert(deliveryOk.json.deliveryCharge === 0, "cross-society COD defers delivery-only charge");
+    assert(deliveryOk.json.deliveryChargePending === true, "delivery-only charge pending");
 
     await prisma.cityReachConfig.delete({ where: { cityKey: CITY_KEY } });
     createdCityConfig = false;

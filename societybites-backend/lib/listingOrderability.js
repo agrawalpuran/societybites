@@ -5,14 +5,16 @@ const { statusesForSellerIds } = require("./fssaiCompliance");
 const FSSAI_BLOCK_REASON =
   "FSSAI registration must be approved before this seller can receive orders";
 
-async function serializeListingsWithSellerOrderability(listings) {
+async function serializeListingsWithSellerOrderability(listings, options = {}) {
   const list = Array.isArray(listings) ? listings : [];
+  const viewerUserId = options.viewerUserId || null;
   const requirement = await isFssaiSellingRequirementEnabled();
   if (!requirement) {
     return list.map((listing) =>
       serializeListing(listing, {
         sellerAcceptingOrders: true,
         sellerOrderBlockReason: null,
+        viewerUserId,
       })
     );
   }
@@ -22,6 +24,7 @@ async function serializeListingsWithSellerOrderability(listings) {
     return serializeListing(listing, {
       sellerAcceptingOrders: approved,
       sellerOrderBlockReason: approved ? null : FSSAI_BLOCK_REASON,
+      viewerUserId,
     });
   });
 }

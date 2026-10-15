@@ -33,7 +33,7 @@ class SellerFssaiRegistration {
 
   static const statusLabels = <String, String>{
     'NOT_SUBMITTED': 'Not Submitted',
-    'UNDER_REVIEW': 'Under Review',
+    'UNDER_REVIEW': 'Submitted',
     'APPROVED': 'Approved',
     'REJECTED': 'Rejected',
   };

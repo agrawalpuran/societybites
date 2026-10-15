@@ -50,6 +50,9 @@ class SellerSettingsScreen extends StatelessWidget {
     this.kitchenClosesAt,
     this.kitchenExplicitAlwaysOpen = false,
     this.onKitchenHoursChanged,
+    this.hideFlatNumber = false,
+    this.hideFlatNumberSaving = false,
+    this.onHideFlatNumberChanged,
   });
 
   final String upiSubtitle;
@@ -89,6 +92,9 @@ class SellerSettingsScreen extends StatelessWidget {
   final String? kitchenClosesAt;
   final bool kitchenExplicitAlwaysOpen;
   final ValueChanged<KitchenHoursDraft>? onKitchenHoursChanged;
+  final bool hideFlatNumber;
+  final bool hideFlatNumberSaving;
+  final ValueChanged<bool>? onHideFlatNumberChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +176,7 @@ class SellerSettingsScreen extends StatelessWidget {
                         const Padding(
                           padding: EdgeInsets.only(bottom: 8),
                           child: Text(
-                            'Submit your FSSAI registration for review before you can enable selling.',
+                            'Submit your FSSAI registration before you can enable selling.',
                             style: TextStyle(
                               color: Color(0xFFC62828),
                               fontWeight: FontWeight.w600,
@@ -249,6 +255,23 @@ class SellerSettingsScreen extends StatelessWidget {
                         trailingLabel: 'Change',
                         onTap: onChangeKitchenHours,
                       ),
+                      const SizedBox(height: 20),
+                      const _SectionLabel('PRIVACY'),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Hide my flat number',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF101617),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _PrivacyFlatRadioGroup(
+                        hideFlatNumber: hideFlatNumber,
+                        saving: hideFlatNumberSaving,
+                        onChanged: onHideFlatNumberChanged,
+                      ),
                       const SizedBox(height: 10),
                       const _SectionLabel('FOOD & COMPLIANCE'),
                       const SizedBox(height: 10),
@@ -278,7 +301,7 @@ class SellerSettingsScreen extends StatelessWidget {
                         const Padding(
                           padding: EdgeInsets.only(bottom: 10),
                           child: Text(
-                            'Submit your FSSAI details for review before you can enable selling.',
+                            'Submit your FSSAI details before you can enable selling.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 13,
@@ -361,6 +384,150 @@ class SellerSettingsScreen extends StatelessWidget {
         ),
       ),
       maxWidth: 720,
+    );
+  }
+}
+
+class _PrivacyFlatRadioGroup extends StatelessWidget {
+  const _PrivacyFlatRadioGroup({
+    required this.hideFlatNumber,
+    required this.saving,
+    this.onChanged,
+  });
+
+  final bool hideFlatNumber;
+  final bool saving;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onChanged != null && !saving;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8E6)),
+      ),
+      child: Column(
+        children: [
+          _PrivacyRadioTile(
+            key: const Key('hide-flat-number-yes'),
+            label: 'Yes',
+            subtitle: hideFlatNumber
+                ? null
+                : 'Hide flat number on public listings and profiles',
+            selectedDetail: hideFlatNumber
+                ? 'Your flat number will be hidden publicly. It may be '
+                    'shown to the relevant buyer only after confirmation of '
+                    'an eligible self-pickup order with My Home selected.'
+                : null,
+            selected: hideFlatNumber,
+            enabled: enabled,
+            onTap: enabled ? () => onChanged!(true) : null,
+          ),
+          const Divider(height: 1, color: Color(0xFFE2E8E6)),
+          _PrivacyRadioTile(
+            key: const Key('hide-flat-number-no'),
+            label: 'No',
+            subtitle: 'Show flat number as today',
+            selected: !hideFlatNumber,
+            enabled: enabled,
+            onTap: enabled ? () => onChanged!(false) : null,
+          ),
+          if (saving)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrivacyRadioTile extends StatelessWidget {
+  const _PrivacyRadioTile({
+    super.key,
+    required this.label,
+    this.subtitle,
+    this.selectedDetail,
+    required this.selected,
+    required this.enabled,
+    this.onTap,
+  });
+
+  final String label;
+  final String? subtitle;
+  final String? selectedDetail;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: enabled
+                  ? (selected ? const Color(0xFF0F766E) : const Color(0xFF9AA8A4))
+                  : const Color(0xFFB8C4C0),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: enabled
+                          ? const Color(0xFF101617)
+                          : const Color(0xFF9AA8A4),
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF6A7774),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                  if (selected && selectedDetail != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      selectedDetail!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF6A7774),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

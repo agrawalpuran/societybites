@@ -25,6 +25,7 @@ import 'add_listing_screen.dart';
 import 'checkout_screen.dart';
 import 'food_detail_screen.dart';
 import 'home_listing_filter.dart';
+import '../utils/listing_catalog_order.dart';
 import 'login_screen.dart';
 
 class _CachedStorefront {
@@ -51,6 +52,8 @@ class SellerStorefrontMemoryCache {
       campaigns: List<PreOrderCampaign>.from(cached.campaigns),
     );
   }
+
+  static void clearFor(String sellerId) => _bySellerId.remove(sellerId);
 
   static void _write({
     required String sellerId,
@@ -266,12 +269,14 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
           }
         }
       }
-      var products = listingRaw
-          .map(FoodItem.fromJson)
-          .where(
-            (item) => (item.isActive || item.isExpired) && !item.isPreOrder,
-          )
-          .toList();
+      var products = sortFoodItemsByCatalogOrder(
+        listingRaw
+            .map(FoodItem.fromJson)
+            .where(
+              (item) => (item.isActive || item.isExpired) && !item.isPreOrder,
+            )
+            .toList(),
+      );
       if (products.isEmpty) {
         final seeded = widget.initialProducts;
         if (seeded != null && seeded.isNotEmpty) {
@@ -364,8 +369,12 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       if (index == -1 && delta > 0) {
         _cart.add(CartItem(food: food));
       } else if (index != -1) {
-        _cart[index].quantity += delta;
-        if (_cart[index].quantity <= 0) _cart.removeAt(index);
+        final nextQty = _cart[index].quantity + delta;
+        if (nextQty <= 0) {
+          _cart.removeAt(index);
+        } else {
+          _cart[index] = CartItem(food: food, quantity: nextQty);
+        }
       }
     });
     widget.onCartChanged?.call();

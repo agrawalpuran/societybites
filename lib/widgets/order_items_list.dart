@@ -160,7 +160,31 @@ class OrderTotalRow extends StatelessWidget {
               ],
             ),
           ],
-          if (order.deliveryCharge > 0) ...[
+          if (order.deliveryChargePending) ...[
+            const SizedBox(height: 4),
+            const Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Delivery charge (confirmed when ready)',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6A7774),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Pending',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6A7774),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (order.deliveryCharge > 0) ...[
             const SizedBox(height: 4),
             Row(
               children: [

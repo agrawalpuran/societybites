@@ -875,7 +875,12 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     });
   }
 
-  Future<void> _updateStatus(Order order, String nextStatus) async {
+  Future<void> _updateStatus(
+    Order order,
+    String nextStatus, {
+    double? deliveryCharge,
+    String? deliveryCollectBy,
+  }) async {
     debugPrint(
       'SELLER STATUS ${order.orderId} ${order.status} → $nextStatus via ${ApiService.baseUrl}',
     );
@@ -890,6 +895,8 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         orderId: order.id,
         currentStatus: order.status,
         nextStatus: nextStatus,
+        deliveryCharge: deliveryCharge,
+        deliveryCollectBy: deliveryCollectBy,
       );
       if (!mounted) return;
 
@@ -897,13 +904,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         Order.mergeStatusPatch(_findOrder(order.id) ?? snapshot, json),
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
-          content: Text('Order updated to ${_statusLabel(nextStatus)}'),
-          backgroundColor: const Color(0xFF0E5A47),
-        ),
+      _showCompactSellerNotice(
+        context,
+        'Order updated to ${_statusLabel(nextStatus)}',
       );
 
       // The button spinner waits on this method. Open Ready-by after it
@@ -926,12 +929,10 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       OrderPushCoordinator.dropHint(snapshot.id);
       _mergeKitchenOrder(snapshot);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
-          content: Text('Could not update order: $e'),
-        ),
+      _showCompactSellerNotice(
+        context,
+        'Could not update order',
+        backgroundColor: const Color(0xFF3A4644),
       );
     }
   }
@@ -2115,24 +2116,38 @@ class _SatisfactionCard extends StatelessWidget {
   }
 }
 
-void _showCompactPaymentNotice(BuildContext context, String message) {
-  ScaffoldMessenger.of(context)
-    ..clearSnackBars()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-        ),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        width: 168,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: const Color(0xFF0E5A47),
+void _showCompactSellerNotice(
+  BuildContext context,
+  String message, {
+  Color backgroundColor = const Color(0xFF0E5A47),
+  bool replaceExisting = true,
+}) {
+  final messenger = ScaffoldMessenger.of(context);
+  if (replaceExisting) {
+    messenger.clearSnackBars();
+  }
+  final estimatedWidth = message.length * 7.2 + 48;
+  final width = estimatedWidth.clamp(168.0, 380.0);
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
       ),
-    );
+      duration: const Duration(seconds: 2),
+      behavior: SnackBarBehavior.floating,
+      width: width,
+      margin: const EdgeInsets.only(bottom: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: backgroundColor,
+    ),
+  );
+}
+
+void _showCompactPaymentNotice(BuildContext context, String message) {
+  _showCompactSellerNotice(context, message);
 }
 
 class SellerActiveOrderCard extends StatefulWidget {
@@ -2148,7 +2163,12 @@ class SellerActiveOrderCard extends StatefulWidget {
   });
 
   final Order order;
-  final Future<void> Function(Order order, String nextStatus) onAction;
+  final Future<void> Function(
+    Order order,
+    String nextStatus, {
+    double? deliveryCharge,
+    String? deliveryCollectBy,
+  }) onAction;
   final void Function(Order order) onOrderUpdated;
   final Future<void> Function() onPaymentConfirmed;
   final Future<void> Function(Order order) onReject;
@@ -2316,7 +2336,126 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     };
   }
 
-  Future<void> _handleAction(String nextStatus) async {
+  Future<({double charge, String? collectBy})?> _showActualDeliveryChargeDialog() async {
+    final controller = TextEditingController();
+    final isUpiSplit = widget.order.upiFoodCashDeliverySplit;
+    var collectBy = 'seller';
+    const dialogMaxWidth = 420.0;
+    final result = await showDialog<({double charge, String? collectBy})?>(
+      context: context,
+      builder: (ctx) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: dialogMaxWidth),
+          child: StatefulBuilder(
+            builder: (context, setState) => AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              title: const Text('Mark order ready'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      isUpiSplit
+                          ? 'Confirm the delivery charge for this outside-society order. '
+                              'The buyer already paid for food via UPI; delivery is collected in cash at handover. '
+                              'Enter 0 if delivery is free.'
+                          : 'Confirm the delivery charge for this outside-society order. '
+                              'Enter 0 if delivery is free.',
+                    ),
+                    if (isUpiSplit) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Who collects the delivery fee?',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      SegmentedButton<String>(
+                        segments: const [
+                          ButtonSegment(
+                            value: 'seller',
+                            label: Text('Me'),
+                          ),
+                          ButtonSegment(
+                            value: 'delivery_person',
+                            label: Text('Delivery partner'),
+                          ),
+                        ],
+                        selected: {collectBy},
+                        onSelectionChanged: (value) {
+                          setState(() => collectBy = value.first);
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: controller,
+                      autofocus: true,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Actual delivery charge (₹)',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final raw = controller.text.trim();
+                    final parsed = double.tryParse(raw);
+                    if (parsed == null || !parsed.isFinite || parsed < 0) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                          content: Text('Enter a valid amount (0 or more).'),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.pop(ctx, (
+                      charge: parsed,
+                      collectBy: isUpiSplit && parsed > 0 ? collectBy : null,
+                    ));
+                  },
+                  child: const Text('Mark ready'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
+  Future<void> _markReady() async {
+    if (_isUpdating) return;
+    double? deliveryCharge;
+    String? deliveryCollectBy;
+    if (widget.order.deliveryChargePending) {
+      final readyDetails = await _showActualDeliveryChargeDialog();
+      if (readyDetails == null || !mounted) return;
+      deliveryCharge = readyDetails.charge;
+      deliveryCollectBy = readyDetails.collectBy;
+    }
+    await _handleAction(
+      'ready',
+      deliveryCharge: deliveryCharge,
+      deliveryCollectBy: deliveryCollectBy,
+    );
+  }
+
+  Future<void> _handleAction(
+    String nextStatus, {
+    double? deliveryCharge,
+    String? deliveryCollectBy,
+  }) async {
     if (_isUpdating) return;
     final order = widget.order;
     if (nextStatus == 'accepted' &&
@@ -2334,7 +2473,12 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     setState(() => _isUpdating = true);
     _stageLocalStatus(nextStatus);
     try {
-      await widget.onAction(order, nextStatus);
+      await widget.onAction(
+        order,
+        nextStatus,
+        deliveryCharge: deliveryCharge,
+        deliveryCollectBy: deliveryCollectBy,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -2410,6 +2554,60 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
           }
         });
       }
+    }
+  }
+
+  Future<void> _confirmDeliveryCash() async {
+    final order = widget.order;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm delivery fee received?'),
+        content: Text(
+          'Confirm that ₹${order.deliveryCharge.toStringAsFixed(0)} delivery fee was received in cash '
+          '${order.deliveryCollectBy == 'delivery_person' ? 'by your delivery partner' : 'by you'}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF0E5A47),
+            ),
+            child: const Text('Confirm & complete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final snapshot = order;
+    setState(() => _isConfirmingPayment = true);
+    if (snapshot.status == 'ready' || snapshot.status == 'picked_up') {
+      _stageLocalStatus('completed');
+    }
+    try {
+      final json = await ApiService.confirmDeliveryCash(orderId: order.id);
+      widget.onOrderUpdated(Order.mergeStatusPatch(snapshot, json));
+      if (!mounted) return;
+      final completed = (json['status'] as String?) == 'completed';
+      _showCompactSellerNotice(
+        context,
+        completed ? 'Order completed' : 'Delivery fee confirmed',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      OrderPushCoordinator.dropHint(snapshot.id);
+      setState(() => _pendingStatusOverride = null);
+      widget.onOrderUpdated(snapshot);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not confirm delivery fee: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isConfirmingPayment = false);
     }
   }
 
@@ -2501,13 +2699,24 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
       allowReadyBy: allowReadyBy,
     );
     final isCash = payment.isCash;
+    final isUpiSplit = order.upiFoodCashDeliverySplit;
     final cashPaid = order.paymentStatus == 'paid';
     final needsCashConfirm = !isRejected &&
         isCash &&
+        !isUpiSplit &&
         lifecycle.treatAsReady &&
         !cashPaid &&
         order.paymentStatus != 'failed';
-    final canComplete = !isRejected && lifecycle.showComplete && (!isCash || cashPaid);
+    final needsDeliveryCashConfirm =
+        !isRejected && order.needsDeliveryCashConfirm;
+    final deliveryCashOk =
+        !isUpiSplit || order.deliveryCharge <= 0 || order.deliveryCashConfirmed;
+    final foodUpiOk = !isUpiSplit || order.foodUpiConfirmed;
+    final canComplete = !isRejected &&
+        lifecycle.showComplete &&
+        (!isCash || cashPaid) &&
+        foodUpiOk &&
+        deliveryCashOk;
     final hasSellerAction =
         !isRejected &&
         (lifecycle.showAccept || payment.showMarkReady || canComplete);
@@ -2846,6 +3055,43 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
               ),
             ),
           ],
+          if (needsDeliveryCashConfirm) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: ElevatedButton.icon(
+                onPressed: _isConfirmingPayment ? null : _confirmDeliveryCash,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE85D04),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                icon: _isConfirmingPayment
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.payments_rounded, size: 18),
+                      label: Text(
+                        _isConfirmingPayment
+                            ? 'Confirming...'
+                            : 'Confirm fee & complete',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (isCash && cashPaid && canComplete) ...[
             const SizedBox(height: 12),
             Align(
@@ -2882,7 +3128,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                         if (canComplete) {
                           _completeOrder();
                         } else if (lifecycle.showMarkReady) {
-                          _handleAction('ready');
+                          _markReady();
                         } else if (lifecycle.showAccept) {
                           _handleAction('accepted');
                         }

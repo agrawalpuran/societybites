@@ -644,7 +644,8 @@ class HomeScreenState extends State<HomeScreen> {
     setState(() {
       final existing = _cart.indexWhere((c) => c.food.id == food.id);
       if (existing != -1) {
-        _cart[existing].quantity++;
+        final qty = _cart[existing].quantity + 1;
+        _cart[existing] = CartItem(food: food, quantity: qty);
       }
     });
     CartController.instance.notify();
@@ -724,7 +725,8 @@ class HomeScreenState extends State<HomeScreen> {
     setState(() {
       final existing = _cart.indexWhere((c) => c.food.id == food.id);
       if (existing != -1) {
-        _cart[existing].quantity++;
+        final qty = _cart[existing].quantity + 1;
+        _cart[existing] = CartItem(food: food, quantity: qty);
       } else {
         _cart.add(CartItem(food: food));
       }

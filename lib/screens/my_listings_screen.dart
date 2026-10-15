@@ -19,6 +19,8 @@ import '../widgets/content_skeleton.dart';
 import '../widgets/status_banner.dart';
 import 'add_listing_screen.dart';
 import 'add_listing_type_screen.dart';
+import 'catalog_reorder_screen.dart';
+import '../utils/listing_catalog_order.dart';
 
 class MyListingsScreen extends StatefulWidget {
   const MyListingsScreen({
@@ -28,6 +30,7 @@ class MyListingsScreen extends StatefulWidget {
     this.pauseAllListings,
     this.resumeAllListings,
     this.ensureCanCreateListing,
+    this.saveCatalogOrder,
   });
 
   /// Test seam. Production uses [ApiService.getListings].
@@ -45,6 +48,10 @@ class MyListingsScreen extends StatefulWidget {
 
   /// Test seam. Production uses [SellerOnboarding.ensureCanCreateListing].
   final Future<bool> Function(BuildContext context)? ensureCanCreateListing;
+
+  /// Test seam. Production uses [ApiService.putCatalogOrder].
+  final Future<List<String>> Function(List<String> orderedListingIds)?
+      saveCatalogOrder;
 
   @override
   MyListingsScreenState createState() => MyListingsScreenState();
@@ -88,6 +95,34 @@ class MyListingsScreenState extends State<MyListingsScreen>
       _listings.where((item) => item.isPreOrderCatalog).toList();
 
   Future<void> reload() => _loadListings();
+
+  List<FoodItem> get _reorderableCatalogItems => sortFoodItemsByCatalogOrder(
+        _listings.where(foodItemIsCatalogReorderEligible).toList(),
+      );
+
+  Future<void> _openReorderCatalog() async {
+    final eligible = _reorderableCatalogItems;
+    if (eligible.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add regular catalog listings before reordering.'),
+        ),
+      );
+      return;
+    }
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CatalogReorderScreen(
+          initialItems: eligible,
+          saveOrder: widget.saveCatalogOrder ?? ApiService.putCatalogOrder,
+        ),
+      ),
+    );
+    if (saved == true && mounted) {
+      await _loadListings();
+    }
+  }
 
   String _cleanError(Object e) {
     var message = e.toString();
@@ -518,6 +553,23 @@ class MyListingsScreenState extends State<MyListingsScreen>
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  key: const Key('my-listings-reorder'),
+                  onPressed: _isLoading || _bulkBusy ? null : _openReorderCatalog,
+                  icon: const Icon(Icons.swap_vert_rounded, size: 20),
+                  label: const Text('Reorder Items'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0E5A47),
+                    side: const BorderSide(color: Color(0xFF0E5A47)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
               child: Row(
                 children: [
                   Expanded(

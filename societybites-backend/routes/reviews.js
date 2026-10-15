@@ -22,7 +22,9 @@ router.get(
       orderBy: { createdAt: "desc" },
     });
 
-    res.json(reviews.map(serializeReview));
+    res.json(
+      reviews.map((review) => serializeReview(review, { viewerUserId: req.user.id }))
+    );
   })
 );
 
@@ -38,7 +40,10 @@ router.get(
       orderBy: { createdAt: "desc" },
     });
 
-    res.json(reviews.map(serializeReview));
+    const viewerUserId = req.user && req.user.id;
+    res.json(
+      reviews.map((review) => serializeReview(review, { viewerUserId }))
+    );
   })
 );
 
@@ -101,7 +106,7 @@ router.post(
       include: { reviewer: { include: { flat: true } } },
     });
 
-    res.status(201).json(serializeReview(review));
+    res.status(201).json(serializeReview(review, { viewerUserId: req.user.id }));
   })
 );
 

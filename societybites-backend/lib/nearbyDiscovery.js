@@ -17,6 +17,7 @@ const { expireDueListings, DISCOVERABLE_STATUSES } = require("../utils/listingEx
 const { attachRecurringAvailability } = require("./recurringAvailability");
 const { serializeListingsWithSellerOrderability } = require("./listingOrderability");
 const { withoutAutomatedTestListings } = require("./testListingNames");
+const { sortSellerCatalogListings } = require("./listingCatalogOrder");
 
 const ACTIVE_LISTING_WHERE = {
   status: { in: DISCOVERABLE_STATUSES },
@@ -155,9 +156,12 @@ function buildNearbySellerCard(seller, eligibility, listings) {
   };
 }
 
-async function serializeNearbySeller(seller, eligibility) {
+async function serializeNearbySeller(seller, eligibility, viewerUserId) {
+  seller.listings = sortSellerCatalogListings(seller.listings || []);
   const attached = await attachRecurringAvailability(prisma, seller.listings || []);
-  const listings = await serializeListingsWithSellerOrderability(attached);
+  const listings = await serializeListingsWithSellerOrderability(attached, {
+    viewerUserId,
+  });
   return buildNearbySellerCard(seller, eligibility, listings);
 }
 
@@ -224,20 +228,25 @@ async function discoverNearbySellers({ buyer, query } = {}) {
     eligible.push({ candidate, eligibility });
   }
 
-  const allListings = eligible.flatMap((entry) => entry.candidate.listings || []);
+  const allListings = sortSellerCatalogListings(
+    eligible.flatMap((entry) => entry.candidate.listings || [])
+  );
   const withRecurring = await attachRecurringAvailability(prisma, allListings);
   await Promise.all([
     attachQuantitySold(prisma, withRecurring),
     attachListingReviewAggregates(prisma, withRecurring),
   ]);
-  const serializedListings = await serializeListingsWithSellerOrderability(withRecurring);
+  const viewerUserId = buyer && buyer.id;
+  const serializedListings = await serializeListingsWithSellerOrderability(withRecurring, {
+    viewerUserId,
+  });
   const serializedById = new Map();
   for (let i = 0; i < withRecurring.length; i++) {
     serializedById.set(withRecurring[i].id, serializedListings[i]);
   }
 
   const sellers = eligible.map(({ candidate, eligibility }) => {
-    const listings = (candidate.listings || [])
+    const listings = sortSellerCatalogListings(candidate.listings || [])
       .map((listing) => serializedById.get(listing.id))
       .filter(Boolean);
     return {
@@ -317,7 +326,7 @@ async function getNearbySellerStorefront({ buyer, sellerId, query } = {}) {
   }
 
   await attachQuantitySold(prisma, seller.listings);
-  return await serializeNearbySeller(seller, eligibility);
+  return await serializeNearbySeller(seller, eligibility, buyer && buyer.id);
 }
 
 const campaignDiscoveryInclude = {

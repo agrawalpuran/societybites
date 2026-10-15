@@ -147,7 +147,7 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
       children: [
         Text(
           fieldsRequired
-              ? 'Fields marked with * are required. Your submission will be reviewed before you can receive orders.'
+              ? 'Fields marked with * are required. We will approve your submission before you can receive orders.'
               : 'Add whatever FSSAI details you have today. You can save partial information or come back later.',
           style: const TextStyle(color: Color(0xFF6A7774)),
         ),
@@ -303,7 +303,7 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Enter complete FSSAI details to submit for review, save partial details, or check '
+            'Enter complete FSSAI details to submit, save partial details, or check '
             '"I do not have these details now" to continue.',
           ),
         ),
@@ -356,7 +356,7 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
         _storageReference = storageRef;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Submitted for review')),
+        const SnackBar(content: Text('FSSAI details submitted')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -534,7 +534,7 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
                       _buildSubmitForm(fieldsRequired: _fssaiRequired),
                     if (_fssai?.status == 'UNDER_REVIEW') ...[
                       const Text(
-                        'Your FSSAI registration details have been submitted and are currently being reviewed.',
+                        'Your FSSAI registration has been submitted. We will notify you once it is approved.',
                         style: TextStyle(
                           height: 1.45,
                           color: Color(0xFF6A7774),

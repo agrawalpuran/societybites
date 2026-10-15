@@ -111,6 +111,15 @@ class FoodItem {
   final bool sellerAcceptingOrders;
   final String? sellerOrderBlockReason;
 
+  /// When true, buyer-facing UI must not show flat/block until order disclosure rules apply.
+  final bool sellerHideFlatNumber;
+
+  /// Set when a confirmed pickup order may show the seller flat to this buyer.
+  final bool sellerFlatDisclosed;
+
+  /// Seller storefront sort position. Null uses legacy created-at ordering.
+  final int? displayOrder;
+
   const FoodItem({
     required this.id,
     required this.name,
@@ -168,6 +177,9 @@ class FoodItem {
     this.kitchenClosesAt,
     this.sellerAcceptingOrders = true,
     this.sellerOrderBlockReason,
+    this.sellerHideFlatNumber = false,
+    this.sellerFlatDisclosed = false,
+    this.displayOrder,
   });
 
   List<String> get listingCategories {
@@ -316,6 +328,9 @@ class FoodItem {
 
   /// Human-readable pickup / seller location for cards and detail.
   String get locationLabel {
+    if (sellerHideFlatNumber && !sellerFlatDisclosed) {
+      return buyerSafeLocationLabel;
+    }
     final parts = <String>[];
     if (flatNumber != null && flatNumber!.isNotEmpty) {
       parts.add('Flat $flatNumber');
@@ -328,6 +343,14 @@ class FoodItem {
     }
     if (parts.isEmpty) return 'Pickup at seller home';
     return parts.join(', ');
+  }
+
+  String get buyerSafeLocationLabel {
+    final society = sellerSocietyName?.trim();
+    if (society != null && society.isNotEmpty) return society;
+    final pickup = pickupLocation?.trim();
+    if (pickup != null && pickup.isNotEmpty) return pickup;
+    return 'Pickup at seller home';
   }
 
   /// Nearby and extended dishes show the apartment and a rough distance.
@@ -387,14 +410,18 @@ class FoodItem {
         : DateTime.tryParse(availableAtRaw.toString());
 
     final parsedCategories = parseListingCategoriesFromJson(json);
+    final hideFlat = json['sellerHideFlatNumber'] == true;
+    final flatDisclosed = json['sellerFlatDisclosed'] == true;
+    final redactAddress = hideFlat && !flatDisclosed;
+    final rawFlat = json['flatNumber']?.toString();
 
     return FoodItem(
       id: id,
       name: json['name']?.toString() ?? 'Untitled',
       sellerId: json['sellerId']?.toString() ?? '',
       sellerName: json['sellerName']?.toString() ?? 'Neighbor',
-      block: json['block']?.toString() ?? 'Block ?',
-      flatNumber: json['flatNumber']?.toString(),
+      block: redactAddress ? '' : (json['block']?.toString() ?? 'Block ?'),
+      flatNumber: redactAddress ? null : rawFlat,
       pickupLocation: json['pickupLocation']?.toString(),
       price: _asDouble(json['price']),
       rating: _asDouble(json['avgRating']),
@@ -477,6 +504,9 @@ class FoodItem {
       kitchenClosesAt: _clock(json['kitchenClosesAt']),
       sellerAcceptingOrders: json['sellerAcceptingOrders'] != false,
       sellerOrderBlockReason: json['sellerOrderBlockReason']?.toString(),
+      sellerHideFlatNumber: hideFlat,
+      sellerFlatDisclosed: flatDisclosed,
+      displayOrder: parseOptionalInt(json['displayOrder']),
     );
   }
 
@@ -609,6 +639,12 @@ class Order {
   final double subtotal;
   final double communityFee;
   final double deliveryCharge;
+  final bool deliveryChargePending;
+  final double? upiPayableAmount;
+  final bool upiFoodCashDeliverySplit;
+  final String? deliveryCollectBy;
+  final bool deliveryCashConfirmed;
+  final bool isCrossSociety;
   final String? couponCode;
   final double? couponDiscount;
   final String type;
@@ -658,6 +694,12 @@ class Order {
     required this.subtotal,
     required this.communityFee,
     this.deliveryCharge = 0,
+    this.deliveryChargePending = false,
+    this.upiPayableAmount,
+    this.upiFoodCashDeliverySplit = false,
+    this.deliveryCollectBy,
+    this.deliveryCashConfirmed = false,
+    this.isCrossSociety = false,
     this.couponCode,
     this.couponDiscount,
     this.type = 'regular',
@@ -694,6 +736,27 @@ class Order {
       paymentStatus == 'buyer_marked_paid' ||
       paymentStatus == 'seller_confirmed' ||
       paymentStatus == 'paid';
+
+  bool get foodUpiConfirmed =>
+      paymentStatus == 'seller_confirmed' || paymentStatus == 'paid';
+
+  /// Amount the buyer should pay via UPI (food-only when outside delivery is deferred).
+  double get upiPaymentAmount {
+    if (upiPayableAmount != null) {
+      return upiPayableAmount!.clamp(0, double.infinity);
+    }
+    if (upiFoodCashDeliverySplit && !foodUpiConfirmed) {
+      final discount = couponDiscount ?? 0;
+      return (subtotal + communityFee - discount).clamp(0, double.infinity);
+    }
+    return orderTotal;
+  }
+
+  bool get needsDeliveryCashConfirm =>
+      upiFoodCashDeliverySplit &&
+      deliveryCharge > 0 &&
+      !deliveryCashConfirmed &&
+      (status == 'ready' || status == 'picked_up');
   bool get isRejected => status == 'rejected';
   bool get isCancelled => status == 'cancelled';
   bool get isPreOrder => type == 'pre_order';
@@ -1000,6 +1063,12 @@ class Order {
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? computedSubtotal,
       communityFee: (json['communityFee'] as num?)?.toDouble() ?? 0,
       deliveryCharge: (json['deliveryCharge'] as num?)?.toDouble() ?? 0,
+      deliveryChargePending: json['deliveryChargePending'] == true,
+      upiPayableAmount: (json['upiPayableAmount'] as num?)?.toDouble(),
+      upiFoodCashDeliverySplit: json['upiFoodCashDeliverySplit'] == true,
+      deliveryCollectBy: json['deliveryCollectBy'] as String?,
+      deliveryCashConfirmed: json['deliveryCashConfirmed'] == true,
+      isCrossSociety: json['isCrossSociety'] == true,
       couponCode: json['couponCode'] as String?,
       couponDiscount: (json['couponDiscount'] as num?)?.toDouble(),
       type: (json['type'] as String?) ?? 'regular',
@@ -1075,6 +1144,13 @@ class Order {
       subtotal: updated.subtotal > 0 ? updated.subtotal : prior.subtotal,
       communityFee: updated.communityFee,
       deliveryCharge: updated.deliveryCharge,
+      deliveryChargePending: updated.deliveryChargePending,
+      upiPayableAmount: updated.upiPayableAmount ?? prior.upiPayableAmount,
+      upiFoodCashDeliverySplit: updated.upiFoodCashDeliverySplit ||
+          prior.upiFoodCashDeliverySplit,
+      deliveryCollectBy: updated.deliveryCollectBy ?? prior.deliveryCollectBy,
+      deliveryCashConfirmed: updated.deliveryCashConfirmed,
+      isCrossSociety: updated.isCrossSociety || prior.isCrossSociety,
       couponCode: updated.couponCode ?? prior.couponCode,
       couponDiscount: updated.couponDiscount ?? prior.couponDiscount,
       type: updated.type,
@@ -1128,12 +1204,36 @@ class Order {
       date: prior.date,
       status: json['status'] as String? ?? prior.status,
       statusStep: (json['statusStep'] as num?)?.toInt() ?? prior.statusStep,
-      orderTotal: prior.orderTotal,
-      subtotal: prior.subtotal,
-      communityFee: prior.communityFee,
-      deliveryCharge: prior.deliveryCharge,
-      couponCode: prior.couponCode,
-      couponDiscount: prior.couponDiscount,
+      orderTotal: (json['total'] as num?)?.toDouble() ??
+          (json['orderTotal'] as num?)?.toDouble() ??
+          prior.orderTotal,
+      subtotal: (json['subtotal'] as num?)?.toDouble() ?? prior.subtotal,
+      communityFee:
+          (json['communityFee'] as num?)?.toDouble() ?? prior.communityFee,
+      deliveryCharge:
+          (json['deliveryCharge'] as num?)?.toDouble() ?? prior.deliveryCharge,
+      deliveryChargePending: json.containsKey('deliveryChargePending')
+          ? json['deliveryChargePending'] == true
+          : prior.deliveryChargePending,
+      upiPayableAmount: json.containsKey('upiPayableAmount')
+          ? (json['upiPayableAmount'] as num?)?.toDouble()
+          : prior.upiPayableAmount,
+      upiFoodCashDeliverySplit: json.containsKey('upiFoodCashDeliverySplit')
+          ? json['upiFoodCashDeliverySplit'] == true
+          : prior.upiFoodCashDeliverySplit,
+      deliveryCollectBy: json.containsKey('deliveryCollectBy')
+          ? json['deliveryCollectBy'] as String?
+          : prior.deliveryCollectBy,
+      deliveryCashConfirmed: json.containsKey('deliveryCashConfirmed')
+          ? json['deliveryCashConfirmed'] == true
+          : prior.deliveryCashConfirmed,
+      isCrossSociety: json.containsKey('isCrossSociety')
+          ? json['isCrossSociety'] == true
+          : prior.isCrossSociety,
+      couponCode: json['couponCode'] as String? ?? prior.couponCode,
+      couponDiscount: json.containsKey('couponDiscount')
+          ? (json['couponDiscount'] as num?)?.toDouble()
+          : prior.couponDiscount,
       type: prior.type,
       campaignId: prior.campaignId,
       fulfilmentMethod: prior.fulfilmentMethod,

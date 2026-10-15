@@ -8,6 +8,10 @@ const {
   serializeOrder,
   serializeOrderStatusPatch,
 } = require("../utils/listingSerializer");
+
+function serializeOrderForUser(order, userId) {
+  return serializeOrder(order, { viewerUserId: userId });
+}
 const { loadSellerInsights } = require("../lib/sellerInsights");
 const { getPlatformFee } = require("../lib/platformFee");
 const { expireListingIfDue } = require("../utils/listingExpiry");
@@ -66,6 +70,17 @@ const {
   couponErrorMessage,
   money: couponMoney,
 } = require("../lib/coupons");
+const {
+  isEligibleDelayedDeliveryChargeAtCreate,
+  isEligibleDelayedDeliveryCharge,
+  isUpiFoodCashDeliverySplit,
+  parseActualDeliveryCharge,
+  couponDiscountFromOrder,
+  computeOrderTotal,
+  normalizeDeliveryCollectBy,
+  sellerDefaultDeliveryCollectBy,
+  assertCanCompleteOrder,
+} = require("../lib/delayedDeliveryCharge");
 const {
   parseIdempotencyKey,
   findCompletedIdempotentOrder,
@@ -257,7 +272,7 @@ router.get(
         return res.json({
           orders: await attachUnreadCounts(
             prisma,
-            page.orders.map(serializeOrder),
+            page.orders.map((order) => serializeOrderForUser(order, req.user.id)),
             req.user.id
           ),
           hasMore: page.hasMore,
@@ -281,7 +296,7 @@ router.get(
       });
 
       return res.json(
-        await attachUnreadCounts(prisma, orders.map(serializeOrder), req.user.id)
+        await attachUnreadCounts(prisma, orders.map((order) => serializeOrderForUser(order, req.user.id)), req.user.id)
       );
     }
 
@@ -295,7 +310,7 @@ router.get(
     });
 
     res.json(
-      await attachUnreadCounts(prisma, orders.map(serializeOrder), req.user.id)
+      await attachUnreadCounts(prisma, orders.map((order) => serializeOrderForUser(order, req.user.id)), req.user.id)
     );
   })
 );
@@ -516,7 +531,7 @@ router.get(
     }
 
     res.json(
-      await attachUnreadCounts(prisma, [serializeOrder(order)], req.user.id).then(
+      await attachUnreadCounts(prisma, [serializeOrderForUser(order, req.user.id)], req.user.id).then(
         (rows) => rows[0]
       )
     );
@@ -556,7 +571,7 @@ router.post(
       orderIncludeForCreate
     );
     if (replayOrder) {
-      return res.status(201).json(serializeOrder(replayOrder));
+      return res.status(201).json(serializeOrderForUser(replayOrder, req.user.id));
     }
 
     if (orderType === "regular" && req.body.campaignId) {
@@ -829,6 +844,17 @@ router.post(
       }
     }
 
+    if (
+      isEligibleDelayedDeliveryChargeAtCreate({
+        orderType,
+        isCrossSocietyOrder,
+        paymentMethod,
+        fulfilmentMethod,
+      })
+    ) {
+      deliveryCharge = 0;
+    }
+
     if (orderType === "pre_order") {
       const campaignId = req.body.campaignId;
       if (!campaignId) {
@@ -1034,7 +1060,7 @@ router.post(
       void flushNotification(notifyOrderCreated(order));
     }
 
-    res.status(201).json(serializeOrder(order));
+    res.status(201).json(serializeOrderForUser(order, req.user.id));
   })
 );
 
@@ -1099,12 +1125,11 @@ router.patch(
       });
     }
 
-    if (status === "completed" && order.paymentMethod === "cash") {
-      if (order.paymentStatus !== "paid") {
-        return res.status(400).json({
-          error:
-            "Please confirm that payment has been received before completing this order.",
-        });
+    if (status === "completed") {
+      try {
+        assertCanCompleteOrder(order);
+      } catch (err) {
+        return res.status(err.statusCode || 400).json({ error: err.message });
       }
     }
 
@@ -1113,6 +1138,33 @@ router.patch(
         error:
           "Confirm UPI payment before marking this order ready. The buyer must use I Have Paid first.",
       });
+    }
+
+    const requestBody = req.body || {};
+    const hasDeliveryChargeField = Object.prototype.hasOwnProperty.call(
+      requestBody,
+      "deliveryCharge"
+    );
+    if (hasDeliveryChargeField && status !== "ready") {
+      return res.status(400).json({
+        error: "deliveryCharge can only be set when marking the order ready",
+      });
+    }
+
+    const eligibleDelayed = isEligibleDelayedDeliveryCharge(order);
+    if (status === "ready") {
+      if (eligibleDelayed) {
+        if (!hasDeliveryChargeField) {
+          return res.status(400).json({
+            error:
+              "Please enter the actual delivery charge before marking this order ready.",
+          });
+        }
+      } else if (hasDeliveryChargeField) {
+        return res.status(400).json({
+          error: "This order does not support a delivery charge update",
+        });
+      }
     }
 
     if (status === "cancelled") {
@@ -1167,6 +1219,38 @@ router.patch(
       ...(TIMESTAMP_FIELDS[status] && { [TIMESTAMP_FIELDS[status]]: new Date() }),
     };
 
+    if (status === "ready" && eligibleDelayed) {
+      try {
+        const charge = parseActualDeliveryCharge(requestBody.deliveryCharge);
+        const couponDiscount = couponDiscountFromOrder(order);
+        updateData.deliveryCharge = charge;
+        updateData.total = computeOrderTotal({
+          subtotal: order.subtotal,
+          communityFee: order.communityFee,
+          deliveryCharge: charge,
+          couponDiscount,
+        });
+        const seller =
+          order.items &&
+          order.items[0] &&
+          order.items[0].listing &&
+          order.items[0].listing.seller;
+        if (isUpiFoodCashDeliverySplit(order) && charge > 0) {
+          updateData.deliveryCollectBy = normalizeDeliveryCollectBy(
+            requestBody.deliveryCollectBy,
+            sellerDefaultDeliveryCollectBy(seller)
+          );
+        } else {
+          updateData.deliveryCollectBy = null;
+          if (isUpiFoodCashDeliverySplit(order) && charge <= 0) {
+            updateData.deliveryCashConfirmedAt = new Date();
+          }
+        }
+      } catch (err) {
+        return res.status(err.statusCode || 400).json({ error: err.message });
+      }
+    }
+
     let updated;
 
     // The order graph was already loaded for the permission checks. Writing the
@@ -1201,6 +1285,14 @@ router.patch(
       updated = { ...order, ...updateData };
 
       logger.info("order", `${order.orderNumber} → ${status}`);
+    }
+
+    if (status === "ready" && eligibleDelayed) {
+      const reloaded = await prisma.order.findUnique({
+        where: { id: order.id },
+        include: orderInclude,
+      });
+      return res.json(serializeOrderForUser(reloaded, req.user.id));
     }
 
     res.json(serializeOrderStatusPatch(updated));
@@ -1282,7 +1374,7 @@ router.post(
       return result;
     });
 
-    res.json(serializeOrder(updated));
+    res.json(serializeOrderForUser(updated, req.user.id));
 
     await flushNotification(notifyOrderRejected(updated));
   })
@@ -1334,7 +1426,7 @@ router.patch(
         include: orderInclude,
       });
       logger.info("order", `Cleared Ready by for ${order.orderNumber}`);
-      res.json(serializeOrder(updated));
+      res.json(serializeOrderForUser(updated, req.user.id));
       return flushNotification(notifyReadyBy(updated, true));
     }
 
@@ -1397,7 +1489,7 @@ router.patch(
       "order",
       `Ready by set for ${order.orderNumber}: ${readyAt.toISOString()}`
     );
-    res.json(serializeOrder(updated));
+    res.json(serializeOrderForUser(updated, req.user.id));
     await flushNotification(notifyReadyBy(updated, false));
   })
 );

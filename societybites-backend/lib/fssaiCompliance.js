@@ -141,7 +141,7 @@ async function assertSellerFssaiForEnableSelling(userId) {
   if (fssaiStatusAllowsEnableSelling(status)) return;
   throw httpError(
     400,
-    "Submit your FSSAI registration for review before enabling selling",
+    "Submit your FSSAI registration before enabling selling",
     { code: "FSSAI_SUBMIT_REQUIRED" }
   );
 }

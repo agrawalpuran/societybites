@@ -52,7 +52,9 @@ class OrderFulfilmentBanner extends StatelessWidget {
                 order.approxDistanceLabel,
               ),
               Text(
-                'Delivery charge: ₹$chargeLabel',
+                order.deliveryChargePending
+                    ? 'Delivery charge: On actuals'
+                    : 'Delivery charge: ₹$chargeLabel',
                 style: const TextStyle(color: Color(0xFF3A4644)),
               ),
             ] else if (order.buyerSocietyName != null &&
@@ -83,14 +85,29 @@ class OrderFulfilmentBanner extends StatelessWidget {
                   ),
                 ),
               ],
-            ] else if (order.sellerSocietyName != null &&
-                order.sellerSocietyName!.isNotEmpty)
-              Text(
-                'Seller Society: ${order.sellerSocietyName}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Color(0xFF3A4644)),
-              ),
+            ] else ...[
+              if (order.sellerSocietyName != null &&
+                  order.sellerSocietyName!.isNotEmpty)
+                Text(
+                  'Seller Society: ${order.sellerSocietyName}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF3A4644)),
+                ),
+              if (order.deliveryChargePending) ...[
+                const SizedBox(height: 6),
+                const Text(
+                  'Delivery charge will be confirmed by the seller when your order is ready.',
+                  style: TextStyle(color: Color(0xFF3A4644)),
+                ),
+              ] else if (order.deliveryCharge > 0) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Delivery charge: ₹${chargeLabel}',
+                  style: const TextStyle(color: Color(0xFF3A4644)),
+                ),
+              ],
+            ],
             if (!delivery && order.fulfilmentAt != null) ...[
               const SizedBox(height: 4),
               Text(

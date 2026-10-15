@@ -1266,7 +1266,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       ],
                       const SizedBox(height: 18),
                       _buildField(
-                        label: 'PICKUP LOCATION',
+                        label: 'PICKUP LOCATION - For BUYER PICKUP',
                         child: Container(
                           height: 52,
                           padding:

@@ -15,6 +15,7 @@ const {
 } = require("../lib/refreshTokens");
 const { rateLimit } = require("../middleware/rateLimit");
 const { attachSellingReach, assertSellerSellingReachLevel } = require("../lib/sellingReach");
+const { normalizeDeliveryCollectBy } = require("../lib/delayedDeliveryCharge");
 const { assertSellerFulfilmentUpdate } = require("../lib/sellerFulfilment");
 const {
   assertSellerPaymentPreferenceUpdate,
@@ -27,6 +28,7 @@ const {
   parseImageUpload,
   normalizeStoredProfilePhotoUrl,
 } = require("../lib/profileImage");
+const { parseHideFlatNumber } = require("../lib/sellerFlatPrivacy");
 
 const router = express.Router();
 
@@ -340,6 +342,8 @@ router.patch(
       paymentPreference,
       kitchenOpensAt,
       kitchenClosesAt,
+      hideFlatNumber,
+      outsideDeliveryCollectBy,
     } = req.body;
     const fssaiBody = req.body && req.body.fssai;
 
@@ -437,6 +441,28 @@ router.patch(
         requested: paymentPreference,
         role: nextRole,
       });
+    }
+    if (hideFlatNumber !== undefined) {
+      const parsed = parseHideFlatNumber(hideFlatNumber);
+      if (parsed === undefined) {
+        return res.status(400).json({ error: "hideFlatNumber must be true or false" });
+      }
+      data.hideFlatNumber = parsed;
+    }
+    if (outsideDeliveryCollectBy !== undefined) {
+      const nextRole = data.role || req.user.role;
+      if (nextRole !== "seller" && req.user.role !== "seller") {
+        return res.status(400).json({
+          error: "outsideDeliveryCollectBy can only be set for sellers",
+        });
+      }
+      try {
+        data.outsideDeliveryCollectBy = normalizeDeliveryCollectBy(
+          outsideDeliveryCollectBy
+        );
+      } catch (err) {
+        return res.status(err.statusCode || 400).json({ error: err.message });
+      }
     }
     if (kitchenOpensAt !== undefined || kitchenClosesAt !== undefined) {
       const nextRole = data.role || req.user.role;

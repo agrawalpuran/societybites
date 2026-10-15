@@ -119,7 +119,7 @@ class _AdminFssaiScreenState extends State<AdminFssaiScreen> {
             onChanged: _toggleRequirement,
           ),
           Text(
-            'Pending review: ${submissions['UNDER_REVIEW'] ?? 0} · '
+            'Submitted: ${submissions['UNDER_REVIEW'] ?? 0} · '
             'Approved: ${submissions['APPROVED'] ?? 0} · '
             'Rejected: ${submissions['REJECTED'] ?? 0}',
           ),

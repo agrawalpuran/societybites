@@ -183,8 +183,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Delivery charges'), findsOneWidget);
     expect(find.text('In society'), findsOneWidget);
-    expect(find.text('Nearby'), findsOneWidget);
-    expect(find.text('Extended'), findsOneWidget);
+    expect(find.text('Nearby & extended'), findsOneWidget);
+    expect(find.textContaining('on actuals'), findsOneWidget);
     expect(
       find.ancestor(
         of: find.byKey(const Key('fulfilment-save')),
@@ -200,23 +200,19 @@ void main() {
       findsNothing,
     );
 
-    await tester.enterText(find.byKey(const Key('delivery-charge-nearby')), '40');
-    await tester.enterText(
-      find.byKey(const Key('delivery-charge-extended')),
-      '60',
-    );
+    await tester.enterText(find.byKey(const Key('delivery-charge-in-society')), '15');
     await tester.ensureVisible(find.byKey(const Key('fulfilment-save')));
     await tester.tap(find.byKey(const Key('fulfilment-save')));
     await tester.pumpAndSettle();
     while (tester.takeException() != null) {}
 
     expect(savedMode, 'SELLER_DELIVERY');
-    expect(savedInSociety, 0);
-    expect(savedNearby, 40);
-    expect(savedExtended, 60);
+    expect(savedInSociety, 15);
+    expect(savedNearby, 0);
+    expect(savedExtended, 0);
     expect(find.text('Seller Delivery'), findsOneWidget);
     expect(
-      find.text('In society ₹0 · Nearby ₹40 · Extended ₹60'),
+      find.text('In society ₹15 · Outside society: on actuals'),
       findsOneWidget,
     );
     expect(find.text('Fulfilment updated'), findsOneWidget);

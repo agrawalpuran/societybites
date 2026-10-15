@@ -451,6 +451,7 @@ class ApiService {
     String? kitchenOpensAt,
     String? kitchenClosesAt,
     bool clearKitchenHours = false,
+    bool? hideFlatNumber,
     String? fssaiNumber,
     String? fssaiExpiry,
     String? fssaiRegisteredName,
@@ -484,6 +485,7 @@ class ApiService {
           if (kitchenOpensAt != null) 'kitchenOpensAt': kitchenOpensAt,
           if (kitchenClosesAt != null) 'kitchenClosesAt': kitchenClosesAt,
         },
+        if (hideFlatNumber != null) 'hideFlatNumber': hideFlatNumber,
         if (!identical(profilePhotoUrl, _omitProfilePhoto))
           'profilePhotoUrl': profilePhotoUrl,
         if (fssaiNumber != null ||
@@ -671,6 +673,25 @@ class ApiService {
     if (response.statusCode == 200) {
       final data = _decodeResponse(response) as List;
       return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<String>> putCatalogOrder(
+    List<String> orderedListingIds,
+  ) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/listings/catalog-order'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'orderedListingIds': orderedListingIds}),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      final raw = data['orderedListingIds'];
+      if (raw is List) {
+        return raw.map((id) => id.toString()).toList();
+      }
+      return orderedListingIds;
     }
     _throwFromResponse(response);
   }
@@ -1173,6 +1194,8 @@ class ApiService {
     required String status,
     String? reason,
     String? otherText,
+    double? deliveryCharge,
+    String? deliveryCollectBy,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/orders/$orderId/status'),
@@ -1182,6 +1205,9 @@ class ApiService {
         if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
         if (otherText != null && otherText.trim().isNotEmpty)
           'otherText': otherText.trim(),
+        if (deliveryCharge != null) 'deliveryCharge': deliveryCharge,
+        if (deliveryCollectBy != null && deliveryCollectBy.trim().isNotEmpty)
+          'deliveryCollectBy': deliveryCollectBy.trim(),
       }),
     );
 
@@ -1196,8 +1222,15 @@ class ApiService {
     required String orderId,
     required String currentStatus,
     required String nextStatus,
+    double? deliveryCharge,
+    String? deliveryCollectBy,
   }) async {
-    return updateOrderStatus(orderId: orderId, status: nextStatus);
+    return updateOrderStatus(
+      orderId: orderId,
+      status: nextStatus,
+      deliveryCharge: deliveryCharge,
+      deliveryCollectBy: deliveryCollectBy,
+    );
   }
 
   /// Set or clear optional Ready-by estimate. Pass null to clear.
@@ -1586,6 +1619,20 @@ class ApiService {
           'expectedReadyAt': expectedReadyAt.toUtc().toIso8601String(),
         if (readyInMinutes != null) 'readyInMinutes': readyInMinutes,
       }),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  /// Seller confirms delivery fee cash (UPI food + outside delivery on actuals).
+  static Future<Map<String, dynamic>> confirmDeliveryCash({
+    required String orderId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/payments/$orderId/confirm-delivery-cash'),
+      headers: await _authHeaders(),
     );
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);

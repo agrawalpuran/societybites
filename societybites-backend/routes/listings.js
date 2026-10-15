@@ -51,19 +51,24 @@ const {
   attachRecurringAvailability,
 } = require("../lib/recurringAvailability");
 const { withoutAutomatedTestListings } = require("../lib/testListingNames");
+const {
+  sortSellerCatalogListings,
+  nextDisplayOrderForSeller,
+  applySellerCatalogOrder,
+} = require("../lib/listingCatalogOrder");
 
-async function jsonListings(listings) {
+async function jsonListings(listings, viewerUserId) {
   const withCapacity = await attachMadeToOrderCapacity(prisma, listings);
   const withRecurring = await attachRecurringAvailability(prisma, withCapacity);
   await Promise.all([
     attachQuantitySold(prisma, withRecurring),
     attachListingReviewAggregates(prisma, withRecurring),
   ]);
-  return serializeListingsWithSellerOrderability(withRecurring);
+  return serializeListingsWithSellerOrderability(withRecurring, { viewerUserId });
 }
 
-async function jsonListing(listing) {
-  const [serialized] = await jsonListings([listing]);
+async function jsonListing(listing, viewerUserId) {
+  const [serialized] = await jsonListings([listing], viewerUserId);
   return serialized;
 }
 
@@ -193,7 +198,7 @@ router.get(
       );
     }
 
-    const listings = await prisma.listing.findMany({
+    let listings = await prisma.listing.findMany({
       where: {
         societyId,
         ...catalogWhere,
@@ -205,6 +210,10 @@ router.get(
       include: listingInclude,
       orderBy: { createdAt: "desc" },
     });
+
+    if (sellerScope) {
+      listings = sortSellerCatalogListings(listings);
+    }
 
     if (isDiscoverableBuyerFeed) {
       const dueIds = listings
@@ -223,7 +232,7 @@ router.get(
     const buyerVisible = isDiscoverableBuyerFeed
       ? withoutAutomatedTestListings(listings)
       : listings;
-    const payload = await jsonListings(buyerVisible);
+    const payload = await jsonListings(buyerVisible, req.user.id);
     res.json(payload);
   })
 );
@@ -250,7 +259,7 @@ router.get(
     }
 
     listing = await expireListingIfDue(prisma, listing, { include: listingInclude });
-    res.json(await jsonListing(listing));
+    res.json(await jsonListing(listing, req.user.id));
   })
 );
 
@@ -338,10 +347,16 @@ router.post(
       return res.status(err.statusCode || 400).json({ error: err.message });
     }
 
+    const displayOrder =
+      parsedCatalogType === "REGULAR"
+        ? await nextDisplayOrderForSeller(prisma, req.user.id)
+        : null;
+
     const listing = await prisma.listing.create({
       data: {
         sellerId: req.user.id,
         societyId: req.user.societyId,
+        displayOrder,
         name,
         description,
         price: parseFloat(price),
@@ -362,7 +377,35 @@ router.post(
       include: listingInclude,
     });
 
-    res.status(201).json(await jsonListing(listing));
+    res.status(201).json(await jsonListing(listing, req.user.id));
+  })
+);
+
+router.put(
+  "/catalog-order",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const role = req.user.role || "buyer";
+    if (!["seller", "super_admin"].includes(role)) {
+      return res.status(403).json({
+        error: "Enable selling in Profile before reordering listings",
+        code: "SELLER_REQUIRED",
+      });
+    }
+
+    try {
+      const orderedListingIds = await applySellerCatalogOrder(
+        prisma,
+        req.user.id,
+        req.body && req.body.orderedListingIds
+      );
+      res.json({ success: true, orderedListingIds });
+    } catch (err) {
+      const statusCode = err.statusCode || 500;
+      return res.status(statusCode).json({
+        error: statusCode === 500 ? "Internal server error" : err.message,
+      });
+    }
   })
 );
 
@@ -405,7 +448,7 @@ router.patch(
     }
 
     if ((listing.catalogType || "REGULAR") === nextType) {
-      return res.json(await jsonListing(listing));
+      return res.json(await jsonListing(listing, req.user.id));
     }
 
     const updated = await prisma.listing.update({
@@ -427,7 +470,7 @@ router.patch(
       include: listingInclude,
     });
 
-    res.json(await jsonListing(updated));
+    res.json(await jsonListing(updated, req.user.id));
   })
 );
 
@@ -539,7 +582,7 @@ router.patch(
       include: listingInclude,
     });
 
-    res.json(await jsonListing(updated));
+    res.json(await jsonListing(updated, req.user.id));
   })
 );
 
@@ -687,7 +730,7 @@ router.patch(
       include: listingInclude,
     });
 
-    res.json(await jsonListing(updated));
+    res.json(await jsonListing(updated, req.user.id));
   })
 );
 
@@ -733,7 +776,7 @@ router.patch(
       include: listingInclude,
     });
 
-    res.json(await jsonListing(updated));
+    res.json(await jsonListing(updated, req.user.id));
   })
 );
 
@@ -787,7 +830,7 @@ router.patch(
       include: listingInclude,
     });
 
-    res.json(await jsonListing(updated));
+    res.json(await jsonListing(updated, req.user.id));
   })
 );
 

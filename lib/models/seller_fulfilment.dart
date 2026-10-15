@@ -67,6 +67,20 @@ extension FulfilmentModeApi on FulfilmentMode {
 
 enum DeliveryReachBand { inSociety, nearby, extended }
 
+DeliveryReachBand? deliveryReachBandFromApi(String? reach) {
+  switch (reach?.trim().toLowerCase()) {
+    case 'extended':
+      return DeliveryReachBand.extended;
+    case 'nearby':
+      return DeliveryReachBand.nearby;
+    case 'insociety':
+    case 'in_society':
+      return DeliveryReachBand.inSociety;
+    default:
+      return null;
+  }
+}
+
 class SellerFulfilment {
   const SellerFulfilment({
     this.mode = FulfilmentMode.buyerPickup,
@@ -104,7 +118,7 @@ class SellerFulfilment {
 
   String get subtitle {
     if (!mode.showsDeliveryCharge) return 'Buyer collects the order from you.';
-    return 'In society ₹${_label(inSocietyCharge)} · Nearby ₹${_label(nearbyCharge)} · Extended ₹${_label(extendedCharge)}';
+    return 'In society ₹${_label(inSocietyCharge)} · Outside society: on actuals';
   }
 
   factory SellerFulfilment.fromAuthMe(Map<String, dynamic> me) {

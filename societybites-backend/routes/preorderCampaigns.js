@@ -43,9 +43,11 @@ const campaignInclude = {
   },
 };
 
-function serializeCampaignWithProducts(campaign) {
+function serializeCampaignWithProducts(campaign, viewerUserId) {
   const base = serializeCampaign(campaign);
-  base.products = (campaign.products || []).map(serializeListing);
+  base.products = (campaign.products || []).map((product) =>
+    serializeListing(product, { viewerUserId })
+  );
   return base;
 }
 
@@ -139,7 +141,7 @@ router.get(
       status,
     });
 
-    res.json(campaigns.map(serializeCampaignWithProducts));
+    res.json(campaigns.map((campaign) => serializeCampaignWithProducts(campaign, req.user.id)));
   })
 );
 
@@ -170,7 +172,7 @@ router.get(
         include: campaignInclude,
       });
     }
-    res.json(serializeCampaignWithProducts(campaign));
+    res.json(serializeCampaignWithProducts(campaign, req.user.id));
   })
 );
 
@@ -234,7 +236,7 @@ router.get(
       orderBy: { createdAt: "desc" },
     });
 
-    res.json(orders.map(serializeOrder));
+    res.json(orders.map((order) => serializeOrder(order, { viewerUserId: req.user.id })));
   })
 );
 
@@ -308,7 +310,7 @@ router.post(
       });
     });
 
-    res.status(201).json(serializeCampaignWithProducts(campaign));
+    res.status(201).json(serializeCampaignWithProducts(campaign, req.user.id));
   })
 );
 
@@ -442,7 +444,7 @@ router.patch(
       });
     });
 
-    res.json(serializeCampaignWithProducts(campaign));
+    res.json(serializeCampaignWithProducts(campaign, req.user.id));
   })
 );
 
@@ -474,7 +476,7 @@ router.post(
       },
     });
 
-    res.status(201).json(serializeListing(listing));
+    res.status(201).json(serializeListing(listing, { viewerUserId: req.user.id }));
   })
 );
 
@@ -566,7 +568,7 @@ router.patch(
       },
     });
 
-    res.json(serializeListing(updated));
+    res.json(serializeListing(updated, { viewerUserId: req.user.id }));
   })
 );
 

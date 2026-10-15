@@ -76,6 +76,7 @@ class ProfileScreen extends StatefulWidget {
     String? kitchenOpensAt,
     String? kitchenClosesAt,
     bool? clearKitchenHours,
+    bool? hideFlatNumber,
   })? updateProfile;
 
   /// Test seam. Production uses [ApiService.updateMyProfile] for UPI.
@@ -137,6 +138,8 @@ class ProfileScreenState extends State<ProfileScreen> {
   String? _kitchenOpensAt;
   String? _kitchenClosesAt;
   SellerPaymentPreference _paymentPreference = defaultSellerPaymentPreference;
+  bool _hideFlatNumber = false;
+  bool _hideFlatNumberSaving = false;
   String? _fssaiNumber;
   String? _profilePhotoUrl;
   bool _savingProfilePhoto = false;
@@ -304,6 +307,9 @@ class ProfileScreenState extends State<ProfileScreen> {
           _kitchenClosesAt = profile['kitchenClosesAt'] as String?;
         }
         _paymentPreference = paymentPreferenceFromAuthMe(profile);
+        if (profile.containsKey('hideFlatNumber')) {
+          _hideFlatNumber = profile['hideFlatNumber'] == true;
+        }
         _applyFssaiFromProfile(profile);
         _profilePhotoUrl = profile['profilePhotoUrl'] as String? ?? _profilePhotoUrl;
         _applyPendingSellerDraftToUi();
@@ -752,6 +758,10 @@ class ProfileScreenState extends State<ProfileScreen> {
               onKitchenHoursChanged: holdingSetup
                   ? _onPendingKitchenHoursChanged
                   : null,
+              hideFlatNumber: _hideFlatNumber,
+              hideFlatNumberSaving: _hideFlatNumberSaving,
+              onHideFlatNumberChanged:
+                  holdingSetup ? null : _onHideFlatNumberChanged,
             );
           },
         ),
@@ -1192,7 +1202,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   String get _sellerFssaiComplianceMessage {
     switch (_fssaiStatus) {
       case 'UNDER_REVIEW':
-        return 'Your FSSAI registration is under review. Buyers cannot order until SocietyBites approves it.';
+        return 'Your FSSAI registration has been submitted. Buyers cannot order until SocietyBites approves it.';
       case 'REJECTED':
         return 'Update your FSSAI registration to continue selling on SocietyBites.';
       default:
@@ -1333,7 +1343,7 @@ class ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Submit your FSSAI registration for review before enabling selling.',
+            'Submit your FSSAI registration before enabling selling.',
           ),
         ),
       );
@@ -1726,10 +1736,8 @@ class ProfileScreenState extends State<ProfileScreen> {
 
     final inSociety = parseCharge(saved.inSocietyText, 'in-society delivery charge');
     if (inSociety == null) return;
-    final nearby = parseCharge(saved.nearbyText, 'nearby delivery charge');
-    if (nearby == null) return;
-    final extended = parseCharge(saved.extendedText, 'extended delivery charge');
-    if (extended == null) return;
+    const nearby = 0.0;
+    const extended = 0.0;
     final draftMode = saved.mode;
 
     final pending = _pendingSellerEnable;
@@ -1889,6 +1897,49 @@ class ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update kitchen hours: $e')),
       );
+    }
+  }
+
+  Future<void> _onHideFlatNumberChanged(bool hide) async {
+    if (_hideFlatNumberSaving || hide == _hideFlatNumber) return;
+
+    final previous = _hideFlatNumber;
+    setState(() {
+      _hideFlatNumber = hide;
+      _hideFlatNumberSaving = true;
+    });
+    _refreshSellerSettings();
+
+    try {
+      final updated = widget.updateProfile != null
+          ? await widget.updateProfile!(hideFlatNumber: hide)
+          : await ApiService.updateMyProfile(hideFlatNumber: hide);
+      if (!mounted) return;
+      setState(() {
+        _hideFlatNumber = updated['hideFlatNumber'] == true;
+      });
+      try {
+        await SessionService.cacheProfileFromApi(updated);
+      } catch (_) {}
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _hideFlatNumber
+                ? 'Your flat number is hidden on public listings'
+                : 'Your flat number is visible on listings again',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _hideFlatNumber = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update privacy setting: $e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() => _hideFlatNumberSaving = false);
+      _refreshSellerSettings();
     }
   }
 
@@ -2457,13 +2508,9 @@ class _FulfilmentDraft {
   const _FulfilmentDraft({
     required this.mode,
     required this.inSocietyText,
-    required this.nearbyText,
-    required this.extendedText,
   });
   final FulfilmentMode mode;
   final String inSocietyText;
-  final String nearbyText;
-  final String extendedText;
 }
 
 class _FulfilmentSheet extends StatefulWidget {
@@ -2477,8 +2524,6 @@ class _FulfilmentSheet extends StatefulWidget {
 class _FulfilmentSheetState extends State<_FulfilmentSheet> {
   late FulfilmentMode _mode;
   late final TextEditingController _inSocietyController;
-  late final TextEditingController _nearbyController;
-  late final TextEditingController _extendedController;
 
   @override
   void initState() {
@@ -2486,12 +2531,6 @@ class _FulfilmentSheetState extends State<_FulfilmentSheet> {
     _mode = widget.initial.mode;
     _inSocietyController = TextEditingController(
       text: _chargeText(widget.initial.inSocietyCharge),
-    );
-    _nearbyController = TextEditingController(
-      text: _chargeText(widget.initial.nearbyCharge),
-    );
-    _extendedController = TextEditingController(
-      text: _chargeText(widget.initial.extendedCharge),
     );
   }
 
@@ -2504,8 +2543,6 @@ class _FulfilmentSheetState extends State<_FulfilmentSheet> {
   @override
   void dispose() {
     _inSocietyController.dispose();
-    _nearbyController.dispose();
-    _extendedController.dispose();
     super.dispose();
   }
 
@@ -2652,7 +2689,7 @@ class _FulfilmentSheetState extends State<_FulfilmentSheet> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Set a charge for each buyer reach. In society defaults to ₹0.',
+                      'Set your in-society delivery charge. Use ₹0 for free delivery within your society.',
                       style: TextStyle(fontSize: 13, color: Color(0xFF6A7774)),
                     ),
                     const SizedBox(height: 10),
@@ -2662,17 +2699,36 @@ class _FulfilmentSheetState extends State<_FulfilmentSheet> {
                       hint: '0',
                       controller: _inSocietyController,
                     ),
-                    _chargeField(
-                      key: const Key('delivery-charge-nearby'),
-                      label: 'Nearby',
-                      hint: '0',
-                      controller: _nearbyController,
-                    ),
-                    _chargeField(
-                      key: const Key('delivery-charge-extended'),
-                      label: 'Extended',
-                      hint: '0',
-                      controller: _extendedController,
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F7F4),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFD4E8DF)),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Nearby & extended',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF101617),
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'For buyers outside your society, delivery is on actuals. '
+                            'You enter the charge when you mark a cash delivery order ready.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF6A7774),
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ],
@@ -2690,8 +2746,6 @@ class _FulfilmentSheetState extends State<_FulfilmentSheet> {
                 _FulfilmentDraft(
                   mode: _mode,
                   inSocietyText: _inSocietyController.text,
-                  nearbyText: _nearbyController.text,
-                  extendedText: _extendedController.text,
                 ),
               ),
               style: ElevatedButton.styleFrom(

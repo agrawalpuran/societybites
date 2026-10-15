@@ -178,8 +178,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double get _subtotal =>
       _items.fold<double>(0, (sum, item) => sum + item.total);
 
+  bool get _usesDelayedDeliveryCharge =>
+      _isCrossSociety && _fulfilmentMethod == 'seller_delivery';
+
   double get _deliveryCharge {
     if (_fulfilmentMethod != 'seller_delivery') return 0;
+    if (_usesDelayedDeliveryCharge) return 0;
     return (_sellerFulfilment ?? const SellerFulfilment()).chargeForBuyer(
       sameSociety: !_isCrossSociety,
       band: widget.deliveryReachBand,
@@ -767,6 +771,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         : amount.toString();
   }
 
+  String _sellerDeliverySubtitle(SellerFulfilment fulfilment) {
+    if (_usesDelayedDeliveryCharge) {
+      if (_payment == PaymentMethod.upi) {
+        return 'Pay for food via UPI after the seller accepts. Outside delivery is on actuals (cash at handover).';
+      }
+      return 'Outside-society delivery charge will be confirmed by the seller when your order is ready.';
+    }
+    final charge = fulfilment.chargeForBuyer(
+      sameSociety: !_isCrossSociety,
+      band: widget.deliveryReachBand,
+    );
+    return 'Delivery charge: ₹${_chargeLabel(charge)}';
+  }
+
   Widget _buildFulfilmentSection() {
     final fulfilment = _sellerFulfilment ?? const SellerFulfilment();
     final society = widget.sellerSocietyName;
@@ -821,8 +839,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _fulfilmentTile(
             value: 'seller_delivery',
             title: '🛵 Seller Delivery',
-            subtitle:
-                'Delivery charge: ₹${_chargeLabel(fulfilment.chargeForBuyer(sameSociety: !_isCrossSociety, band: widget.deliveryReachBand))}',
+            subtitle: _sellerDeliverySubtitle(fulfilment),
           )
         else ...[
           _fulfilmentTile(
@@ -834,8 +851,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _fulfilmentTile(
             value: 'seller_delivery',
             title: '🛵 Seller Delivery',
-            subtitle:
-                '₹${_chargeLabel(fulfilment.chargeForBuyer(sameSociety: !_isCrossSociety, band: widget.deliveryReachBand))}',
+            subtitle: _sellerDeliverySubtitle(fulfilment),
           ),
         ],
       ],
@@ -1017,7 +1033,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ],
           ),
-          if (_deliveryCharge > 0) ...[
+          if (_usesDelayedDeliveryCharge) ...[
+            const SizedBox(height: 10),
+            const _BillRow(
+              label: 'Delivery charge',
+              value: 'Confirmed when ready',
+            ),
+          ] else if (_deliveryCharge > 0) ...[
             const SizedBox(height: 10),
             _BillRow(
               label: 'Delivery charge',

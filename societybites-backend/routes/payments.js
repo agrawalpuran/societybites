@@ -10,9 +10,15 @@ const {
   notifyBuyerMarkedPaid,
   notifyPaymentConfirmed,
   notifyReadyBy,
+  notifyStatusChange,
   flushNotification,
 } = require("../utils/notifications");
 const { parseOptionalReadyAt } = require("../lib/orderReadyTime");
+const {
+  isUpiFoodCashDeliverySplit,
+  upiPayableAmountForOrder,
+  assertCanCompleteOrder,
+} = require("../lib/delayedDeliveryCharge");
 
 const router = express.Router();
 
@@ -79,7 +85,7 @@ router.post(
       include: orderInclude,
     });
 
-    res.json(serializeOrder(updated));
+    res.json(serializeOrder(updated, { viewerUserId: req.user.id }));
 
     void flushNotification(notifyBuyerMarkedPaid(updated));
   })
@@ -220,6 +226,87 @@ router.post(
   })
 );
 
+/**
+ * POST /payments/:orderId/confirm-delivery-cash
+ * Seller confirms delivery fee cash received (UPI food + cash delivery outside society).
+ */
+router.post(
+  "/:orderId/confirm-delivery-cash",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.orderId },
+      include: orderInclude,
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    if (!isOrderSeller(order, req.user.id)) {
+      return res.status(403).json({
+        error: "Only the seller can confirm delivery cash for this order",
+      });
+    }
+
+    if (!isUpiFoodCashDeliverySplit(order)) {
+      return res.status(400).json({
+        error: "This endpoint is only for outside-society UPI orders with cash delivery",
+      });
+    }
+
+    if (["cancelled", "rejected"].includes(order.status)) {
+      return res.status(400).json({
+        error: `Cannot confirm delivery cash for a ${order.status} order`,
+      });
+    }
+
+    if (order.deliveryCashConfirmedAt) {
+      return res.json(serializeOrderStatusPatch(order));
+    }
+
+    const charge = Number(order.deliveryCharge || 0);
+    if (charge <= 0) {
+      return res.status(400).json({
+        error: "No delivery fee to confirm for this order",
+      });
+    }
+
+    if (!["ready", "picked_up"].includes(order.status)) {
+      return res.status(400).json({
+        error: "Delivery cash can only be confirmed when the order is ready for handover",
+      });
+    }
+
+    const now = new Date();
+    const data = { deliveryCashConfirmedAt: now };
+    const candidate = { ...order, deliveryCashConfirmedAt: now };
+    try {
+      assertCanCompleteOrder(candidate);
+      data.status = "completed";
+      data.completedAt = now;
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data,
+      include: orderInclude,
+    });
+
+    console.log(
+      `[PAYMENT] Delivery cash confirmed for ${order.orderNumber} by seller ${req.user.phone}`
+    );
+
+    res.json(serializeOrderStatusPatch(updated));
+
+    if (updated.status === "completed") {
+      void flushNotification(notifyStatusChange(updated, "completed"));
+    }
+  })
+);
+
 router.get(
   "/:orderId",
   requireUser,
@@ -246,6 +333,7 @@ router.get(
       paymentStatus: order.paymentStatus || "pending",
       paymentMethod: order.paymentMethod,
       total: order.total,
+      upiPayableAmount: upiPayableAmountForOrder(order),
       buyerMarkedPaidAt: order.buyerMarkedPaidAt || null,
       sellerConfirmedPaidAt: order.sellerConfirmedPaidAt || null,
       upiTransactionRef: order.upiTransactionRef || null,

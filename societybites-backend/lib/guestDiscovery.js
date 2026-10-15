@@ -4,6 +4,7 @@ const { canonicalCityKey } = require("./launchCity");
 const { expireDueListings, DISCOVERABLE_STATUSES } = require("../utils/listingExpiry");
 const { withoutAutomatedTestListings } = require("./testListingNames");
 const { evaluateRecurringAvailability, attachRecurringAvailability } = require("./recurringAvailability");
+const { sortSellerCatalogListings } = require("./listingCatalogOrder");
 
 const GUEST_REACH_LEVELS = ["NEARBY", "EXTENDED"];
 
@@ -84,10 +85,11 @@ function serializeGuestListing(listing, seller) {
 }
 
 async function serializeGuestKitchen(seller) {
+  const sorted = sortSellerCatalogListings(seller.listings || []);
   const listings = (
     await attachRecurringAvailability(
       prisma,
-      withoutAutomatedTestListings(seller.listings || [])
+      withoutAutomatedTestListings(sorted)
     )
   ).map((listing) => serializeGuestListing(listing, seller));
   const categories = [

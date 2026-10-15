@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/issue_report.dart';
 import '../services/api_service.dart';
@@ -30,6 +31,9 @@ class ReportIssueScreen extends StatefulWidget {
   @override
   State<ReportIssueScreen> createState() => _ReportIssueScreenState();
 }
+
+const _urgentSupportPhoneDisplay = '+91 97405 52800';
+const _urgentSupportPhoneUri = '+919740552880';
 
 class _ReportIssueScreenState extends State<ReportIssueScreen> {
   final _description = TextEditingController();
@@ -162,10 +166,81 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     );
   }
 
+  Future<void> _callUrgentSupport() async {
+    final uri = Uri(scheme: 'tel', path: _urgentSupportPhoneUri);
+    if (!await launchUrl(uri)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the phone dialer')),
+      );
+    }
+  }
+
+  Widget _urgentContactBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E8),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFE0A3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.phone_in_talk_rounded,
+                size: 20,
+                color: Color(0xFFB8860B),
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Need urgent help?',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF101617),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'If your issue is urgent and you can\'t wait, please call us '
+            '(9am to 6pm).',
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: Color(0xFF6A7774),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          InkWell(
+            onTap: _callUrgentSupport,
+            borderRadius: BorderRadius.circular(6),
+            child: Text(
+              _urgentSupportPhoneDisplay,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0E5A47),
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _form() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       children: [
+        _urgentContactBanner(),
         if (_submitted != null) ...[
           const Icon(Icons.check_circle_rounded, color: Color(0xFF0E5A47), size: 36),
           const SizedBox(height: 8),

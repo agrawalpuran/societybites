@@ -29,6 +29,8 @@ model User {
   deliveryChargeExtended  Float                   @default(0)
   /// UPI_ONLY | UPI_AND_COD | COD_IN_SOCIETY_UPI_OUTSIDE. Controls NEW checkout options only; orders snapshot paymentMethod.
   paymentPreference       String                  @default("COD_IN_SOCIETY_UPI_OUTSIDE")
+  /// Default for outside-society delivery fee on UPI orders: seller | delivery_person (cash at handover).
+  outsideDeliveryCollectBy String                 @default("seller")
   /// Daily kitchen window in IST, "HH:mm". Both null means always open.
   kitchenOpensAt          String?
   kitchenClosesAt         String?
@@ -44,6 +46,8 @@ model User {
   /// Admin user id that last marked the photo. Does not change selling.
   addressProofReviewedBy  String?
   suspended               Boolean                 @default(false)
+  /// When true, seller flat number is omitted from public APIs except buyer pickup exception.
+  hideFlatNumber          Boolean                 @default(false)
   /// View-only admin portal access without replacing seller/buyer role.
   consoleAdmin            Boolean                 @default(false)
   createdAt               DateTime                @default(now())
@@ -194,6 +198,8 @@ model Listing {
   /// active | paused | expired | sold_out | inactive
   status                 String            @default("active")
   featured               Boolean           @default(false)
+  /// Seller storefront sort position for REGULAR catalog listings. Null = legacy fallback sort.
+  displayOrder           Int?
   /// REGULAR | PREORDER. Marketplace vs seller pre-order catalog. Independent of campaignId.
   catalogType            String            @default("REGULAR")
   /// READY_NOW | MADE_TO_ORDER. Only meaningful for REGULAR catalog listings.
@@ -275,6 +281,10 @@ model Order {
   fulfilmentMethod      String?
   /// Historical charge for this order. 0 for pickup / regular.
   deliveryCharge        Float              @default(0)
+  /// Who collects outside delivery fee in cash on UPI split-pay orders: seller | delivery_person.
+  deliveryCollectBy     String?
+  /// Seller confirmed delivery fee cash received (UPI food + cash delivery).
+  deliveryCashConfirmedAt DateTime?
   fulfilmentNotes       String?
   /// Snapshot of campaign.fulfilmentAt at place-order time.
   fulfilmentAt          DateTime?

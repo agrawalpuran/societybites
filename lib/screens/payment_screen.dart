@@ -116,12 +116,12 @@ class _PaymentScreenState extends State<PaymentScreen>
     return _order.sellerLabel;
   }
 
-  String get _amount => _order.orderTotal.toStringAsFixed(2);
+  String get _amount => _order.upiPaymentAmount.toStringAsFixed(2);
 
   Uri get _upiPaymentUri => buildUpiPaymentUri(
     upiId: _sellerUpiId ?? '',
     payeeName: _sellerName.trim().isEmpty ? 'SocietyBites seller' : _sellerName,
-    amount: _order.orderTotal,
+    amount: _order.upiPaymentAmount,
     transactionNote: 'SocietyBites Order ${_order.orderId}',
     transactionRef: _order.orderId,
   );
@@ -308,7 +308,7 @@ class _PaymentScreenState extends State<PaymentScreen>
       'No UPI app found. You can scan the QR code or copy the UPI ID instead.';
 
   Future<void> _launchUpiApp() async {
-    if (!_hasUpi || _order.orderTotal <= 0) return;
+    if (!_hasUpi || _order.upiPaymentAmount <= 0) return;
 
     try {
       setState(() => _upiLaunchError = null);
@@ -366,7 +366,7 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   Future<void> _launchSelectedUpiApp(UpiAppOption app) async {
     final resolved = app.resolvedLaunchUri;
-    if (resolved == null || _order.orderTotal <= 0) return;
+    if (resolved == null || _order.upiPaymentAmount <= 0) return;
     final handoff = shouldHandoffUpiCollect(
       platform: defaultTargetPlatform,
     );

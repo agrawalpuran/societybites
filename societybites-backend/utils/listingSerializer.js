@@ -2,8 +2,18 @@ const { distanceKmBetweenCoordinates } = require("../lib/geoDistance");
 const { listingCategoriesFromRecord } = require("./listingCategories");
 const { serializePaymentPreference } = require("../lib/sellerPaymentPreference");
 const { serializeFulfilment } = require("../lib/sellerFulfilment");
+const {
+  isDeliveryChargePending,
+  isUpiFoodCashDeliverySplit,
+  upiPayableAmountForOrder,
+} = require("../lib/delayedDeliveryCharge");
 const { evaluateRecurringAvailability } = require("../lib/recurringAvailability");
 const { sellerCanDecline } = require("../lib/orderAcceptance");
+const {
+  redactSellerFlatOnListingPayload,
+  sellerHidesFlatNumber,
+  shouldExposeSellerFlatNumber,
+} = require("../lib/sellerFlatPrivacy");
 
 const ORDER_ENDED_WITHOUT_FOOD = new Set(["rejected", "cancelled"]);
 
@@ -51,7 +61,7 @@ function serializeListing(listing, options = {}) {
     soldToday: listing.recurringSoldToday || 0,
   });
 
-  return {
+  const payload = {
     id: listing.id,
     name: listing.name,
     description: listing.description,
@@ -114,9 +124,27 @@ function serializeListing(listing, options = {}) {
     quantitySold: Number(listing.quantitySold) || 0,
     sellerAcceptingOrders,
     sellerOrderBlockReason,
+    sellerHideFlatNumber: sellerHidesFlatNumber(seller),
+    displayOrder:
+      listing.displayOrder == null ? null : listing.displayOrder,
     createdAt: listing.createdAt,
     updatedAt: listing.updatedAt,
   };
+
+  const privacyContext = {
+    seller,
+    viewerUserId: options.viewerUserId,
+    order: options.order,
+    pickupLocation: listing.pickupLocation,
+  };
+  const sellerFlatDisclosed =
+    sellerHidesFlatNumber(seller) &&
+    shouldExposeSellerFlatNumber(privacyContext);
+  const redacted = redactSellerFlatOnListingPayload(payload, privacyContext);
+  if (sellerFlatDisclosed) {
+    redacted.sellerFlatDisclosed = true;
+  }
+  return redacted;
 }
 
 /** Cumulative completed OrderItem quantities. Does not change listing.quantity. */
@@ -182,13 +210,28 @@ function roundKm(value) {
   return Math.round(value * 10) / 10;
 }
 
-function serializeOrder(order) {
+function serializeOrder(order, options = {}) {
+  const viewerUserId = options.viewerUserId || null;
+  const orderContext = {
+    buyerId: order.buyerId,
+    status: order.status,
+    fulfilmentMethod: order.fulfilmentMethod,
+  };
   const items = (order.items || []).map((item) => ({
     id: item.id,
     quantity: item.quantity,
     unitPrice: item.unitPrice,
     total: item.quantity * item.unitPrice,
-    listing: item.listing ? serializeListing({ ...item.listing, seller: item.listing.seller }) : null,
+    listing: item.listing
+      ? serializeListing(
+          { ...item.listing, seller: item.listing.seller },
+          {
+            viewerUserId,
+            order: orderContext,
+            pickupLocation: item.listing.pickupLocation,
+          }
+        )
+      : null,
   }));
 
   const buyer = order.buyer || {};
@@ -259,6 +302,11 @@ function serializeOrder(order) {
     campaignId: order.campaignId || null,
     fulfilmentMethod: order.fulfilmentMethod || null,
     deliveryCharge: order.deliveryCharge || 0,
+    deliveryChargePending: isDeliveryChargePending(order),
+    upiPayableAmount: upiPayableAmountForOrder(order),
+    upiFoodCashDeliverySplit: isUpiFoodCashDeliverySplit(order),
+    deliveryCollectBy: order.deliveryCollectBy || null,
+    deliveryCashConfirmed: Boolean(order.deliveryCashConfirmedAt),
     fulfilmentNotes: order.fulfilmentNotes || null,
     fulfilmentAt: order.fulfilmentAt || null,
     items,
@@ -280,6 +328,9 @@ function serializeOrder(order) {
 
 /** Small PATCH /orders/:id/status payload — client merges onto the cached order. */
 function serializeOrderStatusPatch(order) {
+  const activeCoupon = Array.isArray(order.couponRedemptions)
+    ? order.couponRedemptions[0]
+    : null;
   return {
     statusPatch: true,
     id: order.id,
@@ -287,6 +338,16 @@ function serializeOrderStatusPatch(order) {
     orderNumber: order.orderNumber,
     status: order.status,
     statusStep: ORDER_STATUS_TO_STEP[order.status] ?? 0,
+    subtotal: order.subtotal,
+    communityFee: order.communityFee,
+    total: order.total,
+    deliveryCharge: order.deliveryCharge || 0,
+    deliveryChargePending: isDeliveryChargePending(order),
+    upiPayableAmount: upiPayableAmountForOrder(order),
+    upiFoodCashDeliverySplit: isUpiFoodCashDeliverySplit(order),
+    deliveryCollectBy: order.deliveryCollectBy || null,
+    deliveryCashConfirmed: Boolean(order.deliveryCashConfirmedAt),
+    couponDiscount: activeCoupon ? activeCoupon.discountAmount : null,
     paymentStatus: order.paymentStatus || "pending",
     refundDue: isRefundDue(order),
     sellerCanDecline: sellerCanDecline(order),
@@ -304,12 +365,12 @@ function serializeOrderStatusPatch(order) {
   };
 }
 
-function serializeReview(review) {
+function serializeReview(review, options = {}) {
   const reviewer = review.reviewer || {};
   const flat = reviewer.flat;
   const listing = review.listing || {};
 
-  return {
+  const payload = {
     id: review.id,
     orderId: review.orderId,
     listingId: review.listingId,
@@ -324,6 +385,11 @@ function serializeReview(review) {
     wouldOrderAgain: review.wouldOrderAgain,
     createdAt: review.createdAt,
   };
+
+  return redactSellerFlatOnListingPayload(payload, {
+    seller: reviewer,
+    viewerUserId: options.viewerUserId,
+  });
 }
 
 module.exports = {
