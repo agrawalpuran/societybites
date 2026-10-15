@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/data.dart';
+import 'buyer_delivery_collect_hint.dart';
 
 class OrderFulfilmentBanner extends StatelessWidget {
   const OrderFulfilmentBanner({
@@ -94,6 +95,15 @@ class OrderFulfilmentBanner extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Color(0xFF3A4644)),
                 ),
+              if (order.buyerShowsDeliveryCollectGuidance) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Delivery charge: ${buyerDeliveryChargeAmountLabel(order)}',
+                  style: const TextStyle(color: Color(0xFF3A4644)),
+                ),
+                const SizedBox(height: 4),
+                BuyerDeliveryCollectHint(order: order),
+              ],
             ],
             if (!delivery && order.fulfilmentAt != null) ...[
               const SizedBox(height: 4),

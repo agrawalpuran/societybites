@@ -109,6 +109,26 @@ function sellerDefaultDeliveryCollectBy(seller) {
   );
 }
 
+function sellerFromOrder(order) {
+  const listing =
+    order &&
+    order.items &&
+    order.items[0] &&
+    order.items[0].listing;
+  return listing && listing.seller;
+}
+
+/** Buyer-facing: order snapshot or seller profile default when charge applies. */
+function effectiveDeliveryCollectBy(order) {
+  if (!isOutsideSellerDeliveryOrder(order)) return null;
+  const charge = Number(order.deliveryCharge || 0);
+  if (!isDeliveryChargePending(order) && charge <= 0) return null;
+  if (order.deliveryCollectBy) {
+    return normalizeDeliveryCollectBy(order.deliveryCollectBy);
+  }
+  return sellerDefaultDeliveryCollectBy(sellerFromOrder(order));
+}
+
 function couponDiscountFromOrder(order) {
   const redemption =
     order &&
@@ -207,6 +227,7 @@ module.exports = {
   parseActualDeliveryCharge,
   normalizeDeliveryCollectBy,
   sellerDefaultDeliveryCollectBy,
+  effectiveDeliveryCollectBy,
   couponDiscountFromOrder,
   computeOrderTotal,
   foodOnlyOrderTotal,

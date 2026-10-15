@@ -6,6 +6,7 @@ const {
   isDeliveryChargePending,
   isUpiFoodCashDeliverySplit,
   upiPayableAmountForOrder,
+  effectiveDeliveryCollectBy,
 } = require("../lib/delayedDeliveryCharge");
 const { evaluateRecurringAvailability } = require("../lib/recurringAvailability");
 const { sellerCanDecline } = require("../lib/orderAcceptance");
@@ -305,7 +306,7 @@ function serializeOrder(order, options = {}) {
     deliveryChargePending: isDeliveryChargePending(order),
     upiPayableAmount: upiPayableAmountForOrder(order),
     upiFoodCashDeliverySplit: isUpiFoodCashDeliverySplit(order),
-    deliveryCollectBy: order.deliveryCollectBy || null,
+    deliveryCollectBy: effectiveDeliveryCollectBy(order),
     deliveryCashConfirmed: Boolean(order.deliveryCashConfirmedAt),
     fulfilmentNotes: order.fulfilmentNotes || null,
     fulfilmentAt: order.fulfilmentAt || null,
@@ -345,7 +346,7 @@ function serializeOrderStatusPatch(order) {
     deliveryChargePending: isDeliveryChargePending(order),
     upiPayableAmount: upiPayableAmountForOrder(order),
     upiFoodCashDeliverySplit: isUpiFoodCashDeliverySplit(order),
-    deliveryCollectBy: order.deliveryCollectBy || null,
+    deliveryCollectBy: effectiveDeliveryCollectBy(order),
     deliveryCashConfirmed: Boolean(order.deliveryCashConfirmedAt),
     couponDiscount: activeCoupon ? activeCoupon.discountAmount : null,
     paymentStatus: order.paymentStatus || "pending",

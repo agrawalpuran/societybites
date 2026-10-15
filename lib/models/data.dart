@@ -867,6 +867,24 @@ class Order {
     return items.any((item) => item.food.sellerId == userId);
   }
 
+  bool get isOutsideSellerDelivery =>
+      isCrossSociety && (fulfilmentMethod?.trim() == 'seller_delivery');
+
+  bool get buyerShowsDeliveryCollectGuidance =>
+      isOutsideSellerDelivery &&
+      (deliveryChargePending || deliveryCharge > 0);
+
+  bool get deliveryFeeCollectedByPartner =>
+      deliveryCollectBy == 'delivery_person';
+
+  String? get sellerUpiForOrder {
+    for (final item in items) {
+      final upi = item.food.sellerUpiId?.trim();
+      if (upi != null && upi.isNotEmpty) return upi;
+    }
+    return null;
+  }
+
   /// On seller kitchen cards, the fulfilment banner holds the address.
   String get sellerKitchenBuyerLine {
     final method = fulfilmentMethod?.trim() ?? '';
