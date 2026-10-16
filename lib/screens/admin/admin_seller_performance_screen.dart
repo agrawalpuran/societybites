@@ -543,14 +543,15 @@ class _KpiGrid extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final cols = width > 900 ? 3 : 2;
-        return GridView.count(
-          crossAxisCount: cols,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 2.4,
-          children: cards,
+        final gap = 10.0;
+        final cardWidth = (width - (cols - 1) * gap) / cols;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final card in cards)
+              SizedBox(width: cardWidth, child: card),
+          ],
         );
       },
     );
@@ -566,7 +567,8 @@ class _KpiCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -574,15 +576,19 @@ class _KpiCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 11, color: Color(0xFF6A7774)),
           ),
           const SizedBox(height: 4),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,

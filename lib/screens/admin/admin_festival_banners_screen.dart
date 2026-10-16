@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -369,17 +368,6 @@ class _AdminFestivalBannersScreenState extends State<AdminFestivalBannersScreen>
                     ),
                     const SizedBox(height: 10),
                     const FestivalBannerPlacementPicker(),
-                    if (kDebugMode) ...[
-                      const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: () {
-                          FestivalBannerPreview.instance.showDevControls = true;
-                          FestivalBannerPreview.instance.notifyListeners();
-                        },
-                        icon: const Icon(Icons.visibility_outlined, size: 18),
-                        label: const Text('Show yellow preview bar on Home'),
-                      ),
-                    ],
                     const SizedBox(height: 20),
                     Text(
                       FestivalBannerPreview.instance.placement ==

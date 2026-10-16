@@ -24,8 +24,8 @@ class FestivalBannerPreview extends ChangeNotifier {
   FestivalBannerPreview._();
   static final FestivalBannerPreview instance = FestivalBannerPreview._();
 
-  /// Dev chip row under the header (debug mode only).
-  bool showDevControls = kDebugMode;
+  /// Legacy debug chip row. Kept off so Home never shows the yellow bar.
+  bool showDevControls = false;
 
   /// True after the admin mock/debug tools mutate local state.
   bool localOverride = false;
