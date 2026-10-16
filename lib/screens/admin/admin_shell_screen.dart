@@ -16,6 +16,7 @@ import 'admin_coupons_screen.dart';
 import 'admin_audit_screen.dart';
 import 'admin_console_access_screen.dart';
 import 'admin_users_screen.dart';
+import 'admin_seller_performance_screen.dart';
 
 class AdminShellScreen extends StatefulWidget {
   const AdminShellScreen({super.key});
@@ -37,6 +38,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     _NavItem(icon: Icons.photo_camera_outlined, label: 'Address proof'),
     _NavItem(icon: Icons.fastfood_rounded, label: 'Listings'),
     _NavItem(icon: Icons.shopping_bag_rounded, label: 'Orders'),
+    _NavItem(icon: Icons.leaderboard_outlined, label: 'Performance'),
     _NavItem(icon: Icons.star_rounded, label: 'Reviews'),
     _NavItem(icon: Icons.flag_outlined, label: 'Issues'),
     _NavItem(icon: Icons.confirmation_number_outlined, label: 'Coupons'),
@@ -103,12 +105,14 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       case 5:
         return const AdminOrdersScreen();
       case 6:
-        return const AdminReviewsScreen();
+        return const AdminSellerPerformanceScreen();
       case 7:
-        return const AdminIssuesScreen();
+        return const AdminReviewsScreen();
       case 8:
-        return const AdminCouponsScreen();
+        return const AdminIssuesScreen();
       case 9:
+        return const AdminCouponsScreen();
+      case 10:
         return const AdminAuditScreen();
       default:
         return const AdminDashboardScreen();

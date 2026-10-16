@@ -2089,6 +2089,131 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> getAdminPerformanceSummary({
+    String preset = 'last_7_days',
+    String? from,
+    String? to,
+    String? societyId,
+  }) async {
+    final query = <String, String>{'preset': preset};
+    if (from != null && from.isNotEmpty) query['from'] = from;
+    if (to != null && to.isNotEmpty) query['to'] = to;
+    if (societyId != null && societyId.isNotEmpty) {
+      query['societyId'] = societyId;
+    }
+    final uri = Uri.parse('$baseUrl/admin/performance/summary')
+        .replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getAdminPerformanceSellers({
+    String preset = 'last_7_days',
+    String? from,
+    String? to,
+    String sort = 'netFoodSales',
+    int page = 1,
+    int limit = 25,
+  }) async {
+    final query = <String, String>{
+      'preset': preset,
+      'sort': sort,
+      'page': '$page',
+      'limit': '$limit',
+    };
+    if (from != null && from.isNotEmpty) query['from'] = from;
+    if (to != null && to.isNotEmpty) query['to'] = to;
+    final uri = Uri.parse('$baseUrl/admin/performance/sellers')
+        .replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getAdminPerformanceSellerDetail(
+    String sellerId, {
+    String preset = 'last_7_days',
+    String? from,
+    String? to,
+  }) async {
+    final query = <String, String>{'preset': preset};
+    if (from != null && from.isNotEmpty) query['from'] = from;
+    if (to != null && to.isNotEmpty) query['to'] = to;
+    final uri = Uri.parse('$baseUrl/admin/performance/sellers/$sellerId')
+        .replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getAdminPerformanceCampaigns({
+    String preset = 'last_30_days',
+    String? from,
+    String? to,
+  }) async {
+    final query = <String, String>{'preset': preset};
+    if (from != null && from.isNotEmpty) query['from'] = from;
+    if (to != null && to.isNotEmpty) query['to'] = to;
+    final uri = Uri.parse('$baseUrl/admin/performance/campaigns')
+        .replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getAdminPerformanceSellerOrders(
+    String sellerId, {
+    String preset = 'last_7_days',
+    String? from,
+    String? to,
+    int page = 1,
+    int limit = 25,
+  }) async {
+    final query = <String, String>{
+      'preset': preset,
+      'page': '$page',
+      'limit': '$limit',
+    };
+    if (from != null && from.isNotEmpty) query['from'] = from;
+    if (to != null && to.isNotEmpty) query['to'] = to;
+    final uri =
+        Uri.parse('$baseUrl/admin/performance/sellers/$sellerId/orders')
+            .replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<String> getAdminPerformanceExportCsv({
+    String preset = 'last_7_days',
+    String sort = 'netFoodSales',
+    String? from,
+    String? to,
+  }) async {
+    final query = <String, String>{'preset': preset, 'sort': sort};
+    if (from != null && from.isNotEmpty) query['from'] = from;
+    if (to != null && to.isNotEmpty) query['to'] = to;
+    final uri = Uri.parse('$baseUrl/admin/performance/export').replace(
+      queryParameters: query,
+    );
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return response.body;
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<List<Map<String, dynamic>>> getAdminGrowthMembers({
     required String metric,
     required String start,

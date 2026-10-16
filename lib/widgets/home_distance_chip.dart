@@ -14,7 +14,11 @@ class HomeDistanceChip extends StatelessWidget {
     this.listingType = HomeListingType.all,
     this.onListingTypeSelected,
     this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 0),
+    this.onFestiveBackground = false,
   });
+
+  /// Light count label when the row sits on the festival hero backdrop.
+  final bool onFestiveBackground;
 
   final SellingReach reach;
   final BuyerDistanceChoice? selected;
@@ -87,10 +91,15 @@ class HomeDistanceChip extends StatelessWidget {
               countLabel,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF6A7774),
+                color: onFestiveBackground
+                    ? Colors.white
+                    : const Color(0xFF6A7774),
+                shadows: onFestiveBackground
+                    ? const [Shadow(color: Colors.black38, blurRadius: 4)]
+                    : null,
               ),
             ),
           ),

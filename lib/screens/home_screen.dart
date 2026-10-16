@@ -47,6 +47,11 @@ import '../widgets/feed_refresh_bar.dart';
 import '../utils/listing_image_precache.dart';
 import '../web/web_breakpoints.dart';
 import '../web/web_marketplace_home.dart';
+import '../preview/festival_banner_preview.dart';
+import '../models/festival_banner_content.dart';
+import '../widgets/festival_announcement_banner.dart';
+import '../widgets/festival_banner_preview_controls.dart';
+import '../widgets/festival_home_hero_section.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -127,6 +132,11 @@ class HomeScreenState extends State<HomeScreen> {
     CartController.instance.onOrderPlaced = _onCartOrderPlaced;
     unawaited(_bootstrapHome());
     _loadPreOrders();
+    FestivalBannerPreview.instance.addListener(_onFestivalPreviewChanged);
+  }
+
+  void _onFestivalPreviewChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _bootstrapHome() async {
@@ -259,6 +269,7 @@ class HomeScreenState extends State<HomeScreen> {
     if (identical(CartController.instance.onOrderPlaced, _onCartOrderPlaced)) {
       CartController.instance.onOrderPlaced = null;
     }
+    FestivalBannerPreview.instance.removeListener(_onFestivalPreviewChanged);
     super.dispose();
   }
 
@@ -1008,14 +1019,23 @@ class HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     if (useWebMarketplaceLayout(context)) {
-      return _buildWebMarketplace();
+      final webHome = _buildWebMarketplace();
+      if (FestivalBannerPreview.instance.showDevControls) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const FestivalBannerPreviewControls(),
+            Expanded(child: webHome),
+          ],
+        );
+      }
+      return webHome;
     }
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       floatingActionButton: const FloatingCartBar(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      body: SafeArea(
-        child: RefreshIndicator(
+      body: RefreshIndicator(
           color: const Color(0xFF0E5A47),
           onRefresh: () => _pullRefresh.run(_refreshHome),
           child: CustomScrollView(
@@ -1023,11 +1043,15 @@ class HomeScreenState extends State<HomeScreen> {
               parent: BouncingScrollPhysics(),
             ),
             slivers: [
-              SliverToBoxAdapter(child: _buildHeader()),
+              if (FestivalBannerPreview.instance.showDevControls)
+                const SliverToBoxAdapter(
+                  child: FestivalBannerPreviewControls(),
+                ),
               SliverToBoxAdapter(
                 child: FeedRefreshBar(visible: _feedRefreshing),
               ),
               if (_isLoading && !_hasSuccessfullyLoaded) ...[
+                SliverToBoxAdapter(child: _buildHeaderWithTopInset()),
                 SliverToBoxAdapter(child: _buildSearchBar()),
                 if (_searchQuery.isEmpty)
                   SliverToBoxAdapter(child: _buildCategoryChips()),
@@ -1084,10 +1108,33 @@ class HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                SliverToBoxAdapter(child: _buildSearchBar()),
-                SliverToBoxAdapter(child: _buildDistanceChip()),
+                if (_festivalUsesHeroBackdrop())
+                  SliverToBoxAdapter(child: _buildFestivalHeroBlock())
+                else ...[
+                  SliverToBoxAdapter(child: _buildHeaderWithTopInset()),
+                  SliverToBoxAdapter(child: _buildSearchBar()),
+                  SliverToBoxAdapter(child: _buildDistanceChip()),
+                  if (_festivalBannerForPlacement(
+                        FestivalBannerPlacement.belowSearch,
+                      ) !=
+                      null)
+                    SliverToBoxAdapter(
+                      child: _festivalBannerForPlacement(
+                        FestivalBannerPlacement.belowSearch,
+                      )!,
+                    ),
+                ],
                 if (_searchQuery.isEmpty) ...[
                   SliverToBoxAdapter(child: _buildCategoryChips()),
+                  if (_festivalBannerForPlacement(
+                        FestivalBannerPlacement.belowCategories,
+                      ) !=
+                      null)
+                    SliverToBoxAdapter(
+                      child: _festivalBannerForPlacement(
+                        FestivalBannerPlacement.belowCategories,
+                      )!,
+                    ),
                   SliverToBoxAdapter(child: _buildHomeDiscoverySections()),
                 ] else if (_listingType == HomeListingType.preOrder) ...[
                   SliverToBoxAdapter(child: _buildPreorderSearchResults()),
@@ -1108,8 +1155,58 @@ class HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
+    );
+  }
+
+  bool _festivalUsesHeroBackdrop() {
+    if (_searchQuery.isNotEmpty) return false;
+    final preview = FestivalBannerPreview.instance;
+    return preview.previewState == FestivalBannerPreviewState.active &&
+        preview.placement == FestivalBannerPlacement.belowSearch;
+  }
+
+  bool _festiveHeroUsesLightForeground() {
+    if (!_festivalUsesHeroBackdrop()) return false;
+    final c = FestivalBannerPreview.instance.content;
+    return c.hasImage || c.hasDisplayText;
+  }
+
+  Widget _buildHeaderWithTopInset({bool onFestiveBackground = false}) {
+    final top = MediaQuery.paddingOf(context).top;
+    return Padding(
+      padding: EdgeInsets.only(top: onFestiveBackground ? 0 : top),
+      child: AppHeader(onFestiveBackground: onFestiveBackground),
+    );
+  }
+
+  Widget _buildFestivalHeroBlock() {
+    final content = FestivalBannerPreview.instance.content;
+    return FestivalHomeHeroSection(
+      content: content,
+      topInset: MediaQuery.paddingOf(context).top,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeaderWithTopInset(
+            onFestiveBackground: _festiveHeroUsesLightForeground(),
+          ),
+          FestivalHeroHeadline(content: content),
+          _buildSearchBar(),
+          _buildDistanceChip(),
+          const SizedBox(height: 10),
+        ],
       ),
     );
+  }
+
+  Widget? _festivalBannerForPlacement(FestivalBannerPlacement slot) {
+    if (_searchQuery.isNotEmpty) return null;
+    final preview = FestivalBannerPreview.instance;
+    if (preview.placement != slot) return null;
+    if (slot == FestivalBannerPlacement.belowSearch && _festivalUsesHeroBackdrop()) {
+      return null;
+    }
+    return buildFestivalBannerIfActive(state: preview.previewState);
   }
 
   Widget _buildDistanceChip() {
@@ -1120,6 +1217,7 @@ class HomeScreenState extends State<HomeScreen> {
       listingType: _listingType,
       onListingTypeSelected: (type) => setState(() => _listingType = type),
       onSelected: (choice) => setState(() => _distanceChoice = choice),
+      onFestiveBackground: _festiveHeroUsesLightForeground(),
     );
   }
 
@@ -1416,9 +1514,7 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeader() {
-    return const AppHeader();
-  }
+  Widget _buildHeader() => _buildHeaderWithTopInset();
 
   Widget _buildSearchBar() {
     return Padding(

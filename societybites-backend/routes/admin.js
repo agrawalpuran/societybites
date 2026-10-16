@@ -51,6 +51,14 @@ const {
   parseGrowthWindow,
   listAdminGrowthMembers,
 } = require("../lib/adminGrowth");
+const {
+  getPerformanceSummary,
+  getPerformanceLeaderboard,
+  getSellerPerformanceDetail,
+  getSellerPerformanceOrders,
+  getCampaignPerformance,
+  getPerformanceExportCsv,
+} = require("../lib/adminSellerPerformance");
 
 const router = express.Router();
 
@@ -234,6 +242,68 @@ router.get(
       totalReviews,
       avgPlatformRating: ratingAgg._avg.rating || 0,
     });
+  })
+);
+
+// GET /admin/performance/summary — seller sales KPIs (read-only)
+router.get(
+  "/performance/summary",
+  asyncHandler(async (req, res) => {
+    const payload = await getPerformanceSummary(prisma, req.query);
+    res.json(payload);
+  })
+);
+
+router.get(
+  "/performance/sellers",
+  asyncHandler(async (req, res) => {
+    const payload = await getPerformanceLeaderboard(prisma, req.query);
+    res.json(payload);
+  })
+);
+
+router.get(
+  "/performance/sellers/:sellerId",
+  asyncHandler(async (req, res) => {
+    const payload = await getSellerPerformanceDetail(
+      prisma,
+      req.params.sellerId,
+      req.query
+    );
+    res.json(payload);
+  })
+);
+
+router.get(
+  "/performance/sellers/:sellerId/orders",
+  asyncHandler(async (req, res) => {
+    const payload = await getSellerPerformanceOrders(
+      prisma,
+      req.params.sellerId,
+      req.query
+    );
+    res.json(payload);
+  })
+);
+
+router.get(
+  "/performance/campaigns",
+  asyncHandler(async (req, res) => {
+    const payload = await getCampaignPerformance(prisma, req.query);
+    res.json(payload);
+  })
+);
+
+router.get(
+  "/performance/export",
+  asyncHandler(async (req, res) => {
+    const csv = await getPerformanceExportCsv(prisma, req.query);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="seller-performance.csv"'
+    );
+    res.send(csv);
   })
 );
 

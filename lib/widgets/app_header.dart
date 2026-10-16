@@ -18,7 +18,11 @@ class AppHeader extends StatefulWidget {
     this.cartItemCount,
     this.onCartPressed,
     this.padding = const EdgeInsets.fromLTRB(20, 14, 20, 0),
+    this.onFestiveBackground = false,
   });
+
+  /// Light logo and profile text when sitting on a dark festive hero.
+  final bool onFestiveBackground;
 
   final Widget? leading;
   final Widget? actions;
@@ -76,7 +80,7 @@ class _AppHeaderState extends State<AppHeader> {
                 if (widget.leading == null)
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 180),
-                    child: const FittedBox(
+                    child: FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Row(
@@ -90,13 +94,17 @@ class _AppHeaderState extends State<AppHeader> {
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 20,
-                              color: Color(0xFF0A4638),
+                              color: widget.onFestiveBackground
+                                  ? Colors.white
+                                  : const Color(0xFF0A4638),
                             ),
                           ),
-                          SizedBox(width: 4),
+                          const SizedBox(width: 4),
                           Icon(
                             Icons.restaurant_menu_rounded,
-                            color: Color(0xFF0E5A47),
+                            color: widget.onFestiveBackground
+                                ? Colors.white
+                                : const Color(0xFF0E5A47),
                             size: 18,
                           ),
                         ],
@@ -112,7 +120,10 @@ class _AppHeaderState extends State<AppHeader> {
                   Flexible(
                     child: Align(
                       alignment: Alignment.centerRight,
-                      child: _UserInfoColumn(name: _name),
+                      child: _UserInfoColumn(
+                        name: _name,
+                        onFestiveBackground: widget.onFestiveBackground,
+                      ),
                     ),
                   ),
               ],
@@ -138,16 +149,20 @@ class _AppHeaderState extends State<AppHeader> {
 }
 
 class _UserInfoColumn extends StatelessWidget {
-  const _UserInfoColumn({required this.name});
+  const _UserInfoColumn({
+    required this.name,
+    this.onFestiveBackground = false,
+  });
 
   final String? name;
+  final bool onFestiveBackground;
 
   @override
   Widget build(BuildContext context) {
     if (name == null || name!.isEmpty) {
-      return const Icon(
+      return Icon(
         Icons.person_rounded,
-        color: Color(0xFF0E5A47),
+        color: onFestiveBackground ? Colors.white : const Color(0xFF0E5A47),
         size: 22,
       );
     }
@@ -157,11 +172,16 @@ class _UserInfoColumn extends StatelessWidget {
       textAlign: TextAlign.right,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         height: 1.2,
-        color: Color(0xFF4A5A57),
+        color: onFestiveBackground
+            ? Colors.white
+            : const Color(0xFF4A5A57),
         fontWeight: FontWeight.w600,
+        shadows: onFestiveBackground
+            ? const [Shadow(color: Colors.black26, blurRadius: 4)]
+            : null,
       ),
     );
   }
