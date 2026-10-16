@@ -8,6 +8,14 @@ import 'admin_city_reach_screen.dart';
 import 'admin_fssai_screen.dart';
 import 'admin_festival_banners_mock_screen.dart';
 
+String _formatTotalSales(Object? raw) {
+  final amount = raw is num ? raw.toDouble() : double.tryParse('$raw') ?? 0;
+  if (amount == amount.roundToDouble()) {
+    return '₹${amount.toStringAsFixed(0)}';
+  }
+  return '₹${amount.toStringAsFixed(2)}';
+}
+
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -515,6 +523,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 value: '${stats['cancelledOrders'] ?? 0}',
                 icon: Icons.cancel_rounded,
                 color: const Color(0xFFC62828),
+              ),
+              _StatCard(
+                label: 'Total Sales',
+                value: _formatTotalSales(stats['totalSales']),
+                icon: Icons.currency_rupee_rounded,
+                color: const Color(0xFF0E5A47),
               ),
             ]),
             const SizedBox(height: 24),

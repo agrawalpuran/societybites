@@ -211,6 +211,7 @@ router.get(
       cancelledOrders,
       totalReviews,
       ratingAgg,
+      completedFoodSalesAgg,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { role: "seller" } }),
@@ -225,7 +226,16 @@ router.get(
       prisma.order.count({ where: { status: "cancelled" } }),
       prisma.review.count(),
       prisma.review.aggregate({ _avg: { rating: true } }),
+      // Food sales only (subtotal). Excludes deliveryCharge and communityFee.
+      prisma.order.aggregate({
+        where: { status: "completed" },
+        _sum: { subtotal: true },
+      }),
     ]);
+
+    const totalSales = Math.round(
+      (Number(completedFoodSalesAgg._sum.subtotal) || 0) * 100
+    ) / 100;
 
     res.json({
       totalUsers,
@@ -239,6 +249,7 @@ router.get(
       pendingOrders,
       completedOrders,
       cancelledOrders,
+      totalSales,
       totalReviews,
       avgPlatformRating: ratingAgg._avg.rating || 0,
     });

@@ -114,7 +114,12 @@ class _AdminFestivalBannersMockScreenState
         elevation: 0,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          20 + MediaQuery.paddingOf(context).bottom,
+        ),
         children: [
           const Text(
             'Set title, subtitle, and image here. The app only shows a neutral '
@@ -124,6 +129,25 @@ class _AdminFestivalBannersMockScreenState
               fontSize: 13,
               color: Color(0xFF6A7774),
               height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Active on Home preview'),
+            subtitle: const Text('Only one active banner in MVP'),
+            value: _active,
+            onChanged: (v) => setState(() => _active = v),
+          ),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                setState(() => _active = false);
+                _applyToHomePreview();
+              },
+              icon: const Icon(Icons.visibility_off_outlined, size: 18),
+              label: const Text('Deactivate on Home'),
             ),
           ),
           const SizedBox(height: 20),
@@ -179,13 +203,6 @@ class _AdminFestivalBannersMockScreenState
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            title: const Text('Active on Home preview'),
-            subtitle: const Text('Only one active banner in MVP'),
-            value: _active,
-            onChanged: (v) => setState(() => _active = v),
           ),
           const SizedBox(height: 16),
           const Text(
@@ -276,14 +293,6 @@ class _AdminFestivalBannersMockScreenState
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () {
-              setState(() => _active = false);
-              _applyToHomePreview();
-            },
-            child: const Text('Deactivate on Home'),
           ),
         ],
       ),
