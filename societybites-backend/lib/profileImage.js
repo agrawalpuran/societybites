@@ -64,13 +64,12 @@ function parseImageUpload(body) {
 }
 
 function storagePrefixForPurpose(purpose) {
-  return String(purpose || "").trim().toLowerCase() === "profile"
-    ? "profiles"
-    : String(purpose || "").trim().toLowerCase() === "issue"
-      ? "issues"
-      : String(purpose || "").trim().toLowerCase() === "address-proof"
-        ? "address-proofs"
-        : "listings";
+  const key = String(purpose || "").trim().toLowerCase();
+  if (key === "profile") return "profiles";
+  if (key === "issue") return "issues";
+  if (key === "address-proof") return "address-proofs";
+  if (key === "festival-banner") return "festival-banners";
+  return "listings";
 }
 
 function normalizeStoredProfilePhotoUrl(value) {

@@ -119,6 +119,7 @@ app.use("/devices", deviceRoutes);
 app.use("/issues", issueRoutes);
 app.use("/coupons", couponRoutes);
 app.use("/fssai", fssaiRoutes);
+app.use("/festival-banners", require("./routes/festivalBanners"));
 
 app.use((err, _req, res, _next) => {
   logger.error("server", err.message, { stack: err.stack });

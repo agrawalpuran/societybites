@@ -44,4 +44,11 @@ class FestivalBannerContent {
       imageAssetPath: json['imageAssetPath'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        if (title != null) 'title': title,
+        if (subtitle != null) 'subtitle': subtitle,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+        if (imageAssetPath != null) 'imageAssetPath': imageAssetPath,
+      };
 }

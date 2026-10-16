@@ -132,11 +132,25 @@ class HomeScreenState extends State<HomeScreen> {
     CartController.instance.onOrderPlaced = _onCartOrderPlaced;
     unawaited(_bootstrapHome());
     _loadPreOrders();
+    unawaited(_loadFestivalBanner());
     FestivalBannerPreview.instance.addListener(_onFestivalPreviewChanged);
   }
 
   void _onFestivalPreviewChanged() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _loadFestivalBanner() async {
+    try {
+      final banner = await ApiService.getActiveFestivalBanner();
+      if (!mounted) return;
+      FestivalBannerPreview.instance.applyServerBanner(banner);
+    } catch (_) {
+      if (!mounted) return;
+      if (!FestivalBannerPreview.instance.localOverride) {
+        FestivalBannerPreview.instance.applyServerBanner(null);
+      }
+    }
   }
 
   Future<void> _bootstrapHome() async {
@@ -222,7 +236,11 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshHome() async {
-    await Future.wait([_loadListings(), _loadPreOrders()]);
+    await Future.wait([
+      _loadListings(),
+      _loadPreOrders(),
+      _loadFestivalBanner(),
+    ]);
   }
 
   Future<void> _loadPreOrders() async {

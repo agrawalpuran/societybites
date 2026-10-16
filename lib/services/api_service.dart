@@ -1809,6 +1809,98 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  /// Public active Home festival banner. Returns null when none is scheduled.
+  static Future<Map<String, dynamic>?> getActiveFestivalBanner() async {
+    final response = await http_client.get(
+      Uri.parse('$baseUrl/festival-banners/active'),
+      headers: const {'Accept': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      final banner = data['banner'];
+      if (banner is Map) {
+        return Map<String, dynamic>.from(banner);
+      }
+      return null;
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminFestivalBanners() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/festival-banners'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return (data['banners'] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> createAdminFestivalBanner(
+    Map<String, dynamic> body,
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/festival-banners'),
+      headers: await _authHeaders(),
+      body: jsonEncode(body),
+    );
+    if (response.statusCode == 201) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return Map<String, dynamic>.from(data['banner'] as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateAdminFestivalBanner(
+    String id,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/festival-banners/$id'),
+      headers: await _authHeaders(),
+      body: jsonEncode(body),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return Map<String, dynamic>.from(data['banner'] as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> activateAdminFestivalBanner(
+    String id,
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/festival-banners/$id/activate'),
+      headers: await _authHeaders(),
+      body: jsonEncode({}),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return Map<String, dynamic>.from(data['banner'] as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> deactivateAdminFestivalBanner(
+    String id,
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/festival-banners/$id/deactivate'),
+      headers: await _authHeaders(),
+      body: jsonEncode({}),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return Map<String, dynamic>.from(data['banner'] as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<List<Map<String, dynamic>>> getAdminFssaiSubmissions({
     String? status,
   }) async {

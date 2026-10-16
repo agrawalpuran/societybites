@@ -591,3 +591,23 @@ model CouponRedemption {
   @@index([couponId, status])
   @@index([orderId])
 }
+
+/// Home festival / announcement banner. At most one row should be ACTIVE.
+model FestivalBanner {
+  id        String    @id @default(uuid())
+  /// Internal admin label (not shown on Home).
+  name      String
+  title     String?
+  subtitle  String?
+  imageUrl  String?
+  /// BELOW_SEARCH | BELOW_CATEGORIES
+  placement String    @default("BELOW_SEARCH")
+  /// DRAFT | ACTIVE | INACTIVE
+  status    String    @default("DRAFT")
+  startsAt  DateTime?
+  endsAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([status, startsAt, endsAt])
+}

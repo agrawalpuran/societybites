@@ -45,6 +45,14 @@ const {
   reviewAddressProof,
 } = require("../lib/addressProofReview");
 const {
+  listFestivalBanners,
+  getFestivalBanner,
+  createFestivalBanner,
+  updateFestivalBanner,
+  activateFestivalBanner,
+  deactivateFestivalBanner,
+} = require("../lib/festivalBanners");
+const {
   getAdminGrowth,
   normalizeGrowthRange,
   normalizeGrowthMetric,
@@ -402,6 +410,54 @@ router.post(
   asyncHandler(async (req, res) => {
     const fssai = await rejectAdminFssai(req.user, req.params.sellerId, req.body);
     res.json({ fssai, rejectionPresets: REJECTION_PRESETS });
+  })
+);
+
+router.get(
+  "/festival-banners",
+  asyncHandler(async (_req, res) => {
+    const banners = await listFestivalBanners();
+    res.json({ banners });
+  })
+);
+
+router.get(
+  "/festival-banners/:id",
+  asyncHandler(async (req, res) => {
+    const banner = await getFestivalBanner(req.params.id);
+    res.json({ banner });
+  })
+);
+
+router.post(
+  "/festival-banners",
+  asyncHandler(async (req, res) => {
+    const banner = await createFestivalBanner(req.body);
+    res.status(201).json({ banner });
+  })
+);
+
+router.patch(
+  "/festival-banners/:id",
+  asyncHandler(async (req, res) => {
+    const banner = await updateFestivalBanner(req.params.id, req.body);
+    res.json({ banner });
+  })
+);
+
+router.post(
+  "/festival-banners/:id/activate",
+  asyncHandler(async (req, res) => {
+    const banner = await activateFestivalBanner(req.params.id, req.user);
+    res.json({ banner });
+  })
+);
+
+router.post(
+  "/festival-banners/:id/deactivate",
+  asyncHandler(async (req, res) => {
+    const banner = await deactivateFestivalBanner(req.params.id, req.user);
+    res.json({ banner });
   })
 );
 
