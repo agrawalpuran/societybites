@@ -96,6 +96,7 @@ async function main() {
         foodType: "VEG",
         category: "Lunch",
         quantity: 20,
+        publish: true,
       },
     });
     assert(readyNow.status === 201, `READY_NOW create failed ${JSON.stringify(readyNow.json)}`);
@@ -114,6 +115,7 @@ async function main() {
         availabilityMode: "MADE_TO_ORDER",
         preparationTimeMinutes: 2880,
         maxDailyOrders: 20,
+        publish: true,
       },
     });
     assert(made.status === 201, `MADE_TO_ORDER create failed ${JSON.stringify(made.json)}`);

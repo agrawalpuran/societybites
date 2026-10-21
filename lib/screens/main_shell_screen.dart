@@ -13,6 +13,7 @@ import '../web/web_breakpoints.dart';
 import '../web/web_cart_dock.dart';
 import '../web/web_shell_header.dart';
 import '../widgets/app_bottom_nav.dart';
+import '../widgets/seller_incoming_order_alert.dart';
 import 'home_screen.dart';
 import 'orders_screen.dart';
 import 'profile_screen.dart';
@@ -67,6 +68,7 @@ class _MainShellScreenState extends State<MainShellScreen>
       onMountDashboard: _mountDashboard,
     );
     PushNotificationService.onForegroundOrderUpdate = _syncOrdersFromPush;
+    PushNotificationService.onIncomingSellerOrder = _presentIncomingSellerOrder;
     CartController.instance.onShowOrdersAfterPlace = _showOrdersAfterCheckout;
     CartController.instance.onSelectShellTab = _selectTab;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -130,6 +132,10 @@ class _MainShellScreenState extends State<MainShellScreen>
     _unreadPoll?.cancel();
     if (PushNotificationService.onForegroundOrderUpdate == _syncOrdersFromPush) {
       PushNotificationService.onForegroundOrderUpdate = null;
+    }
+    if (PushNotificationService.onIncomingSellerOrder ==
+        _presentIncomingSellerOrder) {
+      PushNotificationService.onIncomingSellerOrder = null;
     }
     if (identical(
       CartController.instance.onShowOrdersAfterPlace,
@@ -205,6 +211,26 @@ class _MainShellScreenState extends State<MainShellScreen>
 
   void _syncOrdersFromPush() {
     unawaited(_syncOrdersFromPushAsync());
+  }
+
+  void _presentIncomingSellerOrder(String orderId, String? orderNumber) {
+    if (!mounted) return;
+    if (!_dashboardMounted) {
+      setState(() {
+        _dashboardMounted = true;
+        _navIndex = 2;
+      });
+    }
+    unawaited(
+      SellerIncomingOrderAlert.presentIfNeeded(
+        context,
+        orderId: orderId,
+        orderNumber: orderNumber,
+      ).then((_) {
+        if (!mounted) return;
+        _syncOrdersFromPush();
+      }),
+    );
   }
 
   Future<void> _syncOrdersFromPushAsync() async {

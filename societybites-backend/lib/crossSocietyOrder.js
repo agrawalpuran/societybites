@@ -106,6 +106,7 @@ async function authorizeListingForBuyer({ buyer, listing, clientRadiusKm, client
     buyerSociety,
     sellerSociety: seller.society,
     sellingReachLevel: seller.sellingReachLevel,
+    sellingReachRadiusKm: seller.sellingReachRadiusKm,
     cityReachConfig: config,
     nearbyRadiusKm: clientRadiusKm,
     distanceKm: clientDistanceKm,
@@ -120,7 +121,7 @@ async function authorizeListingForBuyer({ buyer, listing, clientRadiusKm, client
     seller,
     buyerSociety,
     eligibility,
-    displayReach: discoveryDisplayReach(eligibility, config && config.nearbyRadiusKm),
+    displayReach: discoveryDisplayReach(eligibility),
   };
 }
 

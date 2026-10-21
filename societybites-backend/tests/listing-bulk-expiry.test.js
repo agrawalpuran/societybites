@@ -124,6 +124,7 @@ async function main() {
         category: "Lunch",
         quantity: 8,
         catalogType: "REGULAR",
+        publish: true,
       },
     });
     assert(active.status === 201, `active create ${JSON.stringify(active.json)}`);
@@ -139,6 +140,7 @@ async function main() {
         foodType: "VEG",
         category: "Snacks",
         quantity: 5,
+        publish: true,
       },
     });
     assert(paused.status === 201, "paused candidate create");
@@ -160,6 +162,7 @@ async function main() {
         foodType: "NON_VEG",
         category: "Dinner",
         quantity: 4,
+        publish: true,
       },
     });
     assert(expired.status === 201, "expired candidate create");
@@ -182,6 +185,7 @@ async function main() {
         foodType: "VEG",
         category: "Snacks",
         quantity: 2,
+        publish: true,
       },
     });
     assert(inactive.status === 201, "inactive candidate create");
@@ -202,6 +206,7 @@ async function main() {
         category: "Dinner",
         catalogType: "PREORDER",
         quantity: 10,
+        publish: true,
       },
     });
     assert(preorder.status === 201, "preorder create");

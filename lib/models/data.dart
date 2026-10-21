@@ -66,6 +66,12 @@ class FoodItem {
   final int quantity;
   final String? weightUnit;
   final String? weightValue;
+  /// Shared across sibling size SKUs. Null for single-SKU listings.
+  final String? variantGroupId;
+  /// Buyer-facing size label (e.g. "250 g").
+  final String? variantLabel;
+  /// Sibling size count for collapsed Home cards (Blinkit-style "N options").
+  final int? variantOptionCount;
   final List<String> tags;
   final String? foodType;
   final String? category;
@@ -137,6 +143,9 @@ class FoodItem {
     this.quantity = 1,
     this.weightUnit,
     this.weightValue,
+    this.variantGroupId,
+    this.variantLabel,
+    this.variantOptionCount,
     this.tags = const [],
     this.foodType,
     this.category,
@@ -213,10 +222,11 @@ class FoodItem {
 
   bool get isPaused => status == 'paused';
   bool get isActive => status == 'active';
+  bool get isDraft => status == 'draft';
   bool get isExpired => status == 'expired';
   bool get isSoldOut => status == 'sold_out';
 
-  /// Normal Home feed. Seller management still shows paused, sold-out, and expired.
+  /// Normal Home feed. Seller management still shows draft, paused, sold-out, and expired.
   bool get isEligibleForHomeFeed => isActive;
 
   static const newListingWindow = Duration(hours: 48);
@@ -443,6 +453,20 @@ class FoodItem {
       quantity: _asInt(json['quantity'], 1),
       weightUnit: json['weightUnit']?.toString(),
       weightValue: json['weightValue']?.toString(),
+      variantGroupId: () {
+        final value = json['variantGroupId']?.toString().trim();
+        return (value == null || value.isEmpty) ? null : value;
+      }(),
+      variantLabel: () {
+        final value = json['variantLabel']?.toString().trim();
+        return (value == null || value.isEmpty) ? null : value;
+      }(),
+      variantOptionCount: () {
+        final raw = json['variantOptionCount'];
+        if (raw == null) return null;
+        final n = raw is num ? raw.toInt() : int.tryParse(raw.toString());
+        return (n == null || n < 1) ? null : n;
+      }(),
       tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
       foodType: parseFoodType(json['foodType']),
       category: parsedCategories.isNotEmpty
@@ -539,6 +563,73 @@ class FoodItem {
     final hour = dt.hour > 12 ? dt.hour - 12 : dt.hour;
     final ampm = dt.hour >= 12 ? 'PM' : 'AM';
     return '${hour == 0 ? 12 : hour}:${dt.minute.toString().padLeft(2, '0')} $ampm';
+  }
+
+  FoodItem withVariantOptionCount(int count) {
+    return FoodItem(
+      id: id,
+      name: name,
+      sellerId: sellerId,
+      sellerName: sellerName,
+      block: block,
+      flatNumber: flatNumber,
+      pickupLocation: pickupLocation,
+      price: price,
+      rating: rating,
+      pickupTime: pickupTime,
+      description: description,
+      imageUrl: imageUrl,
+      imageCacheKey: imageCacheKey,
+      quantity: quantity,
+      weightUnit: weightUnit,
+      weightValue: weightValue,
+      variantGroupId: variantGroupId,
+      variantLabel: variantLabel,
+      variantOptionCount: count,
+      tags: tags,
+      foodType: foodType,
+      category: category,
+      categories: categories,
+      status: status,
+      availableAt: availableAt,
+      createdAt: createdAt,
+      reviewCount: reviewCount,
+      quantitySold: quantitySold,
+      icon: icon,
+      bgColor: bgColor,
+      sellerUpiId: sellerUpiId,
+      campaignId: campaignId,
+      societyId: societyId,
+      catalogType: catalogType,
+      availabilityMode: availabilityMode,
+      preparationTimeMinutes: preparationTimeMinutes,
+      maxDailyOrders: maxDailyOrders,
+      madeToOrderUnavailableToday: madeToOrderUnavailableToday,
+      recurringEnabled: recurringEnabled,
+      recurringWeekdays: recurringWeekdays,
+      recurringStartMinute: recurringStartMinute,
+      recurringEndMinute: recurringEndMinute,
+      recurringDailyLimit: recurringDailyLimit,
+      recurringUnavailable: recurringUnavailable,
+      recurringBuyerLabel: recurringBuyerLabel,
+      recurringNextLabel: recurringNextLabel,
+      recurringScheduleSummary: recurringScheduleSummary,
+      recurringHoursSummary: recurringHoursSummary,
+      recurringDailyLimitLabel: recurringDailyLimitLabel,
+      sellerPaymentPreference: sellerPaymentPreference,
+      sellerFulfilment: sellerFulfilment,
+      sellerSellingReachLevel: sellerSellingReachLevel,
+      distanceKm: distanceKm,
+      sellerSocietyName: sellerSocietyName,
+      sellerProfilePhotoUrl: sellerProfilePhotoUrl,
+      kitchenOpensAt: kitchenOpensAt,
+      kitchenClosesAt: kitchenClosesAt,
+      sellerAcceptingOrders: sellerAcceptingOrders,
+      sellerOrderBlockReason: sellerOrderBlockReason,
+      sellerHideFlatNumber: sellerHideFlatNumber,
+      sellerFlatDisclosed: sellerFlatDisclosed,
+      displayOrder: displayOrder,
+    );
   }
 }
 

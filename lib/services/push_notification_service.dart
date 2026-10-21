@@ -11,6 +11,7 @@ import '../firebase_options.dart';
 import 'api_service.dart';
 import 'order_push_coordinator.dart';
 import '../screens/main_shell_screen.dart';
+import '../widgets/seller_incoming_order_alert.dart';
 
 /// Top-level background handler (must be a top-level or static function).
 @pragma('vm:entry-point')
@@ -42,6 +43,9 @@ class PushNotificationService {
       GlobalKey<NavigatorState>();
 
   static VoidCallback? onForegroundOrderUpdate;
+
+  /// Fired when a new seller order needs the full-screen accept UI.
+  static void Function(String orderId, String? orderNumber)? onIncomingSellerOrder;
 
   static const _sellerTypes = {
     'order_created',
@@ -202,10 +206,16 @@ class PushNotificationService {
     final title = message.notification?.title ?? 'SocietyBites';
     final body = message.notification?.body ?? '';
     if (body.isEmpty && message.notification?.title == null) return;
+    final type = message.data['notificationType']?.toString() ?? '';
+    final urgent = type == 'order_created' ||
+        message.data['urgent']?.toString() == '1';
+    final orderId = message.data['orderId']?.toString();
     try {
       await _androidChannel.invokeMethod('show', {
         'title': title,
         'body': body,
+        'urgent': urgent,
+        if (orderId != null && orderId.isNotEmpty) 'orderId': orderId,
       });
     } catch (err) {
       if (kDebugMode) {
@@ -217,6 +227,32 @@ class PushNotificationService {
   static Future<void> _onOrderPushMessage(RemoteMessage message) async {
     await OrderPushCoordinator.recordFromMessage(message);
     onForegroundOrderUpdate?.call();
+    _maybePresentIncomingOrder(message);
+  }
+
+  static void _maybePresentIncomingOrder(RemoteMessage message) {
+    final type = message.data['notificationType']?.toString() ?? '';
+    if (type != 'order_created') return;
+    final orderId = message.data['orderId']?.toString().trim() ?? '';
+    if (orderId.isEmpty) return;
+    final orderNumber = message.data['orderNumber']?.toString();
+    final present = onIncomingSellerOrder;
+    if (present != null) {
+      present(orderId, orderNumber);
+      return;
+    }
+    // Shell not mounted yet — queue after next frame via navigator.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = navigatorKey.currentContext;
+      if (ctx == null) return;
+      unawaited(
+        SellerIncomingOrderAlert.presentIfNeeded(
+          ctx,
+          orderId: orderId,
+          orderNumber: orderNumber,
+        ),
+      );
+    });
   }
 
   static void _handleOpen(RemoteMessage message) {
@@ -241,6 +277,18 @@ class PushNotificationService {
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.onForegroundOrderUpdate?.call();
+      if (type == 'order_created' && orderId.isNotEmpty) {
+        final ctx = navigatorKey.currentContext;
+        if (ctx != null) {
+          unawaited(
+            SellerIncomingOrderAlert.presentIfNeeded(
+              ctx,
+              orderId: orderId,
+              orderNumber: message.data['orderNumber']?.toString(),
+            ),
+          );
+        }
+      }
     });
   }
 }

@@ -20,6 +20,8 @@
 
 Payload data: `{ type: "order_update", orderId, notificationType }` plus notification title/body.
 
+**New seller orders** use Android channel `societybites_new_orders` (high importance, heads-up / full-screen intent when the app posts a local notification). Foreground and notification taps open a full-screen Accept / Reject sheet. Other order updates stay on `societybites_orders`.
+
 ## Setup notes
 
 - Backend needs Firebase Admin service account env vars (same as Auth).

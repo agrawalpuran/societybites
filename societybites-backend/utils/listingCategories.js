@@ -3,6 +3,7 @@ const LISTING_FOOD_CATEGORIES = Object.freeze([
   "Lunch",
   "Dinner",
   "Snacks",
+  "Dairy",
   "Desserts",
   "Beverages",
 ]);

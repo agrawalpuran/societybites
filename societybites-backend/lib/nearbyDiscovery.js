@@ -48,6 +48,9 @@ function roundKm(value) {
 }
 
 function appliedDisplayRadiusKm(reach) {
+  if (reach && Number.isFinite(reach.maxSellerRadiusKm)) {
+    return Number(reach.maxSellerRadiusKm);
+  }
   const nearby = reach && Number.isFinite(reach.nearbyRadiusKm) ? reach.nearbyRadiusKm : null;
   const extended = reach && Number.isFinite(reach.extendedRadiusKm) ? reach.extendedRadiusKm : null;
   if (extended != null && nearby != null) return Math.max(nearby, extended);
@@ -112,9 +115,7 @@ function buildNearbySellerCandidateWhere(buyerSocietyId, crossSocietyIds) {
       ? [
           {
             societyId: { in: crossSocietyIds },
-            sellingReachLevel: {
-              in: [SELLING_REACH_LEVELS.NEARBY, SELLING_REACH_LEVELS.EXTENDED],
-            },
+            sellingReachLevel: { not: SELLING_REACH_LEVELS.MY_SOCIETY },
           },
         ]
       : [];
@@ -219,6 +220,7 @@ async function discoverNearbySellers({ buyer, query } = {}) {
       buyerSociety,
       sellerSociety: candidate.society,
       sellingReachLevel: candidate.sellingReachLevel,
+      sellingReachRadiusKm: candidate.sellingReachRadiusKm,
       cityReachConfig: config,
       nearbyRadiusKm: query && query.nearbyRadiusKm,
       extendedRadiusKm: query && query.extendedRadiusKm,
@@ -312,6 +314,7 @@ async function getNearbySellerStorefront({ buyer, sellerId, query } = {}) {
     buyerSociety,
     sellerSociety: seller.society,
     sellingReachLevel: seller.sellingReachLevel,
+    sellingReachRadiusKm: seller.sellingReachRadiusKm,
     cityReachConfig: config,
     nearbyRadiusKm: query && query.nearbyRadiusKm,
     extendedRadiusKm: query && query.extendedRadiusKm,
@@ -404,11 +407,12 @@ async function listDiscoverableCampaigns({ buyer, sellerId, status } = {}) {
       buyerSociety,
       sellerSociety: seller.society,
       sellingReachLevel: seller.sellingReachLevel,
+      sellingReachRadiusKm: seller.sellingReachRadiusKm,
       cityReachConfig: config,
     });
     if (!eligibility.eligible) return false;
     campaign.discoveryEligibility = eligibility;
-    campaign.discoveryReach = discoveryDisplayReach(eligibility, nearbyRadiusKm);
+    campaign.discoveryReach = discoveryDisplayReach(eligibility);
     return true;
   });
 }
@@ -441,6 +445,7 @@ async function assertBuyerCanViewCampaign({ buyer, campaign }) {
     buyerSociety,
     sellerSociety: seller && seller.society,
     sellingReachLevel: seller && seller.sellingReachLevel,
+    sellingReachRadiusKm: seller && seller.sellingReachRadiusKm,
     cityReachConfig: config,
   });
   if (!eligibility.eligible) {

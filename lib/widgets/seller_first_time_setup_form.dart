@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
 import '../models/selling_reach.dart';
+import 'selling_reach_radius_slider.dart';
 import 'confirm_upi_id_dialog.dart';
 import 'kitchen_hours_inline_editor.dart';
 import 'kitchen_hours_sheet.dart';
@@ -20,9 +21,9 @@ class SellerFirstTimeSetupForm extends StatefulWidget {
     this.onUpiConfirmed,
     this.onUpiConfirmationInvalidated,
     this.upiIdConfirmed = false,
-    required this.sellingReachLevel,
+    required this.sellingReachPreference,
     required this.sellingReach,
-    required this.onReachChanged,
+    required this.onReachPreferenceChanged,
     required this.fulfilment,
     required this.onFulfilmentChanged,
     required this.kitchenOpensAt,
@@ -39,9 +40,9 @@ class SellerFirstTimeSetupForm extends StatefulWidget {
   final VoidCallback? onUpiConfirmed;
   final VoidCallback? onUpiConfirmationInvalidated;
   final bool upiIdConfirmed;
-  final SellingReachLevel sellingReachLevel;
+  final SellerReachPreference sellingReachPreference;
   final SellingReach sellingReach;
-  final ValueChanged<SellingReachLevel> onReachChanged;
+  final ValueChanged<SellerReachPreference> onReachPreferenceChanged;
   final SellerFulfilment fulfilment;
   final ValueChanged<SellerFulfilment> onFulfilmentChanged;
   final String? kitchenOpensAt;
@@ -291,20 +292,46 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
           ),
         ),
         const SizedBox(height: 10),
-        ...SellingReachLevel.values.map((level) {
-          final enabled = widget.sellingReach.isSelectable(level);
-          final selected = level == widget.sellingReachLevel;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _RadioCard(
-              selected: selected,
-              enabled: enabled,
-              title: level.title,
-              subtitle: widget.sellingReach.setupHintFor(level),
-              onTap: enabled ? () => widget.onReachChanged(level) : null,
+        _RadioCard(
+          selected: widget.sellingReachPreference.mySocietyOnly,
+          title: 'My society',
+          subtitle: 'Only residents of your society',
+          onTap: () => widget.onReachPreferenceChanged(
+            SellerReachPreference(
+              mySocietyOnly: true,
+              radiusKm: widget.sellingReachPreference.radiusKm,
             ),
-          );
-        }),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _RadioCard(
+          selected: !widget.sellingReachPreference.mySocietyOnly,
+          enabled: widget.sellingReach.beyondSocietyAvailable,
+          title: 'Beyond your society',
+          subtitle: widget.sellingReach.beyondSocietyAvailable
+              ? 'Choose how far buyers can discover you'
+              : 'Not available in your city yet',
+          onTap: widget.sellingReach.beyondSocietyAvailable
+              ? () => widget.onReachPreferenceChanged(
+                    SellerReachPreference(
+                      mySocietyOnly: false,
+                      radiusKm: widget.sellingReachPreference.radiusKm,
+                    ),
+                  )
+              : null,
+        ),
+        if (!widget.sellingReachPreference.mySocietyOnly &&
+            widget.sellingReach.beyondSocietyAvailable) ...[
+          const SizedBox(height: 12),
+          SellingReachRadiusSlider(
+            value: widget.sellingReachPreference.radiusKm,
+            minKm: 1,
+            maxKm: widget.sellingReach.maxRadiusKm,
+            onChanged: (km) => widget.onReachPreferenceChanged(
+              SellerReachPreference(mySocietyOnly: false, radiusKm: km),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         const Text(
           'Fulfilment',

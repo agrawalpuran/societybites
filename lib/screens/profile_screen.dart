@@ -13,6 +13,7 @@ import '../models/seller_payment_preference.dart';
 import '../models/seller_terms.dart';
 import '../models/seller_terms_accept_result.dart';
 import '../models/selling_reach.dart';
+import '../widgets/selling_reach_picker_sheet.dart';
 import '../services/api_service.dart';
 import '../services/profile_photo_processor.dart';
 import '../services/seller_onboarding.dart';
@@ -36,6 +37,7 @@ import 'login_screen.dart';
 import 'profile_photo_crop_screen.dart';
 import 'seller_fssai_screen.dart';
 import 'seller_settings_screen.dart';
+import 'seller_staff_access_list_screen.dart';
 import 'seller_terms_screen.dart';
 import '../models/seller_fssai.dart';
 
@@ -67,6 +69,7 @@ class ProfileScreen extends StatefulWidget {
   /// Test seam. Production uses [ApiService.updateMyProfile].
   final Future<Map<String, dynamic>> Function({
     String? sellingReachLevel,
+    int? sellingReachRadiusKm,
     String? fulfilmentMode,
     double? deliveryCharge,
     double? deliveryChargeInSociety,
@@ -133,6 +136,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   bool _deletingAccount = false;
   String? _upiDisplayName;
   SellingReachLevel _sellingReachLevel = SellingReachLevel.mySociety;
+  double? _sellingReachRadiusKm;
   SellingReach _sellingReach = const SellingReach();
   SellerFulfilment _fulfilment = const SellerFulfilment();
   String? _kitchenOpensAt;
@@ -298,6 +302,8 @@ class ProfileScreenState extends State<ProfileScreen> {
         _societyName = society?['name'] as String? ?? _societyName;
         _flatNumber = flat?['flatNumber'] as String? ?? _flatNumber;
         _sellingReachLevel = parseSellingReachLevel(profile['sellingReachLevel']);
+        _sellingReachRadiusKm =
+            (profile['sellingReachRadiusKm'] as num?)?.toDouble();
         _sellingReach = SellingReach.fromAuthMe(profile);
         _fulfilment = SellerFulfilment.fromAuthMe(profile);
         if (profile.containsKey('kitchenOpensAt')) {
@@ -445,14 +451,35 @@ class ProfileScreenState extends State<ProfileScreen> {
     return pending.upiIdConfirmed;
   }
 
-  void _onPendingSellingReachChanged(SellingReachLevel selected) {
+  SellerReachPreference get _reachPreference =>
+      SellerReachPreference.fromProfile(
+        level: _sellingReachLevel,
+        radiusKm: _sellingReachRadiusKm,
+        reach: _sellingReach,
+      );
+
+  void _onPendingSellingReachChanged(SellerReachPreference selected) {
     final pending = _pendingSellerEnable;
     if (pending == null) return;
     setState(() {
-      _sellingReachLevel = selected;
-      pending.sellingReachLevel = selected.apiValue;
+      _applyReachPreferenceToState(selected);
+      pending.sellingReachLevel = selected.mySocietyOnly
+          ? SellingReachLevel.mySociety.apiValue
+          : SellingReachLevel.beyondSociety.apiValue;
+      pending.sellingReachRadiusKm =
+          selected.mySocietyOnly ? null : selected.radiusKm;
     });
     _refreshSellerSettings();
+  }
+
+  void _applyReachPreferenceToState(SellerReachPreference pref) {
+    if (pref.mySocietyOnly) {
+      _sellingReachLevel = SellingReachLevel.mySociety;
+      _sellingReachRadiusKm = null;
+    } else {
+      _sellingReachLevel = SellingReachLevel.beyondSociety;
+      _sellingReachRadiusKm = pref.radiusKm.toDouble();
+    }
   }
 
   void _onPendingFulfilmentChanged(SellerFulfilment updated) {
@@ -703,8 +730,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                   ? _upiId!
                   : 'Add UPI ID so buyers can pay you',
               paymentTitle: _paymentPreference.title,
-              sellingReachSubtitle:
-                  _sellingReach.subtitleFor(_sellingReachLevel),
+              sellingReachSubtitle: _reachPreference.summary(_sellingReach),
               fulfilmentTitle: _fulfilment.mode.title,
               fulfilmentSubtitle: _fulfilment.subtitle,
               kitchenHoursSubtitle: kitchenHoursSubtitle(
@@ -742,8 +768,8 @@ class ProfileScreenState extends State<ProfileScreen> {
               onUpiConfirmationInvalidated: holdingSetup
                   ? _onPendingUpiConfirmationInvalidated
                   : null,
-              sellingReachLevel:
-                  holdingSetup ? _sellingReachLevel : null,
+              sellingReachPreference:
+                  holdingSetup ? _reachPreference : null,
               sellingReach: holdingSetup ? _sellingReach : null,
               onSellingReachChanged: holdingSetup
                   ? _onPendingSellingReachChanged
@@ -1571,121 +1597,53 @@ class ProfileScreenState extends State<ProfileScreen> {
   bool get _isSeller => _role == 'seller' || _role == 'super_admin';
 
   Future<void> _changeSellingReach() async {
-    final selected = await showModalBottomSheet<SellingReachLevel>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Selling Reach',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF101617),
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Who can see your food?',
-                style: TextStyle(fontSize: 14, color: Color(0xFF6A7774)),
-              ),
-              const SizedBox(height: 18),
-              ...SellingReachLevel.values.map((level) {
-                final enabled = _sellingReach.isSelectable(level);
-                final selected = level == _sellingReachLevel;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Material(
-                    color: const Color(0xFFF5F7F6),
-                    borderRadius: BorderRadius.circular(14),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: enabled ? () => Navigator.pop(ctx, level) : null,
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(
-                          children: [
-                            Icon(
-                              selected
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_off,
-                              color: enabled
-                                  ? const Color(0xFF0E5A47)
-                                  : const Color(0xFFADB5B2),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    level.title,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color: enabled
-                                          ? const Color(0xFF101617)
-                                          : const Color(0xFF8A9491),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _sellingReach.optionSubtitleFor(level),
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: enabled
-                                          ? const Color(0xFF6A7774)
-                                          : const Color(0xFF8A9491),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ],
-          ),
-        );
-      },
+    final selected = await SellingReachPickerSheet.show(
+      context,
+      reach: _sellingReach,
+      initial: _reachPreference,
     );
-
-    if (selected == null || !mounted || selected == _sellingReachLevel) return;
+    if (selected == null || !mounted) return;
+    if (selected.mySocietyOnly == _reachPreference.mySocietyOnly &&
+        (!selected.mySocietyOnly ||
+            selected.radiusKm == _reachPreference.radiusKm)) {
+      return;
+    }
 
     final pending = _pendingSellerEnable;
     if (pending != null) {
-      setState(() {
-        _sellingReachLevel = selected;
-        pending.sellingReachLevel = selected.apiValue;
-      });
-      _refreshSellerSettings();
+      _onPendingSellingReachChanged(selected);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Selling reach updated')),
       );
       return;
     }
 
-    final previous = _sellingReachLevel;
+    final previousPref = _reachPreference;
     try {
+      final level = selected.mySocietyOnly
+          ? SellingReachLevel.mySociety.apiValue
+          : SellingReachLevel.beyondSociety.apiValue;
       final updated = widget.updateProfile != null
-          ? await widget.updateProfile!(sellingReachLevel: selected.apiValue)
+          ? await widget.updateProfile!(
+              sellingReachLevel: level,
+              sellingReachRadiusKm:
+                  selected.mySocietyOnly ? null : selected.radiusKm,
+            )
           : await ApiService.updateMyProfile(
-              sellingReachLevel: selected.apiValue,
+              sellingReachLevel: level,
+              sellingReachRadiusKm:
+                  selected.mySocietyOnly ? null : selected.radiusKm,
             );
       if (!mounted) return;
       setState(() {
-        _sellingReachLevel = parseSellingReachLevel(updated['sellingReachLevel']);
+        if (updated.containsKey('sellingReachLevel')) {
+          _sellingReachLevel =
+              parseSellingReachLevel(updated['sellingReachLevel']);
+        } else {
+          _applyReachPreferenceToState(selected);
+        }
+        _sellingReachRadiusKm =
+            (updated['sellingReachRadiusKm'] as num?)?.toDouble();
         if (updated.containsKey('sellingReach') || updated.containsKey('cityKey')) {
           _sellingReach = SellingReach.fromAuthMe(updated);
         }
@@ -1696,7 +1654,7 @@ class ProfileScreenState extends State<ProfileScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() => _sellingReachLevel = previous);
+      setState(() => _applyReachPreferenceToState(previousPref));
       _refreshSellerSettings();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update selling reach: $e')),
@@ -2097,6 +2055,20 @@ class ProfileScreenState extends State<ProfileScreen> {
           onTap: _openSellerSettings,
         ),
       ],
+      const _WebSectionLabel('OVERSIGHT'),
+      ProfileMenuTile(
+        icon: Icons.visibility_outlined,
+        title: 'Stores I oversee',
+        subtitle: 'View-only kitchens where you were invited as owner',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const SellerStaffAccessListScreen(),
+            ),
+          );
+        },
+      ),
       const _WebSectionLabel('SUPPORT'),
       ProfileMenuTile(
         icon: Icons.help_outline_rounded,
@@ -3026,6 +2998,7 @@ class _PendingSellerEnable {
   String? upiDisplayName;
   String? paymentPreference;
   String? sellingReachLevel;
+  int? sellingReachRadiusKm;
   bool includeFulfilment = false;
   String? fulfilmentMode;
   double? deliveryCharge;
@@ -3048,6 +3021,8 @@ class _PendingSellerEnable {
       if (includeUpi) 'upiDisplayName': upiDisplayName,
       if (paymentPreference != null) 'paymentPreference': paymentPreference,
       if (sellingReachLevel != null) 'sellingReachLevel': sellingReachLevel,
+      if (sellingReachRadiusKm != null)
+        'sellingReachRadiusKm': sellingReachRadiusKm,
       if (includeFulfilment) 'fulfilmentMode': fulfilmentMode,
       if (includeFulfilment && deliveryCharge != null) 'deliveryCharge': deliveryCharge,
       if (includeFulfilment && deliveryChargeInSociety != null)

@@ -26,8 +26,14 @@ String? listingPortionLabel({String? weightValue, String? weightUnit}) {
   }
 }
 
-String? portionLabelForFood(FoodItem food) =>
-    listingPortionLabel(weightValue: food.weightValue, weightUnit: food.weightUnit);
+String? portionLabelForFood(FoodItem food) {
+  final variant = food.variantLabel?.trim();
+  if (variant != null && variant.isNotEmpty) return variant;
+  return listingPortionLabel(
+    weightValue: food.weightValue,
+    weightUnit: food.weightUnit,
+  );
+}
 
 /// Price line for detail screens, e.g. "₹250 / 250 g" or "₹250 / portion".
 String listingPricePerUnitLabel(FoodItem food) {
@@ -35,4 +41,35 @@ String listingPricePerUnitLabel(FoodItem food) {
   final portion = portionLabelForFood(food);
   if (portion == null) return '$price / portion';
   return '$price / $portion';
+}
+
+/// Home / card price. Uses "from ₹X" when sibling sizes have different prices,
+/// or when the listing belongs to a size group (collapsed Home card).
+String listingCardPriceLabel(FoodItem food, {List<FoodItem> variants = const []}) {
+  if (variants.length > 1) {
+    final prices = variants.map((v) => v.price).toList();
+    final min = prices.reduce((a, b) => a < b ? a : b);
+    final max = prices.reduce((a, b) => a > b ? a : b);
+    if ((max - min).abs() > 0.009) {
+      return 'from ₹${min.toStringAsFixed(0)}';
+    }
+  }
+  final groupId = food.variantGroupId?.trim();
+  if (groupId != null && groupId.isNotEmpty) {
+    return 'from ₹${food.price.toStringAsFixed(0)}';
+  }
+  return '₹${food.price.toStringAsFixed(0)}';
+}
+
+bool listingHasSizeOptions(FoodItem food) {
+  if ((food.variantOptionCount ?? 0) > 1) return true;
+  final groupId = food.variantGroupId?.trim();
+  return groupId != null && groupId.isNotEmpty;
+}
+
+/// Blinkit-style subtitle under Add, e.g. "2 options". Null when single SKU.
+String? listingOptionsLabel(FoodItem food) {
+  final count = food.variantOptionCount ?? 0;
+  if (count <= 1) return null;
+  return count == 1 ? '1 option' : '$count options';
 }

@@ -1,5 +1,7 @@
 const { assertSellerFssaiForEnableSelling } = require("./fssaiCompliance");
-const { assertSellerSellingReachLevel } = require("./sellingReach");
+const { assertSellerSellingReachSettings } = require("./sellingReach");
+const { canonicalCityKey } = require("./launchCity");
+const { assertSellingReachDecreaseAllowed } = require("./sellerReachDecrease");
 const { assertSellerFulfilmentUpdate } = require("./sellerFulfilment");
 const { assertSellerPaymentPreferenceUpdate, DEFAULT_PAYMENT_PREFERENCE } = require("./sellerPaymentPreference");
 
@@ -72,7 +74,7 @@ async function acceptSellerTermsAndEnable({ prisma, user, body }) {
     }
   }
 
-  if (body.sellingReachLevel !== undefined) {
+  if (body.sellingReachLevel !== undefined || body.sellingReachRadiusKm !== undefined) {
     let societyCity = null;
     if (user.societyId) {
       const society = await prisma.society.findUnique({
@@ -81,12 +83,36 @@ async function acceptSellerTermsAndEnable({ prisma, user, body }) {
       });
       societyCity = society && society.city;
     }
-    data.sellingReachLevel = await assertSellerSellingReachLevel({
-      requested: body.sellingReachLevel,
+    const reach = await assertSellerSellingReachSettings({
+      requestedLevel: body.sellingReachLevel,
+      requestedRadiusKm: body.sellingReachRadiusKm,
+      currentLevel: user.sellingReachLevel,
+      currentRadiusKm: user.sellingReachRadiusKm,
       role: enablingRole,
       societyCity,
       prismaClient: prisma,
     });
+    const sellerWithSociety = await prisma.user.findUnique({
+      where: { id: user.id },
+      include: { society: true },
+    });
+    const cityKey = canonicalCityKey(societyCity);
+    const cityReachConfig = cityKey
+      ? await prisma.cityReachConfig.findUnique({ where: { cityKey } })
+      : null;
+    await assertSellingReachDecreaseAllowed({
+      prisma,
+      sellerId: user.id,
+      sellerSociety: sellerWithSociety && sellerWithSociety.society,
+      currentReach: {
+        sellingReachLevel: user.sellingReachLevel,
+        sellingReachRadiusKm: user.sellingReachRadiusKm,
+      },
+      proposedReach: reach,
+      cityReachConfig,
+    });
+    data.sellingReachLevel = reach.sellingReachLevel;
+    data.sellingReachRadiusKm = reach.sellingReachRadiusKm;
   }
 
   if (

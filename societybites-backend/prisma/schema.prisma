@@ -17,8 +17,10 @@ model User {
   upiId                   String?
   upiDisplayName          String?
   paymentEnabled          Boolean                 @default(false)
-  /// MY_SOCIETY | NEARBY | EXTENDED. Radius km lives on CityReachConfig, not here.
+  /// MY_SOCIETY | BEYOND_SOCIETY (legacy: NEARBY | EXTENDED). Beyond uses sellingReachRadiusKm.
   sellingReachLevel       String                  @default("MY_SOCIETY")
+  /// When sellingReachLevel is BEYOND_SOCIETY, sellers within this km of the seller society.
+  sellingReachRadiusKm    Float?
   /// BUYER_PICKUP | SELLER_DELIVERY | BOTH. Independent of sellingReachLevel.
   fulfilmentMode          String                  @default("BUYER_PICKUP")
   /// Legacy / nearby alias. Prefer the per-reach fields below.
@@ -72,6 +74,32 @@ model User {
   fssaiReviews            SellerFssai[]           @relation("FssaiReviewedBy")
   flat                    Flat?                   @relation(fields: [flatId], references: [id])
   society                 Society?                @relation(fields: [societyId], references: [id])
+  /// Kitchens this user operates as the principal seller (invite target side).
+  sellerStaffManaged      SellerStaffMembership[] @relation("SellerStaffKitchen")
+  /// Kitchens this user can oversee (e.g. owner view-only).
+  sellerStaffAccess       SellerStaffMembership[] @relation("SellerStaffMember")
+}
+
+/// Links a staff user to a seller kitchen. MVP: role=owner is view-only oversight.
+/// No manager revoke in MVP — membership stays until admin/manual cleanup.
+model SellerStaffMembership {
+  id           String   @id @default(uuid())
+  /// Kitchen principal (the operating seller / store manager account).
+  sellerUserId String
+  /// Invited user (product role "owner" = view-only for MVP).
+  staffUserId  String
+  /// owner | manager — MVP invites only create "owner" (read-only).
+  role         String   @default("owner")
+  /// invited | active | revoked — MVP uses active after invite; no revoke API yet.
+  status       String   @default("active")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  seller       User     @relation("SellerStaffKitchen", fields: [sellerUserId], references: [id], onDelete: Cascade)
+  staff        User     @relation("SellerStaffMember", fields: [staffUserId], references: [id], onDelete: Cascade)
+
+  @@unique([sellerUserId, staffUserId])
+  @@index([staffUserId, status])
+  @@index([sellerUserId, status])
 }
 
 /// One current FSSAI registration record per seller (review workflow).
@@ -186,16 +214,25 @@ model Listing {
   quantity               Int               @default(1)
   weightUnit             String?
   weightValue            String?
+  /// Shared id across sibling size/pack SKUs (e.g. paneer 250g / 500g / 1kg).
+  variantGroupId         String?
+  /// Buyer-facing size label, e.g. "250 g". Null when not part of a variant group.
+  variantLabel           String?
+  /// SEPARATE | SHARED — how sibling sizes share stock. Null = single SKU / legacy SEPARATE.
+  variantInventoryMode   String?
+  /// SHARED only: pool units consumed by one purchase of this size (e.g. 250 for 250 g).
+  portionUnits           Int?
   tags                   String[]          @default([])
   /// VEG | NON_VEG. Nullable for listings created before this field existed.
   foodType               String?
   category               String?
-  /// Multi-select food occasions. Display labels: Breakfast, Lunch, Dinner, Snacks, Desserts.
+  /// Multi-select food occasions. Labels in utils/listingCategories.js (e.g. Dairy).
   categories             String[]          @default([])
   availableAt            DateTime?
   pickupLocation         String            @default("My Home (Verified)")
   imageUrl               String?
-  /// active | paused | expired | sold_out | inactive
+  /// draft | active | paused | expired | sold_out | inactive
+  /// New listings from POST /listings start as draft until the seller publishes.
   status                 String            @default("active")
   featured               Boolean           @default(false)
   /// Seller storefront sort position for REGULAR catalog listings. Null = legacy fallback sort.
@@ -238,6 +275,7 @@ model Listing {
   @@index([sellerId])
   @@index([campaignId])
   @@index([sourceListingId])
+  @@index([variantGroupId])
 }
 
 /// Seller-created future offering. Products are Listings with campaignId set.
@@ -309,6 +347,8 @@ model Order {
   paymentStatus         String             @default("pending")
   buyerMarkedPaidAt     DateTime?
   sellerConfirmedPaidAt DateTime?
+  /// Last seller-initiated payment reminder push (cooldown).
+  lastPaymentReminderAt DateTime?
   upiTransactionRef     String?
   rejectReason          String?
   rejectedAt            DateTime?
@@ -404,14 +444,15 @@ model AuditLog {
   admin     User     @relation("AdminLogs", fields: [adminId], references: [id])
 }
 
-/// Per-city Level 2 / Level 3 selling radii. cityKey is canonicalCityKey(city).
-/// Do not store these radii on User. Validation: nearby > 0, extended > nearby.
+/// Per-city reach config. cityKey is canonicalCityKey(city).
+/// nearby/extended radii are legacy; maxSellerRadiusKm caps the seller slider.
 model CityReachConfig {
-  cityKey          String   @id
-  displayName      String
-  nearbyRadiusKm   Float
-  extendedRadiusKm Float
-  updatedAt        DateTime @updatedAt
+  cityKey            String   @id
+  displayName        String
+  nearbyRadiusKm     Float
+  extendedRadiusKm   Float
+  maxSellerRadiusKm  Float    @default(10)
+  updatedAt          DateTime @updatedAt
 }
 
 /// Key/value platform config (e.g. platform_fee).

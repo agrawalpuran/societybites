@@ -113,11 +113,18 @@ async function main() {
       method: "POST",
       path: "/listings",
       token: sellerToken,
-      body: { name: `Catalog regular ${stamp}`, price: 40, foodType: "VEG", category: "Lunch" },
+      body: {
+        name: `Catalog regular ${stamp}`,
+        price: 40,
+        foodType: "VEG",
+        category: "Lunch",
+        publish: true,
+      },
     });
     assert(regular.status === 201, `create regular failed: ${JSON.stringify(regular.json)}`);
     assert(regular.json.catalogType === "REGULAR", "new listing must default to REGULAR");
     assert(regular.json.availabilityMode === "READY_NOW", "new listing must default to READY_NOW");
+    assert(regular.json.status === "active", "publish:true creates active listing");
     created.listingIds.push(regular.json.id);
 
     const preorder = await jsonRequest(server, {
@@ -130,6 +137,7 @@ async function main() {
         foodType: "VEG",
         category: "Dinner",
         catalogType: "PREORDER",
+        publish: true,
       },
     });
     assert(preorder.status === 201, `create PREORDER failed: ${JSON.stringify(preorder.json)}`);
@@ -429,6 +437,7 @@ async function main() {
         foodType: "VEG",
         category: "Snacks",
         catalogType: "REGULAR",
+        publish: true,
       },
     });
     assert(sameNameTwin.status === 201, `same-name twin create failed: ${JSON.stringify(sameNameTwin.json)}`);

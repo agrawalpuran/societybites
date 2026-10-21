@@ -19,6 +19,7 @@ import '../widgets/simple_time_picker.dart';
 import '../widgets/food_type_selector.dart';
 import '../widgets/photo_source_sheet.dart';
 import '../widgets/required_field_label.dart';
+import '../utils/inventory_units.dart';
 
 class AddListingScreen extends StatefulWidget {
   const AddListingScreen({
@@ -72,8 +73,17 @@ class _AddListingScreenState extends State<AddListingScreen> {
   bool _dailyLimitEnabled = false;
   final _dailyLimitController = TextEditingController();
   bool _todayFullDay = true;
+  bool _useMultipleSizes = false;
+  /// SEPARATE = per-size stock; SHARED = one pool (e.g. paneer block).
+  String _variantInventoryMode = 'SEPARATE';
+  final List<_ListingVariantDraft> _variantDrafts = [];
+  final _variantLabelController = TextEditingController();
+  final _sharedPoolController = TextEditingController();
+  InventoryUnit _sharedPoolUnit = InventoryUnit.kg;
 
   bool get _isEditing => widget.existingListing != null;
+  bool get _showMultipleSizes =>
+      !_isEditing && !_isPreorderCatalog && _showStockAndExpiryFields;
   bool get _isPreorderCatalog =>
       widget.catalogType == listingCatalogPreorder ||
       (widget.existingListing?.isPreOrderCatalog ?? false);
@@ -671,6 +681,9 @@ class _AddListingScreenState extends State<AddListingScreen> {
       if (listing.weightUnit != null && listing.weightUnit!.isNotEmpty) {
         _weightUnit = listing.weightUnit!;
       }
+      if (listing.variantLabel != null) {
+        _variantLabelController.text = listing.variantLabel!;
+      }
       _selectedTags = List<String>.from(listing.tags);
       final known = listing.listingCategories
           .map(normalizeListingCategory)
@@ -752,7 +765,521 @@ class _AddListingScreenState extends State<AddListingScreen> {
     _descController.dispose();
     _customPrepDaysController.dispose();
     _dailyLimitController.dispose();
+    _variantLabelController.dispose();
+    _sharedPoolController.dispose();
+    for (final draft in _variantDrafts) {
+      draft.dispose();
+    }
     super.dispose();
+  }
+
+  bool get _variantSharedPool =>
+      _useMultipleSizes && _variantInventoryMode == 'SHARED';
+
+  void _enableMultipleSizes(bool enabled) {
+    setState(() {
+      _useMultipleSizes = enabled;
+      if (enabled && _variantDrafts.isEmpty) {
+        _variantDrafts.addAll([
+          _ListingVariantDraft(
+            qty: '250',
+            stock: '10',
+            unit: InventoryUnit.grams,
+          )..syncLabelFromAmount(),
+          _ListingVariantDraft(
+            qty: '500',
+            stock: '10',
+            unit: InventoryUnit.grams,
+          )..syncLabelFromAmount(),
+        ]);
+        if (_sharedPoolController.text.trim().isEmpty) {
+          _sharedPoolController.text = '10';
+          _sharedPoolUnit = InventoryUnit.kg;
+        }
+      }
+    });
+  }
+
+  void _setVariantInventoryMode(String mode) {
+    setState(() {
+      _variantInventoryMode = mode;
+      if (mode == 'SHARED') {
+        for (final draft in _variantDrafts) {
+          final n = double.tryParse(draft.qtyController.text.trim());
+          if (n == null || n <= 0) {
+            draft.qtyController.text = '250';
+            draft.unit = InventoryUnit.grams;
+          }
+          draft.syncLabelFromAmount();
+        }
+        if (_sharedPoolController.text.trim().isEmpty) {
+          _sharedPoolController.text = '10';
+          _sharedPoolUnit = InventoryUnit.kg;
+        }
+      }
+    });
+  }
+
+  void _addVariantDraft() {
+    if (_variantDrafts.length >= 8) return;
+    setState(() {
+      final draft = _ListingVariantDraft(
+        qty: '250',
+        stock: '10',
+        unit: InventoryUnit.grams,
+      )..syncLabelFromAmount();
+      _variantDrafts.add(draft);
+    });
+  }
+
+  void _removeVariantDraft(int index) {
+    if (_variantDrafts.length <= 2) return;
+    setState(() {
+      _variantDrafts.removeAt(index).dispose();
+    });
+  }
+
+  List<Map<String, dynamic>>? _variantsPayloadOrNull() {
+    if (!_useMultipleSizes || _variantDrafts.length < 2) return null;
+    final shared = _variantSharedPool;
+    return _variantDrafts.map((draft) {
+      final label = draft.suggestedLabel();
+      final price = double.parse(draft.priceController.text.trim());
+      final amount = double.parse(draft.qtyController.text.trim());
+      if (shared) {
+        return {
+          'label': label,
+          'price': price,
+          'portionAmount': amount,
+          'portionUnit': draft.unit.apiValue,
+          'weightValue': amount.toString(),
+          'weightUnit': draft.unit.apiValue,
+        };
+      }
+      return {
+        'label': label,
+        'price': price,
+        'quantity': int.parse(draft.stockController.text.trim()),
+        'weightValue': amount.toString(),
+        'weightUnit': draft.unit.apiValue,
+      };
+    }).toList();
+  }
+
+  num? _sharedPoolAmountOrNull() {
+    if (!_variantSharedPool) return null;
+    return num.parse(_sharedPoolController.text.trim());
+  }
+
+  String? _sharedPoolUnitOrNull() {
+    if (!_variantSharedPool) return null;
+    return _sharedPoolUnit.apiValue;
+  }
+
+  Widget _buildInventoryUnitDropdown({
+    required InventoryUnit value,
+    required ValueChanged<InventoryUnit> onChanged,
+    Key? key,
+  }) {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE0E5E3)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          key: key,
+          value: value.apiValue,
+          isExpanded: true,
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Color(0xFF8A9491),
+          ),
+          style: const TextStyle(
+            fontSize: 15,
+            color: Color(0xFF3A4644),
+            fontWeight: FontWeight.w500,
+          ),
+          items: [
+            for (final unit in InventoryUnit.all)
+              DropdownMenuItem(
+                value: unit.apiValue,
+                child: Text(unit.label, overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          onChanged: (v) {
+            if (v == null) return;
+            onChanged(InventoryUnit.parse(v));
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMultipleSizesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
+            'Multiple sizes',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF101617),
+            ),
+          ),
+          subtitle: Text(
+            _variantSharedPool
+                ? 'e.g. Paneer from one block — sizes share one pool of stock'
+                : 'e.g. Juice bottles — each size has its own price and stock',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF6A7774),
+              height: 1.35,
+            ),
+          ),
+          value: _useMultipleSizes,
+          activeColor: const Color(0xFF0E5A47),
+          onChanged: _enableMultipleSizes,
+        ),
+        if (_useMultipleSizes) ...[
+          const SizedBox(height: 8),
+          _buildVariantModePicker(),
+          if (_variantSharedPool) ...[
+            const SizedBox(height: 12),
+            _buildField(
+              label: 'TOTAL AVAILABLE (SHARED POOL)',
+              isRequired: true,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      controller: _sharedPoolController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+                      ],
+                      validator: (v) {
+                        if (!_variantSharedPool) return null;
+                        final n = double.tryParse(v?.trim() ?? '');
+                        if (n == null || n <= 0) return 'Required';
+                        return null;
+                      },
+                      decoration: _inputDeco('e.g. 10'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 3,
+                    child: _buildInventoryUnitDropdown(
+                      key: const Key('shared-pool-unit'),
+                      value: _sharedPoolUnit,
+                      onChanged: (unit) {
+                        setState(() => _sharedPoolUnit = unit);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              '10 kg + 250 g sizes is fine — we convert to the same base for stock.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF6A7774),
+                height: 1.35,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          for (var i = 0; i < _variantDrafts.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            _buildVariantDraftRow(i),
+          ],
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _variantDrafts.length >= 8 ? null : _addVariantDraft,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Add size'),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF0E5A47),
+              textStyle: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildVariantModePicker() {
+    return Column(
+      children: [
+        _VariantModeTile(
+          selected: !_variantSharedPool,
+          title: 'Each size has its own stock',
+          subtitle: 'Juice bottles, packs — stock counted separately',
+          onTap: () => _setVariantInventoryMode('SEPARATE'),
+        ),
+        const SizedBox(height: 8),
+        _VariantModeTile(
+          selected: _variantSharedPool,
+          title: 'Sizes share one pool',
+          subtitle: 'One block of paneer sold as 250 g / 500 g / 1 kg',
+          onTap: () => _setVariantInventoryMode('SHARED'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVariantDraftRow(int index) {
+    final draft = _variantDrafts[index];
+    final shared = _variantSharedPool;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE0E5E3)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Size ${index + 1}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF6A7774),
+                  ),
+                ),
+              ),
+              if (_variantDrafts.length > 2)
+                IconButton(
+                  tooltip: 'Remove size',
+                  onPressed: () => _removeVariantDraft(index),
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  color: const Color(0xFF8A9491),
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
+          ),
+          if (shared) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    controller: draft.qtyController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+                    ],
+                    onChanged: (_) {
+                      draft.syncLabelFromAmount();
+                      setState(() {});
+                    },
+                    validator: (v) {
+                      if (!_useMultipleSizes) return null;
+                      final n = double.tryParse(v?.trim() ?? '');
+                      if (n == null || n <= 0) return 'Required';
+                      if (!inventoryUnitsCompatible(
+                        _sharedPoolUnit,
+                        draft.unit,
+                      )) {
+                        return 'Unit kind';
+                      }
+                      final poolAmount =
+                          double.tryParse(_sharedPoolController.text.trim());
+                      if (poolAmount != null) {
+                        final poolBase =
+                            _sharedPoolUnit.toBaseUnits(poolAmount);
+                        final portionBase = draft.unit.toBaseUnits(n);
+                        if (portionBase > poolBase) return '≤ pool';
+                      }
+                      return null;
+                    },
+                    decoration: _inputDeco('Amount'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 3,
+                  child: _buildInventoryUnitDropdown(
+                    value: draft.unit,
+                    onChanged: (unit) {
+                      setState(() {
+                        draft.unit = unit;
+                        draft.syncLabelFromAmount();
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _buildField(
+              label: 'PRICE',
+              isRequired: true,
+              labelStyle: _pairedFieldLabelStyle,
+              child: TextFormField(
+                controller: draft.priceController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+                ],
+                validator: (v) {
+                  if (!_useMultipleSizes) return null;
+                  if (v == null || v.trim().isEmpty) return 'Required';
+                  if (double.tryParse(v.trim()) == null) return 'Invalid';
+                  return null;
+                },
+                decoration: _inputDeco('₹ 0.00'),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Shown as “${draft.suggestedLabel()}”',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF6A7774),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ] else ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: _buildField(
+                    label: 'SIZE',
+                    isRequired: true,
+                    labelStyle: _pairedFieldLabelStyle,
+                    child: TextFormField(
+                      controller: draft.qtyController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+                      ],
+                      onChanged: (_) {
+                        draft.syncLabelFromAmount();
+                        setState(() {});
+                      },
+                      validator: (v) {
+                        if (!_useMultipleSizes) return null;
+                        final n = double.tryParse(v?.trim() ?? '');
+                        if (n == null || n <= 0) return 'Required';
+                        return null;
+                      },
+                      decoration: _inputDeco('e.g. 250'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 3,
+                  child: _buildField(
+                    label: 'UNIT',
+                    isRequired: true,
+                    labelStyle: _pairedFieldLabelStyle,
+                    child: _buildInventoryUnitDropdown(
+                      value: draft.unit,
+                      onChanged: (unit) {
+                        setState(() {
+                          draft.unit = unit;
+                          draft.syncLabelFromAmount();
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildField(
+                    label: 'PRICE',
+                    isRequired: true,
+                    labelStyle: _pairedFieldLabelStyle,
+                    child: TextFormField(
+                      controller: draft.priceController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+                      ],
+                      validator: (v) {
+                        if (!_useMultipleSizes) return null;
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        if (double.tryParse(v.trim()) == null) return 'Invalid';
+                        return null;
+                      },
+                      decoration: _inputDeco('₹ 0.00'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildField(
+                    label: 'STOCK',
+                    isRequired: true,
+                    labelStyle: _pairedFieldLabelStyle,
+                    child: TextFormField(
+                      controller: draft.stockController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (v) {
+                        if (!_useMultipleSizes) return null;
+                        final n = int.tryParse(v?.trim() ?? '');
+                        if (n == null || n < 1) return 'Min 1';
+                        return null;
+                      },
+                      decoration: _inputDeco('Qty'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Shown as “${draft.suggestedLabel()}”',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF6A7774),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   DateTime _endOfToday() {
@@ -923,13 +1450,23 @@ class _AddListingScreenState extends State<AddListingScreen> {
         );
       }
 
-      final quantity = _showQuantityAvailableField
-          ? int.parse(_qtyController.text.trim())
-          : (_isPreorderCatalog || useRecurring)
-              ? (_isEditing && widget.existingListing!.quantity > 0
-                  ? widget.existingListing!.quantity
-                  : 99)
-              : int.parse(_qtyController.text.trim());
+      final variants = _variantsPayloadOrNull();
+      final sharedPoolAmount = _sharedPoolAmountOrNull();
+      final sharedPoolUnit = _sharedPoolUnitOrNull();
+      final quantity = variants != null
+          ? (_variantSharedPool
+              ? _sharedPoolUnit.toBaseUnits(sharedPoolAmount!)
+              : (variants.first['quantity'] as int))
+          : _showQuantityAvailableField
+              ? int.parse(_qtyController.text.trim())
+              : (_isPreorderCatalog || useRecurring)
+                  ? (_isEditing && widget.existingListing!.quantity > 0
+                      ? widget.existingListing!.quantity
+                      : 99)
+                  : int.parse(_qtyController.text.trim());
+      final price = variants != null
+          ? (variants.first['price'] as double)
+          : double.parse(_priceController.text.trim());
       final recurringStartMinute = timeOfDayToMinute(
         _recurringStart.hour,
         _recurringStart.minute,
@@ -956,12 +1493,13 @@ class _AddListingScreenState extends State<AddListingScreen> {
           : (justToday ? _endOfToday() : null);
 
       final (weightValue, weightUnit) = _weightFieldsForApi();
+      final variantLabel = _variantLabelController.text.trim();
 
       if (_isEditing) {
         await ApiService.updateListing(
           listingId: widget.existingListing!.id,
           name: _nameController.text.trim(),
-          price: double.parse(_priceController.text.trim()),
+          price: price,
           quantity: quantity,
           description: _descController.text.trim(),
           availableAt: availableAt,
@@ -970,6 +1508,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
           imageUrl: imageUrl,
           weightUnit: weightUnit,
           weightValue: weightValue,
+          variantLabel: variantLabel.isEmpty ? '' : variantLabel,
           tags: _selectedTags,
           categories: [..._selectedCategories, ..._legacyCategories],
           foodType: _foodType!,
@@ -992,7 +1531,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
         await ApiService.createListing(
           societyId: societyId,
           name: _nameController.text.trim(),
-          price: double.parse(_priceController.text.trim()),
+          price: price,
           quantity: quantity,
           description: _descController.text.trim(),
           availableAt: availableAt,
@@ -1017,6 +1556,11 @@ class _AddListingScreenState extends State<AddListingScreen> {
           recurringEndMinute:
               (useRecurring || sameDayHours) ? recurringEndMinute : null,
           recurringDailyLimit: recurringLimit,
+          variants: variants,
+          variantInventoryMode:
+              variants != null ? _variantInventoryMode : null,
+          sharedPoolQuantity: sharedPoolAmount,
+          sharedPoolUnit: sharedPoolUnit,
         );
       }
 
@@ -1026,7 +1570,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
         SnackBar(
           content: Text(_isEditing
               ? 'Listing updated successfully!'
-              : 'Listing created successfully!'),
+              : 'Saved as draft. Publish it from My Listings when you are ready.'),
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1137,30 +1681,51 @@ class _AddListingScreenState extends State<AddListingScreen> {
                               "e.g. Grandma's Sourdough Loaf"),
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      _buildField(
-                        label: 'PRICE PER PORTION',
-                        isRequired: true,
-                        child: TextFormField(
-                          controller: _priceController,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                                RegExp(r'[\d.]')),
-                          ],
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Required';
-                            if (double.tryParse(v) == null) return 'Invalid price';
-                            return null;
-                          },
-                          decoration: _inputDeco('₹ 0.00'),
+                      if (_showMultipleSizes) ...[
+                        const SizedBox(height: 18),
+                        _buildMultipleSizesSection(),
+                      ],
+                      if (!_useMultipleSizes) ...[
+                        const SizedBox(height: 18),
+                        _buildField(
+                          label: 'PRICE PER PORTION',
+                          isRequired: true,
+                          child: TextFormField(
+                            controller: _priceController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'[\d.]')),
+                            ],
+                            validator: (v) {
+                              if (_useMultipleSizes) return null;
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Required';
+                              }
+                              if (double.tryParse(v) == null) {
+                                return 'Invalid price';
+                              }
+                              return null;
+                            },
+                            decoration: _inputDeco('₹ 0.00'),
+                          ),
                         ),
-                      ),
+                      ],
+                      if (_isEditing) ...[
+                        const SizedBox(height: 18),
+                        _buildField(
+                          label: 'SIZE LABEL (OPTIONAL)',
+                          child: TextFormField(
+                            controller: _variantLabelController,
+                            decoration: _inputDeco('e.g. 250 g'),
+                          ),
+                        ),
+                      ],
                       if (_showRecurringSection) ...[
                         const SizedBox(height: 18),
                         _buildRecurringSection(),
                       ],
-                      if (_showQuantityAvailableField) ...[
+                      if (_showQuantityAvailableField && !_useMultipleSizes) ...[
                         const SizedBox(height: 18),
                         _buildField(
                           label: 'PORTIONS AVAILABLE',
@@ -1176,6 +1741,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                                   FilteringTextInputFormatter.digitsOnly,
                                 ],
                                 validator: (v) {
+                                  if (_useMultipleSizes) return null;
                                   if (v == null || v.trim().isEmpty) {
                                     return 'Required';
                                   }
@@ -1208,7 +1774,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           ),
                         ),
                       ],
-                      if (_showWeightAndUnitFields) ...[
+                      if (_showWeightAndUnitFields && !_useMultipleSizes) ...[
                         const SizedBox(height: 18),
                         _buildWeightAndUnitRow(),
                       ],
@@ -1820,6 +2386,111 @@ class _FulfilmentOption extends StatelessWidget {
                 child: child,
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ListingVariantDraft {
+  _ListingVariantDraft({
+    String label = '',
+    String price = '',
+    String qty = '1',
+    String stock = '1',
+    InventoryUnit unit = InventoryUnit.grams,
+  })  : labelController = TextEditingController(text: label),
+        priceController = TextEditingController(text: price),
+        qtyController = TextEditingController(text: qty),
+        stockController = TextEditingController(text: stock),
+        unit = unit;
+
+  final TextEditingController labelController;
+  final TextEditingController priceController;
+  /// Size amount (250) when using unit dropdown; SHARED portion amount.
+  final TextEditingController qtyController;
+  /// SEPARATE mode only: how many of this size are in stock.
+  final TextEditingController stockController;
+  InventoryUnit unit;
+
+  String suggestedLabel() {
+    final amount = num.tryParse(qtyController.text.trim());
+    if (amount == null || amount <= 0) return unit.shortLabel;
+    return unit.formatLabel(amount);
+  }
+
+  void syncLabelFromAmount() {
+    labelController.text = suggestedLabel();
+  }
+
+  void dispose() {
+    labelController.dispose();
+    priceController.dispose();
+    qtyController.dispose();
+    stockController.dispose();
+  }
+}
+
+class _VariantModeTile extends StatelessWidget {
+  const _VariantModeTile({
+    required this.selected,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? const Color(0xFFE8F5EE) : const Color(0xFFF5F7F6),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: selected
+                    ? const Color(0xFF0E5A47)
+                    : const Color(0xFF8A9491),
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Color(0xFF101617),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: Color(0xFF6A7774),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1098,14 +1098,22 @@ router.put(
       return res.status(400).json({ error: "cityKey is required" });
     }
 
-    const { nearbyRadiusKm, extendedRadiusKm } = validateCityReachRadii(req.body || {});
+    const { nearbyRadiusKm, extendedRadiusKm, maxSellerRadiusKm } = validateCityReachRadii(
+      req.body || {}
+    );
     const existing = await prisma.cityReachConfig.findUnique({ where: { cityKey } });
     const displayName = displayNameFromCityKey(cityKey, req.body && req.body.displayName);
 
     const config = await prisma.cityReachConfig.upsert({
       where: { cityKey },
-      update: { displayName, nearbyRadiusKm, extendedRadiusKm },
-      create: { cityKey, displayName, nearbyRadiusKm, extendedRadiusKm },
+      update: { displayName, nearbyRadiusKm, extendedRadiusKm, maxSellerRadiusKm },
+      create: {
+        cityKey,
+        displayName,
+        nearbyRadiusKm,
+        extendedRadiusKm,
+        maxSellerRadiusKm,
+      },
     });
 
     await prisma.auditLog.create({
@@ -1118,6 +1126,7 @@ router.put(
           displayName,
           nearbyRadiusKm,
           extendedRadiusKm,
+          maxSellerRadiusKm,
         }),
       },
     });

@@ -66,7 +66,7 @@ class ListingCompactPriceRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('₹${food.price.toStringAsFixed(0)}', style: priceStyle),
+        Text(listingCardPriceLabel(food), style: priceStyle),
         if (portion != null)
           Padding(
             padding: const EdgeInsets.only(top: 2),

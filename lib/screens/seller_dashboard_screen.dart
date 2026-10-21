@@ -36,6 +36,7 @@ import 'seller_preorders_screen.dart';
 import 'seller_feedback_screen.dart';
 import 'seller_older_orders_screen.dart';
 import 'seller_enable_welcome_screen.dart';
+import 'seller_payment_reconciliation_screen.dart';
 
 class SellerDashboardScreen extends StatefulWidget {
   const SellerDashboardScreen({
@@ -47,6 +48,9 @@ class SellerDashboardScreen extends StatefulWidget {
     this.onStartSelling,
     this.fetchOrders,
     this.fetchCampaigns,
+    this.kitchenSellerId,
+    this.readOnly = false,
+    this.oversightStoreName,
   });
 
   /// From notification tap — fetch this order before the kitchen list returns.
@@ -69,6 +73,15 @@ class SellerDashboardScreen extends StatefulWidget {
 
   /// Test seam. Production uses [ApiService.getPreOrderCampaigns].
   final Future<List<Map<String, dynamic>>> Function()? fetchCampaigns;
+
+  /// When set, load this kitchen (owner oversight). Null = caller's own kitchen.
+  final String? kitchenSellerId;
+
+  /// Owner view-only: hide accept/reject and listing management.
+  final bool readOnly;
+
+  /// Shown in the view-only banner (store / manager name).
+  final String? oversightStoreName;
 
   @override
   SellerDashboardScreenState createState() => SellerDashboardScreenState();
@@ -112,7 +125,22 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   bool _listingAssetsPrecacheScheduled = false;
   bool _sellerWelcomePopupInFlight = false;
 
-  bool get _canSell => _role == 'seller' || _role == 'super_admin';
+  bool get _isOversight {
+    final kitchenId = widget.kitchenSellerId?.trim() ?? '';
+    return widget.readOnly && kitchenId.isNotEmpty;
+  }
+
+  String? get _kitchenSellerId {
+    final kitchenId = widget.kitchenSellerId?.trim() ?? '';
+    return kitchenId.isEmpty ? null : kitchenId;
+  }
+
+  /// Own kitchen seller, or owner viewing another kitchen.
+  bool get _canSell =>
+      _isOversight || _role == 'seller' || _role == 'super_admin';
+
+  /// Accept / reject / listing management — not for owner oversight.
+  bool get _canOperate => !_isOversight && (_role == 'seller' || _role == 'super_admin');
 
   @override
   void initState() {
@@ -294,8 +322,14 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         raw = await injected();
       } else {
         final pages = await Future.wait([
-          ApiService.getSellerOrderBucket(scope: 'active'),
-          ApiService.getSellerOrderBucket(scope: 'recent_past'),
+          ApiService.getSellerOrderBucket(
+            scope: 'active',
+            kitchenSellerId: _kitchenSellerId,
+          ),
+          ApiService.getSellerOrderBucket(
+            scope: 'recent_past',
+            kitchenSellerId: _kitchenSellerId,
+          ),
         ]);
         raw = [...pages[0].orders, ...pages[1].orders];
       }
@@ -383,6 +417,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   void _warmSellerSurfaces(String? role) {
+    if (_isOversight) return;
     if (role != 'seller' && role != 'super_admin') return;
     if (!_sellerWarmStarted) {
       _sellerWarmStarted = true;
@@ -447,11 +482,18 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   List<KitchenOrderCategory> get _visibleKitchenCategories {
     final List<FoodItem> listings =
         MyListingsCache.hasSnapshot ? MyListingsCache.listings : const [];
-    return visibleKitchenCategories(
+    final cats = visibleKitchenCategories(
       orders: [..._activeOrders, ..._pastOrders],
       campaigns: _preOrderCampaigns,
       listings: listings,
     );
+    // Pre-order campaigns API is principal-scoped; skip in owner oversight.
+    if (_isOversight) {
+      return cats
+          .where((c) => c != KitchenOrderCategory.preorders)
+          .toList(growable: false);
+    }
+    return cats;
   }
 
   KitchenOrderCategory? get _resolvedKitchenCategory => resolveKitchenCategory(
@@ -510,6 +552,16 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   Future<void> _loadPreOrders() async {
+    if (_isOversight) {
+      if (mounted) {
+        setState(() {
+          _preOrderCampaigns = [];
+          _preOrdersLoading = false;
+          _preOrdersSlow = false;
+        });
+      }
+      return;
+    }
     _preOrdersLoadRequested = true;
     _preOrdersSlow = false;
     _armSlowTimer(
@@ -669,7 +721,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   Future<void> _loadStats() async {
     try {
-      final stats = await ApiService.getSellerStats();
+      final stats = await ApiService.getSellerStats(
+        kitchenSellerId: _kitchenSellerId,
+      );
       if (!mounted) return;
       setState(() => _stats = stats);
     } catch (_) {}
@@ -750,8 +804,14 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
             parsed.where((order) => order.status == 'pending').length;
       } else {
         final pages = await Future.wait([
-          ApiService.getSellerOrderBucket(scope: 'active'),
-          ApiService.getSellerOrderBucket(scope: 'recent_past'),
+          ApiService.getSellerOrderBucket(
+            scope: 'active',
+            kitchenSellerId: _kitchenSellerId,
+          ),
+          ApiService.getSellerOrderBucket(
+            scope: 'recent_past',
+            kitchenSellerId: _kitchenSellerId,
+          ),
         ]);
         active = pages[0].orders.map(Order.fromJson).toList();
         past = pages[1].orders.map(Order.fromJson).toList();
@@ -1103,7 +1163,20 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            if (!useWebMarketplaceLayout(context)) const AppHeader(),
+            if (!useWebMarketplaceLayout(context))
+              AppHeader(
+                leading: _isOversight
+                    ? IconButton(
+                        onPressed: () => Navigator.maybePop(context),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 20,
+                        ),
+                        color: const Color(0xFF3A4644),
+                      )
+                    : null,
+              ),
+            if (_isOversight) _buildOversightBanner(),
             if (_roleLoaded && !_canSell)
               Expanded(child: _buildBuyerStartSelling())
             else ...[
@@ -1154,8 +1227,10 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                               onRetry: _loadOrders,
                             ),
                           ),
-                        SliverToBoxAdapter(child: _buildExpandCard()),
-                        SliverToBoxAdapter(child: _buildAddListingCta(context)),
+                        if (_canOperate) ...[
+                          SliverToBoxAdapter(child: _buildExpandCard()),
+                          SliverToBoxAdapter(child: _buildAddListingCta(context)),
+                        ],
                         const SliverToBoxAdapter(child: SizedBox(height: 30)),
                       ],
                     ),
@@ -1217,25 +1292,38 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           constraints: const BoxConstraints(maxWidth: webSellerContentMaxWidth),
           child: Column(
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(28, 24, 28, 8),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(28, 24, 28, 8),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (_isOversight)
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () => Navigator.maybePop(context),
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 20,
+                            color: webInk,
+                          ),
+                        ),
                       Text(
-                        'My Kitchen',
-                        style: TextStyle(
+                        _isOversight ? 'Store oversight' : 'My Kitchen',
+                        style: const TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.w800,
                           color: webInk,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        'Orders, listings, and how your kitchen is doing.',
-                        style: TextStyle(
+                        _isOversight
+                            ? 'View-only kitchen activity for this store.'
+                            : 'Orders, listings, and how your kitchen is doing.',
+                        style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
                           color: webMuted,
@@ -1245,6 +1333,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                   ),
                 ),
               ),
+              if (_isOversight) _buildOversightBanner(),
               if (_roleLoaded && !_canSell)
                 Expanded(child: _buildBuyerStartSelling())
               else ...[
@@ -1305,15 +1394,16 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                                   onRetry: _loadOrders,
                                 ),
                               ),
-                            SliverToBoxAdapter(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _buildExpandCard(),
-                                  _buildAddListingCta(context),
-                                ],
+                            if (_canOperate)
+                              SliverToBoxAdapter(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    _buildExpandCard(),
+                                    _buildAddListingCta(context),
+                                  ],
+                                ),
                               ),
-                            ),
                             const SliverToBoxAdapter(
                               child: SizedBox(height: 30),
                             ),
@@ -1345,9 +1435,49 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         slivers: [
           SliverToBoxAdapter(child: _buildDashboardHeader()),
           SliverToBoxAdapter(child: _buildSatisfactionRow()),
-          SliverToBoxAdapter(
-            child: SellerInsightsPanel(showHeading: false),
-          ),
+          if (_canOperate || _isOversight) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: ProfileMenuTile(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Payments & Reconciliation',
+                  subtitle: _isOversight
+                      ? 'View sales and collections (read only)'
+                      : 'Sales, collections, and payment reminders',
+                  onTap: () {
+                    Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SellerPaymentReconciliationScreen(
+                          kitchenSellerId: _kitchenSellerId,
+                          readOnly: _isOversight,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SellerInsightsPanel(
+                showHeading: false,
+                fetchInsights: _kitchenSellerId != null
+                    ? ({
+                        required String preset,
+                        String? from,
+                        String? to,
+                      }) =>
+                        ApiService.getSellerInsights(
+                          preset: preset,
+                          from: from,
+                          to: to,
+                          kitchenSellerId: _kitchenSellerId,
+                        )
+                    : null,
+              ),
+            ),
+          ],
           const SliverToBoxAdapter(child: SizedBox(height: 30)),
         ],
       ),
@@ -1397,6 +1527,34 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     );
   }
 
+  Widget _buildOversightBanner() {
+    final name = (widget.oversightStoreName ?? '').trim();
+    final label = name.isEmpty ? 'this store' : name;
+    return Material(
+      color: const Color(0xFFFFF8E8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+        child: Row(
+          children: [
+            const Icon(Icons.visibility_outlined, color: Color(0xFF9A6B00), size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Viewing $label as owner · view only',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF9A6B00),
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDashboardHeader() {
     return const Padding(
       padding: EdgeInsets.fromLTRB(20, 18, 20, 0),
@@ -1431,11 +1589,11 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Orders',
                   style: TextStyle(
                     fontSize: 26,
@@ -1443,10 +1601,12 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                     color: Color(0xFF101617),
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Accept, prepare, and complete neighbor orders.',
-                  style: TextStyle(
+                  _isOversight
+                      ? 'View-only · you cannot accept or update orders here.'
+                      : 'Accept, prepare, and complete neighbor orders.',
+                  style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF6A7774),
                     fontWeight: FontWeight.w500,
@@ -1455,6 +1615,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               ],
             ),
           ),
+          if (_canOperate)
           Wrap(
             alignment: WrapAlignment.end,
             children: [
@@ -1545,14 +1706,20 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: _SatisfactionCard(
         rating: (_stats['avgRating'] as num?)?.toDouble() ?? 0,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const SellerFeedbackScreen(),
-            ),
-          );
-        },
+        onTap: (_canOperate || _isOversight)
+            ? () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SellerFeedbackScreen(
+                      fetchReviews: () => ApiService.getSellerReviews(
+                        kitchenSellerId: _kitchenSellerId,
+                      ),
+                    ),
+                  ),
+                );
+              }
+            : null,
       ),
     );
     if (!useWebMarketplaceLayout(context)) return card;
@@ -1597,43 +1764,46 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                   ],
                 ),
               ),
-              TextButton(
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SellerPreOrdersScreen(),
-                    ),
-                  );
-                  _loadPreOrders();
-                },
-                child: const Text(
-                  'View all',
+              if (_canOperate)
+                TextButton(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SellerPreOrdersScreen(),
+                      ),
+                    );
+                    _loadPreOrders();
+                  },
+                  child: const Text(
+                    'View all',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+            ],
+          ),
+          if (_canOperate) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const Key('create-preorder-catalog'),
+                onPressed: _createPreOrderCatalog,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: preorderGreen,
+                  side: const BorderSide(color: Color(0xFFD4E8DF)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.menu_book_outlined, size: 18),
+                label: const Text(
+                  'Create catalog',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: const Key('create-preorder-catalog'),
-              onPressed: _createPreOrderCatalog,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: preorderGreen,
-                side: const BorderSide(color: Color(0xFFD4E8DF)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: const Icon(Icons.menu_book_outlined, size: 18),
-              label: const Text(
-                'Create catalog',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
             ),
-          ),
+          ],
           const SizedBox(height: 12),
           if (_preOrdersLoading) ...[
             const KitchenPreOrdersSkeleton(),
@@ -1813,11 +1983,13 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                     SellerActiveOrderCard(
                       key: ValueKey(order.id),
                       order: order,
-                      onAction: _updateStatus,
-                      onOrderUpdated: _mergeKitchenOrder,
-                      onPaymentConfirmed: _scheduleBackgroundOrdersRefresh,
-                      onReject: _rejectOrder,
-                      onReadyBy: _editReadyBy,
+                      onAction: _canOperate ? _updateStatus : null,
+                      onOrderUpdated: _canOperate ? _mergeKitchenOrder : null,
+                      onPaymentConfirmed: _canOperate
+                          ? _scheduleBackgroundOrdersRefresh
+                          : null,
+                      onReject: _canOperate ? _rejectOrder : null,
+                      onReadyBy: _canOperate ? _editReadyBy : null,
                       rejectBusy: _rejectingOrderId == order.id,
                     ),
               ],
@@ -1834,11 +2006,13 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
               (order) => SellerActiveOrderCard(
                 key: ValueKey(order.id),
                 order: order,
-                onAction: _updateStatus,
-                onOrderUpdated: _mergeKitchenOrder,
-                onPaymentConfirmed: _scheduleBackgroundOrdersRefresh,
-                onReject: _rejectOrder,
-                onReadyBy: _editReadyBy,
+                onAction: _canOperate ? _updateStatus : null,
+                onOrderUpdated: _canOperate ? _mergeKitchenOrder : null,
+                onPaymentConfirmed: _canOperate
+                    ? _scheduleBackgroundOrdersRefresh
+                    : null,
+                onReject: _canOperate ? _rejectOrder : null,
+                onReadyBy: _canOperate ? _editReadyBy : null,
                 rejectBusy: _rejectingOrderId == order.id,
               ),
             ),
@@ -1879,12 +2053,13 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
           openOrders: openOrders,
           fetchOrders: widget.fetchOrders,
           onOrderRefresh: _loadOrders,
-          onAction: openOrders ? _updateStatus : null,
-          onOrderUpdated: openOrders ? _mergeKitchenOrder : null,
-          onPaymentConfirmed:
-              openOrders ? _scheduleBackgroundOrdersRefresh : null,
-          onReject: openOrders ? _rejectOrder : null,
-          onReadyBy: openOrders ? _editReadyBy : null,
+          onAction: openOrders && _canOperate ? _updateStatus : null,
+          onOrderUpdated: openOrders && _canOperate ? _mergeKitchenOrder : null,
+          onPaymentConfirmed: openOrders && _canOperate
+              ? _scheduleBackgroundOrdersRefresh
+              : null,
+          onReject: openOrders && _canOperate ? _rejectOrder : null,
+          onReadyBy: openOrders && _canOperate ? _editReadyBy : null,
         ),
       ),
     );
@@ -2159,25 +2334,26 @@ class SellerActiveOrderCard extends StatefulWidget {
   const SellerActiveOrderCard({
     super.key,
     required this.order,
-    required this.onAction,
-    required this.onOrderUpdated,
-    required this.onPaymentConfirmed,
-    required this.onReject,
-    required this.onReadyBy,
+    this.onAction,
+    this.onOrderUpdated,
+    this.onPaymentConfirmed,
+    this.onReject,
+    this.onReadyBy,
     this.rejectBusy = false,
   });
 
   final Order order;
+  /// Null = view-only (owner oversight): hide accept / reject / payment actions.
   final Future<void> Function(
     Order order,
     String nextStatus, {
     double? deliveryCharge,
     String? deliveryCollectBy,
-  }) onAction;
-  final void Function(Order order) onOrderUpdated;
-  final Future<void> Function() onPaymentConfirmed;
-  final Future<void> Function(Order order) onReject;
-  final Future<void> Function(Order order) onReadyBy;
+  })? onAction;
+  final void Function(Order order)? onOrderUpdated;
+  final Future<void> Function()? onPaymentConfirmed;
+  final Future<void> Function(Order order)? onReject;
+  final Future<void> Function(Order order)? onReadyBy;
   final bool rejectBusy;
 
   @override
@@ -2224,12 +2400,14 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     return order;
   }
 
+  bool get _canOperate => widget.onAction != null;
+
   void _stageLocalStatus(String nextStatus) {
     final snapshot = widget.order;
     final hint = OrderPushHint(orderId: snapshot.id, status: nextStatus);
     OrderPushCoordinator.stageHint(hint);
     setState(() => _pendingStatusOverride = nextStatus);
-    widget.onOrderUpdated(applyOrderPushHint(snapshot, hint));
+    widget.onOrderUpdated?.call(applyOrderPushHint(snapshot, hint));
   }
 
   void _stageLocalPayment({
@@ -2253,7 +2431,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
         expectedReadyAt: expectedReadyAt,
       ),
     );
-    widget.onOrderUpdated(patched);
+    widget.onOrderUpdated?.call(patched);
   }
 
   bool _displayCaughtUp(String targetStatus) {
@@ -2461,7 +2639,9 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     double? deliveryCharge,
     String? deliveryCollectBy,
   }) async {
-    if (_isUpdating) return;
+    if (_isUpdating || !_canOperate) return;
+    final onAction = widget.onAction;
+    if (onAction == null) return;
     final order = widget.order;
     if (nextStatus == 'accepted' &&
         order.requestedEarlierThanUsualLead &&
@@ -2478,7 +2658,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     setState(() => _isUpdating = true);
     _stageLocalStatus(nextStatus);
     try {
-      await widget.onAction(
+      await onAction(
         order,
         nextStatus,
         deliveryCharge: deliveryCharge,
@@ -2496,6 +2676,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
   }
 
   Future<void> _confirmPayment() async {
+    if (!_canOperate) return;
     final allowReadyBy = kitchenOrderAllowsReadyBy(widget.order);
     Object? result = 'skip';
     if (allowReadyBy) {
@@ -2538,14 +2719,14 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
         expectedReadyAt: result is DateTime ? expectedReadyAt : null,
         readyInMinutes: readyInMinutes,
       );
-      widget.onOrderUpdated(Order.mergeStatusPatch(snapshot, json));
+      widget.onOrderUpdated?.call(Order.mergeStatusPatch(snapshot, json));
       if (!mounted) return;
       _showCompactPaymentNotice(context, 'Payment confirmed');
     } catch (e) {
       if (!mounted) return;
       OrderPushCoordinator.dropHint(snapshot.id);
       setState(() => _pendingPaymentOverride = null);
-      widget.onOrderUpdated(snapshot);
+      widget.onOrderUpdated?.call(snapshot);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not confirm payment: $e')));
@@ -2563,6 +2744,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
   }
 
   Future<void> _confirmDeliveryCash() async {
+    if (!_canOperate) return;
     final order = widget.order;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -2596,7 +2778,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     }
     try {
       final json = await ApiService.confirmDeliveryCash(orderId: order.id);
-      widget.onOrderUpdated(Order.mergeStatusPatch(snapshot, json));
+      widget.onOrderUpdated?.call(Order.mergeStatusPatch(snapshot, json));
       if (!mounted) return;
       final completed = (json['status'] as String?) == 'completed';
       _showCompactSellerNotice(
@@ -2607,7 +2789,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
       if (!mounted) return;
       OrderPushCoordinator.dropHint(snapshot.id);
       setState(() => _pendingStatusOverride = null);
-      widget.onOrderUpdated(snapshot);
+      widget.onOrderUpdated?.call(snapshot);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not confirm delivery fee: $e')),
       );
@@ -2617,6 +2799,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
   }
 
   Future<void> _confirmCashPayment() async {
+    if (!_canOperate) return;
     final order = widget.order;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -2647,14 +2830,14 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     _stageLocalPayment(paymentStatus: 'paid');
     try {
       final json = await ApiService.confirmCashPayment(orderId: order.id);
-      widget.onOrderUpdated(Order.mergeStatusPatch(snapshot, json));
+      widget.onOrderUpdated?.call(Order.mergeStatusPatch(snapshot, json));
       if (!mounted) return;
       _showCompactPaymentNotice(context, 'Payment received');
     } catch (e) {
       if (!mounted) return;
       OrderPushCoordinator.dropHint(snapshot.id);
       setState(() => _pendingPaymentOverride = null);
-      widget.onOrderUpdated(snapshot);
+      widget.onOrderUpdated?.call(snapshot);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not confirm cash payment: $e')),
       );
@@ -2672,14 +2855,16 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
   }
 
   Future<void> _completeOrder() async {
-    if (_isUpdating) return;
+    if (_isUpdating || !_canOperate) return;
+    final onAction = widget.onAction;
+    if (onAction == null) return;
     final confirmed = await confirmCompleteOrder(context);
     if (!confirmed || !mounted) return;
 
     setState(() => _isUpdating = true);
     _stageLocalStatus('completed');
     try {
-      await widget.onAction(widget.order, 'completed');
+      await onAction(widget.order, 'completed');
     } finally {
       if (mounted) {
         setState(() {
@@ -2706,30 +2891,37 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     final isCash = payment.isCash;
     final isUpiSplit = order.upiFoodCashDeliverySplit;
     final cashPaid = order.paymentStatus == 'paid';
-    final needsCashConfirm = !isRejected &&
+    final canOperate = _canOperate;
+    final needsCashConfirm = canOperate &&
+        !isRejected &&
         isCash &&
         !isUpiSplit &&
         lifecycle.treatAsReady &&
         !cashPaid &&
         order.paymentStatus != 'failed';
     final needsDeliveryCashConfirm =
-        !isRejected && order.needsDeliveryCashConfirm;
+        canOperate && !isRejected && order.needsDeliveryCashConfirm;
     final deliveryCashOk =
         !isUpiSplit || order.deliveryCharge <= 0 || order.deliveryCashConfirmed;
     final foodUpiOk = !isUpiSplit || order.foodUpiConfirmed;
-    final canComplete = !isRejected &&
+    final canComplete = canOperate &&
+        !isRejected &&
         lifecycle.showComplete &&
         (!isCash || cashPaid) &&
         foodUpiOk &&
         deliveryCashOk;
-    final hasSellerAction =
+    final hasSellerAction = canOperate &&
         !isRejected &&
         (lifecycle.showAccept || payment.showMarkReady || canComplete);
     final rejectLocked = widget.rejectBusy || isRejected;
-    final canReject = !isRejected &&
+    final canReject = canOperate &&
+        widget.onReject != null &&
+        !isRejected &&
         (lifecycle.showReject || order.sellerCanDecline || widget.rejectBusy);
-    final canSetReadyBy = !isRejected && payment.canSetReadyBy;
-    final showUpiConfirm = !isRejected && payment.showConfirmOrderAndChooseTime;
+    final canSetReadyBy =
+        canOperate && widget.onReadyBy != null && !isRejected && payment.canSetReadyBy;
+    final showUpiConfirm =
+        canOperate && !isRejected && payment.showConfirmOrderAndChooseTime;
     // Accepted and Buyer paid chips already say this. The extra headline
     // and "buyer marked paid" banner only repeat those chips.
     final showStatusCopy =
@@ -3196,7 +3388,9 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
               width: double.infinity,
               height: 42,
               child: OutlinedButton.icon(
-                onPressed: _isUpdating ? null : () => widget.onReadyBy(order),
+                onPressed: _isUpdating
+                    ? null
+                    : () => widget.onReadyBy?.call(order),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF0E5A47),
                   side: const BorderSide(color: Color(0xFFD4E8DF)),
@@ -3226,7 +3420,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                 key: const Key('seller-reject-button'),
                 onPressed: rejectLocked || _isUpdating || widget.rejectBusy
                     ? null
-                    : () => widget.onReject(order),
+                    : () => widget.onReject?.call(order),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: rejectLocked
                       ? const Color(0xFF8A9491)

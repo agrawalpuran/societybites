@@ -56,6 +56,15 @@ const {
   nextDisplayOrderForSeller,
   applySellerCatalogOrder,
 } = require("../lib/listingCatalogOrder");
+const {
+  parseVariantCreatePayload,
+  newVariantGroupId,
+  sortVariantSiblings,
+} = require("../lib/listingVariants");
+const {
+  resolveCreateListingStatus,
+  draftIdsToPublish,
+} = require("../lib/listingPublish");
 
 async function jsonListings(listings, viewerUserId) {
   const withCapacity = await attachMadeToOrderCapacity(prisma, listings);
@@ -157,7 +166,7 @@ router.get(
     if (status === "all") {
       // Seller management view: exclude soft-deleted (inactive) only
       statusFilter = {
-        status: { in: ["active", "paused", "sold_out", "expired"] },
+        status: { in: ["draft", "active", "paused", "sold_out", "expired"] },
       };
     } else if (status === "discoverable") {
       // Buyer marketplace: currently orderable plus expired (visible, not orderable)
@@ -238,6 +247,55 @@ router.get(
 );
 
 router.get(
+  "/:id/variants",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const societyId = requireJoinedSociety(req, res);
+    if (!societyId) return;
+
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        societyId: true,
+        sellerId: true,
+        variantGroupId: true,
+        catalogType: true,
+        campaignId: true,
+        status: true,
+      },
+    });
+
+    if (!listing || listing.societyId !== societyId) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    const isOwner = listing.sellerId === req.user.id;
+    if (!isRegularMarketplaceListing(listing) && !isOwner) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    if (!listing.variantGroupId) {
+      const full = await prisma.listing.findUnique({
+        where: { id: listing.id },
+        include: listingInclude,
+      });
+      return res.json(await jsonListings([full], req.user.id));
+    }
+
+    const siblings = await prisma.listing.findMany({
+      where: {
+        variantGroupId: listing.variantGroupId,
+        sellerId: listing.sellerId,
+        ...(isOwner ? {} : { status: { in: DISCOVERABLE_STATUSES } }),
+      },
+      include: listingInclude,
+    });
+    res.json(await jsonListings(sortVariantSiblings(siblings), req.user.id));
+  })
+);
+
+router.get(
   "/:id",
   requireUser,
   asyncHandler(async (req, res) => {
@@ -255,6 +313,9 @@ router.get(
 
     const isOwner = listing.sellerId === req.user.id;
     if (!isRegularMarketplaceListing(listing) && !isOwner) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+    if (listing.status === "draft" && !isOwner) {
       return res.status(404).json({ error: "Listing not found" });
     }
 
@@ -352,27 +413,71 @@ router.post(
         ? await nextDisplayOrderForSeller(prisma, req.user.id)
         : null;
 
+    let variantPayload;
+    try {
+      variantPayload = parseVariantCreatePayload({
+        variants: req.body.variants,
+        variantInventoryMode: req.body.variantInventoryMode,
+        sharedPoolQuantity: req.body.sharedPoolQuantity,
+        sharedPoolUnit: req.body.sharedPoolUnit,
+      });
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+
+    const createStatus = resolveCreateListingStatus(req.body);
+
+    const sharedData = {
+      sellerId: req.user.id,
+      societyId: req.user.societyId,
+      name,
+      description,
+      availableAt: availableAtDate,
+      pickupLocation: pickupLocation || "My Home (Verified)",
+      imageUrl,
+      tags: listingTags,
+      foodType: parsedFoodType,
+      status: createStatus,
+      ...categoryWriteFields(parsedCategories),
+      catalogType: parsedCatalogType,
+      ...availabilityFields,
+      ...recurringFields,
+      ...(recurringFields.recurringEnabled ? { availableAt: null } : {}),
+    };
+
+    if (variantPayload) {
+      const variantGroupId = newVariantGroupId();
+      const created = await prisma.$transaction(
+        variantPayload.rows.map((row, index) =>
+          prisma.listing.create({
+            data: {
+              ...sharedData,
+              displayOrder: displayOrder == null ? null : displayOrder + index,
+              price: row.price,
+              quantity: row.quantity,
+              weightUnit: row.weightUnit,
+              weightValue: row.weightValue,
+              variantGroupId,
+              variantLabel: row.variantLabel,
+              variantInventoryMode: row.variantInventoryMode,
+              portionUnits: row.portionUnits,
+            },
+            include: listingInclude,
+          })
+        )
+      );
+      const primary = sortVariantSiblings(created)[0];
+      return res.status(201).json(await jsonListing(primary, req.user.id));
+    }
+
     const listing = await prisma.listing.create({
       data: {
-        sellerId: req.user.id,
-        societyId: req.user.societyId,
+        ...sharedData,
         displayOrder,
-        name,
-        description,
         price: parseFloat(price),
         quantity: storedQuantity,
-        availableAt: availableAtDate,
-        pickupLocation: pickupLocation || "My Home (Verified)",
-        imageUrl,
         weightUnit: weightUnit || null,
         weightValue: weightValue || null,
-        tags: listingTags,
-        foodType: parsedFoodType,
-        ...categoryWriteFields(parsedCategories),
-        catalogType: parsedCatalogType,
-        ...availabilityFields,
-        ...recurringFields,
-        ...(recurringFields.recurringEnabled ? { availableAt: null } : {}),
       },
       include: listingInclude,
     });
@@ -505,6 +610,7 @@ router.patch(
       status,
       weightUnit,
       weightValue,
+      variantLabel,
       tags,
       category,
       foodType,
@@ -518,6 +624,9 @@ router.patch(
       ...(imageUrl !== undefined && { imageUrl }),
       ...(weightUnit !== undefined && { weightUnit: weightUnit || null }),
       ...(weightValue !== undefined && { weightValue: weightValue || null }),
+      ...(variantLabel !== undefined && {
+        variantLabel: variantLabel ? String(variantLabel).trim() || null : null,
+      }),
       ...(tags !== undefined && { tags: Array.isArray(tags) ? tags : [] }),
       ...(status !== undefined && { status }),
     };
@@ -582,7 +691,81 @@ router.patch(
       include: listingInclude,
     });
 
+    // Keep shared product fields aligned across size siblings.
+    if (updated.variantGroupId) {
+      const shared = {};
+      for (const key of [
+        "name",
+        "description",
+        "imageUrl",
+        "pickupLocation",
+        "tags",
+        "foodType",
+        "category",
+        "categories",
+        "availableAt",
+        "availabilityMode",
+        "preparationTimeMinutes",
+        "maxDailyOrders",
+        "recurringEnabled",
+        "recurringWeekdays",
+        "recurringStartMinute",
+        "recurringEndMinute",
+        "recurringDailyLimit",
+      ]) {
+        if (data[key] !== undefined) shared[key] = data[key];
+      }
+      if (Object.keys(shared).length > 0) {
+        await prisma.listing.updateMany({
+          where: {
+            variantGroupId: updated.variantGroupId,
+            sellerId: req.user.id,
+            id: { not: updated.id },
+          },
+          data: shared,
+        });
+      }
+    }
+
     res.json(await jsonListing(updated, req.user.id));
+  })
+);
+
+router.patch(
+  "/bulk/publish",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const role = req.user.role || "buyer";
+    if (!["seller", "super_admin"].includes(role)) {
+      return res.status(403).json({
+        error: "Enable selling in Profile before managing listings",
+        code: "SELLER_REQUIRED",
+      });
+    }
+
+    const sellerId = req.user.id;
+    const drafts = await prisma.listing.findMany({
+      where: {
+        sellerId,
+        campaignId: null,
+        status: "draft",
+      },
+      select: { id: true },
+    });
+
+    if (drafts.length === 0) {
+      return res.status(400).json({
+        error: "No draft listings to publish.",
+        publishedCount: 0,
+      });
+    }
+
+    const result = await prisma.listing.updateMany({
+      where: { id: { in: drafts.map((row) => row.id) }, sellerId },
+      data: { status: "active" },
+    });
+
+    res.json({ publishedCount: result.count });
   })
 );
 
@@ -685,6 +868,49 @@ router.patch(
 );
 
 router.patch(
+  "/:id/publish",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    let listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      include: listingInclude,
+    });
+
+    if (!listing) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    if (listing.sellerId !== req.user.id) {
+      return res.status(403).json({ error: "Not allowed to publish this listing" });
+    }
+
+    if (await rejectCommittedCampaignProductMutation(listing, res)) return;
+
+    if (listing.status === "active") {
+      return res.status(400).json({ error: "Listing is already published" });
+    }
+
+    if (listing.status !== "draft") {
+      return res.status(400).json({
+        error: `Cannot publish a listing with status "${listing.status}"`,
+      });
+    }
+
+    const ids = await draftIdsToPublish(prisma, listing);
+    await prisma.listing.updateMany({
+      where: { id: { in: ids }, sellerId: req.user.id },
+      data: { status: "active" },
+    });
+
+    const updated = await prisma.listing.findUnique({
+      where: { id: listing.id },
+      include: listingInclude,
+    });
+    res.json(await jsonListing(updated, req.user.id));
+  })
+);
+
+router.patch(
   "/:id/pause",
   requireUser,
   asyncHandler(async (req, res) => {
@@ -710,6 +936,12 @@ router.patch(
 
     if (listing.status === "inactive") {
       return res.status(400).json({ error: "Cannot pause a removed listing" });
+    }
+
+    if (listing.status === "draft") {
+      return res.status(400).json({
+        error: "Publish this listing before pausing it.",
+      });
     }
 
     if (listing.status === "expired") {

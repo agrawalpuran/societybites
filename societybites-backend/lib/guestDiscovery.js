@@ -6,7 +6,7 @@ const { withoutAutomatedTestListings } = require("./testListingNames");
 const { evaluateRecurringAvailability, attachRecurringAvailability } = require("./recurringAvailability");
 const { sortSellerCatalogListings } = require("./listingCatalogOrder");
 
-const GUEST_REACH_LEVELS = ["NEARBY", "EXTENDED"];
+const { SELLING_REACH_LEVELS } = require("./sellingReach");
 
 const ACTIVE_REGULAR_LISTING_WHERE = {
   status: { in: DISCOVERABLE_STATUSES },
@@ -110,7 +110,9 @@ async function serializeGuestKitchen(seller) {
 function matchesGuestEligibility(seller, cityKey) {
   if (!seller) return false;
   if (!["seller", "super_admin"].includes(seller.role || "")) return false;
-  if (!GUEST_REACH_LEVELS.includes(seller.sellingReachLevel || "")) return false;
+  if ((seller.sellingReachLevel || "") === SELLING_REACH_LEVELS.MY_SOCIETY) {
+    return false;
+  }
   if (canonicalCityKey(seller.society && seller.society.city) !== cityKey) {
     return false;
   }
@@ -142,7 +144,7 @@ async function discoverGuestKitchens({ query } = {}) {
   const sellers = await prisma.user.findMany({
     where: {
       role: { in: ["seller", "super_admin"] },
-      sellingReachLevel: { in: GUEST_REACH_LEVELS },
+      sellingReachLevel: { not: SELLING_REACH_LEVELS.MY_SOCIETY },
       societyId: { in: societyIds },
       listings: { some: ACTIVE_REGULAR_LISTING_WHERE },
     },
@@ -201,7 +203,6 @@ async function getGuestKitchenStorefront({ sellerId, query } = {}) {
 }
 
 module.exports = {
-  GUEST_REACH_LEVELS,
   ACTIVE_REGULAR_LISTING_WHERE,
   discoverGuestKitchens,
   getGuestKitchenStorefront,

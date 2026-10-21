@@ -13,6 +13,24 @@ function serializeOrderForUser(order, userId) {
   return serializeOrder(order, { viewerUserId: userId });
 }
 const { loadSellerInsights } = require("../lib/sellerInsights");
+const {
+  canViewKitchenAsOwner,
+  canViewOrderAsOwnerStaff,
+} = require("../lib/sellerStaff");
+const {
+  isSharedVariantInventory,
+  orderableQuantity,
+  reserveSharedPool,
+  restoreSharedPool,
+} = require("../lib/listingVariants");
+const {
+  getReconciliationSummary,
+  listReconciliationOrders,
+  assertSellerOwnsOrder,
+  canSendPaymentReminder,
+  orderInclude: reconciliationOrderInclude,
+} = require("../lib/sellerPaymentReconciliation");
+const { notifyPaymentReminder } = require("../utils/notifications");
 const { getPlatformFee } = require("../lib/platformFee");
 const { expireListingIfDue } = require("../utils/listingExpiry");
 const {
@@ -202,6 +220,10 @@ async function restoreReservedInventory(tx, items) {
   for (const item of items) {
     if (!shouldRestoreListingInventory(item.listing)) continue;
     if (isRecurringReadyNowListing(item.listing)) continue;
+    if (isSharedVariantInventory(item.listing)) {
+      await restoreSharedPool(tx, item.listing, item.quantity);
+      continue;
+    }
     await tx.listing.update({
       where: { id: item.listingId },
       data: {
@@ -253,6 +275,26 @@ const orderIncludeForCreate = {
   couponRedemptions: orderInclude.couponRedemptions,
 };
 
+/**
+ * Resolve which seller kitchen to read. Default = caller's own kitchen (unchanged).
+ * Optional kitchenSellerId only works for active owner staff (view-only).
+ */
+async function resolveSellerKitchenId(req, res) {
+  const kitchenSellerId = String(req.query.kitchenSellerId || "").trim();
+  if (!kitchenSellerId) return req.user.id;
+  if (kitchenSellerId === req.user.id) return req.user.id;
+  const allowed = await canViewKitchenAsOwner(
+    prisma,
+    req.user.id,
+    kitchenSellerId
+  );
+  if (!allowed) {
+    res.status(403).json({ error: "Not allowed to view this kitchen" });
+    return null;
+  }
+  return kitchenSellerId;
+}
+
 router.get(
   "/",
   requireUser,
@@ -260,9 +302,12 @@ router.get(
     const { role = "buyer", status, scope } = req.query;
 
     if (role === "seller") {
+      const sellerId = await resolveSellerKitchenId(req, res);
+      if (!sellerId) return;
+
       if (scope) {
         const page = await listSellerOrders(prisma, {
-          sellerId: req.user.id,
+          sellerId,
           scope,
           status,
           page: req.query.page,
@@ -286,7 +331,7 @@ router.get(
         where: {
           items: {
             some: {
-              listing: { sellerId: req.user.id },
+              listing: { sellerId },
             },
           },
           ...(status && { status: String(status) }),
@@ -319,7 +364,8 @@ router.get(
   "/seller/stats",
   requireUser,
   asyncHandler(async (req, res) => {
-    const sellerId = req.user.id;
+    const sellerId = await resolveSellerKitchenId(req, res);
+    if (!sellerId) return;
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfWeek = new Date(startOfToday);
@@ -428,9 +474,11 @@ router.get(
   "/seller/insights",
   requireUser,
   asyncHandler(async (req, res) => {
+    const sellerId = await resolveSellerKitchenId(req, res);
+    if (!sellerId) return;
     try {
       const insights = await loadSellerInsights(prisma, {
-        sellerId: req.user.id,
+        sellerId,
         preset: req.query.preset,
         from: req.query.from,
         to: req.query.to,
@@ -446,6 +494,94 @@ router.get(
 );
 
 router.get(
+  "/seller/reconciliation/summary",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const sellerId = await resolveSellerKitchenId(req, res);
+    if (!sellerId) return;
+    const payload = await getReconciliationSummary(prisma, sellerId, req.query);
+    res.json(payload);
+  })
+);
+
+router.get(
+  "/seller/reconciliation/orders",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const sellerId = await resolveSellerKitchenId(req, res);
+    if (!sellerId) return;
+    const payload = await listReconciliationOrders(prisma, sellerId, req.query);
+    res.json(payload);
+  })
+);
+
+router.post(
+  "/seller/reconciliation/orders/:orderId/payment-reminder",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const sellerId = req.user.id;
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.orderId },
+      include: reconciliationOrderInclude,
+    });
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    if (!assertSellerOwnsOrder(order, sellerId)) {
+      return res.status(403).json({ error: "Not your order" });
+    }
+
+    const eligibility = canSendPaymentReminder(order);
+    if (!eligibility.ok) {
+      if (eligibility.reason === "ALREADY_PAID") {
+        return res.status(400).json({
+          error: "Payment is already recorded for this order",
+          code: eligibility.reason,
+        });
+      }
+      if (eligibility.reason === "COOLDOWN") {
+        return res.status(429).json({
+          error: "A reminder was sent recently. Try again later.",
+          code: eligibility.reason,
+          retryAfterMs: eligibility.retryAfterMs,
+        });
+      }
+      return res.status(400).json({
+        error: "This order cannot receive a payment reminder",
+        code: eligibility.reason,
+      });
+    }
+
+    const tokenCount = await prisma.deviceToken.count({
+      where: { userId: order.buyerId, active: true },
+    });
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: { lastPaymentReminderAt: new Date() },
+      include: reconciliationOrderInclude,
+    });
+
+    if (tokenCount > 0) {
+      void flushNotification(notifyPaymentReminder(updated));
+    }
+
+    res.json({
+      success: true,
+      reminderSentAt: updated.lastPaymentReminderAt,
+      notification: {
+        attempted: tokenCount > 0,
+        hasActiveDeviceTokens: tokenCount > 0,
+        message:
+          tokenCount > 0
+            ? "Reminder sent to the buyer's registered devices."
+            : "No active app devices for this buyer. They may not receive a push notification.",
+      },
+    });
+  })
+);
+
+router.get(
   "/:id/messages",
   requireUser,
   asyncHandler(async (req, res) => {
@@ -456,7 +592,18 @@ router.get(
       },
     });
 
-    assertOrderParticipant(order, req.user.id);
+    let isOwnerStaffViewer = false;
+    try {
+      assertOrderParticipant(order, req.user.id);
+    } catch (err) {
+      if (err.statusCode !== 403) throw err;
+      isOwnerStaffViewer = await canViewOrderAsOwnerStaff(
+        prisma,
+        req.user.id,
+        order
+      );
+      if (!isOwnerStaffViewer) throw err;
+    }
 
     const rows = await prisma.message.findMany({
       where: { orderId: order.id },
@@ -464,6 +611,9 @@ router.get(
     });
 
     res.json(rows.map((row) => serializeMessage(row, order)));
+
+    // Owner staff may read but should not clear the kitchen's unread state.
+    if (isOwnerStaffViewer) return;
 
     try {
       await prisma.message.updateMany({
@@ -525,8 +675,12 @@ router.get(
     const isSeller = order.items.some(
       (item) => item.listing.sellerId === req.user.id
     );
+    const isOwnerStaff =
+      !isBuyer &&
+      !isSeller &&
+      (await canViewOrderAsOwnerStaff(prisma, req.user.id, order));
 
-    if (!isBuyer && !isSeller) {
+    if (!isBuyer && !isSeller && !isOwnerStaff) {
       return res.status(403).json({ error: "Not allowed to view this order" });
     }
 
@@ -727,13 +881,14 @@ router.post(
       const enforceStock =
         (orderType === "regular" || current.inventoryMode === "limited") &&
         !isRecurringReadyNowListing(current);
-      if (enforceStock && quantity > current.quantity) {
+      const available = orderableQuantity(current);
+      if (enforceStock && quantity > available) {
         return res.status(409).json({
           error:
-            current.quantity === 0
+            available === 0
               ? `"${current.name}" is sold out`
-              : `Only ${current.quantity} portions are available for "${current.name}".`,
-          availableQuantity: current.quantity,
+              : `Only ${available} portions are available for "${current.name}".`,
+          availableQuantity: available,
         });
       }
 
@@ -944,6 +1099,11 @@ router.post(
             (orderType === "regular" || listing.inventoryMode === "limited") &&
             !isRecurringReadyNowListing(listing);
           if (!reserveStock) continue;
+
+          if (isSharedVariantInventory(listing)) {
+            await reserveSharedPool(tx, listing, quantity);
+            continue;
+          }
 
           const updated = await tx.listing.updateMany({
             where: {

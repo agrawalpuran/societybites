@@ -10,6 +10,7 @@ import '../widgets/listing_portion_caption.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/recurring_availability_hint.dart';
 import '../widgets/listing_cart_controls.dart';
+import '../utils/listing_portion_label.dart';
 import 'web_breakpoints.dart';
 
 class WebFoodCard extends StatelessWidget {
@@ -200,7 +201,10 @@ class WebFoodCard extends StatelessWidget {
                       child: MarketplacePurchaseSlot(
                         food: food,
                         cartQty: cartQty,
-                        addButton: ListingCartAddButton(onPressed: onAdd),
+                        addButton: ListingCartAddButton(
+                          onPressed: onAdd,
+                          optionsLabel: listingOptionsLabel(food),
+                        ),
                         qtyStepper: ListingCartQtyStepper(
                           qty: cartQty,
                           onIncrement: onAdd,
@@ -398,7 +402,10 @@ class _ReadyCard extends StatelessWidget {
                             child: MarketplacePurchaseSlot(
                               food: food,
                               cartQty: cartQty,
-                              addButton: ListingCartAddButton(onPressed: onAdd),
+                              addButton: ListingCartAddButton(
+                                onPressed: onAdd,
+                                optionsLabel: listingOptionsLabel(food),
+                              ),
                               qtyStepper: ListingCartQtyStepper(
                                 qty: cartQty,
                                 onIncrement: onAdd,

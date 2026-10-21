@@ -1,5 +1,6 @@
 const {
   ANDROID_CHANNEL_ID,
+  ANDROID_NEW_ORDER_CHANNEL_ID,
   buildFcmMessage,
   formatNotificationTime,
 } = require("../utils/notifications");
@@ -30,6 +31,31 @@ assert(message.apns.headers["apns-push-type"] === "alert", "apns push type");
 assert(message.apns.headers["apns-priority"] === "10", "apns priority");
 assert(message.apns.payload.aps.sound === "default", "apns sound");
 assert(message.apns.payload.aps.alert.title === "Order confirmed", "apns title");
+
+const urgent = buildFcmMessage("x".repeat(40), {
+  title: "New order — accept now",
+  body: "Order SB-1 is waiting.",
+  data: {
+    type: "order_update",
+    orderId: "ord-2",
+    notificationType: "order_created",
+    urgent: "1",
+  },
+  urgent: true,
+});
+assert(
+  ANDROID_NEW_ORDER_CHANNEL_ID === "societybites_new_orders",
+  "new order channel constant"
+);
+assert(
+  urgent.android.notification.channelId === ANDROID_NEW_ORDER_CHANNEL_ID,
+  "urgent uses new-order channel"
+);
+assert(urgent.android.notification.priority === "max", "urgent android priority");
+assert(
+  urgent.apns.payload.aps.interruptionLevel === "time-sensitive",
+  "urgent iOS interruption"
+);
 
 // 12:30 UTC is 6:00 PM IST. Host-local toLocaleString() would print the UTC clock.
 assert(

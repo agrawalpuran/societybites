@@ -66,6 +66,8 @@ IconData _iconFor(String label) {
       return Icons.event_available_outlined;
     case 'Snacks':
       return Icons.cookie_outlined;
+    case 'Dairy':
+      return Icons.egg_outlined;
     case 'Desserts':
       return Icons.cake_outlined;
     case 'Beverages':

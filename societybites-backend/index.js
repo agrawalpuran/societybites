@@ -22,6 +22,7 @@ const issueRoutes = require("./routes/issues");
 const couponRoutes = require("./routes/coupons");
 const fssaiRoutes = require("./routes/fssai");
 const preorderCampaignRoutes = require("./routes/preorderCampaigns");
+const sellerStaffRoutes = require("./routes/sellerStaff");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -119,6 +120,7 @@ app.use("/devices", deviceRoutes);
 app.use("/issues", issueRoutes);
 app.use("/coupons", couponRoutes);
 app.use("/fssai", fssaiRoutes);
+app.use("/seller-staff", sellerStaffRoutes);
 app.use("/festival-banners", require("./routes/festivalBanners"));
 
 app.use((err, _req, res, _next) => {

@@ -29,6 +29,8 @@ class MyListingsScreen extends StatefulWidget {
     this.updateCatalog,
     this.pauseAllListings,
     this.resumeAllListings,
+    this.publishAllDraftListings,
+    this.publishListing,
     this.ensureCanCreateListing,
     this.saveCatalogOrder,
   });
@@ -45,6 +47,12 @@ class MyListingsScreen extends StatefulWidget {
 
   /// Test seam. Production uses [ApiService.resumeAllListings].
   final Future<Map<String, dynamic>> Function()? resumeAllListings;
+
+  /// Test seam. Production uses [ApiService.publishAllDraftListings].
+  final Future<Map<String, dynamic>> Function()? publishAllDraftListings;
+
+  /// Test seam. Production uses [ApiService.publishListing].
+  final Future<Map<String, dynamic>> Function(String listingId)? publishListing;
 
   /// Test seam. Production uses [SellerOnboarding.ensureCanCreateListing].
   final Future<bool> Function(BuildContext context)? ensureCanCreateListing;
@@ -408,6 +416,100 @@ class MyListingsScreenState extends State<MyListingsScreen>
     }
   }
 
+  int get _draftCount => _listings.where((item) => item.isDraft).length;
+
+  Future<void> _publishListing(FoodItem listing) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Publish listing?'),
+        content: Text(
+          '"${listing.name}" will become visible to buyers in your society.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Publish'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final publish =
+          widget.publishListing ?? ApiService.publishListing;
+      await publish(listing.id);
+      await _loadListings();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Listing published')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not publish: ${_cleanError(e)}')),
+      );
+    }
+  }
+
+  Future<void> _publishAllDrafts() async {
+    final count = _draftCount;
+    if (count == 0) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Publish all drafts?'),
+        content: Text(
+          count == 1
+              ? '1 draft will go live for buyers.'
+              : '$count drafts will go live for buyers.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Publish all'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _bulkBusy = true);
+    try {
+      final publishAll =
+          widget.publishAllDraftListings ?? ApiService.publishAllDraftListings;
+      final result = await publishAll();
+      await _loadListings();
+      if (!mounted) return;
+      final published = result['publishedCount'];
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            published is num && published > 0
+                ? 'Published $published listing${published == 1 ? '' : 's'}'
+                : 'Drafts published',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not publish drafts: ${_cleanError(e)}')),
+      );
+    } finally {
+      if (mounted) setState(() => _bulkBusy = false);
+    }
+  }
+
   Future<void> _pauseAllListings() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -568,6 +670,42 @@ class MyListingsScreenState extends State<MyListingsScreen>
                 ),
               ),
             ),
+            if (_draftCount > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                child: Material(
+                  color: const Color(0xFFFFF8E8),
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _draftCount == 1
+                                ? '1 draft ready — publish when your catalog looks right.'
+                                : '$_draftCount drafts ready — publish when your catalog looks right.',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF9A6B00),
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          key: const Key('my-listings-publish-all-drafts'),
+                          onPressed: _bulkBusy ? null : _publishAllDrafts,
+                          child: const Text(
+                            'Publish all',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
               child: Row(
@@ -818,6 +956,7 @@ class MyListingsScreenState extends State<MyListingsScreen>
                   listing: listing,
                   onEdit: () => _openEditor(listing),
                   onDelete: () => _deleteListing(listing),
+                  onPublish: () => _publishListing(listing),
                   onPause: () => _pauseListing(listing),
                   onResume: () => _resumeListing(listing),
                   onRenew: () => _renewListing(listing),
@@ -837,6 +976,7 @@ class _SellerListingCard extends StatelessWidget {
     required this.listing,
     required this.onEdit,
     required this.onDelete,
+    required this.onPublish,
     required this.onPause,
     required this.onResume,
     required this.onRenew,
@@ -846,6 +986,7 @@ class _SellerListingCard extends StatelessWidget {
   final FoodItem listing;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onPublish;
   final VoidCallback onPause;
   final VoidCallback onResume;
   final VoidCallback onRenew;
@@ -855,6 +996,7 @@ class _SellerListingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isPaused = listing.isPaused;
     final isExpired = listing.isExpired;
+    final canPublish = listing.isDraft;
     final canPause = listing.isActive || listing.status == 'sold_out';
     final canResume = isPaused;
     final canRenew = isExpired;
@@ -962,9 +1104,11 @@ class _SellerListingCard extends StatelessWidget {
           const SizedBox(height: 12),
           _ListingCardActions(
             listing: listing,
+            canPublish: canPublish,
             canPause: canPause,
             canResume: canResume,
             canRenew: canRenew,
+            onPublish: onPublish,
             onPause: onPause,
             onResume: onResume,
             onRenew: onRenew,
@@ -981,9 +1125,11 @@ class _SellerListingCard extends StatelessWidget {
 class _ListingCardActions extends StatelessWidget {
   const _ListingCardActions({
     required this.listing,
+    required this.canPublish,
     required this.canPause,
     required this.canResume,
     required this.canRenew,
+    required this.onPublish,
     required this.onPause,
     required this.onResume,
     required this.onRenew,
@@ -993,9 +1139,11 @@ class _ListingCardActions extends StatelessWidget {
   });
 
   final FoodItem listing;
+  final bool canPublish;
   final bool canPause;
   final bool canResume;
   final bool canRenew;
+  final VoidCallback onPublish;
   final VoidCallback onPause;
   final VoidCallback onResume;
   final VoidCallback onRenew;
@@ -1008,31 +1156,39 @@ class _ListingCardActions extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final stackEditDelete = constraints.maxWidth < 360;
-        final statusButton = canPause
+        final statusButton = canPublish
             ? _ListingPillButton(
-                icon: Icons.pause_circle_outline,
-                label: 'Pause',
-                foreground: const Color(0xFFB86A00),
-                background: const Color(0xFFFFF3E0),
-                onTap: onPause,
+                icon: Icons.publish_rounded,
+                label: 'Publish',
+                foreground: const Color(0xFF0E5A47),
+                background: const Color(0xFFE8F5EE),
+                onTap: onPublish,
               )
-            : canResume
+            : canPause
                 ? _ListingPillButton(
-                    icon: Icons.play_circle_outline,
-                    label: 'Resume',
-                    foreground: const Color(0xFF0E5A47),
-                    background: const Color(0xFFE8F5EE),
-                    onTap: onResume,
+                    icon: Icons.pause_circle_outline,
+                    label: 'Pause',
+                    foreground: const Color(0xFFB86A00),
+                    background: const Color(0xFFFFF3E0),
+                    onTap: onPause,
                   )
-                : canRenew
+                : canResume
                     ? _ListingPillButton(
-                        icon: Icons.refresh_rounded,
-                        label: 'Renew',
-                        foreground: const Color(0xFF3A4644),
-                        background: const Color(0xFFF0F2F1),
-                        onTap: onRenew,
+                        icon: Icons.play_circle_outline,
+                        label: 'Resume',
+                        foreground: const Color(0xFF0E5A47),
+                        background: const Color(0xFFE8F5EE),
+                        onTap: onResume,
                       )
-                    : null;
+                    : canRenew
+                        ? _ListingPillButton(
+                            icon: Icons.refresh_rounded,
+                            label: 'Renew',
+                            foreground: const Color(0xFF3A4644),
+                            background: const Color(0xFFF0F2F1),
+                            onTap: onRenew,
+                          )
+                        : null;
 
         final moveButton = _ListingPillButton(
           icon: Icons.swap_horiz_rounded,
@@ -1226,6 +1382,11 @@ class _StatusBadge extends StatelessWidget {
     late final Color fg;
 
     switch (listing.status) {
+      case 'draft':
+        label = 'DRAFT';
+        bg = const Color(0xFFFFF8E8);
+        fg = const Color(0xFF9A6B00);
+        break;
       case 'paused':
         label = 'PAUSED';
         bg = const Color(0xFFFFF3E0);

@@ -247,12 +247,11 @@ class _SellerOlderOrdersScreenState extends State<SellerOlderOrdersScreen> {
             return SellerActiveOrderCard(
               key: ValueKey(order.id),
               order: order,
-              onAction: widget.onAction ??
-                  (_, __, {deliveryCharge, deliveryCollectBy}) async {},
-              onOrderUpdated: widget.onOrderUpdated ?? (_) {},
-              onPaymentConfirmed: widget.onPaymentConfirmed ?? () async {},
-              onReject: _reject,
-              onReadyBy: widget.onReadyBy ?? (_) async {},
+              onAction: widget.onAction,
+              onOrderUpdated: widget.onOrderUpdated,
+              onPaymentConfirmed: widget.onPaymentConfirmed,
+              onReject: widget.onReject == null ? null : _reject,
+              onReadyBy: widget.onReadyBy,
               rejectBusy: _rejectingOrderId == order.id,
             );
           }

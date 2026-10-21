@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../web/web_breakpoints.dart';
@@ -20,7 +22,7 @@ import '../widgets/one_seller_cart.dart';
 import '../widgets/screen_loading_note.dart';
 import '../widgets/seller_avatar.dart';
 
-class FoodDetailScreen extends StatelessWidget {
+class FoodDetailScreen extends StatefulWidget {
   const FoodDetailScreen({
     super.key,
     required this.food,
@@ -33,9 +35,42 @@ class FoodDetailScreen extends StatelessWidget {
   final bool requireAuthToOrder;
 
   @override
+  State<FoodDetailScreen> createState() => _FoodDetailScreenState();
+}
+
+class _FoodDetailScreenState extends State<FoodDetailScreen> {
+  late FoodItem _food;
+  List<FoodItem> _variants = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _food = widget.food;
+    if (widget.food.variantGroupId != null) {
+      unawaited(_loadVariants());
+    }
+  }
+
+  Future<void> _loadVariants() async {
+    try {
+      final rows = await ApiService.getListingVariants(widget.food.id);
+      if (!mounted || rows.isEmpty) return;
+      final variants = rows.map(FoodItem.fromJson).toList();
+      final match = variants.where((v) => v.id == _food.id);
+      setState(() {
+        _variants = variants;
+        if (match.isNotEmpty) _food = match.first;
+      });
+    } catch (_) {
+      // Detail still works with the opened listing alone.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (useWebMarketplaceLayout(context)) return _buildWebDetail(context);
     final size = MediaQuery.of(context).size;
+    final food = _food;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
@@ -48,9 +83,17 @@ class FoodDetailScreen extends StatelessWidget {
                 SliverToBoxAdapter(
                   child: _HeroSection(food: food, size: size),
                 ),
+                if (_variants.length > 1)
+                  SliverToBoxAdapter(
+                    child: _VariantPicker(
+                      variants: _variants,
+                      selectedId: food.id,
+                      onSelected: (next) => setState(() => _food = next),
+                    ),
+                  ),
                 SliverToBoxAdapter(child: _QuickInfoRow(food: food)),
                 SliverToBoxAdapter(
-                  child: _SellerCard(food: food, onTap: onSellerTap),
+                  child: _SellerCard(food: food, onTap: widget.onSellerTap),
                 ),
                 SliverToBoxAdapter(child: _StorySection(food: food)),
                 SliverToBoxAdapter(child: _ReviewsSection(food: food)),
@@ -58,22 +101,35 @@ class FoodDetailScreen extends StatelessWidget {
               ],
             ),
           ),
-          _BottomCta(food: food, requireAuthToOrder: requireAuthToOrder),
+          _BottomCta(
+            food: food,
+            requireAuthToOrder: widget.requireAuthToOrder,
+          ),
         ],
       ),
     );
   }
 
   Widget _buildWebDetail(BuildContext context) {
+    final food = _food;
     final info = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_variants.length > 1)
+          _VariantPicker(
+            variants: _variants,
+            selectedId: food.id,
+            onSelected: (next) => setState(() => _food = next),
+          ),
         _QuickInfoRow(food: food),
-        _SellerCard(food: food, onTap: onSellerTap),
+        _SellerCard(food: food, onTap: widget.onSellerTap),
         _StorySection(food: food),
         _ReviewsSection(food: food),
         const SizedBox(height: 16),
-        _BottomCta(food: food, requireAuthToOrder: requireAuthToOrder),
+        _BottomCta(
+          food: food,
+          requireAuthToOrder: widget.requireAuthToOrder,
+        ),
       ],
     );
     final image = ListingImage(
@@ -273,6 +329,127 @@ class _CircleButton extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: Icon(icon, size: 20, color: const Color(0xFF3A4644)),
+      ),
+    );
+  }
+}
+
+class _VariantPicker extends StatelessWidget {
+  const _VariantPicker({
+    required this.variants,
+    required this.selectedId,
+    required this.onSelected,
+  });
+
+  final List<FoodItem> variants;
+  final String selectedId;
+  final ValueChanged<FoodItem> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'CHOOSE SIZE',
+            style: TextStyle(
+              fontSize: 11,
+              letterSpacing: 1.1,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF6A7774),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final option in variants)
+                _VariantChip(
+                  label: portionLabelForFood(option) ??
+                      option.variantLabel ??
+                      'Option',
+                  price: option.price,
+                  selected: option.id == selectedId,
+                  enabled: option.canAddToCart && !option.isKitchenClosed,
+                  onTap: () => onSelected(option),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VariantChip extends StatelessWidget {
+  const _VariantChip({
+    required this.label,
+    required this.price,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String label;
+  final double price;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = selected
+        ? const Color(0xFF0E5A47)
+        : enabled
+            ? Colors.white
+            : const Color(0xFFF0F3F2);
+    final fg = selected
+        ? Colors.white
+        : enabled
+            ? const Color(0xFF101617)
+            : const Color(0xFF8A9491);
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: enabled || selected ? onTap : null,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected
+                  ? const Color(0xFF0E5A47)
+                  : const Color(0xFFD8E0DD),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '₹${price.toStringAsFixed(0)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? const Color(0xFFB8F0D4) : fg,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

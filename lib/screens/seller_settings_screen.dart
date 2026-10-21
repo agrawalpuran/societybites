@@ -8,6 +8,7 @@ import '../widgets/app_header.dart';
 import '../widgets/kitchen_hours_sheet.dart';
 import '../widgets/profile_menu_tile.dart';
 import '../widgets/seller_first_time_setup_form.dart';
+import 'seller_owner_access_screen.dart';
 
 /// Navigation container for seller settings. Save behaviour stays on Profile —
 /// this screen groups entry points (existing sellers) or inline setup (first time).
@@ -41,7 +42,7 @@ class SellerSettingsScreen extends StatelessWidget {
     this.onUpiDetailsChanged,
     this.onUpiConfirmed,
     this.onUpiConfirmationInvalidated,
-    this.sellingReachLevel,
+    this.sellingReachPreference,
     this.sellingReach,
     this.onSellingReachChanged,
     this.fulfilment,
@@ -83,9 +84,9 @@ class SellerSettingsScreen extends StatelessWidget {
   final void Function(String upiId, String displayName)? onUpiDetailsChanged;
   final VoidCallback? onUpiConfirmed;
   final VoidCallback? onUpiConfirmationInvalidated;
-  final SellingReachLevel? sellingReachLevel;
+  final SellerReachPreference? sellingReachPreference;
   final SellingReach? sellingReach;
-  final ValueChanged<SellingReachLevel>? onSellingReachChanged;
+  final ValueChanged<SellerReachPreference>? onSellingReachChanged;
   final SellerFulfilment? fulfilment;
   final ValueChanged<SellerFulfilment>? onFulfilmentChanged;
   final String? kitchenOpensAt;
@@ -102,7 +103,7 @@ class SellerSettingsScreen extends StatelessWidget {
         paymentPreference != null &&
         onPaymentPreferenceChanged != null &&
         onUpiDetailsChanged != null &&
-        sellingReachLevel != null &&
+        sellingReachPreference != null &&
         sellingReach != null &&
         onSellingReachChanged != null &&
         fulfilment != null &&
@@ -196,9 +197,9 @@ class SellerSettingsScreen extends StatelessWidget {
                         onUpiConfirmationInvalidated:
                             onUpiConfirmationInvalidated,
                         upiIdConfirmed: upiIdConfirmed,
-                        sellingReachLevel: sellingReachLevel!,
+                        sellingReachPreference: sellingReachPreference!,
                         sellingReach: sellingReach!,
-                        onReachChanged: onSellingReachChanged!,
+                        onReachPreferenceChanged: onSellingReachChanged!,
                         fulfilment: fulfilment!,
                         onFulfilmentChanged: onFulfilmentChanged!,
                         kitchenOpensAt: kitchenOpensAt,
@@ -254,6 +255,21 @@ class SellerSettingsScreen extends StatelessWidget {
                         subtitle: kitchenHoursSubtitle,
                         trailingLabel: 'Change',
                         onTap: onChangeKitchenHours,
+                      ),
+                      ProfileMenuTile(
+                        icon: Icons.manage_accounts_outlined,
+                        title: 'Owner access',
+                        subtitle:
+                            'Invite someone to view your kitchen (view only)',
+                        trailingLabel: 'Manage',
+                        onTap: () {
+                          Navigator.push<void>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SellerOwnerAccessScreen(),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 20),
                       const _SectionLabel('PRIVACY'),

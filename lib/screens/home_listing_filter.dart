@@ -99,7 +99,49 @@ List<FoodItem> applyHomeListingFilters(
     results = results.where((food) => !food.blockedBySellerFssai).toList();
   }
 
-  return results;
+  return collapseListingVariants(results);
+}
+
+/// One Home card per size group. Keeps the cheapest sibling as the representative.
+List<FoodItem> collapseListingVariants(List<FoodItem> listings) {
+  final singles = <FoodItem>[];
+  final groups = <String, List<FoodItem>>{};
+  for (final food in listings) {
+    final groupId = food.variantGroupId?.trim();
+    if (groupId == null || groupId.isEmpty) {
+      singles.add(food);
+      continue;
+    }
+    groups.putIfAbsent(groupId, () => []).add(food);
+  }
+  if (groups.isEmpty) return listings;
+
+  final representatives = <String, FoodItem>{};
+  for (final entry in groups.entries) {
+    final siblings = [...entry.value]
+      ..sort((a, b) => a.price.compareTo(b.price));
+    // Prefer buyable sizes for the Blinkit-style "N options" label.
+    final available = siblings
+        .where((s) => s.canAddToCart && !s.isKitchenClosed)
+        .length;
+    final optionCount = available > 0 ? available : siblings.length;
+    representatives[entry.key] =
+        siblings.first.withVariantOptionCount(optionCount);
+  }
+
+  final seen = <String>{};
+  final out = <FoodItem>[];
+  for (final food in listings) {
+    final groupId = food.variantGroupId?.trim();
+    if (groupId == null || groupId.isEmpty) {
+      out.add(food);
+      continue;
+    }
+    if (seen.contains(groupId)) continue;
+    seen.add(groupId);
+    out.add(representatives[groupId]!);
+  }
+  return out;
 }
 
 /// Buyer Home type filter. All keeps today's feed.
@@ -297,7 +339,14 @@ const homeAllItemsPreviewCount = 12;
 /// Horizontal reach-section preview on Home.
 const homeReachPreviewCount = 6;
 
-enum HomeListingReach { inSociety, nearby, extended }
+enum HomeListingReach { inSociety, beyondSociety, nearby, extended }
+
+extension HomeListingReachBuckets on HomeListingReach {
+  bool get isBeyondSociety =>
+      this == HomeListingReach.beyondSociety ||
+      this == HomeListingReach.nearby ||
+      this == HomeListingReach.extended;
+}
 
 /// Buyer-side Home distance. A null selection means the widest option,
 /// which is today's full feed.
@@ -542,21 +591,20 @@ HomeListingReach? homeListingReachFor(
       listingSociety == buyer) {
     return HomeListingReach.inSociety;
   }
+  if (food.sellerSellingReachLevel?.isBeyondSociety == true) {
+    return HomeListingReach.beyondSociety;
+  }
   final distance = food.distanceKm;
-  final nearbyKm = nearbyRadiusKm;
-  if (distance != null && nearbyKm != null) {
-    if (distance <= nearbyKm) return HomeListingReach.nearby;
-    return HomeListingReach.extended;
+  if (distance != null && distance > 0) {
+    return HomeListingReach.beyondSociety;
   }
-  switch (food.sellerSellingReachLevel) {
-    case SellingReachLevel.nearby:
-      return HomeListingReach.nearby;
-    case SellingReachLevel.extended:
-      return HomeListingReach.extended;
-    case SellingReachLevel.mySociety:
-    case null:
-      return null;
-  }
+  return null;
+}
+
+bool _homeReachMatches(HomeListingReach? band, HomeListingReach want) {
+  if (band == null) return false;
+  if (want.isBeyondSociety) return band.isBeyondSociety;
+  return band == want;
 }
 
 List<FoodItem> listingsForHomeReach(
@@ -567,13 +615,14 @@ List<FoodItem> listingsForHomeReach(
 }) {
   return listings
       .where(
-        (food) =>
-            homeListingReachFor(
-              food,
-              buyerSocietyId: buyerSocietyId,
-              nearbyRadiusKm: nearbyRadiusKm,
-            ) ==
-            reach,
+        (food) => _homeReachMatches(
+          homeListingReachFor(
+            food,
+            buyerSocietyId: buyerSocietyId,
+            nearbyRadiusKm: nearbyRadiusKm,
+          ),
+          reach,
+        ),
       )
       .toList();
 }
@@ -592,10 +641,10 @@ HomeListingReach? homeCampaignReachFor(
   switch (campaign.discoveryReach) {
     case 'inSociety':
       return HomeListingReach.inSociety;
+    case 'beyondSociety':
     case 'nearby':
-      return HomeListingReach.nearby;
     case 'extended':
-      return HomeListingReach.extended;
+      return HomeListingReach.beyondSociety;
   }
   final campaignSociety = campaign.societyId?.trim();
   final buyer = buyerSocietyId?.trim();
@@ -610,10 +659,8 @@ HomeListingReach? homeCampaignReachFor(
   if (distance != null && distance <= 0) {
     return HomeListingReach.inSociety;
   }
-  final nearbyKm = nearbyRadiusKm;
-  if (distance != null && nearbyKm != null) {
-    if (distance <= nearbyKm) return HomeListingReach.nearby;
-    return HomeListingReach.extended;
+  if (distance != null && distance > 0) {
+    return HomeListingReach.beyondSociety;
   }
   return null;
 }
@@ -627,14 +674,15 @@ List<PreOrderCampaign> campaignsForHomeReach(
 }) {
   return campaigns
       .where(
-        (campaign) =>
-            homeCampaignReachFor(
-              campaign,
-              buyerSocietyId: buyerSocietyId,
-              viewerUserId: viewerUserId,
-              nearbyRadiusKm: nearbyRadiusKm,
-            ) ==
-            reach,
+        (campaign) => _homeReachMatches(
+          homeCampaignReachFor(
+            campaign,
+            buyerSocietyId: buyerSocietyId,
+            viewerUserId: viewerUserId,
+            nearbyRadiusKm: nearbyRadiusKm,
+          ),
+          reach,
+        ),
       )
       .toList();
 }

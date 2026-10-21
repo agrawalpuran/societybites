@@ -219,6 +219,7 @@ class _ReorderRow extends StatelessWidget {
   final VoidCallback onMoveDown;
 
   String get _statusLabel {
+    if (item.isDraft) return 'Draft';
     if (item.isExpired) return 'Expired';
     if (item.status == 'paused') return 'Paused';
     if (item.status == 'sold_out') return 'Sold out';

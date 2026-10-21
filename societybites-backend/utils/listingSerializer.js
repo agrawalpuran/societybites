@@ -15,6 +15,10 @@ const {
   sellerHidesFlatNumber,
   shouldExposeSellerFlatNumber,
 } = require("../lib/sellerFlatPrivacy");
+const {
+  isSharedVariantInventory,
+  orderableQuantity,
+} = require("../lib/listingVariants");
 
 const ORDER_ENDED_WITHOUT_FOOD = new Set(["rejected", "cancelled"]);
 
@@ -62,12 +66,17 @@ function serializeListing(listing, options = {}) {
     soldToday: listing.recurringSoldToday || 0,
   });
 
+  const sharedVariant = isSharedVariantInventory(listing);
+  const orderable = orderableQuantity(listing);
   const payload = {
     id: listing.id,
     name: listing.name,
     description: listing.description,
     price: listing.price,
-    quantity: listing.quantity,
+    // Buyer/cart-facing: for SHARED sizes, floor(pool / portionUnits).
+    quantity: orderable,
+    // Raw shared pool remaining (g/ml/units). Null when not SHARED.
+    poolQuantity: sharedVariant ? Number(listing.quantity) || 0 : null,
     availableAt: listing.availableAt,
     pickupLocation: listing.pickupLocation,
     imageUrl: listing.imageUrl,
@@ -75,6 +84,11 @@ function serializeListing(listing, options = {}) {
     inventoryMode: listing.inventoryMode || null,
     weightUnit: listing.weightUnit,
     weightValue: listing.weightValue,
+    variantGroupId: listing.variantGroupId || null,
+    variantLabel: listing.variantLabel || null,
+    variantInventoryMode: listing.variantInventoryMode || null,
+    portionUnits:
+      listing.portionUnits == null ? null : Number(listing.portionUnits),
     tags: listing.tags || [],
     foodType: listing.foodType || null,
     category: listingCategoriesFromRecord(listing)[0] || listing.category || null,

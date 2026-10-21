@@ -120,17 +120,27 @@ function mainUnit() {
   assert(extendedYes.eligible === true, "EXTENDED inside extended radius eligible");
   assert(extendedYes.appliedRadiusKm === 10, "extended uses city extendedRadiusKm");
   assert(
-    discoveryDisplayReach(sameMine, 5) === "inSociety",
+    discoveryDisplayReach(sameMine) === "inSociety",
     "same society campaigns group in society"
   );
   assert(
-    discoveryDisplayReach(nearbyYes, 5) === "nearby",
-    "within nearby radius groups as nearby"
+    discoveryDisplayReach(nearbyYes) === "beyondSociety",
+    "cross-society within radius groups as beyond"
   );
   assert(
-    discoveryDisplayReach(extendedYes, 5) === "extended",
-    "outside nearby and inside extended groups as extended"
+    discoveryDisplayReach(extendedYes) === "beyondSociety",
+    "cross-society within extended radius groups as beyond"
   );
+
+  const customRadius = evaluateSellerDiscoveryEligibility({
+    buyerSociety: nearbyInside,
+    sellerSociety: a,
+    sellingReachLevel: "BEYOND_SOCIETY",
+    sellingReachRadiusKm: 5,
+    cityReachConfig: bengaluruConfig,
+  });
+  assert(customRadius.eligible === true, "BEYOND_SOCIETY uses seller radius km");
+  assert(customRadius.appliedRadiusKm === 5, "seller radius stored on user");
 
   const extendedNo = evaluateSellerDiscoveryEligibility({
     buyerSociety: extendedOutside,

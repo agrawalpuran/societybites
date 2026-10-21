@@ -4,7 +4,7 @@ const {
   SELLING_REACH_LEVELS,
   DEFAULT_SELLING_REACH_LEVEL,
   normalizeSellingReachLevel,
-  serializeSellingReach,
+  resolveSellerAppliedRadiusKm,
 } = require("./sellingReach");
 
 /**
@@ -24,8 +24,7 @@ function sameSociety(buyerSociety, sellerSociety) {
 }
 
 /**
- * Backend-authoritative discovery eligibility for a future Explore Nearby surface.
- * Does not change GET /listings. Client radius/distance fields are ignored.
+ * Backend-authoritative discovery eligibility.
  *
  * @returns {{
  *   eligible: boolean,
@@ -39,6 +38,7 @@ function evaluateSellerDiscoveryEligibility({
   buyerSociety,
   sellerSociety,
   sellingReachLevel,
+  sellingReachRadiusKm,
   cityReachConfig,
   nearbyRadiusKm: _clientNearbyRadiusKm,
   extendedRadiusKm: _clientExtendedRadiusKm,
@@ -47,7 +47,6 @@ function evaluateSellerDiscoveryEligibility({
   void _clientNearbyRadiusKm;
   void _clientExtendedRadiusKm;
   void _clientDistanceKm;
-  const level = normalizeSellingReachLevel(sellingReachLevel);
 
   if (sameSociety(buyerSociety, sellerSociety)) {
     return {
@@ -59,6 +58,7 @@ function evaluateSellerDiscoveryEligibility({
     };
   }
 
+  const level = normalizeSellingReachLevel(sellingReachLevel);
   if (level === SELLING_REACH_LEVELS.MY_SOCIETY || !level) {
     return {
       eligible: false,
@@ -80,11 +80,11 @@ function evaluateSellerDiscoveryEligibility({
   }
 
   const cityKey = canonicalCityKey(sellerSociety && sellerSociety.city) || null;
-  const reach = serializeSellingReach(sellerSociety && sellerSociety.city, cityReachConfig);
-
-  let appliedRadiusKm = null;
-  if (level === SELLING_REACH_LEVELS.NEARBY) appliedRadiusKm = reach.nearbyRadiusKm;
-  if (level === SELLING_REACH_LEVELS.EXTENDED) appliedRadiusKm = reach.extendedRadiusKm;
+  const appliedRadiusKm = resolveSellerAppliedRadiusKm(
+    { sellingReachLevel, sellingReachRadiusKm },
+    cityReachConfig,
+    sellerSociety && sellerSociety.city
+  );
 
   if (appliedRadiusKm == null) {
     return {
@@ -130,7 +130,7 @@ function evaluateSellerDiscoveryEligibility({
   if (distanceKm <= appliedRadiusKm) {
     return {
       eligible: true,
-      reason: level === SELLING_REACH_LEVELS.NEARBY ? "WITHIN_NEARBY" : "WITHIN_EXTENDED",
+      reason: "WITHIN_RADIUS",
       distanceKm,
       cityKey,
       appliedRadiusKm,
@@ -139,7 +139,7 @@ function evaluateSellerDiscoveryEligibility({
 
   return {
     eligible: false,
-    reason: level === SELLING_REACH_LEVELS.NEARBY ? "OUTSIDE_NEARBY" : "OUTSIDE_EXTENDED",
+    reason: "OUTSIDE_RADIUS",
     distanceKm,
     cityKey,
     appliedRadiusKm,
@@ -150,15 +150,11 @@ function isSellerDiscoverableByBuyer(input) {
   return evaluateSellerDiscoveryEligibility(input).eligible;
 }
 
-/** Home grouping uses distance vs nearby radius, not the seller's opted-in level. */
-function discoveryDisplayReach(eligibility, nearbyRadiusKm) {
+/** Home grouping: in-society vs beyond (single bucket). */
+function discoveryDisplayReach(eligibility) {
   if (!eligibility || !eligibility.eligible) return null;
   if (eligibility.reason === "SAME_SOCIETY") return "inSociety";
-  if (eligibility.distanceKm != null && nearbyRadiusKm != null) {
-    return eligibility.distanceKm <= nearbyRadiusKm ? "nearby" : "extended";
-  }
-  if (eligibility.reason === "WITHIN_NEARBY") return "nearby";
-  return "extended";
+  return "beyondSociety";
 }
 
 module.exports = {

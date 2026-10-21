@@ -14,7 +14,13 @@ const {
   revokeRefreshToken,
 } = require("../lib/refreshTokens");
 const { rateLimit } = require("../middleware/rateLimit");
-const { attachSellingReach, assertSellerSellingReachLevel } = require("../lib/sellingReach");
+const { attachSellingReach, assertSellerSellingReachSettings } = require("../lib/sellingReach");
+const { canonicalCityKey } = require("../lib/launchCity");
+const {
+  evaluateSellingReachChange,
+  assertSellingReachDecreaseAllowed,
+} = require("../lib/sellerReachDecrease");
+const { listStaffAccessForUser } = require("../lib/sellerStaff");
 const { normalizeDeliveryCollectBy } = require("../lib/delayedDeliveryCharge");
 const { assertSellerFulfilmentUpdate } = require("../lib/sellerFulfilment");
 const {
@@ -272,7 +278,10 @@ router.get(
       include: { society: true, flat: true },
     });
 
-    res.json(await attachSellingReach(user, prisma));
+    const payload = await attachSellingReach(user, prisma);
+    // Additive: owner oversight of another kitchen. Absent/empty for everyone else.
+    payload.staffAccess = await listStaffAccessForUser(prisma, req.user.id);
+    res.json(payload);
   })
 );
 
@@ -322,6 +331,73 @@ router.post(
   })
 );
 
+async function proposedReachFromRequest(user, input) {
+  let societyCity = null;
+  if (user.societyId) {
+    const society = await prisma.society.findUnique({
+      where: { id: user.societyId },
+      select: { city: true },
+    });
+    societyCity = society && society.city;
+  }
+  const nextRole = user.role;
+  return assertSellerSellingReachSettings({
+    requestedLevel: input.sellingReachLevel,
+    requestedRadiusKm: input.sellingReachRadiusKm,
+    currentLevel: user.sellingReachLevel,
+    currentRadiusKm: user.sellingReachRadiusKm,
+    role: nextRole,
+    societyCity,
+    prismaClient: prisma,
+  });
+}
+
+async function evaluateReachChangeForUser(user, proposedReach) {
+  const seller = await prisma.user.findUnique({
+    where: { id: user.id },
+    include: { society: true },
+  });
+  const cityKey = canonicalCityKey(seller && seller.society && seller.society.city);
+  const cityReachConfig = cityKey
+    ? await prisma.cityReachConfig.findUnique({ where: { cityKey } })
+    : null;
+  return evaluateSellingReachChange({
+    prisma,
+    sellerId: user.id,
+    sellerSociety: seller && seller.society,
+    currentReach: {
+      sellingReachLevel: user.sellingReachLevel,
+      sellingReachRadiusKm: user.sellingReachRadiusKm,
+    },
+    proposedReach: {
+      sellingReachLevel: proposedReach.sellingReachLevel,
+      sellingReachRadiusKm: proposedReach.sellingReachRadiusKm,
+    },
+    cityReachConfig,
+  });
+}
+
+router.get(
+  "/me/selling-reach-change-preview",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const { sellingReachLevel, sellingReachRadiusKm } = req.query;
+    if (sellingReachLevel === undefined && sellingReachRadiusKm === undefined) {
+      return res.status(400).json({ error: "sellingReachLevel or sellingReachRadiusKm required" });
+    }
+    const radius =
+      sellingReachRadiusKm === undefined || sellingReachRadiusKm === ""
+        ? undefined
+        : Number(sellingReachRadiusKm);
+    const proposed = await proposedReachFromRequest(req.user, {
+      sellingReachLevel,
+      sellingReachRadiusKm: radius,
+    });
+    const evaluation = await evaluateReachChangeForUser(req.user, proposed);
+    res.json(evaluation);
+  })
+);
+
 router.patch(
   "/me/profile",
   requireUser,
@@ -334,6 +410,7 @@ router.patch(
       upiDisplayName,
       paymentEnabled,
       sellingReachLevel,
+      sellingReachRadiusKm,
       fulfilmentMode,
       deliveryCharge,
       deliveryChargeInSociety,
@@ -361,22 +438,32 @@ router.patch(
       }
       data.role = role;
     }
-    if (sellingReachLevel !== undefined) {
-      const nextRole = data.role || req.user.role;
-      let societyCity = null;
-      if (req.user.societyId) {
-        const society = await prisma.society.findUnique({
-          where: { id: req.user.societyId },
-          select: { city: true },
-        });
-        societyCity = society && society.city;
-      }
-      data.sellingReachLevel = await assertSellerSellingReachLevel({
-        requested: sellingReachLevel,
-        role: nextRole,
-        societyCity,
-        prismaClient: prisma,
+    if (sellingReachLevel !== undefined || sellingReachRadiusKm !== undefined) {
+      const reach = await proposedReachFromRequest(req.user, {
+        sellingReachLevel,
+        sellingReachRadiusKm,
       });
+      const seller = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        include: { society: true },
+      });
+      const cityKey = canonicalCityKey(seller && seller.society && seller.society.city);
+      const cityReachConfig = cityKey
+        ? await prisma.cityReachConfig.findUnique({ where: { cityKey } })
+        : null;
+      await assertSellingReachDecreaseAllowed({
+        prisma,
+        sellerId: req.user.id,
+        sellerSociety: seller && seller.society,
+        currentReach: {
+          sellingReachLevel: req.user.sellingReachLevel,
+          sellingReachRadiusKm: req.user.sellingReachRadiusKm,
+        },
+        proposedReach: reach,
+        cityReachConfig,
+      });
+      data.sellingReachLevel = reach.sellingReachLevel;
+      data.sellingReachRadiusKm = reach.sellingReachRadiusKm;
     }
     if (
       fulfilmentMode !== undefined ||

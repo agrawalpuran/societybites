@@ -32,3 +32,13 @@ if (result.status !== 0) {
   console.error("[ensure-db-migrations] prisma migrate deploy failed");
   process.exit(result.status || 1);
 }
+
+const migrateReach = spawnSync(process.execPath, ["scripts/migrate-selling-reach-radius.js"], {
+  cwd: backendRoot,
+  stdio: "inherit",
+  env: process.env,
+});
+if (migrateReach.status !== 0) {
+  console.error("[ensure-db-migrations] migrate-selling-reach-radius failed");
+  process.exit(migrateReach.status || 1);
+}

@@ -1,6 +1,7 @@
-/// Seller reach level. Radius km is city-configured, not stored on the seller.
+/// Legacy API levels. New sellers use [SellingReachLevel.beyondSociety] + radius km.
 enum SellingReachLevel {
   mySociety,
+  beyondSociety,
   nearby,
   extended,
 }
@@ -8,6 +9,8 @@ enum SellingReachLevel {
 SellingReachLevel parseSellingReachLevel(Object? value) {
   final raw = value?.toString().trim().toUpperCase();
   switch (raw) {
+    case 'BEYOND_SOCIETY':
+      return SellingReachLevel.beyondSociety;
     case 'NEARBY':
       return SellingReachLevel.nearby;
     case 'EXTENDED':
@@ -23,6 +26,8 @@ extension SellingReachLevelApi on SellingReachLevel {
     switch (this) {
       case SellingReachLevel.mySociety:
         return 'MY_SOCIETY';
+      case SellingReachLevel.beyondSociety:
+        return 'BEYOND_SOCIETY';
       case SellingReachLevel.nearby:
         return 'NEARBY';
       case SellingReachLevel.extended:
@@ -30,15 +35,54 @@ extension SellingReachLevelApi on SellingReachLevel {
     }
   }
 
-  String get title {
-    switch (this) {
-      case SellingReachLevel.mySociety:
-        return 'My Society';
-      case SellingReachLevel.nearby:
-        return 'Nearby';
-      case SellingReachLevel.extended:
-        return 'Extended';
+  bool get isBeyondSociety =>
+      this == SellingReachLevel.beyondSociety ||
+      this == SellingReachLevel.nearby ||
+      this == SellingReachLevel.extended;
+}
+
+/// Seller-facing reach choice (mode A).
+class SellerReachPreference {
+  const SellerReachPreference({
+    required this.mySocietyOnly,
+    required this.radiusKm,
+  });
+
+  final bool mySocietyOnly;
+  final int radiusKm;
+
+  static const defaultRadiusKm = 5;
+
+  factory SellerReachPreference.fromProfile({
+    required SellingReachLevel level,
+    double? radiusKm,
+    required SellingReach reach,
+  }) {
+    if (level == SellingReachLevel.mySociety) {
+      return SellerReachPreference(
+        mySocietyOnly: true,
+        radiusKm: reach.defaultRadiusKm,
+      );
     }
+    final stored = radiusKm?.round();
+    if (stored != null && stored > 0) {
+      return SellerReachPreference(
+        mySocietyOnly: false,
+        radiusKm: stored.clamp(1, reach.maxRadiusKm),
+      );
+    }
+    final legacy = level == SellingReachLevel.extended
+        ? reach.extendedRadiusKm?.round()
+        : reach.nearbyRadiusKm?.round();
+    return SellerReachPreference(
+      mySocietyOnly: false,
+      radiusKm: (legacy ?? defaultRadiusKm).clamp(1, reach.maxRadiusKm),
+    );
+  }
+
+  String summary(SellingReach reach) {
+    if (mySocietyOnly) return 'Visible to buyers in your society';
+    return 'Buyers in your society and within $radiusKm km';
   }
 }
 
@@ -46,80 +90,46 @@ String formatReachRadiusKm(double km) {
   return km == km.roundToDouble() ? km.toInt().toString() : km.toString();
 }
 
-/// Resolved city radii for the user's society city. Null radii mean no admin config.
+/// Resolved city config for the seller's society city.
 class SellingReach {
   const SellingReach({
     this.cityKey,
     this.nearbyRadiusKm,
     this.extendedRadiusKm,
+    this.maxSellerRadiusKm,
   });
 
   final String? cityKey;
   final double? nearbyRadiusKm;
   final double? extendedRadiusKm;
+  final double? maxSellerRadiusKm;
 
-  bool get nearbyAvailable => nearbyRadiusKm != null;
-  bool get extendedAvailable => extendedRadiusKm != null;
+  static const defaultMaxRadiusKm = 10.0;
 
+  int get maxRadiusKm =>
+      (maxSellerRadiusKm ?? defaultMaxRadiusKm).round().clamp(1, 100);
+
+  int get defaultRadiusKm {
+    final legacy = nearbyRadiusKm?.round() ?? extendedRadiusKm?.round();
+    if (legacy != null && legacy >= 1) {
+      return legacy.clamp(1, maxRadiusKm);
+    }
+    return SellerReachPreference.defaultRadiusKm.clamp(1, maxRadiusKm);
+  }
+
+  bool get beyondSocietyAvailable => cityKey != null;
+
+  /// Buyer distance menu can offer the full city "extended" band.
+  bool get extendedAvailable =>
+      extendedRadiusKm != null && extendedRadiusKm! > 0;
+
+  @Deprecated('Use SellerReachPreference.summary')
   String subtitleFor(SellingReachLevel level) {
-    switch (level) {
-      case SellingReachLevel.mySociety:
-        return 'Visible to buyers in your society';
-      case SellingReachLevel.nearby:
-        return nearbyAvailable
-            ? 'Buyers within ${formatReachRadiusKm(nearbyRadiusKm!)} km'
-            : 'Nearby selling is not available in your city yet.';
-      case SellingReachLevel.extended:
-        return extendedAvailable
-            ? 'Buyers within ${formatReachRadiusKm(extendedRadiusKm!)} km'
-            : 'Nearby selling is not available in your city yet.';
-    }
-  }
-
-  String optionSubtitleFor(SellingReachLevel level) {
-    switch (level) {
-      case SellingReachLevel.mySociety:
-        return 'Buyers in your society';
-      case SellingReachLevel.nearby:
-        return nearbyAvailable
-            ? 'Buyers within ${formatReachRadiusKm(nearbyRadiusKm!)} km'
-            : 'Nearby selling is not available in your city yet.';
-      case SellingReachLevel.extended:
-        return extendedAvailable
-            ? 'Buyers within ${formatReachRadiusKm(extendedRadiusKm!)} km'
-            : 'Nearby selling is not available in your city yet.';
-    }
-  }
-
-  /// Short helper shown during seller setup so choices are easy to compare.
-  String setupHintFor(SellingReachLevel level) {
-    switch (level) {
-      case SellingReachLevel.mySociety:
-        return 'Only residents of your society can discover and order from you.';
-      case SellingReachLevel.nearby:
-        if (!nearbyAvailable) {
-          return 'Your city has not enabled nearby reach yet.';
-        }
-        return 'Residents in your society plus buyers within '
-            '${formatReachRadiusKm(nearbyRadiusKm!)} km of your society.';
-      case SellingReachLevel.extended:
-        if (!extendedAvailable) {
-          return 'Your city has not enabled extended reach yet.';
-        }
-        return 'Widest reach: buyers within '
-            '${formatReachRadiusKm(extendedRadiusKm!)} km of your society.';
-    }
-  }
-
-  bool isSelectable(SellingReachLevel level) {
-    switch (level) {
-      case SellingReachLevel.mySociety:
-        return true;
-      case SellingReachLevel.nearby:
-        return nearbyAvailable;
-      case SellingReachLevel.extended:
-        return extendedAvailable;
-    }
+    return SellerReachPreference.fromProfile(
+      level: level,
+      radiusKm: null,
+      reach: this,
+    ).summary(this);
   }
 
   factory SellingReach.fromJson(Map<String, dynamic>? json) {
@@ -130,6 +140,7 @@ class SellingReach {
       cityKey: json['cityKey'] as String?,
       nearbyRadiusKm: _toDoubleOrNull(json['nearbyRadiusKm']),
       extendedRadiusKm: _toDoubleOrNull(json['extendedRadiusKm']),
+      maxSellerRadiusKm: _toDoubleOrNull(json['maxSellerRadiusKm']),
     );
   }
 
@@ -142,6 +153,7 @@ class SellingReach {
       cityKey: me['cityKey'] as String?,
       nearbyRadiusKm: _toDoubleOrNull(me['nearbyRadiusKm']),
       extendedRadiusKm: _toDoubleOrNull(me['extendedRadiusKm']),
+      maxSellerRadiusKm: _toDoubleOrNull(me['maxSellerRadiusKm']),
     );
   }
 }
@@ -152,12 +164,14 @@ class CityReachConfig {
     required this.displayName,
     required this.nearbyRadiusKm,
     required this.extendedRadiusKm,
+    required this.maxSellerRadiusKm,
   });
 
   final String cityKey;
   final String displayName;
   final double nearbyRadiusKm;
   final double extendedRadiusKm;
+  final double maxSellerRadiusKm;
 
   factory CityReachConfig.fromJson(Map<String, dynamic> json) {
     return CityReachConfig(
@@ -165,6 +179,8 @@ class CityReachConfig {
       displayName: (json['displayName'] as String?) ?? json['cityKey'] as String,
       nearbyRadiusKm: _toDoubleOrNull(json['nearbyRadiusKm']) ?? 0,
       extendedRadiusKm: _toDoubleOrNull(json['extendedRadiusKm']) ?? 0,
+      maxSellerRadiusKm:
+          _toDoubleOrNull(json['maxSellerRadiusKm']) ?? SellingReach.defaultMaxRadiusKm,
     );
   }
 }

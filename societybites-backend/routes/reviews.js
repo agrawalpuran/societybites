@@ -3,17 +3,35 @@ const prisma = require("../lib/prisma");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { requireUser } = require("../middleware/requireUser");
 const { serializeReview } = require("../utils/listingSerializer");
+const { canViewKitchenAsOwner } = require("../lib/sellerStaff");
 
 const router = express.Router();
+
+async function resolveSellerIdForReviews(req, res) {
+  const kitchenSellerId = String(req.query.kitchenSellerId || "").trim();
+  if (!kitchenSellerId || kitchenSellerId === req.user.id) return req.user.id;
+  const allowed = await canViewKitchenAsOwner(
+    prisma,
+    req.user.id,
+    kitchenSellerId
+  );
+  if (!allowed) {
+    res.status(403).json({ error: "Not allowed to view this kitchen" });
+    return null;
+  }
+  return kitchenSellerId;
+}
 
 router.get(
   "/seller/me",
   requireUser,
   asyncHandler(async (req, res) => {
+    const sellerId = await resolveSellerIdForReviews(req, res);
+    if (!sellerId) return;
     const reviews = await prisma.review.findMany({
       where: {
         hidden: false,
-        listing: { sellerId: req.user.id },
+        listing: { sellerId },
       },
       include: {
         reviewer: { include: { flat: true } },

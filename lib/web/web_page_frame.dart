@@ -52,12 +52,20 @@ Widget centerOnWeb(
   if (!useWebMarketplaceLayout(context)) return page;
   return ColoredBox(
     color: webPageBackground,
-    child: Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: page,
-      ),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final parentWidth = constraints.maxWidth;
+        final width = parentWidth.isFinite && parentWidth < maxWidth
+            ? parentWidth
+            : maxWidth;
+        return Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            width: width,
+            child: page,
+          ),
+        );
+      },
     ),
   );
 }

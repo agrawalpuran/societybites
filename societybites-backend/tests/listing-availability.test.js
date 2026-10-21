@@ -92,6 +92,7 @@ async function main() {
         foodType: "VEG",
         category: "Lunch",
         quantity: 20,
+        publish: true,
       },
     });
     assert(readyNow.status === 201, `READY_NOW create failed ${JSON.stringify(readyNow.json)}`);
@@ -111,6 +112,7 @@ async function main() {
         catalogType: "PREORDER",
         availabilityMode: "MADE_TO_ORDER",
         preparationTimeMinutes: 60,
+        publish: true,
       },
     });
     assert(preorder.status === 400, "PREORDER cannot be MADE_TO_ORDER");
@@ -125,6 +127,7 @@ async function main() {
         foodType: "VEG",
         category: "Dinner",
         catalogType: "PREORDER",
+        publish: true,
       },
     });
     assert(preorderOk.status === 201, "PREORDER create still works");
@@ -142,6 +145,7 @@ async function main() {
         foodType: "VEG",
         category: "Snacks",
         availabilityMode: "CUSTOM",
+        publish: true,
       },
     });
     assert(invalidMode.status === 400, "invalid availabilityMode must be 400");
@@ -156,6 +160,7 @@ async function main() {
         foodType: "VEG",
         category: "Snacks",
         availabilityMode: "MADE_TO_ORDER",
+        publish: true,
       },
     });
     assert(missingPrep.status === 400, "MADE_TO_ORDER without prep must be 400");
@@ -171,6 +176,7 @@ async function main() {
         category: "Snacks",
         availabilityMode: "MADE_TO_ORDER",
         preparationTimeMinutes: 5,
+        publish: true,
       },
     });
     assert(badPrep.status === 400, "short prep time must be 400");
@@ -188,6 +194,7 @@ async function main() {
         availabilityMode: "MADE_TO_ORDER",
         preparationTimeMinutes: 240,
         maxDailyOrders: 1,
+        publish: true,
       },
     });
     assert(made.status === 201, `MADE_TO_ORDER create failed ${JSON.stringify(made.json)}`);
@@ -209,6 +216,7 @@ async function main() {
         quantity: 10,
         availabilityMode: "MADE_TO_ORDER",
         preparationTimeMinutes: 60,
+        publish: true,
       },
     });
     assert(

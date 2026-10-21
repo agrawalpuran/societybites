@@ -36,6 +36,7 @@ import '../widgets/one_seller_cart.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/floating_cart_bar.dart';
 import '../widgets/listing_cart_controls.dart';
+import '../widgets/listing_variant_picker_sheet.dart';
 import '../widgets/carousel_page_dots.dart';
 import '../widgets/home_distance_chip.dart';
 import '../widgets/guest_order_auth.dart';
@@ -45,6 +46,7 @@ import '../widgets/listing_type_badge.dart';
 import '../widgets/seller_avatar.dart';
 import '../widgets/feed_refresh_bar.dart';
 import '../utils/listing_image_precache.dart';
+import '../utils/listing_portion_label.dart';
 import '../web/web_breakpoints.dart';
 import '../web/web_marketplace_home.dart';
 import '../preview/festival_banner_preview.dart';
@@ -115,8 +117,7 @@ class HomeScreenState extends State<HomeScreen> {
   final Set<String> _homePrecachedImageUrls = {};
   final _reachSectionKeys = <HomeListingReach, GlobalKey>{
     HomeListingReach.inSociety: GlobalKey(),
-    HomeListingReach.nearby: GlobalKey(),
-    HomeListingReach.extended: GlobalKey(),
+    HomeListingReach.beyondSociety: GlobalKey(),
   };
 
   bool get isLoadInProgress => _isLoading;
@@ -625,11 +626,45 @@ class HomeScreenState extends State<HomeScreen> {
       _removeFromCart(food);
       return;
     }
+    if (listingHasSizeOptions(food)) {
+      await _addVariantViaPicker(food);
+      return;
+    }
     if (_cartQtyFor(food) > 0) {
       await _incrementCartLine(food);
       return;
     }
     await _addToCart(food);
+  }
+
+  Future<void> _addVariantViaPicker(FoodItem seed) async {
+    if (seed.isKitchenClosed) {
+      showKitchenClosedMessage(context);
+      return;
+    }
+    if (await _webVisitorNeedsSignIn()) return;
+    if (!mounted) return;
+
+    final allowed = await confirmCartSellerAllowed(
+      context,
+      cart: _cart,
+      sellerId: seed.sellerId,
+      sellerName: seed.sellerName,
+      alsoBlockedBy: CartController.instance.items,
+      onViewCart: () => CartController.instance.openCheckout(context),
+    );
+    if (!allowed || !mounted) return;
+
+    final result = await ListingVariantPickerSheet.show(
+      context,
+      seed: seed,
+    );
+    if (result == null || !mounted) return;
+    await _addToCart(
+      result.food,
+      quantity: result.quantity,
+      sellerAlreadyConfirmed: true,
+    );
   }
 
   Future<void> _incrementCartLine(FoodItem food) async {
@@ -652,7 +687,7 @@ class HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
-    final currentInCart = _cartQtyFor(food);
+    final currentInCart = _cartQtyForExact(food);
     if (currentInCart >= food.buyerMaxCartQuantity) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -680,7 +715,12 @@ class HomeScreenState extends State<HomeScreen> {
     CartController.instance.notify();
   }
 
-  Future<void> _addToCart(FoodItem food) async {
+  Future<void> _addToCart(
+    FoodItem food, {
+    int quantity = 1,
+    bool sellerAlreadyConfirmed = false,
+  }) async {
+    final qtyToAdd = quantity < 1 ? 1 : quantity;
     if (food.isKitchenClosed) {
       showKitchenClosedMessage(context);
       return;
@@ -701,18 +741,20 @@ class HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    if (await _webVisitorNeedsSignIn()) return;
-    if (!mounted) return;
+    if (!sellerAlreadyConfirmed) {
+      if (await _webVisitorNeedsSignIn()) return;
+      if (!mounted) return;
 
-    final allowed = await confirmCartSellerAllowed(
-      context,
-      cart: _cart,
-      sellerId: food.sellerId,
-      sellerName: food.sellerName,
-      alsoBlockedBy: CartController.instance.items,
-      onViewCart: () => CartController.instance.openCheckout(context),
-    );
-    if (!allowed || !mounted) return;
+      final allowed = await confirmCartSellerAllowed(
+        context,
+        cart: _cart,
+        sellerId: food.sellerId,
+        sellerName: food.sellerName,
+        alsoBlockedBy: CartController.instance.items,
+        onViewCart: () => CartController.instance.openCheckout(context),
+      );
+      if (!allowed || !mounted) return;
+    }
 
     final mixConflict = cartAvailabilityConflict(_cart, food);
     if (mixConflict != null) {
@@ -731,15 +773,14 @@ class HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final currentInCart = _cart
-        .where((c) => c.food.id == food.id)
-        .fold<int>(0, (sum, c) => sum + c.quantity);
-    if (currentInCart >= food.buyerMaxCartQuantity) {
+    final currentInCart = _cartQtyForExact(food);
+    final maxQty = food.buyerMaxCartQuantity;
+    if (currentInCart >= maxQty) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Only ${food.buyerMaxCartQuantity} available for ${food.name}',
+            'Only $maxQty available for ${food.name}',
           ),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
@@ -751,13 +792,13 @@ class HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
+    final nextQty = (currentInCart + qtyToAdd).clamp(1, maxQty);
     setState(() {
       final existing = _cart.indexWhere((c) => c.food.id == food.id);
       if (existing != -1) {
-        final qty = _cart[existing].quantity + 1;
-        _cart[existing] = CartItem(food: food, quantity: qty);
+        _cart[existing] = CartItem(food: food, quantity: nextQty);
       } else {
-        _cart.add(CartItem(food: food));
+        _cart.add(CartItem(food: food, quantity: nextQty));
       }
     });
     CartController.instance.notify();
@@ -781,7 +822,12 @@ class HomeScreenState extends State<HomeScreen> {
 
   void _removeFromCart(FoodItem food) {
     setState(() {
-      final existing = _cart.indexWhere((c) => c.food.id == food.id);
+      final groupId = food.variantGroupId?.trim();
+      final existing = (groupId != null && groupId.isNotEmpty)
+          ? _cart.lastIndexWhere(
+              (c) => c.food.variantGroupId?.trim() == groupId,
+            )
+          : _cart.indexWhere((c) => c.food.id == food.id);
       if (existing != -1) {
         if (_cart[existing].quantity > 1) {
           _cart[existing].quantity--;
@@ -793,9 +839,19 @@ class HomeScreenState extends State<HomeScreen> {
     CartController.instance.notify();
   }
 
-  int _cartQtyFor(FoodItem food) {
+  int _cartQtyForExact(FoodItem food) {
     final idx = _cart.indexWhere((c) => c.food.id == food.id);
     return idx != -1 ? _cart[idx].quantity : 0;
+  }
+
+  int _cartQtyFor(FoodItem food) {
+    final groupId = food.variantGroupId?.trim();
+    if (groupId != null && groupId.isNotEmpty) {
+      return _cart
+          .where((c) => c.food.variantGroupId?.trim() == groupId)
+          .fold<int>(0, (sum, c) => sum + c.quantity);
+    }
+    return _cartQtyForExact(food);
   }
 
   void _openDetail(FoodItem food) {
@@ -964,6 +1020,12 @@ class HomeScreenState extends State<HomeScreen> {
     return _distanceFiltered.take(1).toList();
   }
 
+  String? _webBeyondSubtitle() {
+    final km = _cityReach.maxSellerRadiusKm;
+    if (km == null) return 'From other societies near you';
+    return 'Beyond your society (up to ~${formatReachRadiusKm(km)} km)';
+  }
+
   String? _webNearbySubtitle() {
     final km = _cityReach.nearbyRadiusKm;
     if (km == null) return null;
@@ -995,16 +1057,16 @@ class HomeScreenState extends State<HomeScreen> {
       sellerListings: _listings,
       readyNow: _webReadyNow,
       madeToOrder: _webMadeToOrder,
-      nearbyListings: _webRegularFor(HomeListingReach.nearby),
-      nearbySellers: _nearbySellers,
-      nearbySubtitle: _webNearbySubtitle(),
-      extendedListings: _webRegularFor(HomeListingReach.extended),
-      extendedSellers: _extendedSellers,
-      extendedSubtitle: _webExtendedSubtitle(),
+      nearbyListings: _webRegularFor(HomeListingReach.beyondSociety),
+      nearbySellers: _beyondSellers,
+      nearbySubtitle: _webBeyondSubtitle(),
+      extendedListings: const [],
+      extendedSellers: const [],
+      extendedSubtitle: null,
       otherListings: _webUnscopedRegular(),
       inSocietyPreorders: _webCampaignsFor(HomeListingReach.inSociety),
-      nearbyPreorders: _webCampaignsFor(HomeListingReach.nearby),
-      extendedPreorders: _webCampaignsFor(HomeListingReach.extended),
+      nearbyPreorders: _webCampaignsFor(HomeListingReach.beyondSociety),
+      extendedPreorders: const [],
       preordersLoading: _preOrdersLoading,
       viewerUserId: _viewerUserId,
       expandedReach: _expandedReach,
@@ -1623,6 +1685,7 @@ class HomeScreenState extends State<HomeScreen> {
     'Made to Order',
     'Pre-order',
     'Snacks',
+    'Dairy',
     'Desserts',
   ];
 
@@ -1685,11 +1748,9 @@ class HomeScreenState extends State<HomeScreen> {
   List<Seller> get _societySellers =>
       sellersFromListings(_sellerPresenceForReach(HomeListingReach.inSociety));
 
-  List<Seller> get _nearbySellers =>
-      sellersFromListings(_sellerPresenceForReach(HomeListingReach.nearby));
-
-  List<Seller> get _extendedSellers =>
-      sellersFromListings(_sellerPresenceForReach(HomeListingReach.extended));
+  List<Seller> get _beyondSellers => sellersFromListings(
+        _sellerPresenceForReach(HomeListingReach.beyondSociety),
+      );
 
   Widget _buildHomeDiscoverySections() {
     return Column(
@@ -1705,42 +1766,23 @@ class HomeScreenState extends State<HomeScreen> {
         _buildSpecialsSection(),
         if (_showPreorderSections) _buildPreOrdersSection(),
         _buildSellerReachCarousel(
-          key: const Key('home-sellers-nearby'),
-          title: 'Nearby Societies',
-          subtitle: _cityReach.nearbyRadiusKm == null
-              ? null
-              : 'Sellers within ~${formatReachRadiusKm(_cityReach.nearbyRadiusKm!)} km',
+          key: const Key('home-sellers-beyond'),
+          title: 'Beyond your society',
+          subtitle: _cityReach.maxSellerRadiusKm == null
+              ? 'From other societies near you'
+              : 'Sellers up to ~${formatReachRadiusKm(_cityReach.maxSellerRadiusKm!)} km away',
           sellers: sellersFromListings(
-            _sellerPresenceForReach(HomeListingReach.nearby),
+            _sellerPresenceForReach(HomeListingReach.beyondSociety),
           ),
         ),
         _buildReachSection(
-          reach: HomeListingReach.nearby,
-          listings: _mobileListingsForReach(HomeListingReach.nearby),
+          reach: HomeListingReach.beyondSociety,
+          listings: _mobileListingsForReach(HomeListingReach.beyondSociety),
         ),
         if (_showPreorderSections)
           _buildPreOrderReachCarousel(
-            title: 'Pre-orders Nearby',
-            campaigns: _mobileCampaignsForReach(HomeListingReach.nearby),
-          ),
-        _buildSellerReachCarousel(
-          key: const Key('home-sellers-extended'),
-          title: 'More Around You',
-          subtitle: _cityReach.extendedRadiusKm == null
-              ? null
-              : 'From other societies (within ~${formatReachRadiusKm(_cityReach.extendedRadiusKm!)} km)',
-          sellers: sellersFromListings(
-            _sellerPresenceForReach(HomeListingReach.extended),
-          ),
-        ),
-        _buildReachSection(
-          reach: HomeListingReach.extended,
-          listings: _mobileListingsForReach(HomeListingReach.extended),
-        ),
-        if (_showPreorderSections)
-          _buildPreOrderReachCarousel(
-            title: 'Pre-orders Around You',
-            campaigns: _mobileCampaignsForReach(HomeListingReach.extended),
+            title: 'Pre-orders beyond your society',
+            campaigns: _mobileCampaignsForReach(HomeListingReach.beyondSociety),
           ),
       ],
     );
@@ -1898,11 +1940,13 @@ class HomeScreenState extends State<HomeScreen> {
         : listings.take(homeReachPreviewCount).toList();
     final seeAllKey = switch (reach) {
       HomeListingReach.inSociety => const Key('home-see-all-in-society'),
+      HomeListingReach.beyondSociety => const Key('home-see-all-beyond'),
       HomeListingReach.nearby => const Key('home-see-all-nearby'),
       HomeListingReach.extended => const Key('home-see-all-extended'),
     };
     final showLessKey = switch (reach) {
       HomeListingReach.inSociety => const Key('home-show-less-in-society'),
+      HomeListingReach.beyondSociety => const Key('home-show-less-beyond'),
       HomeListingReach.nearby => const Key('home-show-less-nearby'),
       HomeListingReach.extended => const Key('home-show-less-extended'),
     };
@@ -2492,7 +2536,10 @@ class _SpecialCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        addButton: ListingCartAddButton(onPressed: onAdd),
+                        addButton: ListingCartAddButton(
+                          onPressed: onAdd,
+                          optionsLabel: listingOptionsLabel(food),
+                        ),
                         qtyStepper: ListingCartQtyStepper(
                           qty: cartQty,
                           onIncrement: onAdd,
@@ -2583,7 +2630,7 @@ class _AvailableItemTile extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            '₹${food.price.toStringAsFixed(0)}',
+                            listingCardPriceLabel(food),
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
@@ -2721,6 +2768,7 @@ class _AvailableItemTile extends StatelessWidget {
                             addButton: ListingCartAddButton(
                               onPressed: onAdd,
                               compact: true,
+                              optionsLabel: listingOptionsLabel(food),
                             ),
                             qtyStepper: ListingCartQtyStepper(
                               qty: cartQty,

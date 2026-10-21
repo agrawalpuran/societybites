@@ -22,16 +22,27 @@ class ListingCartAddButton extends StatelessWidget {
     super.key,
     required this.onPressed,
     this.compact = false,
+    this.optionsLabel,
   });
 
   final VoidCallback onPressed;
   final bool compact;
 
+  /// Blinkit-style line under Add, e.g. "2 options".
+  final String? optionsLabel;
+
   @override
   Widget build(BuildContext context) {
     final radius = compact ? 10.0 : 12.0;
-    final hPad = compact ? 12.0 : 14.0;
-    final vPad = compact ? 6.0 : 7.0;
+    final hasOptions =
+        optionsLabel != null && optionsLabel!.trim().isNotEmpty;
+    // Keep multi-option Add close to single-SKU size so mobile cards stay balanced.
+    final hPad = hasOptions
+        ? (compact ? 10.0 : 11.0)
+        : (compact ? 12.0 : 14.0);
+    final vPad = hasOptions
+        ? (compact ? 4.0 : 4.5)
+        : (compact ? 6.0 : 7.0);
     return ListingCartTapShield(
       child: Material(
         color: const Color(0xFF0E5A47),
@@ -41,15 +52,41 @@ class ListingCartAddButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(radius),
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
-            child: const Text(
-              'Add',
-              softWrap: false,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            child: hasOptions
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Add',
+                        softWrap: false,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: compact ? 12 : 13,
+                          fontWeight: FontWeight.w700,
+                          height: 1.0,
+                        ),
+                      ),
+                      Text(
+                        optionsLabel!,
+                        softWrap: false,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.78),
+                          fontSize: compact ? 8 : 8.5,
+                          fontWeight: FontWeight.w500,
+                          height: 1.05,
+                        ),
+                      ),
+                    ],
+                  )
+                : const Text(
+                    'Add',
+                    softWrap: false,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
           ),
         ),
       ),

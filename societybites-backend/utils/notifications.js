@@ -29,6 +29,9 @@ function formatNotificationTime(value) {
 /** Must match Android MainActivity CHANNEL_ID and AndroidManifest default channel. */
 const ANDROID_CHANNEL_ID = "societybites_orders";
 
+/** Loud channel for new seller orders. Must match MainActivity NEW_ORDER_CHANNEL_ID. */
+const ANDROID_NEW_ORDER_CHANNEL_ID = "societybites_new_orders";
+
 /** Upper bound on how long we keep a handler alive waiting for FCM. */
 const NOTIFY_TIMEOUT_MS = Number(process.env.NOTIFY_TIMEOUT_MS || 8000);
 
@@ -70,7 +73,8 @@ function sellerIdFromOrder(order) {
   return order?.items?.[0]?.listing?.sellerId || null;
 }
 
-function buildFcmMessage(token, { title, body, data }) {
+function buildFcmMessage(token, { title, body, data, urgent = false }) {
+  const channelId = urgent ? ANDROID_NEW_ORDER_CHANNEL_ID : ANDROID_CHANNEL_ID;
   return {
     token,
     notification: { title, body },
@@ -78,19 +82,28 @@ function buildFcmMessage(token, { title, body, data }) {
     android: {
       priority: "high",
       notification: {
-        channelId: ANDROID_CHANNEL_ID,
+        channelId,
         sound: "default",
+        ...(urgent
+          ? {
+              visibility: "PUBLIC",
+              priority: "max",
+              defaultVibrateTimings: true,
+            }
+          : {}),
       },
     },
     apns: {
       headers: {
         "apns-push-type": "alert",
         "apns-priority": "10",
+        ...(urgent ? { "apns-relevance-score": "1.0" } : {}),
       },
       payload: {
         aps: {
           alert: { title, body },
           sound: "default",
+          ...(urgent ? { interruptionLevel: "time-sensitive" } : {}),
         },
       },
     },
@@ -100,9 +113,9 @@ function buildFcmMessage(token, { title, body, data }) {
 /**
  * Send a push to all active tokens for a user.
  * @param {string} userId
- * @param {{ title: string, body: string, notificationType: string, orderId: string }} opts
+ * @param {{ title: string, body: string, notificationType: string, orderId: string, urgent?: boolean }} opts
  */
-async function sendToUser(userId, { title, body, notificationType, orderId, extra }) {
+async function sendToUser(userId, { title, body, notificationType, orderId, extra, urgent = false }) {
   if (!userId || !notificationType || !orderId) return;
 
   const tokens = await prisma.deviceToken.findMany({
@@ -120,6 +133,7 @@ async function sendToUser(userId, { title, body, notificationType, orderId, extr
     type: "order_update",
     orderId: String(orderId),
     notificationType: String(notificationType),
+    ...(urgent ? { urgent: "1" } : {}),
     ...(extra && typeof extra === "object" ? extra : {}),
   };
   for (const key of Object.keys(data)) {
@@ -132,7 +146,9 @@ async function sendToUser(userId, { title, body, notificationType, orderId, extr
   await Promise.all(
     tokens.map(async ({ id, token }) => {
       try {
-        await messaging.send(buildFcmMessage(token, { title, body, data }));
+        await messaging.send(
+          buildFcmMessage(token, { title, body, data, urgent })
+        );
         sent += 1;
       } catch (err) {
         const code = err?.code || "";
@@ -166,14 +182,16 @@ function notifyOrderCreated(order) {
   if (!sellerId) return;
   return notifyAsync(() =>
     sendToUser(sellerId, {
-      title: "New SocietyBites order",
-      body: `Order ${order.orderNumber} is waiting for you`,
+      title: "New order — accept now",
+      body: `Order ${order.orderNumber} is waiting. Tap to accept or reject.`,
       notificationType: "order_created",
       orderId: order.id,
+      urgent: true,
       extra: {
         status: String(order.status || "pending"),
         paymentStatus: String(order.paymentStatus || "pending"),
         recipientRole: "seller",
+        orderNumber: String(order.orderNumber || ""),
       },
     })
   );
@@ -286,6 +304,20 @@ function notifyPaymentConfirmed(order) {
   );
 }
 
+function notifyPaymentReminder(order) {
+  const amount = Math.round(Number(order.total || 0));
+  const label = order.orderNumber || order.id;
+  return notifyAsync(() =>
+    sendToUser(order.buyerId, {
+      title: "Payment reminder",
+      body: `Your payment for Order #${label} (₹${amount}) is still pending. Please complete payment or contact the seller if you have already paid.`,
+      notificationType: "payment_reminder",
+      orderId: order.id,
+      extra: { recipientRole: "buyer" },
+    })
+  );
+}
+
 function notifyOrderMessage(order, senderId) {
   const sellerId = sellerIdFromOrder(order);
   const recipientId = senderId === order.buyerId ? sellerId : order.buyerId;
@@ -304,6 +336,7 @@ function notifyOrderMessage(order, senderId) {
 
 module.exports = {
   ANDROID_CHANNEL_ID,
+  ANDROID_NEW_ORDER_CHANNEL_ID,
   formatNotificationTime,
   notifyAsync,
   flushNotification,
@@ -315,5 +348,6 @@ module.exports = {
   notifyReadyBy,
   notifyBuyerMarkedPaid,
   notifyPaymentConfirmed,
+  notifyPaymentReminder,
   notifyOrderMessage,
 };

@@ -4,7 +4,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.media.AudioAttributes
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -14,18 +16,21 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     companion object {
         const val CHANNEL_ID = "societybites_orders"
+        const val NEW_ORDER_CHANNEL_ID = "societybites_new_orders"
         private const val METHOD_CHANNEL = "societybites/notifications"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        createNotificationChannel()
+        createNotificationChannels()
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
             .setMethodCallHandler { call, result ->
                 if (call.method == "show") {
                     val title = call.argument<String>("title") ?: "SocietyBites"
                     val body = call.argument<String>("body") ?: ""
-                    showLocalNotification(title, body)
+                    val urgent = call.argument<Boolean>("urgent") == true
+                    val orderId = call.argument<String>("orderId")
+                    showLocalNotification(title, body, urgent, orderId)
                     result.success(null)
                 } else {
                     result.notImplemented()
@@ -33,9 +38,11 @@ class MainActivity : FlutterActivity() {
             }
     }
 
-    private fun createNotificationChannel() {
+    private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val channel = NotificationChannel(
+        val manager = getSystemService(NotificationManager::class.java)
+
+        val orders = NotificationChannel(
             CHANNEL_ID,
             "Order updates",
             NotificationManager.IMPORTANCE_HIGH,
@@ -43,33 +50,76 @@ class MainActivity : FlutterActivity() {
             description = "SocietyBites order and message alerts"
             enableVibration(true)
         }
-        getSystemService(NotificationManager::class.java)
-            .createNotificationChannel(channel)
+        manager.createNotificationChannel(orders)
+
+        val alarmAttrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        val newOrders = NotificationChannel(
+            NEW_ORDER_CHANNEL_ID,
+            "New orders",
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = "Urgent alerts when a neighbor places a new order"
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 400, 200, 400, 200, 400)
+            setSound(Settings.System.DEFAULT_NOTIFICATION_URI, alarmAttrs)
+            lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+            setBypassDnd(false)
+        }
+        manager.createNotificationChannel(newOrders)
     }
 
-    private fun showLocalNotification(title: String, body: String) {
-        createNotificationChannel()
-        val launch = packageManager.getLaunchIntentForPackage(packageName)
-            ?: Intent(this, MainActivity::class.java)
-        launch.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+    private fun showLocalNotification(
+        title: String,
+        body: String,
+        urgent: Boolean,
+        orderId: String?,
+    ) {
+        createNotificationChannels()
+        val channelId = if (urgent) NEW_ORDER_CHANNEL_ID else CHANNEL_ID
+        val launch = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            if (!orderId.isNullOrBlank()) {
+                putExtra("orderId", orderId)
+                putExtra("notificationType", "order_created")
+            }
+        }
+        val requestCode = (orderId?.hashCode() ?: System.currentTimeMillis().toInt()) and 0x7fffffff
         val pending = PendingIntent.getActivity(
             this,
-            0,
+            requestCode,
             launch,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(
+                if (urgent) NotificationCompat.PRIORITY_MAX
+                else NotificationCompat.PRIORITY_HIGH,
+            )
+            .setCategory(
+                if (urgent) NotificationCompat.CATEGORY_ALARM
+                else NotificationCompat.CATEGORY_MESSAGE,
+            )
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(pending)
-            .build()
+
+        if (urgent) {
+            builder
+                .setFullScreenIntent(pending, true)
+                .setVibrate(longArrayOf(0, 400, 200, 400, 200, 400))
+                .setDefaults(NotificationCompat.DEFAULT_SOUND)
+        }
+
         try {
             NotificationManagerCompat.from(this).notify(
-                (System.currentTimeMillis() % Int.MAX_VALUE).toInt(),
-                notification,
+                requestCode,
+                builder.build(),
             )
         } catch (_: SecurityException) {
             // POST_NOTIFICATIONS denied

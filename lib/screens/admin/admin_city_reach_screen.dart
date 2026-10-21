@@ -52,6 +52,11 @@ class _AdminCityReachScreenState extends State<AdminCityReachScreen> {
     final extendedController = TextEditingController(
       text: existing == null ? '' : existing.extendedRadiusKm.toString(),
     );
+    final maxSellerController = TextEditingController(
+      text: existing == null
+          ? '10'
+          : existing.maxSellerRadiusKm.toString(),
+    );
 
     final saved = await showDialog<bool>(
       context: context,
@@ -83,6 +88,14 @@ class _AdminCityReachScreenState extends State<AdminCityReachScreen> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(labelText: 'Level 3 radius (km)'),
               ),
+              TextField(
+                controller: maxSellerController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Max seller reach slider (km)',
+                  helperText: 'Caps the distance bar in seller settings (e.g. 10 or 15)',
+                ),
+              ),
             ],
           ),
         ),
@@ -103,13 +116,15 @@ class _AdminCityReachScreenState extends State<AdminCityReachScreen> {
     final displayName = displayController.text.trim();
     final nearby = double.tryParse(nearbyController.text.trim());
     final extended = double.tryParse(extendedController.text.trim());
+    final maxSeller = double.tryParse(maxSellerController.text.trim());
     cityController.dispose();
     displayController.dispose();
     nearbyController.dispose();
     extendedController.dispose();
+    maxSellerController.dispose();
 
     if (saved != true || !mounted) return;
-    if (cityKey.isEmpty || nearby == null || extended == null) {
+    if (cityKey.isEmpty || nearby == null || extended == null || maxSeller == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('City and both radii are required')),
       );
@@ -121,6 +136,7 @@ class _AdminCityReachScreenState extends State<AdminCityReachScreen> {
         cityKey: cityKey,
         nearbyRadiusKm: nearby,
         extendedRadiusKm: extended,
+        maxSellerRadiusKm: maxSeller,
         displayName: displayName.isEmpty ? null : displayName,
       );
       if (!mounted) return;
@@ -180,7 +196,7 @@ class _AdminCityReachScreenState extends State<AdminCityReachScreen> {
                     padding: const EdgeInsets.all(20),
                     children: [
                       const Text(
-                        'Level 2 is Nearby. Level 3 is Extended. Values are per city, not per seller.',
+                        'Legacy L2/L3 radii remain for migration. Max seller slider km caps each seller’s reach bar.',
                         style: TextStyle(fontSize: 13, color: Color(0xFF6A7774)),
                       ),
                       const SizedBox(height: 16),

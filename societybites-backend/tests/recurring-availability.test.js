@@ -216,6 +216,7 @@ async function main() {
         foodType: "VEG",
         category: "Breakfast",
         quantity: 8,
+        publish: true,
       },
     });
     assert(plain.status === 201, `plain create failed ${JSON.stringify(plain.json)}`);
@@ -237,6 +238,7 @@ async function main() {
         recurringStartMinute: 0,
         recurringEndMinute: 1439,
         recurringDailyLimit: 2,
+        publish: true,
       },
     });
     assert(saved.status === 201, `recurring create failed ${JSON.stringify(saved.json)}`);
@@ -268,6 +270,7 @@ async function main() {
         recurringWeekdays: [1],
         recurringStartMinute: 600,
         recurringEndMinute: 500,
+        publish: true,
       },
     });
     assert(badTime.status === 400, "invalid time range rejected");
@@ -286,6 +289,7 @@ async function main() {
         recurringStartMinute: 0,
         recurringEndMinute: 1439,
         recurringDailyLimit: 0,
+        publish: true,
       },
     });
     assert(badLimit.status === 400, "invalid daily limit rejected");
@@ -304,6 +308,7 @@ async function main() {
         recurringWeekdays: [1],
         recurringStartMinute: 0,
         recurringEndMinute: 1439,
+        publish: true,
       },
     });
     assert(preorder.status === 400, "PREORDER recurring rejected");
@@ -323,6 +328,7 @@ async function main() {
         recurringWeekdays: [1],
         recurringStartMinute: 0,
         recurringEndMinute: 1439,
+        publish: true,
       },
     });
     assert(mto.status === 400, "MADE_TO_ORDER recurring rejected");

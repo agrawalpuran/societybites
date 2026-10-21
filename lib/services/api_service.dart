@@ -433,6 +433,26 @@ class ApiService {
     return SellingReach.fromAuthMe(me);
   }
 
+  static Future<Map<String, dynamic>> previewSellingReachChange({
+    required String sellingReachLevel,
+    int? sellingReachRadiusKm,
+  }) async {
+    final query = <String, String>{
+      'sellingReachLevel': sellingReachLevel,
+    };
+    if (sellingReachRadiusKm != null) {
+      query['sellingReachRadiusKm'] = '$sellingReachRadiusKm';
+    }
+    final uri = Uri.parse(
+      '$baseUrl/auth/me/selling-reach-change-preview',
+    ).replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> updateMyProfile({
     String? name,
     String? role,
@@ -442,6 +462,7 @@ class ApiService {
     String? upiDisplayName,
     bool? paymentEnabled,
     String? sellingReachLevel,
+    int? sellingReachRadiusKm,
     String? fulfilmentMode,
     double? deliveryCharge,
     double? deliveryChargeInSociety,
@@ -469,6 +490,8 @@ class ApiService {
         if (upiDisplayName != null) 'upiDisplayName': upiDisplayName,
         if (paymentEnabled != null) 'paymentEnabled': paymentEnabled,
         if (sellingReachLevel != null) 'sellingReachLevel': sellingReachLevel,
+        if (sellingReachRadiusKm != null)
+          'sellingReachRadiusKm': sellingReachRadiusKm,
         if (fulfilmentMode != null) 'fulfilmentMode': fulfilmentMode,
         if (deliveryCharge != null) 'deliveryCharge': deliveryCharge,
         if (deliveryChargeInSociety != null)
@@ -774,6 +797,10 @@ class ApiService {
     int? recurringStartMinute,
     int? recurringEndMinute,
     int? recurringDailyLimit,
+    List<Map<String, dynamic>>? variants,
+    String? variantInventoryMode,
+    num? sharedPoolQuantity,
+    String? sharedPoolUnit,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/listings'),
@@ -809,6 +836,13 @@ class ApiService {
         if (recurringEndMinute != null)
           'recurringEndMinute': recurringEndMinute,
         if (recurringEnabled) 'recurringDailyLimit': recurringDailyLimit,
+        if (variants != null && variants.isNotEmpty) 'variants': variants,
+        if (variantInventoryMode != null && variantInventoryMode.isNotEmpty)
+          'variantInventoryMode': variantInventoryMode,
+        if (sharedPoolQuantity != null)
+          'sharedPoolQuantity': sharedPoolQuantity,
+        if (sharedPoolUnit != null && sharedPoolUnit.isNotEmpty)
+          'sharedPoolUnit': sharedPoolUnit,
       }),
     );
 
@@ -943,6 +977,7 @@ class ApiService {
     String? status,
     String? weightUnit,
     String? weightValue,
+    String? variantLabel,
     List<String>? tags,
     String? category,
     List<String>? categories,
@@ -976,6 +1011,7 @@ class ApiService {
         if (status != null) 'status': status,
         if (weightUnit != null) 'weightUnit': weightUnit,
         if (weightValue != null) 'weightValue': weightValue,
+        if (variantLabel != null) 'variantLabel': variantLabel,
         if (tags != null) 'tags': tags,
         if (category != null) 'category': category,
         if (categories != null) 'categories': categories,
@@ -1001,6 +1037,20 @@ class ApiService {
 
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getListingVariants(
+    String listingId,
+  ) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/listings/$listingId/variants'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response) as List;
+      return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     }
     _throwFromResponse(response);
   }
@@ -1054,6 +1104,28 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> publishListing(String listingId) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/listings/$listingId/publish'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> publishAllDraftListings() async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/listings/bulk/publish'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> pauseListing(String listingId) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/listings/$listingId/pause'),
@@ -1097,9 +1169,13 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getOrders({
     String role = 'buyer',
     String? status,
+    String? kitchenSellerId,
   }) async {
     final query = <String, String>{'role': role};
     if (status != null) query['status'] = status;
+    if (kitchenSellerId != null && kitchenSellerId.isNotEmpty) {
+      query['kitchenSellerId'] = kitchenSellerId;
+    }
 
     final uri = Uri.parse('$baseUrl/orders').replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
@@ -1116,6 +1192,7 @@ class ApiService {
     required String scope,
     int? page,
     int? limit,
+    String? kitchenSellerId,
   }) async {
     final query = <String, String>{
       'role': 'seller',
@@ -1123,6 +1200,9 @@ class ApiService {
     };
     if (page != null) query['page'] = '$page';
     if (limit != null) query['limit'] = '$limit';
+    if (kitchenSellerId != null && kitchenSellerId.isNotEmpty) {
+      query['kitchenSellerId'] = kitchenSellerId;
+    }
 
     final uri = Uri.parse('$baseUrl/orders').replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
@@ -1278,13 +1358,147 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<Map<String, dynamic>> getSellerStats() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/orders/seller/stats'),
-      headers: await _authHeaders(),
+  static Future<Map<String, dynamic>> getSellerStats({
+    String? kitchenSellerId,
+  }) async {
+    final query = <String, String>{};
+    if (kitchenSellerId != null && kitchenSellerId.isNotEmpty) {
+      query['kitchenSellerId'] = kitchenSellerId;
+    }
+    final uri = Uri.parse('$baseUrl/orders/seller/stats').replace(
+      queryParameters: query.isEmpty ? null : query,
     );
+    final response = await http.get(uri, headers: await _authHeaders());
 
     if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  /// Manager: owners with view-only access to this kitchen.
+  static Future<List<Map<String, dynamic>>> listSellerStaffOwners() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/seller-staff/owners'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      final raw = data['owners'];
+      if (raw is! List) return [];
+      return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  /// Manager: invite an owner by phone (view-only, no revoke in MVP).
+  static Future<Map<String, dynamic>> inviteSellerStaffOwner({
+    required String phone,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/seller-staff/owners/invite'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'phone': phone.trim()}),
+    );
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  /// Kitchens this user may oversee as owner (view-only).
+  static Future<List<Map<String, dynamic>>> listSellerStaffAccess() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/seller-staff/access'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      final raw = data['staffAccess'];
+      if (raw is! List) return [];
+      return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getSellerReconciliationSummary({
+    String preset = 'today',
+    String? from,
+    String? to,
+    String? kitchenSellerId,
+  }) async {
+    final query = <String, String>{'preset': preset};
+    if (from != null && from.isNotEmpty) query['from'] = from;
+    if (to != null && to.isNotEmpty) query['to'] = to;
+    if (kitchenSellerId != null && kitchenSellerId.isNotEmpty) {
+      query['kitchenSellerId'] = kitchenSellerId;
+    }
+    final uri = Uri.parse(
+      '$baseUrl/orders/seller/reconciliation/summary',
+    ).replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getSellerReconciliationOrders({
+    String preset = 'today',
+    String? from,
+    String? to,
+    String? paymentPhase,
+    String? locationType,
+    String? societyId,
+    String? buyerId,
+    String? paymentMethod,
+    String? search,
+    int page = 1,
+    int limit = 25,
+    String? kitchenSellerId,
+  }) async {
+    final query = <String, String>{
+      'preset': preset,
+      'page': '$page',
+      'limit': '$limit',
+    };
+    if (from != null && from.isNotEmpty) query['from'] = from;
+    if (to != null && to.isNotEmpty) query['to'] = to;
+    if (paymentPhase != null && paymentPhase.isNotEmpty) {
+      query['paymentPhase'] = paymentPhase;
+    }
+    if (locationType != null && locationType.isNotEmpty) {
+      query['locationType'] = locationType;
+    }
+    if (societyId != null && societyId.isNotEmpty) query['societyId'] = societyId;
+    if (buyerId != null && buyerId.isNotEmpty) query['buyerId'] = buyerId;
+    if (paymentMethod != null && paymentMethod.isNotEmpty) {
+      query['paymentMethod'] = paymentMethod;
+    }
+    if (search != null && search.isNotEmpty) query['search'] = search;
+    if (kitchenSellerId != null && kitchenSellerId.isNotEmpty) {
+      query['kitchenSellerId'] = kitchenSellerId;
+    }
+    final uri = Uri.parse(
+      '$baseUrl/orders/seller/reconciliation/orders',
+    ).replace(queryParameters: query);
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> sendSellerPaymentReminder(
+    String orderId,
+  ) async {
+    final response = await http.post(
+      Uri.parse(
+        '$baseUrl/orders/seller/reconciliation/orders/$orderId/payment-reminder',
+      ),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200 || response.statusCode == 429) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
     }
     _throwFromResponse(response);
@@ -1294,10 +1508,14 @@ class ApiService {
     String preset = 'last_7_days',
     String? from,
     String? to,
+    String? kitchenSellerId,
   }) async {
     final query = <String, String>{'preset': preset};
     if (from != null && from.isNotEmpty) query['from'] = from;
     if (to != null && to.isNotEmpty) query['to'] = to;
+    if (kitchenSellerId != null && kitchenSellerId.isNotEmpty) {
+      query['kitchenSellerId'] = kitchenSellerId;
+    }
     final uri = Uri.parse(
       '$baseUrl/orders/seller/insights',
     ).replace(queryParameters: query);
@@ -1549,11 +1767,17 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<List<Map<String, dynamic>>> getSellerReviews() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/reviews/seller/me'),
-      headers: await _authHeaders(),
+  static Future<List<Map<String, dynamic>>> getSellerReviews({
+    String? kitchenSellerId,
+  }) async {
+    final query = <String, String>{};
+    if (kitchenSellerId != null && kitchenSellerId.isNotEmpty) {
+      query['kitchenSellerId'] = kitchenSellerId;
+    }
+    final uri = Uri.parse('$baseUrl/reviews/seller/me').replace(
+      queryParameters: query.isEmpty ? null : query,
     );
+    final response = await http.get(uri, headers: await _authHeaders());
 
     if (response.statusCode == 200) {
       final data = _decodeResponse(response) as List;
@@ -2097,6 +2321,7 @@ class ApiService {
     required String cityKey,
     required double nearbyRadiusKm,
     required double extendedRadiusKm,
+    required double maxSellerRadiusKm,
     String? displayName,
   }) async {
     final encoded = Uri.encodeComponent(cityKey);
@@ -2106,6 +2331,7 @@ class ApiService {
       body: jsonEncode({
         'nearbyRadiusKm': nearbyRadiusKm,
         'extendedRadiusKm': extendedRadiusKm,
+        'maxSellerRadiusKm': maxSellerRadiusKm,
         if (displayName != null && displayName.trim().isNotEmpty)
           'displayName': displayName.trim(),
       }),
