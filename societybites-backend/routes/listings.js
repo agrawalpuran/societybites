@@ -65,6 +65,7 @@ const {
   resolveCreateListingStatus,
   draftIdsToPublish,
 } = require("../lib/listingPublish");
+const { authorizeListingForBuyer } = require("../lib/crossSocietyOrder");
 
 async function jsonListings(listings, viewerUserId) {
   const withCapacity = await attachMadeToOrderCapacity(prisma, listings);
@@ -79,6 +80,27 @@ async function jsonListings(listings, viewerUserId) {
 async function jsonListing(listing, viewerUserId) {
   const [serialized] = await jsonListings([listing], viewerUserId);
   return serialized;
+}
+
+/** Same visibility as buyer Home / checkout (in-society or eligible cross-society). */
+async function buyerCanViewListing(req, listing) {
+  if (!listing) return false;
+  if (listing.sellerId === req.user.id) return true;
+  if (!req.user.societyId) return false;
+  if (listing.societyId === req.user.societyId) return true;
+  try {
+    await authorizeListingForBuyer({
+      buyer: req.user,
+      listing,
+      clientRadiusKm:
+        req.query.radiusKm != null ? Number(req.query.radiusKm) : undefined,
+      clientDistanceKm:
+        req.query.distanceKm != null ? Number(req.query.distanceKm) : undefined,
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const listingInclude = {
@@ -266,7 +288,7 @@ router.get(
       },
     });
 
-    if (!listing || listing.societyId !== societyId) {
+    if (!listing || !(await buyerCanViewListing(req, listing))) {
       return res.status(404).json({ error: "Listing not found" });
     }
 
@@ -307,7 +329,7 @@ router.get(
       include: listingInclude,
     });
 
-    if (!listing || listing.societyId !== societyId) {
+    if (!listing || !(await buyerCanViewListing(req, listing))) {
       return res.status(404).json({ error: "Listing not found" });
     }
 
