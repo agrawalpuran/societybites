@@ -69,6 +69,7 @@ class _MainShellScreenState extends State<MainShellScreen>
     );
     PushNotificationService.onForegroundOrderUpdate = _syncOrdersFromPush;
     PushNotificationService.onIncomingSellerOrder = _presentIncomingSellerOrder;
+    PushNotificationService.tryPresentPendingIncomingOrder();
     CartController.instance.onShowOrdersAfterPlace = _showOrdersAfterCheckout;
     CartController.instance.onSelectShellTab = _selectTab;
     WidgetsBinding.instance.addPostFrameCallback((_) {

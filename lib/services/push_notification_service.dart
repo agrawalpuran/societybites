@@ -60,6 +60,8 @@ class PushNotificationService {
   static bool _initialized = false;
   static bool _tokenRefreshBound = false;
   static int _tokenRetries = 0;
+  static String? _pendingIncomingOrderId;
+  static String? _pendingIncomingOrderNumber;
 
   static bool get _supported =>
       !kIsWeb && (Platform.isAndroid || Platform.isIOS);
@@ -68,6 +70,20 @@ class PushNotificationService {
     try {
       if (!_supported || _initialized) return;
       _initialized = true;
+
+      if (Platform.isAndroid) {
+        _androidChannel.setMethodCallHandler((call) async {
+          if (call.method == 'launchFromNotification') {
+            final args = call.arguments;
+            if (args is Map) {
+              _handleAndroidLaunchFromNotification(
+                orderId: args['orderId']?.toString(),
+                notificationType: args['notificationType']?.toString(),
+              );
+            }
+          }
+        });
+      }
 
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
@@ -199,14 +215,68 @@ class PushNotificationService {
     } catch (_) {}
   }
 
+  static void _handleAndroidLaunchFromNotification({
+    String? orderId,
+    String? notificationType,
+  }) {
+    if (notificationType != 'order_created') return;
+    final id = orderId?.trim() ?? '';
+    if (id.isEmpty) return;
+    _presentIncomingOrder(id, null);
+  }
+
+  /// Call from MainShell once the kitchen shell is mounted (cold start from FSI).
+  static void tryPresentPendingIncomingOrder() {
+    final id = _pendingIncomingOrderId;
+    if (id == null || id.isEmpty) return;
+    final number = _pendingIncomingOrderNumber;
+    _pendingIncomingOrderId = null;
+    _pendingIncomingOrderNumber = null;
+    _presentIncomingOrder(id, number);
+  }
+
+  static void _presentIncomingOrder(String orderId, String? orderNumber) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final present = onIncomingSellerOrder;
+      if (present != null) {
+        present(orderId, orderNumber);
+        return;
+      }
+      final ctx = navigatorKey.currentContext;
+      if (ctx == null) {
+        _pendingIncomingOrderId = orderId;
+        _pendingIncomingOrderNumber = orderNumber;
+        return;
+      }
+      unawaited(
+        SellerIncomingOrderAlert.presentIfNeeded(
+          ctx,
+          orderId: orderId,
+          orderNumber: orderNumber,
+        ),
+      );
+    });
+  }
+
+  static Future<void> setIncomingOrderWakeScreen(bool active) async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      await _androidChannel.invokeMethod('setIncomingOrderWake', {
+        'active': active,
+      });
+    } catch (_) {}
+  }
+
   static Future<void> _showAndroidForegroundNotification(
     RemoteMessage message,
   ) async {
     if (kIsWeb || !Platform.isAndroid) return;
+    final type = message.data['notificationType']?.toString() ?? '';
+    // Foreground new orders use the in-app full-screen sheet (sound/haptics there).
+    if (type == 'order_created') return;
     final title = message.notification?.title ?? 'SocietyBites';
     final body = message.notification?.body ?? '';
     if (body.isEmpty && message.notification?.title == null) return;
-    final type = message.data['notificationType']?.toString() ?? '';
     final urgent = type == 'order_created' ||
         message.data['urgent']?.toString() == '1';
     final orderId = message.data['orderId']?.toString();
@@ -236,23 +306,7 @@ class PushNotificationService {
     final orderId = message.data['orderId']?.toString().trim() ?? '';
     if (orderId.isEmpty) return;
     final orderNumber = message.data['orderNumber']?.toString();
-    final present = onIncomingSellerOrder;
-    if (present != null) {
-      present(orderId, orderNumber);
-      return;
-    }
-    // Shell not mounted yet — queue after next frame via navigator.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final ctx = navigatorKey.currentContext;
-      if (ctx == null) return;
-      unawaited(
-        SellerIncomingOrderAlert.presentIfNeeded(
-          ctx,
-          orderId: orderId,
-          orderNumber: orderNumber,
-        ),
-      );
-    });
+    _presentIncomingOrder(orderId, orderNumber);
   }
 
   static void _handleOpen(RemoteMessage message) {

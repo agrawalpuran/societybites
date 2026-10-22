@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/session_service.dart';
 import '../../web/admin_content_frame.dart';
+import '../../widgets/admin_loading_panel.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_societies_screen.dart';
 import 'admin_fssai_screen.dart';
@@ -27,7 +28,6 @@ class AdminShellScreen extends StatefulWidget {
 
 class _AdminShellScreenState extends State<AdminShellScreen> {
   int _selectedIndex = 0;
-  List<Widget?> _pageCache = [];
   bool _isSuperAdmin = false;
   bool _roleLoaded = false;
 
@@ -62,22 +62,18 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   @override
   void initState() {
     super.initState();
-    _pageCache = List<Widget?>.filled(_baseNavItems.length, null);
-    _pageCache[0] = _createPage(0);
     unawaited(_loadRole());
   }
 
   Future<void> _loadRole() async {
     final role = await SessionService.getRole();
-    final consoleAdmin = await SessionService.isConsoleAdmin();
     if (!mounted) return;
     final superAdmin = role == 'super_admin';
     setState(() {
       _isSuperAdmin = superAdmin;
       _roleLoaded = true;
-      if (superAdmin) {
-        _pageCache = List<Widget?>.filled(_navItems.length, null);
-        _pageCache[0] = _createPage(0);
+      if (_selectedIndex >= _navItems.length) {
+        _selectedIndex = 0;
       }
     });
   }
@@ -120,22 +116,18 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   }
 
   void _selectTab(int index) {
-    setState(() {
-      _selectedIndex = index;
-      if (index < _pageCache.length) {
-        _pageCache[index] ??= _createPage(index);
-      }
-    });
+    if (index == _selectedIndex) return;
+    setState(() => _selectedIndex = index);
   }
 
+  /// One active admin page at a time — avoids mounting every visited tab (memory + jank).
   Widget _buildBody() {
-    return IndexedStack(
-      index: _selectedIndex,
-      sizing: StackFit.expand,
-      children: List.generate(
-        _pageCache.length,
-        (i) => _pageCache[i] ?? const SizedBox.shrink(),
-      ),
+    if (!_roleLoaded) {
+      return const AdminLoadingPanel(message: 'Opening admin portal…');
+    }
+    return KeyedSubtree(
+      key: ValueKey<int>(_selectedIndex),
+      child: _createPage(_selectedIndex),
     );
   }
 

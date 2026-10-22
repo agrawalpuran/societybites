@@ -26,12 +26,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Map<String, dynamic>? _stats;
   double _platformFee = 0;
   bool _isLoading = true;
+  bool _showGrowthPanel = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _loadStats();
+  }
+
+  void _scheduleGrowthPanel() {
+    if (_showGrowthPanel) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _showGrowthPanel = true);
+    });
   }
 
   Future<void> _loadStats() async {
@@ -50,6 +59,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _platformFee = results[1] as double;
         _isLoading = false;
       });
+      _scheduleGrowthPanel();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -382,7 +392,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            const AdminGrowthPanel(),
+            if (_showGrowthPanel) const AdminGrowthPanel(),
             const SizedBox(height: 24),
             _SectionTitle(title: 'HOME BANNER'),
             const SizedBox(height: 10),

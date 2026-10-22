@@ -67,24 +67,29 @@ class _AdminSellerPerformanceScreenState
       _error = null;
     });
     try {
-      final summary = await ApiService.getAdminPerformanceSummary(
-        preset: _preset,
-        from: _fromYmd,
-        to: _toYmd,
-      );
-      final board = await ApiService.getAdminPerformanceSellers(
-        preset: _preset,
-        from: _fromYmd,
-        to: _toYmd,
-        sort: _sort,
-        limit: 50,
-      );
-      final campaigns = await ApiService.getAdminPerformanceCampaigns(
-        preset: _preset,
-        from: _fromYmd,
-        to: _toYmd,
-      );
+      final results = await Future.wait([
+        ApiService.getAdminPerformanceSummary(
+          preset: _preset,
+          from: _fromYmd,
+          to: _toYmd,
+        ),
+        ApiService.getAdminPerformanceSellers(
+          preset: _preset,
+          from: _fromYmd,
+          to: _toYmd,
+          sort: _sort,
+          limit: 50,
+        ),
+        ApiService.getAdminPerformanceCampaigns(
+          preset: _preset,
+          from: _fromYmd,
+          to: _toYmd,
+        ),
+      ]);
       if (!mounted) return;
+      final summary = results[0] as Map<String, dynamic>;
+      final board = results[1] as Map<String, dynamic>;
+      final campaigns = results[2] as Map<String, dynamic>;
       setState(() {
         _summary = summary;
         _sellers = (board['sellers'] as List<dynamic>? ?? [])

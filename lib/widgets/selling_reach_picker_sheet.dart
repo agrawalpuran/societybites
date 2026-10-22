@@ -23,10 +23,15 @@ class SellingReachPickerSheet extends StatefulWidget {
     return showModalBottomSheet<SellerReachPreference>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => SellingReachPickerSheet(reach: reach, initial: initial),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: SellingReachPickerSheet(reach: reach, initial: initial),
+      ),
     );
   }
 
@@ -114,17 +119,24 @@ class _SellingReachPickerSheetState extends State<SellingReachPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final beyondAvailable = widget.reach.beyondSocietyAvailable;
-    final sheet = Padding(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        24,
-        24,
-        32 + MediaQuery.paddingOf(context).bottom,
-      ),
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 12, 24, 20 + bottomInset),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0E5E3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           const Text(
             'Selling reach',
             style: TextStyle(
@@ -188,13 +200,6 @@ class _SellingReachPickerSheetState extends State<SellingReachPickerSheet> {
                 : const Text('Save', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
-      ),
-    );
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: sheet,
       ),
     );
   }
