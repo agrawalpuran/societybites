@@ -2349,8 +2349,6 @@ void _showCompactSellerNotice(
   if (replaceExisting) {
     messenger.clearSnackBars();
   }
-  final estimatedWidth = message.length * 7.2 + 48;
-  final width = estimatedWidth.clamp(168.0, 380.0);
   messenger.showSnackBar(
     SnackBar(
       content: Text(
@@ -2360,8 +2358,7 @@ void _showCompactSellerNotice(
       ),
       duration: const Duration(seconds: 2),
       behavior: SnackBarBehavior.floating,
-      width: width,
-      margin: const EdgeInsets.only(bottom: 28),
+      margin: const EdgeInsets.fromLTRB(24, 0, 24, 28),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       backgroundColor: backgroundColor,
@@ -2756,23 +2753,27 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
       paymentStatus: 'seller_confirmed',
       expectedReadyAt: expectedReadyAt,
     );
+    Map<String, dynamic>? json;
     try {
-      final json = await ApiService.confirmPayment(
+      json = await ApiService.confirmPayment(
         orderId: snapshot.id,
         expectedReadyAt: result is DateTime ? expectedReadyAt : null,
         readyInMinutes: readyInMinutes,
       );
       widget.onOrderUpdated?.call(Order.mergeStatusPatch(snapshot, json));
-      if (!mounted) return;
-      _showCompactPaymentNotice(context, 'Payment confirmed');
     } catch (e) {
       if (!mounted) return;
       OrderPushCoordinator.dropHint(snapshot.id);
       setState(() => _pendingPaymentOverride = null);
       widget.onOrderUpdated?.call(snapshot);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not confirm payment: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not confirm payment: ${ApiService.userFacingError(e)}',
+          ),
+        ),
+      );
+      return;
     } finally {
       if (mounted) {
         setState(() {
@@ -2784,6 +2785,8 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
         });
       }
     }
+    if (!mounted || json == null) return;
+    _showCompactPaymentNotice(context, 'Payment confirmed');
   }
 
   Future<void> _confirmDeliveryCash() async {
@@ -2819,26 +2822,32 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     if (snapshot.status == 'ready' || snapshot.status == 'picked_up') {
       _stageLocalStatus('completed');
     }
+    Map<String, dynamic>? json;
     try {
-      final json = await ApiService.confirmDeliveryCash(orderId: order.id);
+      json = await ApiService.confirmDeliveryCash(orderId: order.id);
       widget.onOrderUpdated?.call(Order.mergeStatusPatch(snapshot, json));
-      if (!mounted) return;
-      final completed = (json['status'] as String?) == 'completed';
-      _showCompactSellerNotice(
-        context,
-        completed ? 'Order completed' : 'Delivery fee confirmed',
-      );
     } catch (e) {
       if (!mounted) return;
       OrderPushCoordinator.dropHint(snapshot.id);
       setState(() => _pendingStatusOverride = null);
       widget.onOrderUpdated?.call(snapshot);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not confirm delivery fee: $e')),
+        SnackBar(
+          content: Text(
+            'Could not confirm delivery fee: ${ApiService.userFacingError(e)}',
+          ),
+        ),
       );
+      return;
     } finally {
       if (mounted) setState(() => _isConfirmingPayment = false);
     }
+    if (!mounted || json == null) return;
+    final completed = (json['status'] as String?) == 'completed';
+    _showCompactSellerNotice(
+      context,
+      completed ? 'Order completed' : 'Delivery fee confirmed',
+    );
   }
 
   Future<void> _confirmCashPayment() async {
@@ -2871,19 +2880,23 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     final snapshot = order;
     setState(() => _isConfirmingPayment = true);
     _stageLocalPayment(paymentStatus: 'paid');
+    Map<String, dynamic>? json;
     try {
-      final json = await ApiService.confirmCashPayment(orderId: order.id);
+      json = await ApiService.confirmCashPayment(orderId: order.id);
       widget.onOrderUpdated?.call(Order.mergeStatusPatch(snapshot, json));
-      if (!mounted) return;
-      _showCompactPaymentNotice(context, 'Payment received');
     } catch (e) {
       if (!mounted) return;
       OrderPushCoordinator.dropHint(snapshot.id);
       setState(() => _pendingPaymentOverride = null);
       widget.onOrderUpdated?.call(snapshot);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not confirm cash payment: $e')),
+        SnackBar(
+          content: Text(
+            'Could not confirm cash payment: ${ApiService.userFacingError(e)}',
+          ),
+        ),
       );
+      return;
     } finally {
       if (mounted) {
         setState(() {
@@ -2895,6 +2908,8 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
         });
       }
     }
+    if (!mounted || json == null) return;
+    _showCompactPaymentNotice(context, 'Payment received');
   }
 
   Future<void> _completeOrder() async {

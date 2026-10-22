@@ -358,21 +358,23 @@ class _SellerPaymentReconciliationScreenState
 
   Widget _summaryCard(String label, String value, {VoidCallback? onTap}) {
     final child = Container(
-      padding: const EdgeInsets.all(14),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE8EBEA)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: _muted)),
-          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontSize: 11, color: _muted)),
+          const SizedBox(height: 2),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w800,
               color: _ink,
             ),
@@ -381,7 +383,22 @@ class _SellerPaymentReconciliationScreenState
       ),
     );
     if (onTap == null) return child;
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(14), child: child);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: child,
+    );
+  }
+
+  Widget _summaryPair(Widget left, Widget right) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 8),
+        Expanded(child: right),
+      ],
+    );
   }
 
   Widget _locationRow({
@@ -448,36 +465,35 @@ class _SellerPaymentReconciliationScreenState
             ),
           ),
         ],
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1.55,
+          child: Column(
             children: [
-              _summaryCard('Total sales', _money(summary['totalSales'])),
-              _summaryCard('Collected', _money(summary['collected'])),
-              _summaryCard(
-                'Pending',
-                _money(summary['pending']),
-                onTap: () => _openDrill(
-                  const _DrillFilter(
-                    paymentPhase: 'PENDING',
-                    title: 'Pending payments',
+              _summaryPair(
+                _summaryCard('Total sales', _money(summary['totalSales'])),
+                _summaryCard('Collected', _money(summary['collected'])),
+              ),
+              const SizedBox(height: 8),
+              _summaryPair(
+                _summaryCard(
+                  'Pending',
+                  _money(summary['pending']),
+                  onTap: () => _openDrill(
+                    const _DrillFilter(
+                      paymentPhase: 'PENDING',
+                      title: 'Pending payments',
+                    ),
                   ),
                 ),
-              ),
-              _summaryCard(
-                'Pending orders',
-                '${summary['pendingOrderCount'] ?? 0}',
-                onTap: () => _openDrill(
-                  const _DrillFilter(
-                    paymentPhase: 'PENDING',
-                    title: 'Pending orders',
+                _summaryCard(
+                  'Pending orders',
+                  '${summary['pendingOrderCount'] ?? 0}',
+                  onTap: () => _openDrill(
+                    const _DrillFilter(
+                      paymentPhase: 'PENDING',
+                      title: 'Pending orders',
+                    ),
                   ),
                 ),
               ),
