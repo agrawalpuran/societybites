@@ -27,10 +27,18 @@ import FirebaseMessaging
     withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
   ) {
     Messaging.messaging().appDidReceiveMessage(notification.request.content.userInfo)
+    // Flutter/Firebase often complete with [] while the app is open, so the
+    // banner never appears. Union in alert + sound so iOS matches Android.
     super.userNotificationCenter(
       center,
       willPresent: notification,
-      withCompletionHandler: completionHandler
+      withCompletionHandler: { options in
+        if #available(iOS 14.0, *) {
+          completionHandler(options.union([.banner, .list, .sound, .badge]))
+        } else {
+          completionHandler(options.union([.alert, .sound, .badge]))
+        }
+      }
     )
   }
 

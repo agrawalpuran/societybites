@@ -146,6 +146,13 @@ class PushNotificationService {
         return;
       }
 
+      // Must be set after permission on iOS; otherwise foreground banners stay off.
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
       final platform = Platform.isIOS ? 'ios' : 'android';
       if (!_tokenRefreshBound) {
         _tokenRefreshBound = true;
