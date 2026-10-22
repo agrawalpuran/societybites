@@ -271,12 +271,10 @@ class PushNotificationService {
     RemoteMessage message,
   ) async {
     if (kIsWeb || !Platform.isAndroid) return;
-    final type = message.data['notificationType']?.toString() ?? '';
-    // Foreground new orders use the in-app full-screen sheet (sound/haptics there).
-    if (type == 'order_created') return;
     final title = message.notification?.title ?? 'SocietyBites';
     final body = message.notification?.body ?? '';
     if (body.isEmpty && message.notification?.title == null) return;
+    final type = message.data['notificationType']?.toString() ?? '';
     final urgent = type == 'order_created' ||
         message.data['urgent']?.toString() == '1';
     final orderId = message.data['orderId']?.toString();
@@ -285,6 +283,7 @@ class PushNotificationService {
         'title': title,
         'body': body,
         'urgent': urgent,
+        'notificationType': type,
         if (orderId != null && orderId.isNotEmpty) 'orderId': orderId,
       });
     } catch (err) {

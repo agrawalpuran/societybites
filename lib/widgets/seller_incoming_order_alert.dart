@@ -31,31 +31,41 @@ class SellerIncomingOrderAlert extends StatefulWidget {
     if (id.isEmpty) return;
     if (_openOrderIds.contains(id)) return;
     _openOrderIds.add(id);
-    await PushNotificationService.setIncomingOrderWakeScreen(true);
+    unawaited(PushNotificationService.setIncomingOrderWakeScreen(true));
     try {
-      await Navigator.of(context, rootNavigator: true).push<void>(
-        PageRouteBuilder<void>(
-          opaque: true,
-          barrierDismissible: false,
-          pageBuilder: (ctx, anim, secondary) {
-            return SellerIncomingOrderAlert(
-              orderId: id,
-              orderNumber: orderNumber,
-              onResolved: () {
-                if (Navigator.of(ctx).canPop()) {
-                  Navigator.of(ctx).pop();
-                }
-              },
-            );
-          },
-          transitionsBuilder: (ctx, anim, secondary, child) {
-            return FadeTransition(opacity: anim, child: child);
-          },
-        ),
+      await showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black.withValues(alpha: 0.72),
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (ctx, anim, secondary) {
+          return SellerIncomingOrderAlert(
+            orderId: id,
+            orderNumber: orderNumber,
+            onResolved: () {
+              if (Navigator.of(ctx).canPop()) {
+                Navigator.of(ctx).pop();
+              }
+            },
+          );
+        },
+        transitionBuilder: (ctx, anim, secondary, child) {
+          final curved = CurvedAnimation(
+            parent: anim,
+            curve: Curves.easeOutCubic,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.94, end: 1).animate(curved),
+              child: child,
+            ),
+          );
+        },
       );
     } finally {
       _openOrderIds.remove(id);
-      await PushNotificationService.setIncomingOrderWakeScreen(false);
+      unawaited(PushNotificationService.setIncomingOrderWakeScreen(false));
     }
   }
 

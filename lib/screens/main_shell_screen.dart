@@ -222,16 +222,20 @@ class _MainShellScreenState extends State<MainShellScreen>
         _navIndex = 2;
       });
     }
-    unawaited(
-      SellerIncomingOrderAlert.presentIfNeeded(
-        context,
-        orderId: orderId,
-        orderNumber: orderNumber,
-      ).then((_) {
-        if (!mounted) return;
-        _syncOrdersFromPush();
-      }),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ctx = PushNotificationService.navigatorKey.currentContext ?? context;
+      unawaited(
+        SellerIncomingOrderAlert.presentIfNeeded(
+          ctx,
+          orderId: orderId,
+          orderNumber: orderNumber,
+        ).then((_) {
+          if (!mounted) return;
+          _syncOrdersFromPush();
+        }),
+      );
+    });
   }
 
   Future<void> _syncOrdersFromPushAsync() async {

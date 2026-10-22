@@ -39,7 +39,14 @@ class MainActivity : FlutterActivity() {
                         val body = call.argument<String>("body") ?: ""
                         val urgent = call.argument<Boolean>("urgent") == true
                         val orderId = call.argument<String>("orderId")
-                        showLocalNotification(title, body, urgent, orderId)
+                        val notificationType = call.argument<String>("notificationType")
+                        showLocalNotification(
+                            title,
+                            body,
+                            urgent,
+                            orderId,
+                            notificationType,
+                        )
                         result.success(null)
                     }
                     "setIncomingOrderWake" -> {
@@ -134,14 +141,20 @@ class MainActivity : FlutterActivity() {
         body: String,
         urgent: Boolean,
         orderId: String?,
+        notificationType: String?,
     ) {
         createNotificationChannels()
         val channelId = if (urgent) NEW_ORDER_CHANNEL_ID else CHANNEL_ID
+        val type = notificationType?.trim().orEmpty().ifEmpty {
+            if (urgent) "order_created" else ""
+        }
         val launch = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             if (!orderId.isNullOrBlank()) {
                 putExtra(EXTRA_ORDER_ID, orderId)
-                putExtra(EXTRA_NOTIFICATION_TYPE, "order_created")
+                if (type.isNotEmpty()) {
+                    putExtra(EXTRA_NOTIFICATION_TYPE, type)
+                }
             }
         }
         val requestCode = (orderId?.hashCode() ?: System.currentTimeMillis().toInt()) and 0x7fffffff
