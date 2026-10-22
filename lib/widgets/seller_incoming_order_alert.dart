@@ -81,6 +81,7 @@ class _SellerIncomingOrderAlertState extends State<SellerIncomingOrderAlert> {
   String? _error;
   bool _loading = true;
   bool _busy = false;
+  bool _soundOn = true;
 
   /// `pending` → Accept/Reject. `accepted` → auto-confirmed ready-now order.
   _IncomingMode _mode = _IncomingMode.loading;
@@ -90,7 +91,6 @@ class _SellerIncomingOrderAlertState extends State<SellerIncomingOrderAlert> {
     super.initState();
     unawaited(_load());
     unawaited(HapticFeedback.heavyImpact());
-    SystemSound.play(SystemSoundType.alert);
   }
 
   Future<void> _load() async {
@@ -138,39 +138,27 @@ class _SellerIncomingOrderAlertState extends State<SellerIncomingOrderAlert> {
       );
       if (!mounted) return;
       widget.onResolved?.call();
-    } catch (_) {
+    } catch (e) {
       OrderPushCoordinator.dropHint(order.id);
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not accept order')),
+        SnackBar(content: Text(ApiService.userFacingError(e))),
       );
     }
   }
 
-  Future<void> _startPreparing() async {
-    final order = _order;
-    if (order == null || _busy || order.status != 'accepted') return;
-    setState(() => _busy = true);
-    OrderPushCoordinator.stageHint(
-      OrderPushHint(orderId: order.id, status: 'preparing'),
-    );
-    try {
-      await ApiService.advanceOrderStatus(
-        orderId: order.id,
-        currentStatus: order.status,
-        nextStatus: 'preparing',
-      );
-      if (!mounted) return;
-      widget.onResolved?.call();
-    } catch (_) {
-      OrderPushCoordinator.dropHint(order.id);
-      if (!mounted) return;
-      setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not update order')),
-      );
-    }
+  /// Auto-accepted orders are already `accepted`. `preparing` is retired —
+  /// Kitchen's next step is Mark Ready. This button only acknowledges.
+  void _acknowledgePreparing() {
+    if (_busy) return;
+    widget.onResolved?.call();
+  }
+
+  void _muteSound() {
+    if (!_soundOn) return;
+    setState(() => _soundOn = false);
+    unawaited(PushNotificationService.stopIncomingOrderSound());
   }
 
   Future<void> _reject() async {
@@ -188,12 +176,12 @@ class _SellerIncomingOrderAlertState extends State<SellerIncomingOrderAlert> {
       );
       if (!mounted) return;
       widget.onResolved?.call();
-    } catch (_) {
+    } catch (e) {
       OrderPushCoordinator.dropHint(order.id);
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not reject order')),
+        SnackBar(content: Text(ApiService.userFacingError(e))),
       );
     }
   }
@@ -218,12 +206,33 @@ class _SellerIncomingOrderAlertState extends State<SellerIncomingOrderAlert> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(
-                  Icons.notifications_active_rounded,
-                  color: Color(0xFFFFB020),
+                Icon(
+                  _soundOn
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_off_rounded,
+                  color: _soundOn
+                      ? const Color(0xFFFFB020)
+                      : const Color(0xFF8A9491),
                   size: 52,
                 ),
-                const SizedBox(height: 20),
+                if (_soundOn) ...[
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: _muteSound,
+                    icon: const Icon(
+                      Icons.volume_off_rounded,
+                      color: Color(0xFFFFB020),
+                    ),
+                    label: const Text(
+                      'Stop sound',
+                      style: TextStyle(
+                        color: Color(0xFFFFB020),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
                 Text(
                   _titleForMode(_mode),
                   textAlign: TextAlign.center,
@@ -314,8 +323,7 @@ class _SellerIncomingOrderAlertState extends State<SellerIncomingOrderAlert> {
                   ] else if (_mode == _IncomingMode.autoAccepted) ...[
                     _primaryButton(
                       label: 'Start preparing',
-                      onPressed: _busy ? null : _startPreparing,
-                      busy: _busy,
+                      onPressed: _busy ? null : _acknowledgePreparing,
                     ),
                     const SizedBox(height: 12),
                     _outlineButton(

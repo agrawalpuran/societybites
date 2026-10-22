@@ -267,6 +267,14 @@ class PushNotificationService {
     } catch (_) {}
   }
 
+  /// Silence the looping new-order sound without closing the overlay.
+  static Future<void> stopIncomingOrderSound() async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      await _androidChannel.invokeMethod('stopIncomingOrderSound');
+    } catch (_) {}
+  }
+
   static Future<void> _showAndroidForegroundNotification(
     RemoteMessage message,
   ) async {

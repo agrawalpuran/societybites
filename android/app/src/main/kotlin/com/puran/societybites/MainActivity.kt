@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.os.Build
 import android.provider.Settings
 import android.view.WindowManager
@@ -24,6 +25,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private var notificationChannel: MethodChannel? = null
+    private var incomingOrderPlayer: MediaPlayer? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -52,6 +54,10 @@ class MainActivity : FlutterActivity() {
                     "setIncomingOrderWake" -> {
                         val active = call.argument<Boolean>("active") == true
                         setIncomingOrderWake(active)
+                        result.success(null)
+                    }
+                    "stopIncomingOrderSound" -> {
+                        stopIncomingOrderSound()
                         result.success(null)
                     }
                     else -> result.notImplemented()
@@ -94,13 +100,50 @@ class MainActivity : FlutterActivity() {
                     WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
             )
+            startIncomingOrderSound()
         } else {
             window.clearFlags(
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
                     WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
             )
+            stopIncomingOrderSound()
         }
+    }
+
+    override fun onDestroy() {
+        stopIncomingOrderSound()
+        super.onDestroy()
+    }
+
+    private fun startIncomingOrderSound() {
+        stopIncomingOrderSound()
+        try {
+            val uri = Settings.System.DEFAULT_NOTIFICATION_URI
+            incomingOrderPlayer = MediaPlayer().apply {
+                setDataSource(this@MainActivity, uri)
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build(),
+                )
+                isLooping = true
+                prepare()
+                start()
+            }
+        } catch (_: Exception) {
+            incomingOrderPlayer = null
+        }
+    }
+
+    private fun stopIncomingOrderSound() {
+        try {
+            incomingOrderPlayer?.stop()
+        } catch (_: Exception) {
+        }
+        incomingOrderPlayer?.release()
+        incomingOrderPlayer = null
     }
 
     private fun createNotificationChannels() {
@@ -181,9 +224,11 @@ class MainActivity : FlutterActivity() {
             .setContentIntent(pending)
 
         if (urgent) {
+            val soundUri = Settings.System.DEFAULT_NOTIFICATION_URI
             builder
                 .setFullScreenIntent(pending, true)
                 .setVibrate(longArrayOf(0, 400, 200, 400, 200, 400))
+                .setSound(soundUri)
                 .setDefaults(NotificationCompat.DEFAULT_SOUND)
         }
 
