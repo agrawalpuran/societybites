@@ -34,6 +34,7 @@ void main() {
     final life = SellerOrderLifecycle.forStatus('completed');
     expect(life.hasPrimaryAction, isFalse);
     expect(life.showReject, isFalse);
+    expect(life.badge, 'COMPLETED');
   });
 
   test('seller action badge ignores waiting-on-buyer UPI', () {

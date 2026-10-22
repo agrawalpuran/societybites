@@ -89,7 +89,7 @@ void main() {
           body: SingleChildScrollView(
             child: SellerActiveOrderCard(
               order: Order.fromJson(_orderJson()),
-              onAction: (_, _) async {},
+              onAction: (_, _, {deliveryCharge, deliveryCollectBy}) async {},
               onOrderUpdated: (_) {},
               onPaymentConfirmed: () async {},
               onReject: (_) async {},

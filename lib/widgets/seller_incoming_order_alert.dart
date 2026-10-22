@@ -32,7 +32,8 @@ class SellerIncomingOrderAlert extends StatefulWidget {
   }) async {
     final id = orderId.trim();
     if (id.isEmpty) return;
-    if (_openOrderIds.contains(id)) return;
+    if (_openOrderIds.contains(id) || _presentedOrderIds.contains(id)) return;
+    _presentedOrderIds.add(id);
     _openOrderIds.add(id);
     unawaited(PushNotificationService.setIncomingOrderWakeScreen(true));
     try {
@@ -74,6 +75,7 @@ class SellerIncomingOrderAlert extends StatefulWidget {
   }
 
   static final Set<String> _openOrderIds = {};
+  static final Set<String> _presentedOrderIds = {};
 
   @override
   State<SellerIncomingOrderAlert> createState() =>

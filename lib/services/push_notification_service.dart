@@ -47,6 +47,9 @@ class PushNotificationService {
   /// Fired when a new seller order needs the full-screen accept UI.
   static void Function(String orderId, String? orderNumber)? onIncomingSellerOrder;
 
+  /// Switch an already-mounted shell tab (notification tap while backgrounded).
+  static void Function(int tabIndex)? onOpenShellTab;
+
   static const _sellerTypes = {
     'order_created',
     'buyer_marked_paid',
@@ -317,16 +320,40 @@ class PushNotificationService {
   }
 
   static void _handleOpen(RemoteMessage message) {
+    unawaited(_openFromNotification(message));
+  }
+
+  static Future<void> _openFromNotification(RemoteMessage message) async {
+    await OrderPushCoordinator.recordFromMessage(message);
     final type = message.data['notificationType'] ?? '';
     final recipientRole = message.data['recipientRole'] ?? '';
     final tabIndex = type == 'order_message'
         ? (recipientRole == 'seller' ? 2 : 1)
         : (_sellerTypes.contains(type) ? 2 : 1);
-    unawaited(_onOrderPushMessage(message));
-    final nav = navigatorKey.currentState;
-    if (nav == null) return;
-
     final orderId = message.data['orderId']?.toString().trim() ?? '';
+    final orderNumber = message.data['orderNumber']?.toString();
+
+    final liveShell = onForegroundOrderUpdate != null ||
+        onIncomingSellerOrder != null ||
+        onOpenShellTab != null;
+    if (liveShell) {
+      onOpenShellTab?.call(tabIndex);
+      onForegroundOrderUpdate?.call();
+      if (type == 'order_created' && orderId.isNotEmpty) {
+        _presentIncomingOrder(orderId, orderNumber);
+      }
+      return;
+    }
+
+    final nav = navigatorKey.currentState;
+    if (nav == null) {
+      if (type == 'order_created' && orderId.isNotEmpty) {
+        _pendingIncomingOrderId = orderId;
+        _pendingIncomingOrderNumber = orderNumber;
+      }
+      return;
+    }
+
     nav.pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => MainShellScreen(
@@ -337,18 +364,9 @@ class PushNotificationService {
       (_) => false,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      PushNotificationService.onForegroundOrderUpdate?.call();
+      onForegroundOrderUpdate?.call();
       if (type == 'order_created' && orderId.isNotEmpty) {
-        final ctx = navigatorKey.currentContext;
-        if (ctx != null) {
-          unawaited(
-            SellerIncomingOrderAlert.presentIfNeeded(
-              ctx,
-              orderId: orderId,
-              orderNumber: message.data['orderNumber']?.toString(),
-            ),
-          );
-        }
+        _presentIncomingOrder(orderId, orderNumber);
       }
     });
   }

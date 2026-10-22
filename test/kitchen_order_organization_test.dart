@@ -47,6 +47,7 @@ Map<String, dynamic> _orderJson({
   String availabilityMode = listingAvailabilityReadyNow,
   String catalogType = listingCatalogRegular,
   String paymentStatus = 'pending',
+  String? completedAt,
 }) {
   return {
     'id': id,
@@ -58,6 +59,7 @@ Map<String, dynamic> _orderJson({
     'subtotal': 80,
     'communityFee': 0,
     'createdAt': DateTime.now().toUtc().toIso8601String(),
+    if (completedAt != null) 'completedAt': completedAt,
     'items': [
       {
         'quantity': 1,
@@ -501,5 +503,107 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('kitchen-active-badge')), findsOneWidget);
+  });
+
+  testWidgets('completed kitchen orders show COMPLETED, not ACTIVE', (
+    tester,
+  ) async {
+    await _pumpKitchen(
+      tester,
+      orders: [
+        _orderJson(
+          id: 'done',
+          name: 'Paneer',
+          status: 'completed',
+          paymentStatus: 'paid',
+          completedAt: DateTime.now().toUtc().toIso8601String(),
+        ),
+      ],
+    );
+    expect(find.text('COMPLETED'), findsOneWidget);
+    expect(find.text('ACTIVE'), findsNothing);
+    expect(find.text('PAID ✓'), findsOneWidget);
+  });
+
+  testWidgets('seeded push order survives a kitchen refresh that omits it', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'user_id': 'seller-1',
+      'user_role': 'seller',
+      'user_name': 'Anita',
+      'society_id': 'soc-1',
+    });
+    await tester.binding.setSurfaceSize(const Size(800, 2200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final key = GlobalKey<SellerDashboardScreenState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SellerDashboardScreen(
+          key: key,
+          fetchOrders: () async => const [],
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    key.currentState!.seedIncomingOrder(
+      Order.fromJson(_orderJson(id: 'pushed', name: 'Paneer')),
+    );
+    await tester.pump();
+    expect(find.text('Paneer'), findsWidgets);
+
+    await key.currentState!.refreshUnread();
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Paneer'), findsWidgets);
+    expect(find.text('Accept Order'), findsOneWidget);
+  });
+
+  testWidgets('kitchen poll applies completed status from the server', (
+    tester,
+  ) async {
+    final orders = [
+      _orderJson(
+        id: 'live',
+        name: 'Paneer',
+        status: 'ready',
+        paymentStatus: 'paid',
+      ),
+    ];
+    SharedPreferences.setMockInitialValues({
+      'user_id': 'seller-1',
+      'user_role': 'seller',
+      'user_name': 'Anita',
+      'society_id': 'soc-1',
+    });
+    await tester.binding.setSurfaceSize(const Size(800, 2200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final key = GlobalKey<SellerDashboardScreenState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SellerDashboardScreen(
+          key: key,
+          fetchOrders: () async => orders,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('READY'), findsOneWidget);
+
+    orders[0] = _orderJson(
+      id: 'live',
+      name: 'Paneer',
+      status: 'completed',
+      paymentStatus: 'paid',
+      completedAt: DateTime.now().toUtc().toIso8601String(),
+    );
+    await key.currentState!.refreshUnread();
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('COMPLETED'), findsOneWidget);
+    expect(find.text('READY'), findsNothing);
   });
 }

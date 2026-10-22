@@ -14,6 +14,7 @@ import '../models/order_lifecycle.dart';
 import '../models/seller_order_history.dart';
 import '../services/api_service.dart';
 import '../services/order_push_coordinator.dart';
+import '../services/push_notification_service.dart';
 import '../widgets/order_lifecycle_dialogs.dart';
 import '../services/my_listings_cache.dart';
 import '../services/my_listings_prefetch.dart';
@@ -253,6 +254,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
         if (json == null) continue;
         final order = Order.fromJson(json);
         if (!order.isSellerKitchenOrderFor(sellerId)) continue;
+        _incomingSeedIds.add(order.id);
         _mergeOrderFromPrefetch(order, sellerUserId: sellerId);
         inserted = true;
       }
@@ -329,48 +331,42 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     if (hints.isNotEmpty) applyPushHints(hints);
   }
 
-  /// Lightweight poll: refresh unread badges without a full kitchen reload.
+  /// Silent kitchen sync: status, new orders, and unread — not just badges.
+  /// iOS often misses foreground FCM, so this poll is the live-update path.
   Future<void> refreshUnread() async {
     if (!_hasSuccessfullyLoaded) return;
-    try {
-      final List<Map<String, dynamic>> raw;
-      final injected = widget.fetchOrders;
-      if (injected != null) {
-        raw = await injected();
-      } else {
-        final pages = await Future.wait([
-          ApiService.getSellerOrderBucket(
-            scope: 'active',
-            kitchenSellerId: _kitchenSellerId,
-          ),
-          ApiService.getSellerOrderBucket(
-            scope: 'recent_past',
-            kitchenSellerId: _kitchenSellerId,
-          ),
-        ]);
-        raw = [...pages[0].orders, ...pages[1].orders];
+    final seen = <String>{
+      ..._activeOrders.map((order) => order.id),
+      ..._pastOrders.map((order) => order.id),
+    };
+    await _loadOrders();
+    if (!mounted) return;
+    _alertForNewlyArrivedKitchenOrders(seen);
+  }
+
+  void _alertForNewlyArrivedKitchenOrders(Set<String> previouslySeen) {
+    final present = PushNotificationService.onIncomingSellerOrder;
+    if (present == null) return;
+    final now = DateTime.now();
+    Order? newest;
+    for (final order in _activeOrders) {
+      if (previouslySeen.contains(order.id) || order.isTerminal) continue;
+      if (order.status != 'pending' && order.status != 'accepted') continue;
+      final created = order.createdAt;
+      if (created != null &&
+          now.difference(created) > const Duration(minutes: 8)) {
+        continue;
       }
-      final counts = <String, int>{};
-      for (final json in raw) {
-        final parsed = Order.fromJson(json);
-        counts[parsed.id] = parsed.unreadMessageCount;
+      if (newest == null ||
+          (order.createdAt != null &&
+              newest.createdAt != null &&
+              order.createdAt!.isAfter(newest.createdAt!)) ||
+          (order.createdAt != null && newest.createdAt == null)) {
+        newest = order;
       }
-      if (!mounted) return;
-      var changed = false;
-      List<Order> mapped(List<Order> list) => list.map((order) {
-        final next = counts[order.id] ?? order.unreadMessageCount;
-        if (next == order.unreadMessageCount) return order;
-        changed = true;
-        return order.withUnreadCount(next);
-      }).toList();
-      final nextActive = mapped(_activeOrders);
-      final nextPast = mapped(_pastOrders);
-      if (!changed) return;
-      setState(() {
-        _activeOrders = nextActive;
-        _pastOrders = nextPast;
-      });
-    } catch (_) {}
+    }
+    if (newest == null) return;
+    present(newest.id, newest.orderId);
   }
 
   /// Bottom-nav entry into My Kitchen always lands on seller orders.
@@ -862,6 +858,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       _publishKitchenAttention();
       OrderPushCoordinator.clearHintsReconciled([...active, ...past]);
       _applyPendingPushHints();
+      unawaited(_retryMissingPushOrders());
     } catch (e) {
       if (!mounted || gen != _ordersLoadGen) return;
 
@@ -874,6 +871,50 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       });
     }
     _notifyInitialLoadSettled();
+  }
+
+  Set<String> _pushFocusOrderIds() {
+    final ids = <String>{..._incomingSeedIds};
+    final focus = widget.priorityOrderId?.trim() ?? '';
+    if (focus.isNotEmpty) ids.add(focus);
+    for (final hint in OrderPushCoordinator.pendingHints) {
+      if (!orderPushHintTargetsSellerKitchen(hint)) continue;
+      if (hint.orderId.isNotEmpty) ids.add(hint.orderId);
+    }
+    return ids;
+  }
+
+  Future<void> _retryMissingPushOrders() async {
+    if (widget.fetchOrders != null) return;
+    final sellerId = await SessionService.getUserId();
+    for (var attempt = 0; attempt < 4; attempt++) {
+      if (!mounted) return;
+      if (attempt > 0) {
+        await Future<void>.delayed(Duration(milliseconds: 350 * attempt));
+        if (!mounted) return;
+      }
+      final missing = _pushFocusOrderIds().where(_orderIdMissing).toList();
+      if (missing.isEmpty) return;
+      var inserted = false;
+      for (final id in missing) {
+        if (!_orderIdMissing(id)) continue;
+        try {
+          final json = await ApiService.getOrderById(id);
+          final order = Order.fromJson(json);
+          if (!order.isSellerKitchenOrderFor(sellerId)) continue;
+          _incomingSeedIds.add(order.id);
+          _mergeOrderFromPrefetch(order, sellerUserId: sellerId);
+          inserted = true;
+        } catch (_) {}
+      }
+      if (!inserted || !mounted) continue;
+      setState(() {
+        _isLoading = false;
+        _hasSuccessfullyLoaded = true;
+        _error = null;
+      });
+      _publishKitchenAttention();
+    }
   }
 
   ({List<Order> active, List<Order> past}) _retainIncomingSeeds(

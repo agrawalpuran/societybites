@@ -73,6 +73,36 @@ class SellerOrderLifecycle {
           headline: 'Ready for Pickup',
           primaryLabel: 'Complete Order',
         );
+      case 'completed':
+        return const SellerOrderLifecycle(
+          showAccept: false,
+          showReject: false,
+          showMarkReady: false,
+          showComplete: false,
+          treatAsReady: true,
+          badge: 'COMPLETED',
+          primaryLabel: '',
+        );
+      case 'cancelled':
+        return const SellerOrderLifecycle(
+          showAccept: false,
+          showReject: false,
+          showMarkReady: false,
+          showComplete: false,
+          treatAsReady: false,
+          badge: 'CANCELLED',
+          primaryLabel: '',
+        );
+      case 'rejected':
+        return const SellerOrderLifecycle(
+          showAccept: false,
+          showReject: false,
+          showMarkReady: false,
+          showComplete: false,
+          treatAsReady: false,
+          badge: 'ORDER REJECTED',
+          primaryLabel: '',
+        );
       default:
         return none;
     }

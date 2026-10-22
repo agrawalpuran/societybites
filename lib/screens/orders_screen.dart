@@ -378,8 +378,8 @@ class OrdersScreenState extends State<OrdersScreen>
     }
   }
 
-  /// Lightweight poll: refresh unread badges without spinner or campaign fetches.
-  Future<void> refreshUnread() => _applyUnreadCounts();
+  /// Silent list sync (status + unread) so buyer web/iOS stay aligned without FCM.
+  Future<void> refreshUnread() => _loadOrders(fetchCampaignMetadata: false);
 
   Future<void> _loadOrders({
     bool isInitial = false,
@@ -460,37 +460,6 @@ class OrdersScreenState extends State<OrdersScreen>
       }
     }
     if (isInitial) _notifyInitialLoadSettled();
-  }
-
-  Future<void> _applyUnreadCounts() async {
-    if (!_buyer.hasSuccessfullyLoaded) return;
-    try {
-      final fetch =
-          widget.fetchOrders ??
-          ({required String role}) => ApiService.getOrders(role: role);
-      final orders = await fetch(role: 'buyer');
-      final counts = <String, int>{};
-      for (final json in orders) {
-        final parsed = Order.fromJson(json);
-        counts[parsed.id] = parsed.unreadMessageCount;
-      }
-      if (!mounted) return;
-      var changed = false;
-      List<Order> mapped(List<Order> list) => list.map((order) {
-        final next = counts[order.id] ?? 0;
-        if (next == order.unreadMessageCount) return order;
-        changed = true;
-        return order.withUnreadCount(next);
-      }).toList();
-      final nextActive = mapped(_buyer.active);
-      final nextPast = mapped(_buyer.past);
-      if (changed) {
-        setState(() {
-          _buyer.active = nextActive;
-          _buyer.past = nextPast;
-        });
-      }
-    } catch (_) {}
   }
 
   void _notifyInitialLoadSettled() {

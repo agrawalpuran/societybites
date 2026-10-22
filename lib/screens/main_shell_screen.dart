@@ -70,6 +70,7 @@ class _MainShellScreenState extends State<MainShellScreen>
     );
     PushNotificationService.onForegroundOrderUpdate = _syncOrdersFromPush;
     PushNotificationService.onIncomingSellerOrder = _presentIncomingSellerOrder;
+    PushNotificationService.onOpenShellTab = _selectTab;
     PushNotificationService.tryPresentPendingIncomingOrder();
     CartController.instance.onShowOrdersAfterPlace = _showOrdersAfterCheckout;
     CartController.instance.onSelectShellTab = _selectTab;
@@ -138,6 +139,9 @@ class _MainShellScreenState extends State<MainShellScreen>
     if (PushNotificationService.onIncomingSellerOrder ==
         _presentIncomingSellerOrder) {
       PushNotificationService.onIncomingSellerOrder = null;
+    }
+    if (PushNotificationService.onOpenShellTab == _selectTab) {
+      PushNotificationService.onOpenShellTab = null;
     }
     if (identical(
       CartController.instance.onShowOrdersAfterPlace,
@@ -306,7 +310,12 @@ class _MainShellScreenState extends State<MainShellScreen>
       ),
     );
     if (mountKitchen) {
-      final kitchenFocus = widget.initialIndex == 2 ? widget.focusOrderId : null;
+      final hinted = sellerKitchenHints
+          .map((hint) => hint.orderId)
+          .firstWhere((id) => id.isNotEmpty, orElse: () => '');
+      final kitchenFocus = (widget.focusOrderId?.isNotEmpty ?? false)
+          ? widget.focusOrderId
+          : (hinted.isEmpty ? null : hinted);
       unawaited(
         _dashboardKey.currentState?.prefetchOrdersFromPush(
           focusOrderId: kitchenFocus,
@@ -447,8 +456,7 @@ class _MainShellScreenState extends State<MainShellScreen>
           _dashboardMounted
               ? SellerDashboardScreen(
                   key: _dashboardKey,
-                  priorityOrderId:
-                      widget.initialIndex == 2 ? widget.focusOrderId : null,
+                  priorityOrderId: widget.focusOrderId,
                   onInitialLoadSettled: _preload.onDashboardInitialLoadSettled,
                   onListingCreated: _onListingPublishedToHome,
                   onStartSelling: _onMarketplaceStartSelling,
