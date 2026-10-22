@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../models/food_type.dart';
 import '../services/api_service.dart';
+import '../services/listing_variants_cache.dart';
 import '../utils/listing_portion_label.dart';
+import '../web/web_breakpoints.dart';
+import 'content_skeleton.dart';
 import 'listing_image.dart';
 
 /// Swiggy-style size picker before adding a multi-size listing to the cart.
@@ -13,11 +18,13 @@ class ListingVariantPickerSheet extends StatefulWidget {
     required this.seed,
     this.initialSelectedId,
     this.initialQty = 1,
+    this.asWebDialog = false,
   });
 
   final FoodItem seed;
   final String? initialSelectedId;
   final int initialQty;
+  final bool asWebDialog;
 
   /// Loads siblings and returns the chosen variant + qty, or null if cancelled.
   static Future<({FoodItem food, int quantity})?> show(
@@ -25,14 +32,33 @@ class ListingVariantPickerSheet extends StatefulWidget {
     required FoodItem seed,
     String? initialSelectedId,
   }) {
+    final picker = ListingVariantPickerSheet(
+      seed: seed,
+      initialSelectedId: initialSelectedId,
+      asWebDialog: useWebMarketplaceLayout(context),
+    );
+    if (useWebMarketplaceLayout(context)) {
+      return showDialog<({FoodItem food, int quantity})>(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.45),
+        builder: (ctx) => Dialog(
+          backgroundColor: const Color(0xFFF8FAF9),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440, maxHeight: 520),
+            child: picker,
+          ),
+        ),
+      );
+    }
     return showModalBottomSheet<({FoodItem food, int quantity})>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => ListingVariantPickerSheet(
-        seed: seed,
-        initialSelectedId: initialSelectedId,
-      ),
+      builder: (ctx) => picker,
     );
   }
 
@@ -45,55 +71,74 @@ class _ListingVariantPickerSheetState extends State<ListingVariantPickerSheet> {
   List<FoodItem> _variants = const [];
   FoodItem? _selected;
   int _qty = 1;
-  bool _loading = true;
+  bool _fetchingSiblings = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _qty = widget.initialQty.clamp(1, 99);
-    _selected = widget.seed;
-    _load();
+    final cached = ListingVariantsCache.getForSeed(widget.seed);
+    if (cached != null) {
+      _applyRows(cached);
+    } else {
+      _variants = [widget.seed];
+      _selected = widget.seed;
+      unawaited(_load());
+    }
+  }
+
+  List<FoodItem> _sortedVariants(List<FoodItem> variants) {
+    return [...variants]
+      ..sort((a, b) {
+        final byPrice = a.price.compareTo(b.price);
+        if (byPrice != 0) return byPrice;
+        return (a.variantLabel ?? '').compareTo(b.variantLabel ?? '');
+      });
+  }
+
+  void _applyRows(List<Map<String, dynamic>> rows) {
+    var variants = rows.map(FoodItem.fromJson).toList();
+    if (variants.isEmpty) variants = [widget.seed];
+    variants = _sortedVariants(variants);
+    final preferredId = widget.initialSelectedId ?? widget.seed.id;
+    final match = variants.where((v) => v.id == preferredId);
+    final selected = match.isNotEmpty
+        ? match.first
+        : variants.firstWhere(
+            (v) => v.canAddToCart && !v.isKitchenClosed,
+            orElse: () => variants.first,
+          );
+    final maxQty = selected.buyerMaxCartQuantity;
+    setState(() {
+      _variants = variants;
+      _selected = selected;
+      _fetchingSiblings = false;
+      _error = null;
+      _qty = maxQty < 1 ? 1 : 1.clamp(1, maxQty);
+    });
   }
 
   Future<void> _load() async {
+    if (_fetchingSiblings) return;
     setState(() {
-      _loading = true;
+      _fetchingSiblings = true;
       _error = null;
     });
     try {
       final rows = await ApiService.getListingVariants(widget.seed.id);
       if (!mounted) return;
-      var variants = rows.map(FoodItem.fromJson).toList();
-      if (variants.isEmpty) variants = [widget.seed];
-      variants = [...variants]
-        ..sort((a, b) {
-          final byPrice = a.price.compareTo(b.price);
-          if (byPrice != 0) return byPrice;
-          return (a.variantLabel ?? '').compareTo(b.variantLabel ?? '');
-        });
-      final preferredId = widget.initialSelectedId ?? widget.seed.id;
-      final match = variants.where((v) => v.id == preferredId);
-      final selected = match.isNotEmpty
-          ? match.first
-          : variants.firstWhere(
-              (v) => v.canAddToCart && !v.isKitchenClosed,
-              orElse: () => variants.first,
-            );
-      final maxQty = selected.buyerMaxCartQuantity;
-      setState(() {
-        _variants = variants;
-        _selected = selected;
-        _loading = false;
-        _qty = maxQty < 1 ? 1 : 1.clamp(1, maxQty);
-      });
+      ListingVariantsCache.put(widget.seed, rows);
+      _applyRows(rows);
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _variants = [widget.seed];
-        _selected = widget.seed;
-        _loading = false;
-        _error = 'Could not load sizes. You can still add this option.';
+        if (_variants.isEmpty) {
+          _variants = [widget.seed];
+          _selected = widget.seed;
+        }
+        _fetchingSiblings = false;
+        _error = 'Could not load all sizes. You can still add this option.';
       });
     }
   }
@@ -115,12 +160,205 @@ class _ListingVariantPickerSheetState extends State<ListingVariantPickerSheet> {
     Navigator.pop(context, (food: selected, quantity: _qty));
   }
 
+  int get _expectedOptionCount {
+    final count = widget.seed.variantOptionCount ?? 0;
+    if (count > 1) return count;
+    return _variants.length;
+  }
+
+  Widget _buildOptionsList(FoodItem selected) {
+    final expectedMore = _fetchingSiblings &&
+        _expectedOptionCount > _variants.length;
+    final skeletonRows = expectedMore
+        ? (_expectedOptionCount - _variants.length).clamp(1, 3)
+        : 0;
+
+    return ListView(
+      shrinkWrap: true,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      children: [
+        if (_error != null) ...[
+          Text(
+            _error!,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6A7774),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (_fetchingSiblings)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: LinearProgressIndicator(
+              minHeight: 2,
+              color: Color(0xFF0E5A47),
+              backgroundColor: Color(0xFFE8F0EC),
+            ),
+          ),
+        const Text(
+          'Quantity',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF101617),
+          ),
+        ),
+        const SizedBox(height: 2),
+        const Text(
+          'Select any 1',
+          style: TextStyle(
+            fontSize: 13,
+            color: Color(0xFF6A7774),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 12),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFEAEFED)),
+          ),
+          child: Column(
+            children: [
+              for (var i = 0; i < _variants.length; i++) ...[
+                if (i > 0)
+                  const Divider(height: 1, color: Color(0xFFEAEFED)),
+                _VariantOptionRow(
+                  food: _variants[i],
+                  selected: _variants[i].id == selected.id,
+                  onTap: () => _select(_variants[i]),
+                ),
+              ],
+              for (var s = 0; s < skeletonRows; s++) ...[
+                if (_variants.isNotEmpty || s > 0)
+                  const Divider(height: 1, color: Color(0xFFEAEFED)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  child: SkeletonBlock(height: 20, radius: 8),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChrome(BuildContext context, FoodItem selected) {
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!widget.asWebDialog) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD4DED9),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, widget.asWebDialog ? 16 : 14, 8, 8),
+          child: Row(
+            children: [
+              ListingImage(
+                food: widget.seed,
+                width: 56,
+                height: 56,
+                borderRadius: 12,
+                iconSize: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  widget.seed.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF101617),
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+                color: const Color(0xFF3A4644),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: Color(0xFFEAEFED)),
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: widget.asWebDialog
+                ? 300
+                : MediaQuery.sizeOf(context).height * 0.42,
+          ),
+          child: _buildOptionsList(selected),
+        ),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, bottom > 0 ? 8 : 12),
+            child: Row(
+              children: [
+                _QtyStepper(
+                  qty: _qty,
+                  max: selected.buyerMaxCartQuantity,
+                  onChanged: (next) => setState(() => _qty = next),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: selected.canAddToCart &&
+                              !selected.isKitchenClosed
+                          ? _confirm
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0E5A47),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFFB8C4C0),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Text(
+                        'Add Item | ₹${(selected.price * _qty).toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final selected = _selected ?? widget.seed;
-    final bottom = MediaQuery.paddingOf(context).bottom;
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.72;
 
+    if (widget.asWebDialog) {
+      return _buildChrome(context, selected);
+    }
+
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.72;
     return Align(
       alignment: Alignment.bottomCenter,
       child: ConstrainedBox(
@@ -129,165 +367,9 @@ class _ListingVariantPickerSheetState extends State<ListingVariantPickerSheet> {
           color: const Color(0xFFF8FAF9),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           clipBehavior: Clip.antiAlias,
-          child: SizedBox(
-            height: maxHeight,
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD4DED9),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
-                  child: Row(
-                    children: [
-                      ListingImage(
-                        food: widget.seed,
-                        width: 56,
-                        height: 56,
-                        borderRadius: 12,
-                        iconSize: 28,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          widget.seed.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF101617),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close_rounded),
-                        color: const Color(0xFF3A4644),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1, color: Color(0xFFEAEFED)),
-                Expanded(
-                  child: _loading
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: Color(0xFF0E5A47),
-                          ),
-                        )
-                      : ListView(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                          children: [
-                            if (_error != null) ...[
-                              Text(
-                                _error!,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF6A7774),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                            ],
-                            const Text(
-                              'Quantity',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF101617),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              'Select any 1',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF6A7774),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFFEAEFED),
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  for (var i = 0; i < _variants.length; i++) ...[
-                                    if (i > 0)
-                                      const Divider(
-                                        height: 1,
-                                        color: Color(0xFFEAEFED),
-                                      ),
-                                    _VariantOptionRow(
-                                      food: _variants[i],
-                                      selected: _variants[i].id == selected.id,
-                                      onTap: () => _select(_variants[i]),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-                SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(16, 8, 16, bottom > 0 ? 8 : 12),
-                    child: Row(
-                      children: [
-                        _QtyStepper(
-                          qty: _qty,
-                          max: selected.buyerMaxCartQuantity,
-                          onChanged: (next) => setState(() => _qty = next),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: ElevatedButton(
-                              onPressed: selected.canAddToCart &&
-                                      !selected.isKitchenClosed &&
-                                      !_loading
-                                  ? _confirm
-                                  : null,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0E5A47),
-                                foregroundColor: Colors.white,
-                                disabledBackgroundColor:
-                                    const Color(0xFFB8C4C0),
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                              child: Text(
-                                'Add Item | ₹${(selected.price * _qty).toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: _buildChrome(context, selected),
           ),
         ),
       ),
