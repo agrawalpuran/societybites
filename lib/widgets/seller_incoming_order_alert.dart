@@ -15,17 +15,20 @@ class SellerIncomingOrderAlert extends StatefulWidget {
     required this.orderId,
     this.orderNumber,
     this.onResolved,
+    this.onOrderLoaded,
   });
 
   final String orderId;
   final String? orderNumber;
   final VoidCallback? onResolved;
+  final ValueChanged<Order>? onOrderLoaded;
 
   /// Show once per orderId. Returns when dismissed.
   static Future<void> presentIfNeeded(
     BuildContext context, {
     required String orderId,
     String? orderNumber,
+    ValueChanged<Order>? onOrderLoaded,
   }) async {
     final id = orderId.trim();
     if (id.isEmpty) return;
@@ -42,6 +45,7 @@ class SellerIncomingOrderAlert extends StatefulWidget {
           return SellerIncomingOrderAlert(
             orderId: id,
             orderNumber: orderNumber,
+            onOrderLoaded: onOrderLoaded,
             onResolved: () {
               if (Navigator.of(ctx).canPop()) {
                 Navigator.of(ctx).pop();
@@ -113,6 +117,7 @@ class _SellerIncomingOrderAlertState extends State<SellerIncomingOrderAlert> {
         _mode = mode;
         _loading = false;
       });
+      widget.onOrderLoaded?.call(order);
     } catch (e) {
       if (!mounted) return;
       setState(() {

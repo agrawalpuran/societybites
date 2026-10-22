@@ -12,16 +12,19 @@ class OrderPushHint {
     required this.orderId,
     this.status,
     this.paymentStatus,
+    this.notificationType,
   });
 
   final String orderId;
   final String? status;
   final String? paymentStatus;
+  final String? notificationType;
 
   Map<String, dynamic> toJson() => {
     'orderId': orderId,
     if (status != null) 'status': status,
     if (paymentStatus != null) 'paymentStatus': paymentStatus,
+    if (notificationType != null) 'notificationType': notificationType,
   };
 
   factory OrderPushHint.fromJson(Map<String, dynamic> json) {
@@ -29,6 +32,7 @@ class OrderPushHint {
       orderId: json['orderId']?.toString() ?? '',
       status: _nonEmpty(json['status']),
       paymentStatus: _nonEmpty(json['paymentStatus']),
+      notificationType: _nonEmpty(json['notificationType']),
     );
   }
 
@@ -40,12 +44,14 @@ class OrderPushHint {
     final paymentStatus =
         _nonEmpty(data['paymentStatus']) ??
         _paymentFromNotificationType(data);
+    final notificationType = _nonEmpty(data['notificationType']);
 
     if (status == null && paymentStatus == null) return null;
     return OrderPushHint(
       orderId: orderId,
       status: status,
       paymentStatus: paymentStatus,
+      notificationType: notificationType,
     );
   }
 
@@ -91,6 +97,7 @@ class OrderPushHint {
 
 /// Push hints meant for the seller My Kitchen tab (not buyer Orders).
 bool orderPushHintTargetsSellerKitchen(OrderPushHint hint) {
+  if (hint.notificationType == 'order_created') return true;
   final status = hint.status;
   if (status == 'pending') return true;
   if (hint.paymentStatus == 'buyer_marked_paid') return true;
@@ -361,6 +368,7 @@ class OrderPushCoordinator {
       orderId: next.orderId,
       status: next.status ?? prior.status,
       paymentStatus: next.paymentStatus ?? prior.paymentStatus,
+      notificationType: next.notificationType ?? prior.notificationType,
     );
   }
 

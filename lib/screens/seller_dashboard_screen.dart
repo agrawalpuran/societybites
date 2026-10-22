@@ -111,6 +111,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   int _ordersLoadGen = 0;
   final _pullRefresh = PullRefreshGate();
   bool _ordersRefreshInFlight = false;
+  final Set<String> _incomingSeedIds = {};
 
   /// 0 = Orders, 1 = Dashboard. Orders is the default My Kitchen landing tab.
   int _areaTab = 0;
@@ -198,6 +199,22 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   /// Fast path when opening My Kitchen from a push — show the order before buckets load.
   Future<void> prefetchOrdersFromPush({String? focusOrderId}) async {
     await _primeOrdersFromPush(focusOrderId: focusOrderId);
+  }
+
+  /// Insert a new-order overlay fetch into Kitchen immediately (before buckets).
+  void seedIncomingOrder(Order order) {
+    if (!mounted) return;
+    _incomingSeedIds.add(order.id);
+    _mergeKitchenOrder(order);
+    if (!_hasSuccessfullyLoaded) {
+      setState(() {
+        _isLoading = false;
+        _hasSuccessfullyLoaded = true;
+        _error = null;
+      });
+    }
+    _ordersSlowTimer?.cancel();
+    showKitchenOrders();
   }
 
   Future<void> _primeOrdersFromPush({String? focusOrderId}) async {
@@ -826,6 +843,9 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       past = _mergeOrderListsPreservingDetails(_pastOrders, past);
       active = applyOrderPushHints(active, OrderPushCoordinator.pendingHints);
       past = applyOrderPushHints(past, OrderPushCoordinator.pendingHints);
+      final retained = _retainIncomingSeeds(active, past);
+      active = retained.active;
+      past = retained.past;
 
       setState(() {
         _activeOrders = active;
@@ -854,6 +874,29 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       });
     }
     _notifyInitialLoadSettled();
+  }
+
+  ({List<Order> active, List<Order> past}) _retainIncomingSeeds(
+    List<Order> active,
+    List<Order> past,
+  ) {
+    if (_incomingSeedIds.isEmpty) return (active: active, past: past);
+    final present = <String>{
+      ...active.map((order) => order.id),
+      ...past.map((order) => order.id),
+    };
+    var nextActive = active;
+    for (final id in _incomingSeedIds) {
+      if (present.contains(id)) continue;
+      final seeded = _findOrder(id);
+      if (seeded == null || seeded.isTerminal) continue;
+      nextActive = [
+        seeded,
+        ...nextActive.where((order) => order.id != id),
+      ];
+    }
+    _incomingSeedIds.removeWhere(present.contains);
+    return (active: nextActive, past: past);
   }
 
   Order? _findOrder(String id) {

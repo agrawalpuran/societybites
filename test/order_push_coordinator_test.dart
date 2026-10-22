@@ -151,5 +151,15 @@ void main() {
     });
     expect(hint?.orderId, 'o3');
     expect(hint?.status, 'accepted');
+    expect(orderPushHintTargetsSellerKitchen(hint!), isTrue);
+  });
+
+  test('buyer order_accepted hint does not target My Kitchen', () {
+    final hint = OrderPushHint.fromMessageData({
+      'orderId': 'o9',
+      'notificationType': 'order_accepted',
+      'status': 'accepted',
+    });
+    expect(orderPushHintTargetsSellerKitchen(hint!), isFalse);
   });
 }

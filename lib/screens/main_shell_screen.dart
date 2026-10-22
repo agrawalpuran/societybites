@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../models/data.dart';
 import '../services/cart_controller.dart';
 import '../services/listing_publish_navigation.dart';
 import '../services/order_push_coordinator.dart';
@@ -216,12 +217,7 @@ class _MainShellScreenState extends State<MainShellScreen>
 
   void _presentIncomingSellerOrder(String orderId, String? orderNumber) {
     if (!mounted) return;
-    if (!_dashboardMounted) {
-      setState(() {
-        _dashboardMounted = true;
-        _navIndex = 2;
-      });
-    }
+    _openKitchenForIncomingOrder();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final ctx = PushNotificationService.navigatorKey.currentContext ?? context;
@@ -230,12 +226,49 @@ class _MainShellScreenState extends State<MainShellScreen>
           ctx,
           orderId: orderId,
           orderNumber: orderNumber,
+          onOrderLoaded: _seedKitchenIncomingOrder,
         ).then((_) {
           if (!mounted) return;
+          _openKitchenForIncomingOrder();
+          unawaited(
+            _dashboardKey.currentState?.prefetchOrdersFromPush(
+              focusOrderId: orderId,
+            ),
+          );
           _syncOrdersFromPush();
         }),
       );
     });
+  }
+
+  void _openKitchenForIncomingOrder() {
+    if (!mounted) return;
+    setState(() {
+      _dashboardMounted = true;
+      _navIndex = 2;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _dashboardKey.currentState?.showKitchenOrders();
+    });
+  }
+
+  void _seedKitchenIncomingOrder(Order order) {
+    if (!mounted) return;
+    _openKitchenForIncomingOrder();
+    var attempts = 0;
+    void seed() {
+      if (!mounted) return;
+      final kitchen = _dashboardKey.currentState;
+      if (kitchen == null) {
+        if (attempts++ >= 12) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) => seed());
+        return;
+      }
+      kitchen.seedIncomingOrder(order);
+    }
+
+    seed();
   }
 
   Future<void> _syncOrdersFromPushAsync() async {
