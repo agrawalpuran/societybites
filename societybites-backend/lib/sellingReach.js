@@ -219,23 +219,42 @@ function parseRadiusKm(value, field) {
   return n;
 }
 
+function hasRadiusValue(value) {
+  return value !== undefined && value !== null && value !== "";
+}
+
 function validateCityReachRadii({ nearbyRadiusKm, extendedRadiusKm, maxSellerRadiusKm }) {
-  const nearby = parseRadiusKm(nearbyRadiusKm, "nearbyRadiusKm");
-  const extended = parseRadiusKm(extendedRadiusKm, "extendedRadiusKm");
-  if (!(nearby > 0)) {
-    throw httpError(400, "nearbyRadiusKm must be greater than 0");
-  }
-  if (!(extended > nearby)) {
-    throw httpError(400, "extendedRadiusKm must be greater than nearbyRadiusKm");
-  }
-  let maxSeller = DEFAULT_MAX_SELLER_RADIUS_KM;
-  if (maxSellerRadiusKm !== undefined && maxSellerRadiusKm !== null && maxSellerRadiusKm !== "") {
+  let maxSeller = null;
+  if (hasRadiusValue(maxSellerRadiusKm)) {
     maxSeller = parseRadiusKm(maxSellerRadiusKm, "maxSellerRadiusKm");
     if (!(maxSeller >= 1)) {
       throw httpError(400, "maxSellerRadiusKm must be at least 1");
     }
   }
-  return { nearbyRadiusKm: nearby, extendedRadiusKm: extended, maxSellerRadiusKm: maxSeller };
+
+  if (hasRadiusValue(nearbyRadiusKm) || hasRadiusValue(extendedRadiusKm)) {
+    const nearby = parseRadiusKm(nearbyRadiusKm, "nearbyRadiusKm");
+    const extended = parseRadiusKm(extendedRadiusKm, "extendedRadiusKm");
+    if (!(nearby > 0)) {
+      throw httpError(400, "nearbyRadiusKm must be greater than 0");
+    }
+    if (!(extended >= nearby)) {
+      throw httpError(400, "extendedRadiusKm must be at least nearbyRadiusKm");
+    }
+    if (maxSeller == null) {
+      maxSeller = extended;
+    }
+    return { nearbyRadiusKm: nearby, extendedRadiusKm: extended, maxSellerRadiusKm: maxSeller };
+  }
+
+  if (maxSeller == null) {
+    throw httpError(400, "maxSellerRadiusKm is required");
+  }
+  return {
+    nearbyRadiusKm: maxSeller,
+    extendedRadiusKm: maxSeller,
+    maxSellerRadiusKm: maxSeller,
+  };
 }
 
 async function attachSellingReach(user, prismaClient) {

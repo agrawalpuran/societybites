@@ -44,6 +44,7 @@ class HomeFeedCache {
         'cityKey': cityReach.cityKey,
         'nearbyRadiusKm': cityReach.nearbyRadiusKm,
         'extendedRadiusKm': cityReach.extendedRadiusKm,
+        'maxSellerRadiusKm': cityReach.maxSellerRadiusKm,
       },
     });
     await prefs.setString(_storageKey(societyId), payload);

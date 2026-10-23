@@ -390,8 +390,11 @@ const _buyerDistanceStepsKm = <double>[0.5, 1, 2, 3, 5, 7, 10];
 /// Compact Home distance menu. The widest step is the city's configured reach.
 const homeDistanceMenuStepsKm = <double>[1, 2, 3, 5, 7];
 
-double? homeDistanceCapKm(SellingReach reach) =>
-    reach.extendedRadiusKm ?? reach.nearbyRadiusKm;
+double? homeDistanceCapKm(SellingReach reach) {
+  final maxSeller = reach.maxSellerRadiusKm;
+  if (maxSeller != null && maxSeller > 0) return maxSeller;
+  return reach.extendedRadiusKm ?? reach.nearbyRadiusKm;
+}
 
 List<BuyerDistanceChoice> homeDistanceMenuChoices(SellingReach reach) {
   final cap = homeDistanceCapKm(reach);
@@ -402,10 +405,10 @@ List<BuyerDistanceChoice> homeDistanceMenuChoices(SellingReach reach) {
     for (final km in homeDistanceMenuStepsKm)
       if (km < cap - 0.001) km,
   ]..sort((a, b) => b.compareTo(a));
-  final widest = reach.extendedAvailable
-      ? const BuyerDistanceChoice.extended()
-      : BuyerDistanceChoice.within(cap);
-  return [widest, for (final km in narrower) BuyerDistanceChoice.within(km)];
+  return [
+    BuyerDistanceChoice.within(cap),
+    for (final km in narrower) BuyerDistanceChoice.within(km),
+  ];
 }
 
 String homeDistanceMenuLabel(BuyerDistanceChoice choice, SellingReach reach) {
@@ -450,7 +453,7 @@ BuyerDistanceChoice effectiveBuyerDistance(
 }
 
 List<BuyerDistanceChoice> buyerDistanceChoices(SellingReach reach) {
-  final cap = reach.extendedRadiusKm ?? reach.nearbyRadiusKm;
+  final cap = homeDistanceCapKm(reach);
   final steps = <double>{};
   if (cap != null && cap > 0) {
     for (final km in _buyerDistanceStepsKm) {
@@ -463,10 +466,7 @@ List<BuyerDistanceChoice> buyerDistanceChoices(SellingReach reach) {
   return [
     const BuyerDistanceChoice.mySociety(),
     for (final km in sorted) BuyerDistanceChoice.within(km),
-    if (cap != null && reach.extendedAvailable)
-      const BuyerDistanceChoice.extended()
-    else if (cap != null)
-      BuyerDistanceChoice.within(cap),
+    if (cap != null) BuyerDistanceChoice.within(cap),
   ];
 }
 
@@ -489,7 +489,7 @@ String buyerDistanceLabel(BuyerDistanceChoice choice, SellingReach _) {
 String buyerDistanceSubtitle(BuyerDistanceChoice choice, SellingReach reach) {
   if (choice.societyOnly) return 'Listings from your own society';
   if (choice.isExtended) {
-    final km = reach.extendedRadiusKm;
+    final km = homeDistanceCapKm(reach);
     if (km == null) return 'The widest range available';
     return 'Up to ${formatBuyerDistanceKm(km)}';
   }

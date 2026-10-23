@@ -91,20 +91,16 @@ class _AppHeaderState extends State<AppHeader> {
                             maxLines: 1,
                             softWrap: false,
                             overflow: TextOverflow.visible,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 20,
-                              color: widget.onFestiveBackground
-                                  ? Colors.white
-                                  : const Color(0xFF0A4638),
+                              color: Color(0xFF0A4638),
                             ),
                           ),
                           const SizedBox(width: 4),
-                          Icon(
+                          const Icon(
                             Icons.restaurant_menu_rounded,
-                            color: widget.onFestiveBackground
-                                ? Colors.white
-                                : const Color(0xFF0E5A47),
+                            color: Color(0xFF0E5A47),
                             size: 18,
                           ),
                         ],

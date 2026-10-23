@@ -2355,9 +2355,9 @@ class ApiService {
 
   static Future<CityReachConfig> upsertAdminCityReachConfig({
     required String cityKey,
-    required double nearbyRadiusKm,
-    required double extendedRadiusKm,
     required double maxSellerRadiusKm,
+    double? nearbyRadiusKm,
+    double? extendedRadiusKm,
     String? displayName,
   }) async {
     final encoded = Uri.encodeComponent(cityKey);
@@ -2365,9 +2365,9 @@ class ApiService {
       Uri.parse('$baseUrl/admin/city-reach-configs/$encoded'),
       headers: await _authHeaders(),
       body: jsonEncode({
-        'nearbyRadiusKm': nearbyRadiusKm,
-        'extendedRadiusKm': extendedRadiusKm,
         'maxSellerRadiusKm': maxSellerRadiusKm,
+        if (nearbyRadiusKm != null) 'nearbyRadiusKm': nearbyRadiusKm,
+        if (extendedRadiusKm != null) 'extendedRadiusKm': extendedRadiusKm,
         if (displayName != null && displayName.trim().isNotEmpty)
           'displayName': displayName.trim(),
       }),

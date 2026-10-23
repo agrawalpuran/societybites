@@ -236,15 +236,15 @@ void main() {
   test('distance menu uses the configured reach and keeps own society', () {
     final reach = SellingReach.fromJson({
       'nearbyRadiusKm': 5,
-      'extendedRadiusKm': 7,
-      'extendedAvailable': true,
+      'extendedRadiusKm': 14,
+      'maxSellerRadiusKm': 10,
     });
     final choices = homeDistanceMenuChoices(reach);
-    expect(homeDistanceMenuLabel(choices.first, reach), 'Up to 7 km');
-    expect(choices.first.isExtended, isTrue);
+    expect(homeDistanceMenuLabel(choices.first, reach), 'Up to 10 km');
+    expect(choices.first.maxKm, 10);
     expect(
       choices.map((choice) => homeDistanceMenuLabel(choice, reach)).toList(),
-      ['Up to 7 km', 'Up to 5 km', 'Up to 3 km', 'Up to 2 km', 'Up to 1 km'],
+      ['Up to 10 km', 'Up to 7 km', 'Up to 5 km', 'Up to 3 km', 'Up to 2 km', 'Up to 1 km'],
     );
 
     final wider = SellingReach.fromJson({

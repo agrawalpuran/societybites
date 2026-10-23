@@ -79,16 +79,16 @@ function jsonRequest(server, { method, path, token, body }) {
 async function main() {
   expectThrow(() => validateCityReachRadii({ nearbyRadiusKm: 0, extendedRadiusKm: 10 }), 400, "greater than 0");
   expectThrow(() => validateCityReachRadii({ nearbyRadiusKm: -1, extendedRadiusKm: 10 }), 400, "greater than 0");
-  expectThrow(
-    () => validateCityReachRadii({ nearbyRadiusKm: 5, extendedRadiusKm: 5 }),
-    400,
-    "greater than nearbyRadiusKm"
-  );
+  const onlyMax = validateCityReachRadii({ maxSellerRadiusKm: 10 });
+  assert(onlyMax.maxSellerRadiusKm === 10, "max-only stores max");
+  assert(onlyMax.nearbyRadiusKm === 10, "max-only fills nearby");
+  assert(onlyMax.extendedRadiusKm === 10, "max-only fills extended");
   expectThrow(
     () => validateCityReachRadii({ nearbyRadiusKm: 8, extendedRadiusKm: 3 }),
     400,
-    "greater than nearbyRadiusKm"
+    "nearbyRadiusKm"
   );
+  expectThrow(() => validateCityReachRadii({}), 400, "maxSellerRadiusKm is required");
 
   assert(canonicalCityKey("Bangalore") === "bengaluru", "Bangalore must canonicalize to bengaluru");
   assert(canonicalCityKey("Bengaluru") === "bengaluru", "Bengaluru must canonicalize to bengaluru");

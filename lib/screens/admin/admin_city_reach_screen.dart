@@ -46,12 +46,6 @@ class _AdminCityReachScreenState extends State<AdminCityReachScreen> {
   Future<void> _edit({CityReachConfig? existing}) async {
     final cityController = TextEditingController(text: existing?.cityKey ?? '');
     final displayController = TextEditingController(text: existing?.displayName ?? '');
-    final nearbyController = TextEditingController(
-      text: existing == null ? '' : existing.nearbyRadiusKm.toString(),
-    );
-    final extendedController = TextEditingController(
-      text: existing == null ? '' : existing.extendedRadiusKm.toString(),
-    );
     final maxSellerController = TextEditingController(
       text: existing == null
           ? '10'
@@ -79,21 +73,12 @@ class _AdminCityReachScreenState extends State<AdminCityReachScreen> {
                 decoration: const InputDecoration(labelText: 'Display name'),
               ),
               TextField(
-                controller: nearbyController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Level 2 radius (km)'),
-              ),
-              TextField(
-                controller: extendedController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Level 3 radius (km)'),
-              ),
-              TextField(
                 controller: maxSellerController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
-                  labelText: 'Max seller reach slider (km)',
-                  helperText: 'Caps the distance bar in seller settings (e.g. 10 or 15)',
+                  labelText: 'Max reach (km)',
+                  helperText:
+                      'Buyer Home “Up to” menu and the seller Selling Reach bar both use this maximum.',
                 ),
               ),
             ],
@@ -114,19 +99,15 @@ class _AdminCityReachScreenState extends State<AdminCityReachScreen> {
 
     final cityKey = cityController.text.trim();
     final displayName = displayController.text.trim();
-    final nearby = double.tryParse(nearbyController.text.trim());
-    final extended = double.tryParse(extendedController.text.trim());
     final maxSeller = double.tryParse(maxSellerController.text.trim());
     cityController.dispose();
     displayController.dispose();
-    nearbyController.dispose();
-    extendedController.dispose();
     maxSellerController.dispose();
 
     if (saved != true || !mounted) return;
-    if (cityKey.isEmpty || nearby == null || extended == null || maxSeller == null) {
+    if (cityKey.isEmpty || maxSeller == null || maxSeller < 1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('City and both radii are required')),
+        const SnackBar(content: Text('City and max reach (km) are required')),
       );
       return;
     }
@@ -134,8 +115,6 @@ class _AdminCityReachScreenState extends State<AdminCityReachScreen> {
     try {
       await ApiService.upsertAdminCityReachConfig(
         cityKey: cityKey,
-        nearbyRadiusKm: nearby,
-        extendedRadiusKm: extended,
         maxSellerRadiusKm: maxSeller,
         displayName: displayName.isEmpty ? null : displayName,
       );
@@ -196,7 +175,7 @@ class _AdminCityReachScreenState extends State<AdminCityReachScreen> {
                     padding: const EdgeInsets.all(20),
                     children: [
                       const Text(
-                        'Legacy L2/L3 radii remain for migration. Max seller slider km caps each seller’s reach bar.',
+                        'Set one maximum km per city. It caps buyer Home distance and each seller’s Selling Reach bar.',
                         style: TextStyle(fontSize: 13, color: Color(0xFF6A7774)),
                       ),
                       const SizedBox(height: 16),
@@ -245,11 +224,7 @@ class _AdminCityReachScreenState extends State<AdminCityReachScreen> {
                                     ),
                                     const SizedBox(height: 12),
                                     Text(
-                                      'Level 2 (Nearby): ${config.nearbyRadiusKm} km',
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                    Text(
-                                      'Level 3 (Extended): ${config.extendedRadiusKm} km',
+                                      'Max reach: ${config.maxSellerRadiusKm} km',
                                       style: const TextStyle(fontSize: 14),
                                     ),
                                   ],

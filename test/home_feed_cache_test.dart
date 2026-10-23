@@ -15,6 +15,7 @@ void main() {
       cityKey: 'bengaluru',
       nearbyRadiusKm: 3,
       extendedRadiusKm: 8,
+      maxSellerRadiusKm: 10,
     );
     await HomeFeedCache.save(
       societyId: 'society-a',
@@ -36,6 +37,7 @@ void main() {
     expect(loaded!.listingMaps.single['name'], 'Samosa');
     expect(loaded.cityReach.nearbyRadiusKm, 3);
     expect(loaded.cityReach.extendedRadiusKm, 8);
+    expect(loaded.cityReach.maxSellerRadiusKm, 10);
     expect(await HomeFeedCache.load('society-b'), isNull);
   });
 

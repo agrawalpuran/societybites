@@ -110,10 +110,6 @@ class SellingReach {
       (maxSellerRadiusKm ?? defaultMaxRadiusKm).round().clamp(1, 100);
 
   int get defaultRadiusKm {
-    final legacy = nearbyRadiusKm?.round() ?? extendedRadiusKm?.round();
-    if (legacy != null && legacy >= 1) {
-      return legacy.clamp(1, maxRadiusKm);
-    }
     return SellerReachPreference.defaultRadiusKm.clamp(1, maxRadiusKm);
   }
 
