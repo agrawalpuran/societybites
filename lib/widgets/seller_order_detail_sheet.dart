@@ -3,14 +3,18 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/data.dart';
+import '../services/api_service.dart';
 import 'order_fulfilment_banner.dart';
 import 'order_items_list.dart';
 import 'order_messages_button.dart';
 
+typedef BuyerPhoneRevealer = Future<String> Function(String orderId);
+
 Future<void> showSellerOrderDetailSheet(
   BuildContext context,
-  Order order,
-) {
+  Order order, {
+  BuyerPhoneRevealer? revealBuyerPhone,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -19,21 +23,113 @@ Future<void> showSellerOrderDetailSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (ctx) => SellerOrderDetailSheet(order: order),
+    builder: (ctx) => SellerOrderDetailSheet(
+      order: order,
+      revealBuyerPhone: revealBuyerPhone,
+    ),
   );
 }
 
-class SellerOrderDetailSheet extends StatelessWidget {
-  const SellerOrderDetailSheet({super.key, required this.order});
+class SellerOrderDetailSheet extends StatefulWidget {
+  const SellerOrderDetailSheet({
+    super.key,
+    required this.order,
+    this.revealBuyerPhone,
+  });
 
   final Order order;
+  final BuyerPhoneRevealer? revealBuyerPhone;
+
+  @override
+  State<SellerOrderDetailSheet> createState() => _SellerOrderDetailSheetState();
+}
+
+class _SellerOrderDetailSheetState extends State<SellerOrderDetailSheet> {
+  String? _revealedPhone;
+  bool _revealing = false;
+
+  Order get order => widget.order;
+
+  Future<void> _showNumber() async {
+    final allowed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Show buyer number?'),
+        content: const Text(
+          'Use this number only to complete this order. Do not save it or use it for anything else.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFF0E5A47)),
+            child: const Text('Show number'),
+          ),
+        ],
+      ),
+    );
+    if (allowed != true || !mounted) return;
+
+    setState(() => _revealing = true);
+    try {
+      final reveal = widget.revealBuyerPhone ??
+          ((id) async {
+            final json = await ApiService.revealBuyerContact(orderId: id);
+            return (json['buyerPhone'] as String?)?.trim() ?? '';
+          });
+      final phone = (await reveal(order.id)).trim();
+      if (!mounted) return;
+      if (phone.isEmpty) {
+        final fallback = order.buyerPhone?.trim() ?? '';
+        if (fallback.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Buyer number is not available')),
+          );
+          return;
+        }
+        setState(() => _revealedPhone = fallback);
+        return;
+      }
+      setState(() => _revealedPhone = phone);
+    } catch (e) {
+      if (!mounted) return;
+      final fallback = order.sellerMayAccessBuyerPhone
+          ? (order.buyerPhone?.trim() ?? '')
+          : '';
+      if (fallback.isNotEmpty) {
+        setState(() => _revealedPhone = fallback);
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ApiService.userFacingError(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _revealing = false);
+    }
+  }
+
+  String? _lockedHint() {
+    if (order.isSellerDelivery && !order.sellerMayAccessBuyerPhone) {
+      if (order.status == 'pending') {
+        return 'Buyer number is shown after you accept this order.';
+      }
+      return 'Buyer number is shown after payment is confirmed.';
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final address = order.buyerAddressForSeller;
-    final phone = order.buyerPhone?.trim() ?? '';
+    final phone = _revealedPhone?.trim() ?? '';
     final mapsQuery = order.buyerMapsQuery;
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final mayAccess = order.sellerMayAccessBuyerPhone;
+    final masked = order.buyerPhoneMasked?.trim() ?? '';
+    final lockedHint = _lockedHint();
 
     return DraggableScrollableSheet(
       expand: false,
@@ -96,10 +192,21 @@ class SellerOrderDetailSheet extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 phone,
+                key: const Key('seller-order-buyer-phone'),
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF3A4644),
+                ),
+              ),
+            ] else if (mayAccess && masked.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                masked,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6A7774),
                 ),
               ),
             ],
@@ -126,11 +233,30 @@ class SellerOrderDetailSheet extends StatelessWidget {
                 ),
               ),
             ],
+            if (lockedHint != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                lockedHint,
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6A7774),
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
+                if (mayAccess && phone.isEmpty)
+                  _ActionChip(
+                    key: const Key('seller-order-show-buyer-phone'),
+                    icon: Icons.phone_outlined,
+                    label: _revealing ? 'Showing…' : 'Show number',
+                    onTap: _revealing ? () {} : _showNumber,
+                  ),
                 if (phone.isNotEmpty)
                   _ActionChip(
                     key: const Key('seller-order-call-buyer'),
@@ -141,8 +267,8 @@ class SellerOrderDetailSheet extends StatelessWidget {
                 if (phone.isNotEmpty)
                   _ActionChip(
                     icon: Icons.copy_rounded,
-                    label: 'Copy phone',
-                    onTap: () => _copy(context, phone, 'Phone number copied'),
+                    label: 'Copy',
+                    onTap: () => _copy(context, phone, 'Number copied'),
                   ),
                 if (mapsQuery.isNotEmpty)
                   _ActionChip(

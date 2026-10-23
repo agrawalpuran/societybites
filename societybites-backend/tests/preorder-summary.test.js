@@ -373,7 +373,8 @@ async function main() {
     assert(listed, "buyer 2 order missing");
     assert(listed.orderNumber, "order number required");
     assert(listed.buyerName === "Test Buyer Two", "buyer name");
-    assert(listed.buyerPhone === BUYER2_PHONE, "buyer phone as in seller order flow");
+    assert(!listed.buyerPhone, "raw buyer phone stays off the kitchen list");
+    assert(typeof listed.canRevealBuyerPhone === "boolean", "reveal flag");
     assert(listed.items.length === 2, "multi-product items");
     assert(listed.subtotal === 70, "food subtotal on order");
     assert(listed.deliveryCharge === 40, "delivery charge on order");

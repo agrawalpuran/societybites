@@ -75,6 +75,7 @@ const {
   attachUnreadCounts,
 } = require("../lib/orderMessages");
 const { buyerCancelDeniedReason } = require("../lib/buyerCancel");
+const { revealBuyerContact } = require("../lib/buyerContact");
 const {
   skipsSellerAcceptance,
   orderSkipsSellerAcceptance,
@@ -655,6 +656,32 @@ router.post(
     res.status(201).json(serializeMessage(created, order));
 
     await flushNotification(notifyOrderMessage(order, req.user.id));
+  })
+);
+
+router.post(
+  "/:id/buyer-contact",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: {
+        buyer: { select: { phone: true } },
+        items: { select: { listing: { select: { sellerId: true } } } },
+      },
+    });
+    try {
+      const payload = await revealBuyerContact({
+        order,
+        sellerId: req.user.id,
+        acknowledged: Boolean(req.body && req.body.acknowledged),
+      });
+      res.json(payload);
+    } catch (err) {
+      const status = err.statusCode || 500;
+      if (status >= 500) throw err;
+      res.status(status).json({ error: err.message });
+    }
   })
 );
 

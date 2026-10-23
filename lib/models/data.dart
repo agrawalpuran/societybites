@@ -767,6 +767,8 @@ class Order {
   final DateTime? createdAt;
   final String? buyerName;
   final String? buyerPhone;
+  final String? buyerPhoneMasked;
+  final bool canRevealBuyerPhone;
   final String? buyerFlatNumber;
   final String? buyerBlock;
   final String? buyerSocietyName;
@@ -817,6 +819,8 @@ class Order {
     this.createdAt,
     this.buyerName,
     this.buyerPhone,
+    this.buyerPhoneMasked,
+    this.canRevealBuyerPhone = false,
     this.buyerFlatNumber,
     this.buyerBlock,
     this.buyerSocietyName,
@@ -1015,6 +1019,21 @@ class Order {
   String get buyerMapsQuery =>
       buyerAddressForSeller.replaceAll('\n', ', ').trim();
 
+  bool get isSellerDelivery =>
+      fulfilmentMethod?.trim() == 'seller_delivery';
+
+  /// Client-side gate so a leaked phone in older API payloads is still hidden.
+  bool get sellerMayAccessBuyerPhone {
+    if (canRevealBuyerPhone) return true;
+    if (!isSellerDelivery) return false;
+    if (isRejected || isCancelled || status == 'pending') return false;
+    if (status != 'accepted' && status != 'ready' && status != 'completed') {
+      return false;
+    }
+    if (paymentMethod == 'cash') return true;
+    return foodUpiConfirmed;
+  }
+
   /// Rough society-to-society distance. Empty for same-society orders.
   String get approxDistanceLabel {
     final km = distanceKm;
@@ -1104,6 +1123,8 @@ class Order {
       createdAt: createdAt,
       buyerName: buyerName,
       buyerPhone: buyerPhone,
+      buyerPhoneMasked: buyerPhoneMasked,
+      canRevealBuyerPhone: canRevealBuyerPhone,
       buyerFlatNumber: buyerFlatNumber,
       buyerBlock: buyerBlock,
       buyerSocietyName: buyerSocietyName,
@@ -1152,6 +1173,8 @@ class Order {
       createdAt: createdAt,
       buyerName: buyerName,
       buyerPhone: buyerPhone,
+      buyerPhoneMasked: buyerPhoneMasked,
+      canRevealBuyerPhone: canRevealBuyerPhone,
       buyerFlatNumber: buyerFlatNumber,
       buyerBlock: buyerBlock,
       buyerSocietyName: buyerSocietyName,
@@ -1242,6 +1265,8 @@ class Order {
       createdAt: createdAt,
       buyerName: json['buyerName'] as String?,
       buyerPhone: json['buyerPhone'] as String?,
+      buyerPhoneMasked: json['buyerPhoneMasked'] as String?,
+      canRevealBuyerPhone: json['canRevealBuyerPhone'] == true,
       buyerFlatNumber: json['buyerFlatNumber'] as String?,
       buyerBlock: json['buyerBlock'] as String?,
       buyerSocietyName: json['buyerSocietyName'] as String?,
@@ -1329,6 +1354,9 @@ class Order {
       createdAt: updated.createdAt ?? prior.createdAt,
       buyerName: updated.buyerName ?? prior.buyerName,
       buyerPhone: updated.buyerPhone ?? prior.buyerPhone,
+      buyerPhoneMasked: updated.buyerPhoneMasked ?? prior.buyerPhoneMasked,
+      canRevealBuyerPhone:
+          updated.canRevealBuyerPhone || prior.canRevealBuyerPhone,
       buyerFlatNumber: updated.buyerFlatNumber ?? prior.buyerFlatNumber,
       buyerBlock: updated.buyerBlock ?? prior.buyerBlock,
       buyerSocietyName: updated.buyerSocietyName ?? prior.buyerSocietyName,
@@ -1418,6 +1446,8 @@ class Order {
       createdAt: prior.createdAt,
       buyerName: prior.buyerName,
       buyerPhone: prior.buyerPhone,
+      buyerPhoneMasked: prior.buyerPhoneMasked,
+      canRevealBuyerPhone: prior.canRevealBuyerPhone,
       buyerFlatNumber: prior.buyerFlatNumber,
       buyerBlock: prior.buyerBlock,
       buyerSocietyName: prior.buyerSocietyName,

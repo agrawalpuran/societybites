@@ -20,6 +20,7 @@ const UNIT = [
   "kitchen-hours",
   "food-type",
   "geo-distance",
+  "buyer-contact",
   "notifications-payload",
 ];
 

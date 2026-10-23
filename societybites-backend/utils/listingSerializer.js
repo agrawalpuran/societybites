@@ -15,6 +15,7 @@ const {
   sellerHidesFlatNumber,
   shouldExposeSellerFlatNumber,
 } = require("../lib/sellerFlatPrivacy");
+const { serializeBuyerContactForViewer } = require("../lib/buyerContact");
 const {
   isSharedVariantInventory,
   orderableQuantity,
@@ -288,7 +289,7 @@ function serializeOrder(order, options = {}) {
     societyId: order.societyId,
     buyerId: order.buyerId,
     buyerName: buyer.name || null,
-    buyerPhone: buyer.phone || null,
+    ...serializeBuyerContactForViewer(order, viewerUserId),
     buyerFlatNumber: buyerFlat?.flatNumber || null,
     buyerBlock: buyerFlat?.block || null,
     buyerSocietyName: buyerSociety?.name || null,

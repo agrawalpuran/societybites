@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/screens/seller_dashboard_screen.dart';
 import 'package:societybites/widgets/order_fulfilment_banner.dart';
+import 'package:societybites/widgets/seller_order_detail_sheet.dart';
 
 Map<String, dynamic> _deliveryOrderJson() {
   return {
@@ -66,11 +67,47 @@ void main() {
 
     expect(find.byKey(const Key('seller-order-detail-sheet')), findsOneWidget);
     expect(find.text('Antara Mukherjee'), findsWidgets);
-    expect(find.text('+917721874567'), findsOneWidget);
+    expect(find.text('+917721874567'), findsNothing);
+    expect(find.byKey(const Key('seller-order-call-buyer')), findsNothing);
+    expect(
+      find.text('Buyer number is shown after payment is confirmed.'),
+      findsOneWidget,
+    );
     expect(find.textContaining('Block B, Flat 701'), findsWidgets);
     expect(find.textContaining('Haralur Main Rd'), findsOneWidget);
-    expect(find.byKey(const Key('seller-order-call-buyer')), findsOneWidget);
     expect(find.byKey(const Key('seller-order-open-maps')), findsOneWidget);
+  });
+
+  testWidgets('paid seller delivery reveals number after acknowledgement', (
+    tester,
+  ) async {
+    final json = _deliveryOrderJson()
+      ..['paymentStatus'] = 'seller_confirmed'
+      ..['buyerPhone'] = null
+      ..['buyerPhoneMasked'] = '+9177218•••••'
+      ..['canRevealBuyerPhone'] = true;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SellerOrderDetailSheet(
+            order: Order.fromJson(json),
+            revealBuyerPhone: (_) async => '+917721874567',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('+917721874567'), findsNothing);
+    expect(find.text('+9177218•••••'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('seller-order-show-buyer-phone')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Use this number only to complete this order'), findsOneWidget);
+    await tester.tap(find.text('Show number').last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('seller-order-buyer-phone')), findsOneWidget);
+    expect(find.text('+917721874567'), findsOneWidget);
+    expect(find.byKey(const Key('seller-order-call-buyer')), findsOneWidget);
   });
 
   testWidgets('seller delivery banner keeps address and distance readable', (

@@ -237,6 +237,8 @@ Order applyOrderPushHint(Order order, OrderPushHint hint) {
     createdAt: order.createdAt,
     buyerName: order.buyerName,
     buyerPhone: order.buyerPhone,
+    buyerPhoneMasked: order.buyerPhoneMasked,
+    canRevealBuyerPhone: order.canRevealBuyerPhone,
     buyerFlatNumber: order.buyerFlatNumber,
     buyerBlock: order.buyerBlock,
     buyerSocietyName: order.buyerSocietyName,
