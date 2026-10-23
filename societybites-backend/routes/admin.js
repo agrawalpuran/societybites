@@ -67,6 +67,7 @@ const {
   getCampaignPerformance,
   getPerformanceExportCsv,
 } = require("../lib/adminSellerPerformance");
+const { getAdminOrderDetail } = require("../lib/adminOrderDetail");
 
 const router = express.Router();
 
@@ -848,6 +849,18 @@ router.get(
     ]);
 
     res.json({ orders, total, page: parseInt(page, 10), limit: take });
+  })
+);
+
+// GET /admin/orders/:id — buyer, seller, and address drill-down
+router.get(
+  "/orders/:id",
+  asyncHandler(async (req, res) => {
+    const order = await getAdminOrderDetail(prisma, req.params.id);
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    res.json(order);
   })
 );
 

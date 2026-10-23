@@ -240,6 +240,8 @@ Order applyOrderPushHint(Order order, OrderPushHint hint) {
     buyerFlatNumber: order.buyerFlatNumber,
     buyerBlock: order.buyerBlock,
     buyerSocietyName: order.buyerSocietyName,
+    buyerSocietyAddress: order.buyerSocietyAddress,
+    buyerCity: order.buyerCity,
     sellerSocietyName: order.sellerSocietyName,
     distanceKm: order.distanceKm,
     unreadMessageCount: order.unreadMessageCount,

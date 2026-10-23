@@ -1,0 +1,56 @@
+name: Phase-1 regression
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test
+
+  backend-unit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: societybites-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: societybites-backend/package-lock.json
+      - run: npm ci
+      - run: npm run test:unit
+
+  backend-regression:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: societybites-backend
+    env:
+      DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: societybites-backend/package-lock.json
+      - run: npm ci
+      - name: Order journeys (needs CI_DATABASE_URL)
+        if: ${{ env.DATABASE_URL != '' }}
+        run: npm run test:regression
+      - name: Skip journeys when CI database is not configured
+        if: ${{ env.DATABASE_URL == '' }}
+        run: echo "Set repository secret CI_DATABASE_URL (staging, not production) to run API journeys."

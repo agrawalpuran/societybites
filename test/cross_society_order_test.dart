@@ -479,8 +479,8 @@ void main() {
         ),
       ),
     );
-    expect(find.text('Palm Grove · Flat 36, Block 36'), findsOneWidget);
-    expect(find.text('  ~1.2 km'), findsOneWidget);
+    expect(find.textContaining('Palm Grove · Flat 36, Block 36'), findsOneWidget);
+    expect(find.textContaining('~1.2 km'), findsOneWidget);
     expect(find.text('Sarika'), findsOneWidget);
     expect(
       find.text(Order.formatReadyBy(DateTime.parse('2026-10-09T11:30:00.000Z'))),
@@ -524,8 +524,8 @@ void main() {
         ),
       ),
     );
-    expect(find.text('Palm Grove · Block C, Flat 3062'), findsOneWidget);
-    expect(find.text('  ~0.8 km'), findsOneWidget);
+    expect(find.textContaining('Palm Grove · Block C, Flat 3062'), findsOneWidget);
+    expect(find.textContaining('~0.8 km'), findsOneWidget);
   });
 
   testWidgets('Home with listings still shows society marketplace', (

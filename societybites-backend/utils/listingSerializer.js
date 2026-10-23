@@ -292,6 +292,8 @@ function serializeOrder(order, options = {}) {
     buyerFlatNumber: buyerFlat?.flatNumber || null,
     buyerBlock: buyerFlat?.block || null,
     buyerSocietyName: buyerSociety?.name || null,
+    buyerSocietyAddress: buyerSociety?.address || null,
+    buyerCity: buyerSociety?.city || null,
     sellerName: items[0]?.listing?.sellerName || null,
     sellerSocietyName: (sellerSociety && sellerSociety.name) || null,
     distanceKm,

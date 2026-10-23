@@ -164,29 +164,15 @@ Widget _placeLine(String place, String distance) {
     height: 1.2,
   );
   if (distance.isEmpty) {
-    return Text(
-      place,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: style,
-    );
+    return Text(place, style: style);
   }
-  return Row(
-    children: [
-      if (place.isNotEmpty)
-        Flexible(
-          child: Text(
-            place,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: style,
-          ),
-        ),
-      Text(
-        place.isEmpty ? distance : '  $distance',
-        maxLines: 1,
-        style: style,
-      ),
-    ],
+  return Text.rich(
+    TextSpan(
+      children: [
+        if (place.isNotEmpty) TextSpan(text: place),
+        TextSpan(text: place.isEmpty ? distance : '  $distance'),
+      ],
+    ),
+    style: style,
   );
 }

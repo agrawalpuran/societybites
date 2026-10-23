@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../widgets/admin_loading_panel.dart';
 import '../../widgets/screen_loading_note.dart';
+import 'admin_order_detail_screen.dart';
 
 String? _sellerNameFromAdminOrder(Map<String, dynamic> order) {
   final direct = (order['seller'] as Map<String, dynamic>?)?['name'];
@@ -96,31 +97,32 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
-            children: [
-              '',
-              'pending',
-              'confirmed',
-              'ready',
-              'picked_up',
-              'completed',
-              'cancelled'
-            ].map((status) {
-              final isActive = _statusFilter == status;
-              final label = status.isEmpty
-                  ? 'All'
-                  : status[0].toUpperCase() +
-                      status.substring(1).replaceAll('_', ' ');
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: FilterChip(
-                  selected: isActive,
-                  label: Text(label),
-                  selectedColor: const Color(0xFFE8F5EE),
-                  checkmarkColor: const Color(0xFF0E5A47),
-                  onSelected: (_) => _onStatusChanged(status),
-                ),
-              );
-            }).toList(),
+            children:
+                [
+                  '',
+                  'pending',
+                  'confirmed',
+                  'ready',
+                  'picked_up',
+                  'completed',
+                  'cancelled',
+                ].map((status) {
+                  final isActive = _statusFilter == status;
+                  final label = status.isEmpty
+                      ? 'All'
+                      : status[0].toUpperCase() +
+                            status.substring(1).replaceAll('_', ' ');
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      selected: isActive,
+                      label: Text(label),
+                      selectedColor: const Color(0xFFE8F5EE),
+                      checkmarkColor: const Color(0xFF0E5A47),
+                      onSelected: (_) => _onStatusChanged(status),
+                    ),
+                  );
+                }).toList(),
           ),
         ),
         Expanded(child: _buildContent()),
@@ -146,8 +148,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     }
     if (_orders.isEmpty) {
       return const Center(
-        child: Text('No orders found',
-            style: TextStyle(color: Color(0xFF6A7774))),
+        child: Text(
+          'No orders found',
+          style: TextStyle(color: Color(0xFF6A7774)),
+        ),
       );
     }
 
@@ -165,88 +169,125 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
 
           final order = _orders[index];
           final orderNumber =
-              order['orderNumber']?.toString() ?? order['id']?.toString() ?? '—';
+              order['orderNumber']?.toString() ??
+              order['id']?.toString() ??
+              '—';
           final buyer =
               (order['buyer'] as Map<String, dynamic>?)?['name']?.toString() ??
-                  '—';
+              '—';
           final seller = _sellerNameFromAdminOrder(order) ?? '—';
           final total = order['total'] ?? order['totalAmount'] ?? 0;
           final status = order['status']?.toString() ?? 'pending';
           final createdAt = order['createdAt']?.toString() ?? '';
 
+          final orderId = order['id']?.toString() ?? '';
+
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
             elevation: 0,
             color: Colors.white,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        '#$orderNumber',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: Color(0xFF101617),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: orderId.isEmpty
+                  ? null
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              AdminOrderDetailScreen(orderId: orderId),
                         ),
-                      ),
-                      const Spacer(),
-                      _StatusBadge(status: status),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.person_outline,
-                          size: 14, color: Color(0xFF8A9491)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          'Buyer: $buyer',
+                      );
+                    },
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          '#$orderNumber',
                           style: const TextStyle(
-                              fontSize: 12, color: Color(0xFF6A7774)),
-                          overflow: TextOverflow.ellipsis,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: Color(0xFF101617),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Icon(Icons.storefront,
-                          size: 14, color: Color(0xFF8A9491)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          'Seller: $seller',
+                        const Spacer(),
+                        _StatusBadge(status: status),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 20,
+                          color: Color(0xFF8A9491),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.person_outline,
+                          size: 14,
+                          color: Color(0xFF8A9491),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Buyer: $buyer',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6A7774),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Icon(
+                          Icons.storefront,
+                          size: 14,
+                          color: Color(0xFF8A9491),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Seller: $seller',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6A7774),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Text(
+                          '₹$total',
                           style: const TextStyle(
-                              fontSize: 12, color: Color(0xFF6A7774)),
-                          overflow: TextOverflow.ellipsis,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: Color(0xFF0E5A47),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Text(
-                        '₹$total',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          color: Color(0xFF0E5A47),
+                        const Spacer(),
+                        Text(
+                          _formatDate(createdAt),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF8A9491),
+                          ),
                         ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        _formatDate(createdAt),
-                        style: const TextStyle(
-                            fontSize: 11, color: Color(0xFF8A9491)),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           );

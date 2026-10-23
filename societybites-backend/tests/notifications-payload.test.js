@@ -27,6 +27,7 @@ assert(
 );
 assert(ANDROID_CHANNEL_ID === "societybites_orders", "channel constant");
 assert(message.data.notificationType === "order_accepted", "data type");
+assert(message.data.orderId === "ord-1", "data orderId");
 assert(message.apns.headers["apns-push-type"] === "alert", "apns push type");
 assert(message.apns.headers["apns-priority"] === "10", "apns priority");
 assert(message.apns.payload.aps.sound === "default", "apns sound");
@@ -39,6 +40,7 @@ const urgent = buildFcmMessage("x".repeat(40), {
     type: "order_update",
     orderId: "ord-2",
     notificationType: "order_created",
+    orderNumber: "SE-100002",
     urgent: "1",
   },
   urgent: true,
@@ -56,6 +58,11 @@ assert(
   urgent.apns.payload.aps.interruptionLevel === "time-sensitive",
   "urgent iOS interruption"
 );
+assert(urgent.data.orderId === "ord-2", "created payload orderId");
+assert(urgent.data.notificationType === "order_created", "created payload type");
+assert(urgent.data.orderNumber === "SE-100002", "created payload orderNumber");
+assert(urgent.apns.payload.aps.alert.title, "created payload APNs title");
+assert(urgent.apns.payload.aps.sound === "default", "created payload APNs sound");
 
 // 12:30 UTC is 6:00 PM IST. Host-local toLocaleString() would print the UTC clock.
 assert(

@@ -1,0 +1,28 @@
+{
+  "id": "ord-accepted-1",
+  "orderNumber": "SE-100002",
+  "status": "accepted",
+  "statusStep": 1,
+  "paymentStatus": "pending",
+  "paymentMethod": "cash",
+  "total": 100,
+  "subtotal": 100,
+  "communityFee": 0,
+  "deliveryCharge": 0,
+  "createdAt": "2026-10-22T16:20:00.000Z",
+  "buyerName": "Test User",
+  "sellerCanDecline": true,
+  "items": [
+    {
+      "quantity": 1,
+      "unitPrice": 100,
+      "listing": {
+        "id": "listing-paneer",
+        "name": "Fresh Sahi Paneer",
+        "sellerId": "seller-1",
+        "sellerName": "Agrawal's",
+        "price": 100
+      }
+    }
+  ]
+}

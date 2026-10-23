@@ -22,6 +22,7 @@ import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/order_messages_button.dart';
+import '../widgets/seller_order_detail_sheet.dart';
 import '../widgets/profile_menu_tile.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/requested_ready_summary.dart';
@@ -3040,100 +3041,120 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Multi-item orders list every dish below, so a hero thumbnail
-              // would just repeat the first one.
-              if (order.items.length == 1) ...[
-                ListingImage(
-                  food: order.items.first.food,
-                  width: 56,
-                  height: 56,
-                  borderRadius: 14,
-                  iconSize: 26,
-                ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                child: Column(
+          InkWell(
+            key: const Key('seller-order-open-details'),
+            onTap: () => showSellerOrderDetailSheet(context, order),
+            borderRadius: BorderRadius.circular(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      order.items.length == 1
-                          ? order.items.first.food.name
-                          : order.itemsSummary,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF101617),
-                      ),
-                    ),
+                    // Multi-item orders list every dish below, so a hero
+                    // thumbnail would just repeat the first one.
                     if (order.items.length == 1) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        'Qty ${order.items.first.quantity}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF6A7774),
-                          fontWeight: FontWeight.w600,
+                      ListingImage(
+                        food: order.items.first.food,
+                        width: 56,
+                        height: 56,
+                        borderRadius: 14,
+                        iconSize: 26,
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            order.items.length == 1
+                                ? order.items.first.food.name
+                                : order.itemsSummary,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF101617),
+                            ),
+                          ),
+                          if (order.items.length == 1) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              'Qty ${order.items.first.quantity}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6A7774),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 3),
+                          Text(
+                            '${order.orderId} • ${order.placedAtLabel}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF8A9491),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            order.sellerKitchenBuyerLine,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF3A4644),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '₹${order.total.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0E5A47),
+                          ),
                         ),
-                      ),
-                    ],
-                    const SizedBox(height: 3),
-                    Text(
-                      '${order.orderId} • ${order.placedAtLabel}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF8A9491),
-                        fontWeight: FontWeight.w500,
-                      ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Color(0xFF0E5A47),
+                          size: 22,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      order.sellerKitchenBuyerLine,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF3A4644),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (order.requestedReadyAt != null) ...[
-                      const SizedBox(height: 8),
-                      RequestedReadySummary(
-                        order: order,
-                        isSellerView: true,
-                      ),
-                    ],
-                    if (order.fulfilmentMethod != null &&
-                        order.fulfilmentMethod!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      OrderFulfilmentBanner(
-                        order: order,
-                        isSellerView: true,
-                      ),
-                    ],
                   ],
                 ),
-              ),
-              Text(
-                '₹${order.total.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0E5A47),
-                ),
-              ),
-            ],
-          ),
-          if (order.items.length > 1) ...[
-            const SizedBox(height: 10),
-            OrderItemsList(
-              items: order.items,
-              compact: true,
-              showSellerName: false,
+                if (order.requestedReadyAt != null) ...[
+                  const SizedBox(height: 8),
+                  RequestedReadySummary(
+                    order: order,
+                    isSellerView: true,
+                  ),
+                ],
+                if (order.fulfilmentMethod != null &&
+                    order.fulfilmentMethod!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  OrderFulfilmentBanner(
+                    order: order,
+                    isSellerView: true,
+                  ),
+                ],
+                if (order.items.length > 1) ...[
+                  const SizedBox(height: 10),
+                  OrderItemsList(
+                    items: order.items,
+                    compact: true,
+                    showSellerName: false,
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -3718,100 +3739,120 @@ class SellerPastOrderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Multi-item orders list every dish below, so a hero thumbnail
-              // would just repeat the first one.
-              if (order.items.length == 1) ...[
-                ListingImage(
-                  food: order.items.first.food,
-                  width: 56,
-                  height: 56,
-                  borderRadius: 14,
-                  iconSize: 26,
-                ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                child: Column(
+          InkWell(
+            key: const Key('seller-order-open-details'),
+            onTap: () => showSellerOrderDetailSheet(context, order),
+            borderRadius: BorderRadius.circular(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      order.items.length == 1
-                          ? order.items.first.food.name
-                          : order.itemsSummary,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF101617),
-                      ),
-                    ),
+                    // Multi-item orders list every dish below, so a hero
+                    // thumbnail would just repeat the first one.
                     if (order.items.length == 1) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        'Qty ${order.items.first.quantity}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF6A7774),
-                          fontWeight: FontWeight.w600,
+                      ListingImage(
+                        food: order.items.first.food,
+                        width: 56,
+                        height: 56,
+                        borderRadius: 14,
+                        iconSize: 26,
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            order.items.length == 1
+                                ? order.items.first.food.name
+                                : order.itemsSummary,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF101617),
+                            ),
+                          ),
+                          if (order.items.length == 1) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              'Qty ${order.items.first.quantity}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6A7774),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 3),
+                          Text(
+                            '${order.orderId} • ${order.placedAtLabel}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF8A9491),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            order.sellerKitchenBuyerLine,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF3A4644),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '₹${order.total.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF101617),
+                          ),
                         ),
-                      ),
-                    ],
-                    const SizedBox(height: 3),
-                    Text(
-                      '${order.orderId} • ${order.placedAtLabel}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF8A9491),
-                        fontWeight: FontWeight.w500,
-                      ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Color(0xFF0E5A47),
+                          size: 22,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      order.sellerKitchenBuyerLine,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF3A4644),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (order.requestedReadyAt != null) ...[
-                      const SizedBox(height: 8),
-                      RequestedReadySummary(
-                        order: order,
-                        isSellerView: true,
-                      ),
-                    ],
-                    if (order.fulfilmentMethod != null &&
-                        order.fulfilmentMethod!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      OrderFulfilmentBanner(
-                        order: order,
-                        isSellerView: true,
-                      ),
-                    ],
                   ],
                 ),
-              ),
-              Text(
-                '₹${order.total.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF101617),
-                ),
-              ),
-            ],
-          ),
-          if (order.items.length > 1) ...[
-            const SizedBox(height: 10),
-            OrderItemsList(
-              items: order.items,
-              compact: true,
-              showSellerName: false,
+                if (order.requestedReadyAt != null) ...[
+                  const SizedBox(height: 8),
+                  RequestedReadySummary(
+                    order: order,
+                    isSellerView: true,
+                  ),
+                ],
+                if (order.fulfilmentMethod != null &&
+                    order.fulfilmentMethod!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  OrderFulfilmentBanner(
+                    order: order,
+                    isSellerView: true,
+                  ),
+                ],
+                if (order.items.length > 1) ...[
+                  const SizedBox(height: 10),
+                  OrderItemsList(
+                    items: order.items,
+                    compact: true,
+                    showSellerName: false,
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,

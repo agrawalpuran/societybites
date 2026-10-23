@@ -770,6 +770,8 @@ class Order {
   final String? buyerFlatNumber;
   final String? buyerBlock;
   final String? buyerSocietyName;
+  final String? buyerSocietyAddress;
+  final String? buyerCity;
   final String? sellerSocietyName;
   final double? distanceKm;
   final int unreadMessageCount;
@@ -818,6 +820,8 @@ class Order {
     this.buyerFlatNumber,
     this.buyerBlock,
     this.buyerSocietyName,
+    this.buyerSocietyAddress,
+    this.buyerCity,
     this.sellerSocietyName,
     this.distanceKm,
     this.unreadMessageCount = 0,
@@ -983,6 +987,34 @@ class Order {
     return 'Buyer · $label';
   }
 
+  String get buyerDoorLabel {
+    final location = <String>[];
+    final block = buyerBlock?.trim() ?? '';
+    final flat = buyerFlatNumber?.trim() ?? '';
+    if (block.isNotEmpty) location.add('Block $block');
+    if (flat.isNotEmpty) location.add('Flat $flat');
+    return location.join(', ');
+  }
+
+  /// Society, door, and street the seller needs for delivery or pickup ID.
+  String get buyerAddressForSeller {
+    final parts = <String>[];
+    final society = buyerSocietyName?.trim() ?? '';
+    if (society.isNotEmpty) parts.add(society);
+    final door = buyerDoorLabel;
+    if (door.isNotEmpty) parts.add(door);
+    final street = buyerSocietyAddress?.trim() ?? '';
+    if (street.isNotEmpty && street != society) parts.add(street);
+    final city = buyerCity?.trim() ?? '';
+    if (city.isNotEmpty && !parts.join(' ').toLowerCase().contains(city.toLowerCase())) {
+      parts.add(city);
+    }
+    return parts.join('\n');
+  }
+
+  String get buyerMapsQuery =>
+      buyerAddressForSeller.replaceAll('\n', ', ').trim();
+
   /// Rough society-to-society distance. Empty for same-society orders.
   String get approxDistanceLabel {
     final km = distanceKm;
@@ -1075,6 +1107,8 @@ class Order {
       buyerFlatNumber: buyerFlatNumber,
       buyerBlock: buyerBlock,
       buyerSocietyName: buyerSocietyName,
+      buyerSocietyAddress: buyerSocietyAddress,
+      buyerCity: buyerCity,
       sellerSocietyName: sellerSocietyName,
       distanceKm: distanceKm,
       unreadMessageCount: unreadMessageCount,
@@ -1121,6 +1155,8 @@ class Order {
       buyerFlatNumber: buyerFlatNumber,
       buyerBlock: buyerBlock,
       buyerSocietyName: buyerSocietyName,
+      buyerSocietyAddress: buyerSocietyAddress,
+      buyerCity: buyerCity,
       sellerSocietyName: sellerSocietyName,
       distanceKm: distanceKm,
       unreadMessageCount: count,
@@ -1209,6 +1245,8 @@ class Order {
       buyerFlatNumber: json['buyerFlatNumber'] as String?,
       buyerBlock: json['buyerBlock'] as String?,
       buyerSocietyName: json['buyerSocietyName'] as String?,
+      buyerSocietyAddress: json['buyerSocietyAddress'] as String?,
+      buyerCity: json['buyerCity'] as String?,
       sellerSocietyName: json['sellerSocietyName'] as String?,
       distanceKm: (json['distanceKm'] as num?)?.toDouble(),
       unreadMessageCount: (json['unreadMessageCount'] as num?)?.toInt() ?? 0,
@@ -1294,6 +1332,9 @@ class Order {
       buyerFlatNumber: updated.buyerFlatNumber ?? prior.buyerFlatNumber,
       buyerBlock: updated.buyerBlock ?? prior.buyerBlock,
       buyerSocietyName: updated.buyerSocietyName ?? prior.buyerSocietyName,
+      buyerSocietyAddress:
+          updated.buyerSocietyAddress ?? prior.buyerSocietyAddress,
+      buyerCity: updated.buyerCity ?? prior.buyerCity,
       sellerSocietyName: updated.sellerSocietyName ?? prior.sellerSocietyName,
       distanceKm: updated.distanceKm ?? prior.distanceKm,
       unreadMessageCount: updated.unreadMessageCount,
@@ -1380,6 +1421,8 @@ class Order {
       buyerFlatNumber: prior.buyerFlatNumber,
       buyerBlock: prior.buyerBlock,
       buyerSocietyName: prior.buyerSocietyName,
+      buyerSocietyAddress: prior.buyerSocietyAddress,
+      buyerCity: prior.buyerCity,
       sellerSocietyName: prior.sellerSocietyName,
       distanceKm: prior.distanceKm,
       unreadMessageCount: prior.unreadMessageCount,

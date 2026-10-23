@@ -1,0 +1,29 @@
+{
+  "id": "ord-rejected-1",
+  "orderNumber": "SE-431074",
+  "status": "rejected",
+  "statusStep": 0,
+  "paymentStatus": "failed",
+  "paymentMethod": "upi",
+  "total": 180,
+  "subtotal": 180,
+  "communityFee": 0,
+  "deliveryCharge": 0,
+  "createdAt": "2026-10-21T16:48:00.000Z",
+  "rejectedAt": "2026-10-21T16:55:00.000Z",
+  "rejectReason": "Not enough time",
+  "buyerName": "Test User",
+  "items": [
+    {
+      "quantity": 1,
+      "unitPrice": 180,
+      "listing": {
+        "id": "listing-paneer",
+        "name": "Fresh Sahi Paneer",
+        "sellerId": "seller-1",
+        "sellerName": "Agrawal's",
+        "price": 180
+      }
+    }
+  ]
+}
