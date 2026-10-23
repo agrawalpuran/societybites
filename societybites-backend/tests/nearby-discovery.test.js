@@ -285,6 +285,7 @@ async function main() {
     assert(nearby.status === 200, `nearby discovery failed: ${nearby.status}`);
     assert(nearby.json.available === true, "nearby should be available");
     assert(nearby.json.appliedRadiusKm === 10, "applied radius comes from city config");
+    assert(nearby.json.maxSellerRadiusKm === 10, "max seller radius from city config");
     assert(nearby.json.nearbyRadiusKm === 5, "nearby radius from city config");
     const ids = sellerIds(nearby.json);
 

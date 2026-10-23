@@ -149,7 +149,10 @@ class SellingReach {
       cityKey: me['cityKey'] as String?,
       nearbyRadiusKm: _toDoubleOrNull(me['nearbyRadiusKm']),
       extendedRadiusKm: _toDoubleOrNull(me['extendedRadiusKm']),
-      maxSellerRadiusKm: _toDoubleOrNull(me['maxSellerRadiusKm']),
+      // Nearby discovery used to omit maxSellerRadiusKm; appliedRadiusKm is
+      // the same city cap the admin Max reach field stores.
+      maxSellerRadiusKm: _toDoubleOrNull(me['maxSellerRadiusKm']) ??
+          _toDoubleOrNull(me['appliedRadiusKm']),
     );
   }
 }

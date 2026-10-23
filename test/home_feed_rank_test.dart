@@ -247,6 +247,19 @@ void main() {
       ['Up to 10 km', 'Up to 7 km', 'Up to 5 km', 'Up to 3 km', 'Up to 2 km', 'Up to 1 km'],
     );
 
+    final fromNearbyPayload = SellingReach.fromAuthMe({
+      'nearbyRadiusKm': 5,
+      'extendedRadiusKm': 14,
+      'appliedRadiusKm': 10,
+    });
+    expect(
+      homeDistanceMenuLabel(
+        homeDistanceMenuChoices(fromNearbyPayload).first,
+        fromNearbyPayload,
+      ),
+      'Up to 10 km',
+    );
+
     final wider = SellingReach.fromJson({
       'nearbyRadiusKm': 8,
       'extendedRadiusKm': 10,

@@ -57,14 +57,23 @@ function appliedDisplayRadiusKm(reach) {
   return extended != null ? extended : nearby;
 }
 
+function cityReachPayloadFields(reach) {
+  return {
+    nearbyRadiusKm: reach ? reach.nearbyRadiusKm : null,
+    extendedRadiusKm: reach ? reach.extendedRadiusKm : null,
+    maxSellerRadiusKm: reach && Number.isFinite(Number(reach.maxSellerRadiusKm))
+      ? Number(reach.maxSellerRadiusKm)
+      : null,
+    appliedRadiusKm: appliedDisplayRadiusKm(reach),
+  };
+}
+
 function unavailablePayload({ reason, buyerSociety, reach }) {
   return {
     available: false,
     reason,
     buyerSocietyName: (buyerSociety && buyerSociety.name) || null,
-    nearbyRadiusKm: reach ? reach.nearbyRadiusKm : null,
-    extendedRadiusKm: reach ? reach.extendedRadiusKm : null,
-    appliedRadiusKm: appliedDisplayRadiusKm(reach),
+    ...cityReachPayloadFields(reach),
     sellers: [],
   };
 }
@@ -264,9 +273,7 @@ async function discoverNearbySellers({ buyer, query } = {}) {
     available: true,
     reason: null,
     buyerSocietyName: buyerSociety.name || null,
-    nearbyRadiusKm: reach.nearbyRadiusKm,
-    extendedRadiusKm: reach.extendedRadiusKm,
-    appliedRadiusKm: appliedDisplayRadiusKm(reach),
+    ...cityReachPayloadFields(reach),
     sellers: sellers.map((item) => item.card),
   };
 }
