@@ -4,6 +4,7 @@ import 'food_type.dart';
 import 'kitchen_hours.dart';
 import 'listing_availability.dart';
 import 'listing_categories.dart';
+import 'listing_discount.dart';
 import 'order_lifecycle.dart';
 import 'recurring_availability.dart';
 import 'seller_fulfilment.dart';
@@ -58,6 +59,13 @@ class FoodItem {
   final String? flatNumber;
   final String? pickupLocation;
   final double price;
+  /// Seller-configured sale. Regular `price` is never replaced by this layer.
+  final bool discountEnabled;
+  final double? discountPercent;
+  final DateTime? discountStartsAt;
+  final DateTime? discountEndsAt;
+  final double? effectivePrice;
+  final bool discountActive;
   final double rating;
   final String pickupTime;
   final String description;
@@ -135,6 +143,12 @@ class FoodItem {
     this.flatNumber,
     this.pickupLocation,
     required this.price,
+    this.discountEnabled = false,
+    this.discountPercent,
+    this.discountStartsAt,
+    this.discountEndsAt,
+    this.effectivePrice,
+    this.discountActive = false,
     required this.rating,
     required this.pickupTime,
     required this.description,
@@ -434,6 +448,12 @@ class FoodItem {
       flatNumber: redactAddress ? null : rawFlat,
       pickupLocation: json['pickupLocation']?.toString(),
       price: _asDouble(json['price']),
+      discountEnabled: json['discountEnabled'] == true,
+      discountPercent: optionalListingDiscountAmount(json['discountPercent']),
+      discountStartsAt: optionalListingDiscountDate(json['discountStartsAt']),
+      discountEndsAt: optionalListingDiscountDate(json['discountEndsAt']),
+      effectivePrice: optionalListingDiscountAmount(json['effectivePrice']),
+      discountActive: json['discountActive'] == true,
       rating: _asDouble(json['avgRating']),
       pickupTime: _formatPickupTime(availableAtRaw),
       description: json['description']?.toString() ?? '',
@@ -575,6 +595,12 @@ class FoodItem {
       flatNumber: flatNumber,
       pickupLocation: pickupLocation,
       price: price,
+      discountEnabled: discountEnabled,
+      discountPercent: discountPercent,
+      discountStartsAt: discountStartsAt,
+      discountEndsAt: discountEndsAt,
+      effectivePrice: effectivePrice,
+      discountActive: discountActive,
       rating: rating,
       pickupTime: pickupTime,
       description: description,
@@ -639,7 +665,14 @@ class CartItem {
 
   CartItem({required this.food, this.quantity = 1});
 
-  double get total => food.price * quantity;
+  double get total =>
+      resolveListingDisplayPrice(
+        regularPrice: food.price,
+        discountActive: food.discountActive,
+        effectivePrice: food.effectivePrice,
+        discountPercent: food.discountPercent,
+      ).chargedPrice *
+      quantity;
 }
 
 class Review {
@@ -691,11 +724,15 @@ class OrderLineItem {
   final FoodItem food;
   final int quantity;
   final double unitPrice;
+  final double? originalUnitPrice;
+  final double? discountPercent;
 
   const OrderLineItem({
     required this.food,
     required this.quantity,
     required this.unitPrice,
+    this.originalUnitPrice,
+    this.discountPercent,
   });
 
   double get lineTotal => unitPrice * quantity;
@@ -715,6 +752,8 @@ class OrderLineItem {
       food: food,
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
       unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? food.price,
+      originalUnitPrice: optionalListingDiscountAmount(json['originalUnitPrice']),
+      discountPercent: optionalListingDiscountAmount(json['discountPercent']),
     );
   }
 }
@@ -1286,11 +1325,23 @@ class Order {
     if (order.items.isNotEmpty || cart.isEmpty) return order;
     final items = cart
         .map(
-          (item) => OrderLineItem(
-            food: item.food,
-            quantity: item.quantity,
-            unitPrice: item.food.price,
-          ),
+          (item) {
+            final quote = resolveListingDisplayPrice(
+              regularPrice: item.food.price,
+              discountActive: item.food.discountActive,
+              effectivePrice: item.food.effectivePrice,
+              discountPercent: item.food.discountPercent,
+            );
+            return OrderLineItem(
+              food: item.food,
+              quantity: item.quantity,
+              unitPrice: quote.chargedPrice,
+              originalUnitPrice:
+                  quote.saleActive ? quote.regularPrice : null,
+              discountPercent:
+                  quote.saleActive ? quote.discountPercent : null,
+            );
+          },
         )
         .toList();
     return mergePreservingDetails(

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../widgets/listing_image.dart';
 import '../models/coupon.dart';
 import '../models/data.dart';
+import '../models/listing_discount.dart';
+import 'listing_buyer_price.dart';
 
 class OrderItemsList extends StatelessWidget {
   const OrderItemsList({
@@ -71,9 +73,22 @@ class OrderItemsList extends StatelessWidget {
                     ],
                   ),
                 ),
-                Text(
-                  '₹${item.lineTotal.toStringAsFixed(0)}',
-                  style: TextStyle(
+                ListingBuyerPriceText(
+                  food: item.food,
+                  alignEnd: true,
+                  quote: () {
+                    final original = item.originalUnitPrice;
+                    final sale = original != null &&
+                        original > item.unitPrice + 0.009;
+                    return ListingDisplayPrice(
+                      regularPrice:
+                          (sale ? original : item.unitPrice) * item.quantity,
+                      chargedPrice: item.lineTotal,
+                      saleActive: sale,
+                      discountPercent: item.discountPercent,
+                    );
+                  }(),
+                  chargedStyle: TextStyle(
                     fontSize: compact ? 14 : 15,
                     fontWeight: FontWeight.w800,
                     color: const Color(0xFF101617),

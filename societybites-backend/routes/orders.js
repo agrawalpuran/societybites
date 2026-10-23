@@ -75,6 +75,7 @@ const {
   attachUnreadCounts,
 } = require("../lib/orderMessages");
 const { buyerCancelDeniedReason } = require("../lib/buyerCancel");
+const { orderItemDiscountSnapshot } = require("../lib/listingDiscount");
 const { revealBuyerContact } = require("../lib/buyerContact");
 const {
   skipsSellerAcceptance,
@@ -1099,8 +1100,14 @@ router.post(
       listings: preparedItems.map(({ listing }) => listing),
     });
 
-    const subtotal = preparedItems.reduce(
-      (sum, { listing, quantity }) => sum + listing.price * quantity,
+    const pricedAt = new Date();
+    const pricedItems = preparedItems.map(({ listing, quantity }) => ({
+      listing,
+      quantity,
+      ...orderItemDiscountSnapshot(listing, pricedAt),
+    }));
+    const subtotal = pricedItems.reduce(
+      (sum, { unitPrice, quantity }) => sum + unitPrice * quantity,
       0
     );
     const platformFee = await getPlatformFee();
@@ -1121,7 +1128,7 @@ router.post(
         idempotencyKey,
         orderInclude: orderIncludeForCreate,
         createOrderInTransaction: async (tx) => {
-        for (const { listing, quantity } of preparedItems) {
+        for (const { listing, quantity } of pricedItems) {
           const reserveStock =
             (orderType === "regular" || listing.inventoryMode === "limited") &&
             !isRecurringReadyNowListing(listing);
@@ -1187,11 +1194,15 @@ router.post(
             communityFee: platformFee,
             total: preCouponTotal,
             items: {
-              create: preparedItems.map(({ listing, quantity }) => ({
-                listingId: listing.id,
-                quantity,
-                unitPrice: listing.price,
-              })),
+              create: pricedItems.map(
+                ({ listing, quantity, unitPrice, originalUnitPrice, discountPercent }) => ({
+                  listingId: listing.id,
+                  quantity,
+                  unitPrice,
+                  originalUnitPrice,
+                  discountPercent,
+                })
+              ),
             },
           },
           include: orderIncludeForCreate,

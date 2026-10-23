@@ -143,7 +143,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AddListingScreen), findsOneWidget);
-      expect(find.text('Pre-order'), findsWidgets);
+      expect(find.text('Pre-order Catalog'), findsWidgets);
       expect(find.byType(CreatePreOrderScreen), findsNothing);
     },
   );

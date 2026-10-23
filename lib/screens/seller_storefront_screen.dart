@@ -16,6 +16,7 @@ import '../widgets/guest_order_auth.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/recurring_availability_hint.dart';
+import '../widgets/listing_buyer_price.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/one_seller_cart.dart';
 import '../widgets/preorder_widgets.dart';
@@ -854,9 +855,10 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  Text(
-                    formatMoney(food.price),
-                    style: const TextStyle(
+                  ListingBuyerPriceText(
+                    food: food,
+                    useCardLabel: true,
+                    chargedStyle: const TextStyle(
                       color: preorderGreen,
                       fontSize: 16,
                       fontWeight: FontWeight.w900,

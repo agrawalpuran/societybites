@@ -2,13 +2,14 @@ require("dotenv").config();
 const {
   sortSellerCatalogListings,
   parseOrderedListingIds,
+  allocateFrontDisplayOrders,
 } = require("../lib/listingCatalogOrder");
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function main() {
+async function main() {
   const items = sortSellerCatalogListings([
     { id: "c", displayOrder: 2, createdAt: new Date("2024-01-01") },
     { id: "a", displayOrder: 0, createdAt: new Date("2024-01-03") },
@@ -34,7 +35,36 @@ function main() {
     assert(/duplicate/i.test(err.message), "duplicate error");
   }
 
+  const calls = [];
+  const prisma = {
+    listing: {
+      updateMany: async (args) => {
+        calls.push(args);
+        return { count: 2 };
+      },
+    },
+  };
+  const start = await allocateFrontDisplayOrders(prisma, "seller-1", 3);
+  assert(start === 0, "new listings start at the front");
+  assert(calls.length === 1, "existing orders are shifted once");
+  assert(calls[0].where.sellerId === "seller-1", "shift is seller-scoped");
+  assert(calls[0].data.displayOrder.increment === 3, "shift by SKU count");
+
+  const created = [
+    { id: "new", displayOrder: 0 },
+    { id: "old-a", displayOrder: 1 },
+    { id: "old-b", displayOrder: 2 },
+  ];
+  assert(
+    sortSellerCatalogListings(created).map((row) => row.id).join(",") ===
+      "new,old-a,old-b",
+    "prepended listing sorts first"
+  );
+
   console.log("listing-catalog-order.test.js OK");
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

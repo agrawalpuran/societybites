@@ -4,6 +4,7 @@ import '../web/web_breakpoints.dart';
 import 'main_shell_screen.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_header.dart';
+import '../widgets/listing_buyer_price.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/one_seller_cart.dart';
@@ -15,6 +16,8 @@ import '../widgets/requested_ready_summary.dart';
 import '../widgets/simple_time_picker.dart';
 import '../widgets/status_banner.dart';
 import '../models/data.dart';
+import '../models/listing_discount.dart';
+import '../utils/listing_portion_label.dart';
 import '../models/kitchen_hours.dart';
 import '../models/order_lifecycle.dart';
 import '../models/seller_fulfilment.dart';
@@ -1243,9 +1246,19 @@ class _OrderItemCard extends StatelessWidget {
                 filled: true,
               ),
               const SizedBox(width: 14),
-              Text(
-                '₹${item.total.toStringAsFixed(0)}',
-                style: const TextStyle(
+              ListingBuyerPriceText(
+                food: item.food,
+                alignEnd: true,
+                quote: () {
+                  final unit = listingDisplayPrice(item.food);
+                  return ListingDisplayPrice(
+                    regularPrice: unit.regularPrice * item.quantity,
+                    chargedPrice: unit.chargedPrice * item.quantity,
+                    saleActive: unit.saleActive,
+                    discountPercent: unit.discountPercent,
+                  );
+                }(),
+                chargedStyle: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF101617),

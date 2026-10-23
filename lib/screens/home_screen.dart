@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../widgets/listing_image.dart';
 import '../utils/listing_timing_chip.dart';
 import '../widgets/listing_compact_card_header.dart';
+import '../widgets/listing_buyer_price.dart';
 import '../widgets/listing_portion_caption.dart';
 import '../widgets/app_header.dart';
 import '../widgets/made_to_order_hint.dart';
@@ -2629,9 +2630,11 @@ class _AvailableItemTile extends StatelessWidget {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(
-                            listingCardPriceLabel(food),
-                            style: const TextStyle(
+                          ListingBuyerPriceText(
+                            food: food,
+                            useCardLabel: true,
+                            alignEnd: true,
+                            chargedStyle: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                               color: Color(0xFF0E5A47),

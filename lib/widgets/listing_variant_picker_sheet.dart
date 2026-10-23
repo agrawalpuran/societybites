@@ -7,6 +7,7 @@ import '../models/food_type.dart';
 import '../services/api_service.dart';
 import '../services/listing_variants_cache.dart';
 import '../utils/listing_portion_label.dart';
+import 'listing_buyer_price.dart';
 import '../web/web_breakpoints.dart';
 import 'content_skeleton.dart';
 import 'listing_image.dart';
@@ -333,7 +334,7 @@ class _ListingVariantPickerSheetState extends State<ListingVariantPickerSheet> {
                         ),
                       ),
                       child: Text(
-                        'Add Item | ₹${(selected.price * _qty).toStringAsFixed(0)}',
+                        'Add Item | ₹${(listingBuyerUnitPrice(selected) * _qty).toStringAsFixed(0)}',
                         style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
@@ -414,9 +415,10 @@ class _VariantOptionRow extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                '₹${food.price.toStringAsFixed(0)}',
-                style: const TextStyle(
+              ListingBuyerPriceText(
+                food: food,
+                alignEnd: true,
+                chargedStyle: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF101617),

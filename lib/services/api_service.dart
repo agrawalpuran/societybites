@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:http/http.dart' as http_client;
 
 import '../models/coupon.dart';
+import '../models/listing_discount.dart';
 import '../models/issue_report.dart';
 import '../models/seller_order_history.dart';
 import '../models/seller_fssai.dart';
@@ -801,6 +802,10 @@ class ApiService {
     String? variantInventoryMode,
     num? sharedPoolQuantity,
     String? sharedPoolUnit,
+    bool discountEnabled = false,
+    int? discountPercent,
+    DateTime? discountStartsAt,
+    DateTime? discountEndsAt,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/listings'),
@@ -843,6 +848,12 @@ class ApiService {
           'sharedPoolQuantity': sharedPoolQuantity,
         if (sharedPoolUnit != null && sharedPoolUnit.isNotEmpty)
           'sharedPoolUnit': sharedPoolUnit,
+        ...listingDiscountFieldsForApi(
+          enabled: discountEnabled,
+          percent: discountPercent,
+          startsAt: discountStartsAt,
+          endsAt: discountEndsAt,
+        ),
       }),
     );
 
@@ -993,6 +1004,10 @@ class ApiService {
     int? recurringStartMinute,
     int? recurringEndMinute,
     int? recurringDailyLimit,
+    bool? discountEnabled,
+    int? discountPercent,
+    DateTime? discountStartsAt,
+    DateTime? discountEndsAt,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/listings/$listingId'),
@@ -1032,6 +1047,13 @@ class ApiService {
         if (recurringEnabled == true)
           'recurringDailyLimit': recurringDailyLimit,
         if (recurringEnabled == false) 'recurringDailyLimit': null,
+        if (discountEnabled != null)
+          ...listingDiscountFieldsForApi(
+            enabled: discountEnabled,
+            percent: discountPercent,
+            startsAt: discountStartsAt,
+            endsAt: discountEndsAt,
+          ),
       }),
     );
 

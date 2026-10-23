@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../utils/listing_portion_label.dart';
+import 'listing_buyer_price.dart';
 
 /// Compact portion size under price on home / web cards.
 class ListingPortionCaption extends StatelessWidget {
@@ -66,7 +67,11 @@ class ListingCompactPriceRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(listingCardPriceLabel(food), style: priceStyle),
+        ListingBuyerPriceText(
+          food: food,
+          useCardLabel: true,
+          chargedStyle: priceStyle,
+        ),
         if (portion != null)
           Padding(
             padding: const EdgeInsets.only(top: 2),

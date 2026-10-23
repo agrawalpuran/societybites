@@ -53,7 +53,7 @@ const {
 const { withoutAutomatedTestListings } = require("../lib/testListingNames");
 const {
   sortSellerCatalogListings,
-  nextDisplayOrderForSeller,
+  allocateFrontDisplayOrders,
   applySellerCatalogOrder,
 } = require("../lib/listingCatalogOrder");
 const {
@@ -66,6 +66,10 @@ const {
   draftIdsToPublish,
 } = require("../lib/listingPublish");
 const { authorizeListingForBuyer } = require("../lib/crossSocietyOrder");
+const {
+  parseDiscountCreateFields,
+  parseDiscountUpdateFields,
+} = require("../lib/listingDiscount");
 
 async function jsonListings(listings, viewerUserId) {
   const withCapacity = await attachMadeToOrderCapacity(prisma, listings);
@@ -430,11 +434,6 @@ router.post(
       return res.status(err.statusCode || 400).json({ error: err.message });
     }
 
-    const displayOrder =
-      parsedCatalogType === "REGULAR"
-        ? await nextDisplayOrderForSeller(prisma, req.user.id)
-        : null;
-
     let variantPayload;
     try {
       variantPayload = parseVariantCreatePayload({
@@ -449,6 +448,13 @@ router.post(
 
     const createStatus = resolveCreateListingStatus(req.body);
 
+    let discountFields;
+    try {
+      discountFields = parseDiscountCreateFields(req.body);
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+
     const sharedData = {
       sellerId: req.user.id,
       societyId: req.user.societyId,
@@ -460,6 +466,7 @@ router.post(
       tags: listingTags,
       foodType: parsedFoodType,
       status: createStatus,
+      ...discountFields,
       ...categoryWriteFields(parsedCategories),
       catalogType: parsedCatalogType,
       ...availabilityFields,
@@ -469,39 +476,55 @@ router.post(
 
     if (variantPayload) {
       const variantGroupId = newVariantGroupId();
-      const created = await prisma.$transaction(
-        variantPayload.rows.map((row, index) =>
-          prisma.listing.create({
-            data: {
-              ...sharedData,
-              displayOrder: displayOrder == null ? null : displayOrder + index,
-              price: row.price,
-              quantity: row.quantity,
-              weightUnit: row.weightUnit,
-              weightValue: row.weightValue,
-              variantGroupId,
-              variantLabel: row.variantLabel,
-              variantInventoryMode: row.variantInventoryMode,
-              portionUnits: row.portionUnits,
-            },
-            include: listingInclude,
-          })
-        )
-      );
+      const created = await prisma.$transaction(async (tx) => {
+        const start =
+          parsedCatalogType === "REGULAR"
+            ? await allocateFrontDisplayOrders(
+                tx,
+                req.user.id,
+                variantPayload.rows.length
+              )
+            : null;
+        return Promise.all(
+          variantPayload.rows.map((row, index) =>
+            tx.listing.create({
+              data: {
+                ...sharedData,
+                displayOrder: start == null ? null : start + index,
+                price: row.price,
+                quantity: row.quantity,
+                weightUnit: row.weightUnit,
+                weightValue: row.weightValue,
+                variantGroupId,
+                variantLabel: row.variantLabel,
+                variantInventoryMode: row.variantInventoryMode,
+                portionUnits: row.portionUnits,
+              },
+              include: listingInclude,
+            })
+          )
+        );
+      });
       const primary = sortVariantSiblings(created)[0];
       return res.status(201).json(await jsonListing(primary, req.user.id));
     }
 
-    const listing = await prisma.listing.create({
-      data: {
-        ...sharedData,
-        displayOrder,
-        price: parseFloat(price),
-        quantity: storedQuantity,
-        weightUnit: weightUnit || null,
-        weightValue: weightValue || null,
-      },
-      include: listingInclude,
+    const listing = await prisma.$transaction(async (tx) => {
+      const displayOrder =
+        parsedCatalogType === "REGULAR"
+          ? await allocateFrontDisplayOrders(tx, req.user.id, 1)
+          : null;
+      return tx.listing.create({
+        data: {
+          ...sharedData,
+          displayOrder,
+          price: parseFloat(price),
+          quantity: storedQuantity,
+          weightUnit: weightUnit || null,
+          weightValue: weightValue || null,
+        },
+        include: listingInclude,
+      });
     });
 
     res.status(201).json(await jsonListing(listing, req.user.id));
@@ -707,6 +730,13 @@ router.patch(
       data.status = "active";
     }
 
+    try {
+      const discountFields = parseDiscountUpdateFields(req.body, listing);
+      if (discountFields) Object.assign(data, discountFields);
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
+    }
+
     const updated = await prisma.listing.update({
       where: { id: req.params.id },
       data,
@@ -734,6 +764,10 @@ router.patch(
         "recurringStartMinute",
         "recurringEndMinute",
         "recurringDailyLimit",
+        "discountEnabled",
+        "discountPercent",
+        "discountStartsAt",
+        "discountEndsAt",
       ]) {
         if (data[key] !== undefined) shared[key] = data[key];
       }

@@ -6,6 +6,7 @@ import '../widgets/listing_image.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/listing_rating_mark.dart';
 import '../widgets/listing_type_badge.dart';
+import '../widgets/listing_buyer_price.dart';
 import '../widgets/listing_portion_caption.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/recurring_availability_hint.dart';
@@ -168,9 +169,10 @@ class WebFoodCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '₹${food.price.toStringAsFixed(0)}',
-                            style: const TextStyle(
+                          ListingBuyerPriceText(
+                            food: food,
+                            useCardLabel: true,
+                            chargedStyle: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                               color: webInk,
@@ -390,9 +392,10 @@ class _ReadyCard extends StatelessWidget {
                       const Spacer(),
                       Row(
                         children: [
-                          Text(
-                            '₹${food.price.toStringAsFixed(0)}',
-                            style: const TextStyle(
+                          ListingBuyerPriceText(
+                            food: food,
+                            useCardLabel: true,
+                            chargedStyle: const TextStyle(
                               fontWeight: FontWeight.w800,
                               color: webInk,
                             ),

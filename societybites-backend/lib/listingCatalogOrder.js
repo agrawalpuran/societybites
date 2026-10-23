@@ -42,19 +42,26 @@ function parseOrderedListingIds(body) {
   return ids;
 }
 
-async function nextDisplayOrderForSeller(prisma, sellerId) {
-  const row = await prisma.listing.findFirst({
+function normalizeFrontSlotCount(count) {
+  const n = Math.floor(Number(count));
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+// Shift existing catalog positions down and return 0 so new listings appear first.
+async function allocateFrontDisplayOrders(prisma, sellerId, count = 1) {
+  const slots = normalizeFrontSlotCount(count);
+  await prisma.listing.updateMany({
     where: {
       sellerId: String(sellerId),
-      catalogType: "REGULAR",
-      campaignId: null,
       displayOrder: { not: null },
     },
-    orderBy: { displayOrder: "desc" },
-    select: { displayOrder: true },
+    data: { displayOrder: { increment: slots } },
   });
-  const max = row && row.displayOrder != null ? row.displayOrder : -1;
-  return max + 1;
+  return 0;
+}
+
+async function nextDisplayOrderForSeller(prisma, sellerId) {
+  return allocateFrontDisplayOrders(prisma, sellerId, 1);
 }
 
 async function loadReorderableListingIds(prisma, sellerId) {
@@ -104,6 +111,7 @@ module.exports = {
   REORDERABLE_CATALOG_WHERE,
   sortSellerCatalogListings,
   parseOrderedListingIds,
+  allocateFrontDisplayOrders,
   nextDisplayOrderForSeller,
   loadReorderableListingIds,
   applySellerCatalogOrder,

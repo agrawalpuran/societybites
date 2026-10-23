@@ -108,7 +108,7 @@ void main() {
     await tester.ensureVisible(find.text('Just today'));
     expect(find.text('Just today'), findsOneWidget);
     expect(find.text('Same days every week'), findsOneWidget);
-    expect(find.text('QUANTITY AVAILABLE'), findsOneWidget);
+    expect(find.text('PORTIONS AVAILABLE'), findsOneWidget);
     expect(find.text('DATE/TIME AVAILABLE UNTIL'), findsNothing);
     expect(find.text('AVAILABLE UNTIL (OPTIONAL)'), findsNothing);
     expect(find.text('Full day'), findsOneWidget);
@@ -128,7 +128,7 @@ void main() {
     await tester.pump();
     expect(find.text('Full day'), findsNothing);
     expect(find.text('WHICH DAYS?'), findsNothing);
-    expect(find.text('QUANTITY AVAILABLE'), findsOneWidget);
+    expect(find.text('PORTIONS AVAILABLE'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('listing-availability-repeat')));
     await tester.pump();
@@ -140,7 +140,7 @@ void main() {
       tester.getTopLeft(find.text('No limit')).dy,
       tester.getTopLeft(find.text('I have a limit')).dy,
     );
-    expect(find.text('QUANTITY AVAILABLE'), findsNothing);
+    expect(find.text('PORTIONS AVAILABLE'), findsNothing);
     expect(find.text('AVAILABLE UNTIL (OPTIONAL)'), findsNothing);
 
     await tester.tap(find.byKey(const Key('listing-recurring-day-1')));

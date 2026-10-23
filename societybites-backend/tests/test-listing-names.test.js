@@ -10,6 +10,8 @@ function assert(condition, message) {
 assert(isAutomatedTestListingName("Cancel 1791447461402"), "cancel test listing");
 assert(isAutomatedTestListingName("Dbg1791447418913"), "debug listing");
 assert(isAutomatedTestListingName("Lifecycle 1710000000000"), "lifecycle listing");
+assert(isAutomatedTestListingName("Discount pool 1792750077116"), "discount pool listing");
+assert(isAutomatedTestListingName("Discount dish 1792750077116"), "discount dish listing");
 assert(!isAutomatedTestListingName("Home made fresh idli"), "real dish name");
 
 const filtered = withoutAutomatedTestListings([

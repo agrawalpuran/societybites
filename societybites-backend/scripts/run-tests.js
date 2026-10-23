@@ -21,6 +21,7 @@ const UNIT = [
   "food-type",
   "geo-distance",
   "buyer-contact",
+  "listing-discount",
   "notifications-payload",
 ];
 

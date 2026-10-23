@@ -2,6 +2,7 @@ import '../models/data.dart';
 import '../models/food_type.dart';
 import '../models/listing_categories.dart';
 import '../models/selling_reach.dart';
+import '../utils/listing_portion_label.dart';
 
 /// Restricts listings to an exact VEG / NON_VEG match.
 /// `null` foodType (All) returns the input unchanged, including unclassified items.
@@ -119,7 +120,12 @@ List<FoodItem> collapseListingVariants(List<FoodItem> listings) {
   final representatives = <String, FoodItem>{};
   for (final entry in groups.entries) {
     final siblings = [...entry.value]
-      ..sort((a, b) => a.price.compareTo(b.price));
+      ..sort((a, b) {
+        final byCharged =
+            listingBuyerUnitPrice(a).compareTo(listingBuyerUnitPrice(b));
+        if (byCharged != 0) return byCharged;
+        return a.price.compareTo(b.price);
+      });
     // Prefer buyable sizes for the Blinkit-style "N options" label.
     final available = siblings
         .where((s) => s.canAddToCart && !s.isKitchenClosed)

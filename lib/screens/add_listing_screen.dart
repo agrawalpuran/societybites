@@ -10,8 +10,10 @@ import '../services/api_service.dart';
 import '../services/listing_publish_navigation.dart';
 import '../services/session_service.dart';
 import '../models/food_type.dart';
+import '../models/coupon.dart';
 import '../models/listing_availability.dart';
 import '../models/listing_categories.dart';
+import '../models/listing_discount.dart';
 import '../models/pickup_location.dart';
 import '../models/recurring_availability.dart';
 import '../widgets/available_in_selector.dart';
@@ -80,6 +82,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
   final _variantLabelController = TextEditingController();
   final _sharedPoolController = TextEditingController();
   InventoryUnit _sharedPoolUnit = InventoryUnit.kg;
+  bool _discountEnabled = false;
+  final _discountPercentController = TextEditingController();
+  DateTime? _discountStartsAt;
+  DateTime? _discountEndsAt;
 
   bool get _isEditing => widget.existingListing != null;
   bool get _showMultipleSizes =>
@@ -106,6 +112,25 @@ class _AddListingScreenState extends State<AddListingScreen> {
   bool get _showRecurringSection => !_isMadeToOrder && !_isPreorderCatalog;
   /// Just today already ends today, so an extra stop date is not offered.
   bool get _showUntilField => false;
+
+  bool get _discountAppliesToVariantGroup {
+    if (_useMultipleSizes) return true;
+    final groupId = widget.existingListing?.variantGroupId?.trim();
+    return groupId != null && groupId.isNotEmpty;
+  }
+
+  int? get _discountPercentValue {
+    final raw = _discountPercentController.text.trim();
+    if (raw.isEmpty) return null;
+    return int.tryParse(raw);
+  }
+
+  double? get _discountPreviewRegularPrice {
+    if (_useMultipleSizes && _variantDrafts.isNotEmpty) {
+      return double.tryParse(_variantDrafts.first.priceController.text.trim());
+    }
+    return double.tryParse(_priceController.text.trim());
+  }
 
   String get _orderTypeTitle {
     if (_isPreorderCatalog) return 'Pre-order Catalog';
@@ -749,6 +774,21 @@ class _AddListingScreenState extends State<AddListingScreen> {
           listing.availableAt == null) {
         _untilStockLasts = true;
       }
+      _discountEnabled = listing.discountEnabled;
+      final storedPercent = listing.discountPercent;
+      if (storedPercent != null) {
+        final asInt = storedPercent.round();
+        _discountPercentController.text = asInt == storedPercent
+            ? '$asInt'
+            : storedPercent.toString();
+      }
+      if (listing.discountStartsAt != null) {
+        _discountStartsAt =
+            listingDiscountCalendarDate(listing.discountStartsAt!);
+      }
+      if (listing.discountEndsAt != null) {
+        _discountEndsAt = listingDiscountCalendarDate(listing.discountEndsAt!);
+      }
     } else {
       _availabilityMode = parseListingAvailabilityMode(
         widget.initialAvailabilityMode,
@@ -767,6 +807,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
     _dailyLimitController.dispose();
     _variantLabelController.dispose();
     _sharedPoolController.dispose();
+    _discountPercentController.dispose();
     for (final draft in _variantDrafts) {
       draft.dispose();
     }
@@ -1142,6 +1183,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
                 ],
+                onChanged: (_) => setState(() {}),
                 validator: (v) {
                   if (!_useMultipleSizes) return null;
                   if (v == null || v.trim().isEmpty) return 'Required';
@@ -1230,6 +1272,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
                       ],
+                      onChanged: (_) => setState(() {}),
                       validator: (v) {
                         if (!_useMultipleSizes) return null;
                         if (v == null || v.trim().isEmpty) return 'Required';
@@ -1382,6 +1425,19 @@ class _AddListingScreenState extends State<AddListingScreen> {
       return;
     }
 
+    final discountError = listingDiscountValidationError(
+      enabled: _discountEnabled,
+      percent: _discountPercentValue,
+      startsAt: _discountStartsAt,
+      endsAt: _discountEndsAt,
+    );
+    if (discountError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(discountError)),
+      );
+      return;
+    }
+
     int? prepMinutes;
     if (_isMadeToOrder) {
       prepMinutes = _selectedPrepMinutes;
@@ -1526,6 +1582,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
           recurringEndMinute:
               (useRecurring || sameDayHours) ? recurringEndMinute : null,
           recurringDailyLimit: recurringLimit,
+          discountEnabled: _discountEnabled,
+          discountPercent: _discountEnabled ? _discountPercentValue : null,
+          discountStartsAt: _discountEnabled ? _discountStartsAt : null,
+          discountEndsAt: _discountEnabled ? _discountEndsAt : null,
         );
       } else {
         await ApiService.createListing(
@@ -1561,6 +1621,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
               variants != null ? _variantInventoryMode : null,
           sharedPoolQuantity: sharedPoolAmount,
           sharedPoolUnit: sharedPoolUnit,
+          discountEnabled: _discountEnabled,
+          discountPercent: _discountEnabled ? _discountPercentValue : null,
+          discountStartsAt: _discountEnabled ? _discountStartsAt : null,
+          discountEndsAt: _discountEnabled ? _discountEndsAt : null,
         );
       }
 
@@ -1697,6 +1761,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                               FilteringTextInputFormatter.allow(
                                   RegExp(r'[\d.]')),
                             ],
+                            onChanged: (_) => setState(() {}),
                             validator: (v) {
                               if (_useMultipleSizes) return null;
                               if (v == null || v.trim().isEmpty) {
@@ -1721,6 +1786,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 18),
+                      _buildDiscountSection(),
                       if (_showRecurringSection) ...[
                         const SizedBox(height: 18),
                         _buildRecurringSection(),
@@ -2126,6 +2193,223 @@ class _AddListingScreenState extends State<AddListingScreen> {
             fontSize: 12,
             color: Color(0xFF8A9491),
             fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickDiscountDate({required bool start}) async {
+    final current = start ? _discountStartsAt : _discountEndsAt;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final firstDate = !start && _discountStartsAt != null
+        ? _discountStartsAt!
+        : DateTime(today.year - 1);
+    var initial = current ?? today;
+    if (initial.isBefore(firstDate)) initial = firstDate;
+    final lastDate = DateTime(today.year + 5);
+    if (initial.isAfter(lastDate)) initial = lastDate;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      final day = listingDiscountCalendarDate(picked);
+      if (start) {
+        _discountStartsAt = day;
+        if (_discountEndsAt != null &&
+            listingDiscountCalendarDate(_discountEndsAt!).isBefore(day)) {
+          _discountEndsAt = null;
+        }
+      } else {
+        _discountEndsAt = day;
+      }
+    });
+  }
+
+  Widget _buildDiscountSection() {
+    final percent = _discountPercentValue;
+    final regular = _discountPreviewRegularPrice;
+    final previewValid = _discountEnabled &&
+        listingDiscountPercentIsAllowed(percent) &&
+        regular != null &&
+        regular > 0;
+    final effective = previewValid
+        ? listingDiscountEffectivePrice(regular, percent!)
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile.adaptive(
+          key: const Key('listing-discount-toggle'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
+            listingDiscountToggleLabel,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF101617),
+            ),
+          ),
+          subtitle: const Text(
+            'Optional percentage off the regular price. The regular price stays the same.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF6A7774),
+              height: 1.35,
+            ),
+          ),
+          value: _discountEnabled,
+          activeColor: const Color(0xFF0E5A47),
+          onChanged: (value) => setState(() => _discountEnabled = value),
+        ),
+        if (_discountEnabled) ...[
+          if (_discountAppliesToVariantGroup) ...[
+            const SizedBox(height: 4),
+            Text(
+              listingDiscountVariantGroupHint,
+              key: const Key('listing-discount-variant-note'),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF0E5A47),
+                height: 1.35,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          _buildField(
+            label: 'DISCOUNT PERCENT',
+            isRequired: true,
+            child: TextFormField(
+              key: const Key('listing-discount-percent'),
+              controller: _discountPercentController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: (_) => setState(() {}),
+              validator: (value) {
+                if (!_discountEnabled) return null;
+                final parsed = int.tryParse(value?.trim() ?? '');
+                if (!listingDiscountPercentIsAllowed(parsed)) {
+                  return listingDiscountPercentRangeError;
+                }
+                return null;
+              },
+              decoration: _inputDeco('e.g. 10'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            listingDiscountUnboundedHint,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF6A7774),
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDiscountDateButton(
+                  key: const Key('listing-discount-start'),
+                  label: 'Start date',
+                  value: _discountStartsAt,
+                  onTap: () => _pickDiscountDate(start: true),
+                  onClear: _discountStartsAt == null
+                      ? null
+                      : () => setState(() => _discountStartsAt = null),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildDiscountDateButton(
+                  key: const Key('listing-discount-end'),
+                  label: 'End date',
+                  value: _discountEndsAt,
+                  onTap: () => _pickDiscountDate(start: false),
+                  onClear: _discountEndsAt == null
+                      ? null
+                      : () => setState(() => _discountEndsAt = null),
+                ),
+              ),
+            ],
+          ),
+          if (effective != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Regular price ${formatRupee(regular!)} · Neighbors pay ${formatRupee(effective)}',
+              key: const Key('listing-discount-preview'),
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0E5A47),
+                height: 1.35,
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDiscountDateButton({
+    required Key key,
+    required String label,
+    required DateTime? value,
+    required VoidCallback onTap,
+    VoidCallback? onClear,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: _pairedFieldLabelStyle.copyWith(color: const Color(0xFF6A7774)),
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          key: key,
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: InputDecorator(
+            decoration: _inputDeco('Optional'),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    value == null ? 'None' : formatCouponDate(value),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: value == null
+                          ? const Color(0xFFADB5B2)
+                          : const Color(0xFF101617),
+                    ),
+                  ),
+                ),
+                if (onClear != null)
+                  GestureDetector(
+                    onTap: onClear,
+                    child: const Icon(
+                      Icons.close,
+                      size: 16,
+                      color: Color(0xFF6A7774),
+                    ),
+                  )
+                else
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    size: 16,
+                    color: Color(0xFF6A7774),
+                  ),
+              ],
+            ),
           ),
         ),
       ],

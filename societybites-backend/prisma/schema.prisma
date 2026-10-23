@@ -261,6 +261,11 @@ model Listing {
   sourceListingId        String?
   /// demand | limited — only for campaign products. Regular listings ignore this.
   inventoryMode          String?
+  /// Seller listing sale. Regular price stays on `price`; never overwritten by this layer.
+  discountEnabled        Boolean           @default(false)
+  discountPercent        Float?
+  discountStartsAt       DateTime?
+  discountEndsAt         DateTime?
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
   seller                 User              @relation(fields: [sellerId], references: [id])
@@ -371,13 +376,17 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(uuid())
-  orderId   String
-  listingId String
-  quantity  Int
-  unitPrice Float
-  listing   Listing @relation(fields: [listingId], references: [id])
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id                String  @id @default(uuid())
+  orderId           String
+  listingId         String
+  quantity          Int
+  unitPrice         Float
+  /// Regular listing price at purchase. Null on orders placed before listing discounts.
+  originalUnitPrice Float?
+  /// Percent applied at purchase when a listing discount was active. Null otherwise.
+  discountPercent   Float?
+  listing           Listing @relation(fields: [listingId], references: [id])
+  order             Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([listingId])

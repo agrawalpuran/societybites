@@ -16,6 +16,7 @@ const {
   shouldExposeSellerFlatNumber,
 } = require("../lib/sellerFlatPrivacy");
 const { serializeBuyerContactForViewer } = require("../lib/buyerContact");
+const { serializeListingDiscount } = require("../lib/listingDiscount");
 const {
   isSharedVariantInventory,
   orderableQuantity,
@@ -74,6 +75,7 @@ function serializeListing(listing, options = {}) {
     name: listing.name,
     description: listing.description,
     price: listing.price,
+    ...serializeListingDiscount(listing),
     // Buyer/cart-facing: for SHARED sizes, floor(pool / portionUnits).
     quantity: orderable,
     // Raw shared pool remaining (g/ml/units). Null when not SHARED.
@@ -237,6 +239,10 @@ function serializeOrder(order, options = {}) {
     id: item.id,
     quantity: item.quantity,
     unitPrice: item.unitPrice,
+    originalUnitPrice:
+      item.originalUnitPrice == null ? null : item.originalUnitPrice,
+    discountPercent:
+      item.discountPercent == null ? null : item.discountPercent,
     total: item.quantity * item.unitPrice,
     listing: item.listing
       ? serializeListing(

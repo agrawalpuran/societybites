@@ -8,6 +8,7 @@ import '../widgets/listing_rating_mark.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/app_header.dart';
 import '../utils/listing_portion_label.dart';
+import '../widgets/listing_buyer_price.dart';
 import '../utils/listing_timing_chip.dart';
 import '../widgets/made_to_order_hint.dart';
 import '../widgets/recurring_availability_hint.dart';
@@ -371,7 +372,7 @@ class _VariantPicker extends StatelessWidget {
                   label: portionLabelForFood(option) ??
                       option.variantLabel ??
                       'Option',
-                  price: option.price,
+                  food: option,
                   selected: option.id == selectedId,
                   enabled: option.canAddToCart && !option.isKitchenClosed,
                   onTap: () => onSelected(option),
@@ -387,14 +388,14 @@ class _VariantPicker extends StatelessWidget {
 class _VariantChip extends StatelessWidget {
   const _VariantChip({
     required this.label,
-    required this.price,
+    required this.food,
     required this.selected,
     required this.enabled,
     required this.onTap,
   });
 
   final String label;
-  final double price;
+  final FoodItem food;
   final bool selected;
   final bool enabled;
   final VoidCallback onTap;
@@ -439,12 +440,19 @@ class _VariantChip extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              Text(
-                '₹${price.toStringAsFixed(0)}',
-                style: TextStyle(
+              ListingBuyerPriceText(
+                food: food,
+                showBadge: !selected,
+                chargedStyle: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: selected ? const Color(0xFFB8F0D4) : fg,
+                ),
+                regularStyle: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? const Color(0xFFD7EDE3) : const Color(0xFF8A9491),
+                  decoration: TextDecoration.lineThrough,
                 ),
               ),
             ],
@@ -1046,9 +1054,9 @@ class _BottomCta extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                Text(
-                  '₹${food.price.toStringAsFixed(0)}',
-                  style: const TextStyle(
+                ListingBuyerPriceText(
+                  food: food,
+                  chargedStyle: const TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF101617),

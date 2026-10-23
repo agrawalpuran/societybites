@@ -35,4 +35,13 @@ void main() {
     ]);
     expect(sorted.map((e) => e.id).toList(), ['a', 'b', 'c', 'legacy']);
   });
+
+  test('a newly prepended listing at 0 stays above shifted catalog items', () {
+    final sorted = sortFoodItemsByCatalogOrder([
+      _item(id: 'old-a', displayOrder: 1),
+      _item(id: 'old-b', displayOrder: 2),
+      _item(id: 'new', displayOrder: 0),
+    ]);
+    expect(sorted.map((e) => e.id).toList(), ['new', 'old-a', 'old-b']);
+  });
 }

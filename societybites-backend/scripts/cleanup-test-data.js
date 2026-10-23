@@ -188,6 +188,8 @@ async function apply(plan) {
   if (orderIds.length) {
     await prisma.message.deleteMany({ where: { orderId: { in: orderIds } } });
     await prisma.review.deleteMany({ where: { orderId: { in: orderIds } } });
+    await prisma.couponRedemption.deleteMany({ where: { orderId: { in: orderIds } } });
+    await prisma.orderIdempotency.deleteMany({ where: { orderId: { in: orderIds } } });
     await prisma.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });
     await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
   }
