@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/main.dart';
 import 'package:societybites/screens/guest_landing_screen.dart';
+import 'package:societybites/screens/main_shell_screen.dart';
 import 'package:societybites/widgets/app_header.dart';
 import 'package:societybites/widgets/mobile_startup_frame.dart';
 import 'package:societybites/widgets/screen_loading_note.dart';
@@ -12,6 +13,19 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  test('onboarded session opens home without a token refresh', () async {
+    SharedPreferences.setMockInitialValues({
+      'auth_provider': '2factor',
+      'user_id': 'user-1',
+      'society_id': 'society-1',
+      'flat_id': 'flat-1',
+    });
+
+    final screen = await resolveAuthStartScreen();
+
+    expect(screen, isA<MainShellScreen>());
   });
 
   testWidgets('AuthGate shows loading then a visible screen', (tester) async {

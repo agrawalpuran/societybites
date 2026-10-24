@@ -104,6 +104,7 @@ void main() {
 
     expect(find.text('Cached Biryani'), findsOneWidget);
     expect(find.byKey(const Key('home-feed-skeletons')), findsNothing);
+    expect(pending.isCompleted, isFalse);
 
     pending.complete([_listingJson('Fresh Biryani')..['societyId'] = 'mine']);
     await tester.pump();

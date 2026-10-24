@@ -42,6 +42,11 @@ const listingInclude = {
   },
 };
 
+function truthyQueryFlag(value) {
+  const raw = String(value == null ? "" : value).trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
 function roundKm(value) {
   if (!Number.isFinite(value)) return null;
   return Math.round(value * 10) / 10;
@@ -118,7 +123,11 @@ async function loadCrossSocietyCandidateSocietyIds(buyerSociety, reach) {
     .map((row) => row.id);
 }
 
-function buildNearbySellerCandidateWhere(buyerSocietyId, crossSocietyIds) {
+function buildNearbySellerCandidateWhere(
+  buyerSocietyId,
+  crossSocietyIds,
+  { excludeOwnSociety = false } = {}
+) {
   const crossReach =
     crossSocietyIds.length > 0
       ? [
@@ -128,12 +137,15 @@ function buildNearbySellerCandidateWhere(buyerSocietyId, crossSocietyIds) {
           },
         ]
       : [];
+  const ownSociety = excludeOwnSociety ? [] : [{ societyId: buyerSocietyId }];
+  const or = [...ownSociety, ...crossReach];
+  if (or.length === 0) return null;
 
   return {
     role: { in: ["seller", "super_admin"] },
     societyId: { not: null },
     listings: { some: ACTIVE_LISTING_WHERE },
-    OR: [{ societyId: buyerSocietyId }, ...crossReach],
+    OR: or,
   };
 }
 
@@ -176,7 +188,7 @@ async function serializeNearbySeller(seller, eligibility, viewerUserId) {
 }
 
 async function discoverNearbySellers({ buyer, query } = {}) {
-  void query;
+  const excludeOwnSociety = truthyQueryFlag(query && query.excludeOwnSociety);
   const buyerSociety = await loadBuyerSociety(buyer);
   if (!buyerSociety) {
     return unavailablePayload({ reason: "BUYER_SOCIETY_MISSING", buyerSociety: null, reach: null });
@@ -208,8 +220,23 @@ async function discoverNearbySellers({ buyer, query } = {}) {
     reach
   );
 
+  const candidateWhere = buildNearbySellerCandidateWhere(
+    buyerSociety.id,
+    crossSocietyIds,
+    { excludeOwnSociety }
+  );
+  if (!candidateWhere) {
+    return {
+      available: true,
+      reason: null,
+      buyerSocietyName: buyerSociety.name || null,
+      ...cityReachPayloadFields(reach),
+      sellers: [],
+    };
+  }
+
   const candidates = await prisma.user.findMany({
-    where: buildNearbySellerCandidateWhere(buyerSociety.id, crossSocietyIds),
+    where: candidateWhere,
     include: {
       society: true,
       flat: true,

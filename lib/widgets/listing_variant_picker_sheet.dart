@@ -9,7 +9,6 @@ import '../services/listing_variants_cache.dart';
 import '../utils/listing_portion_label.dart';
 import 'listing_buyer_price.dart';
 import '../web/web_breakpoints.dart';
-import 'content_skeleton.dart';
 import 'listing_image.dart';
 
 /// Swiggy-style size picker before adding a multi-size listing to the cart.
@@ -79,14 +78,26 @@ class _ListingVariantPickerSheetState extends State<ListingVariantPickerSheet> {
   void initState() {
     super.initState();
     _qty = widget.initialQty.clamp(1, 99);
+    final remembered = ListingVariantsCache.foodsForSeed(widget.seed);
+    if (remembered != null && remembered.isNotEmpty) {
+      _setVariants(remembered, notify: false);
+      if (!_hasEverySize(_variants.length)) unawaited(_load());
+      return;
+    }
     final cached = ListingVariantsCache.getForSeed(widget.seed);
     if (cached != null) {
       _applyRows(cached);
-    } else {
-      _variants = [widget.seed];
-      _selected = widget.seed;
-      unawaited(_load());
+      return;
     }
+    _variants = [widget.seed];
+    _selected = widget.seed;
+    unawaited(_load());
+  }
+
+  bool _hasEverySize(int loaded) {
+    final count = widget.seed.variantOptionCount ?? 0;
+    if (count <= 1) return loaded > 0;
+    return loaded >= count;
   }
 
   List<FoodItem> _sortedVariants(List<FoodItem> variants) {
@@ -99,9 +110,13 @@ class _ListingVariantPickerSheetState extends State<ListingVariantPickerSheet> {
   }
 
   void _applyRows(List<Map<String, dynamic>> rows) {
-    var variants = rows.map(FoodItem.fromJson).toList();
-    if (variants.isEmpty) variants = [widget.seed];
-    variants = _sortedVariants(variants);
+    final variants = rows.map(FoodItem.fromJson).toList();
+    ListingVariantsCache.rememberFoods(variants);
+    _setVariants(variants);
+  }
+
+  void _setVariants(List<FoodItem> incoming, {bool notify = true}) {
+    var variants = incoming.isEmpty ? [widget.seed] : _sortedVariants(incoming);
     final preferredId = widget.initialSelectedId ?? widget.seed.id;
     final match = variants.where((v) => v.id == preferredId);
     final selected = match.isNotEmpty
@@ -111,13 +126,19 @@ class _ListingVariantPickerSheetState extends State<ListingVariantPickerSheet> {
             orElse: () => variants.first,
           );
     final maxQty = selected.buyerMaxCartQuantity;
-    setState(() {
+    void apply() {
       _variants = variants;
       _selected = selected;
       _fetchingSiblings = false;
       _error = null;
       _qty = maxQty < 1 ? 1 : 1.clamp(1, maxQty);
-    });
+    }
+
+    if (notify) {
+      setState(apply);
+    } else {
+      apply();
+    }
   }
 
   Future<void> _load() async {
@@ -161,19 +182,7 @@ class _ListingVariantPickerSheetState extends State<ListingVariantPickerSheet> {
     Navigator.pop(context, (food: selected, quantity: _qty));
   }
 
-  int get _expectedOptionCount {
-    final count = widget.seed.variantOptionCount ?? 0;
-    if (count > 1) return count;
-    return _variants.length;
-  }
-
   Widget _buildOptionsList(FoodItem selected) {
-    final expectedMore = _fetchingSiblings &&
-        _expectedOptionCount > _variants.length;
-    final skeletonRows = expectedMore
-        ? (_expectedOptionCount - _variants.length).clamp(1, 3)
-        : 0;
-
     return ListView(
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -230,14 +239,6 @@ class _ListingVariantPickerSheetState extends State<ListingVariantPickerSheet> {
                   food: _variants[i],
                   selected: _variants[i].id == selected.id,
                   onTap: () => _select(_variants[i]),
-                ),
-              ],
-              for (var s = 0; s < skeletonRows; s++) ...[
-                if (_variants.isNotEmpty || s > 0)
-                  const Divider(height: 1, color: Color(0xFFEAEFED)),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  child: SkeletonBlock(height: 20, radius: 8),
                 ),
               ],
             ],

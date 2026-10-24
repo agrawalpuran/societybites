@@ -75,6 +75,13 @@ Future<Widget> resolveAuthStartScreen() async {
       return signedOutStartScreen();
     }
 
+    // Home paints from the on-device feed. Token rotation happens on the
+    // first 401, so iOS Keychain + /auth/refresh do not block the first screen.
+    if (await SessionService.isOnboarded()) {
+      unawaited(warmTokens);
+      return const MainShellScreen();
+    }
+
     final refreshToken = await SessionService.getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) {
       return signedOutStartScreen();

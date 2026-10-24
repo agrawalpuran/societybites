@@ -52,8 +52,15 @@ const helpCategories = <HelpCategory>[
         id: 'buying-how',
         question: 'How do I buy something?',
         answer:
-            'Open Home, tap a dish or a seller, add items to your cart, then checkout with UPI or cash. For UPI, use Pay Now on the order after checkout. For cash, pay the seller when you collect the food.',
-        keywords: ['order', 'cart', 'checkout', 'buy', 'purchase'],
+            'Open Home, tap a dish or a seller, pick a size if the dish has more than one, add items to your cart, then checkout with UPI or cash. For UPI, use Pay Now on the order after checkout. For cash, pay the seller when you collect the food.',
+        keywords: ['order', 'cart', 'checkout', 'buy', 'purchase', 'size'],
+      ),
+      HelpFaq(
+        id: 'buying-sizes',
+        question: 'Why do some dishes show sizes or “from ₹”?',
+        answer:
+            'The seller listed more than one size, such as 250 g and 500 g. Home shows the lowest price as “from ₹”. Tap the dish or Add to choose the size you want. Stock is counted either per size or from one shared pool (for example one block of paneer).',
+        keywords: ['size', 'variant', 'from', 'paneer', 'portion', 'weight'],
       ),
       HelpFaq(
         id: 'buying-other-society',
@@ -101,15 +108,59 @@ const helpCategories = <HelpCategory>[
         id: 'selling-listing',
         question: 'How do I add or edit a listing?',
         answer:
-            'Open My Kitchen or My Listings and tap Add Listing. Choose Available now, Made to Order, or Pre-Order, then complete the form. Open any item in My Listings to edit, pause, resume, renew, or remove it.',
-        keywords: ['create listing', 'edit', 'my listings', 'publish'],
+            'Open My Kitchen or My Listings and tap Add Listing. Choose Available now, Made to Order, or Pre-Order, then complete the form. You can add more than one size, set a listing discount, then publish. Open any item in My Listings to edit, pause, resume, renew, or remove it. New listings appear at the top of My Listings.',
+        keywords: ['create listing', 'edit', 'my listings', 'publish', 'discount'],
+      ),
+      HelpFaq(
+        id: 'selling-sizes',
+        question: 'How do sizes and a shared pool work?',
+        answer:
+            'Turn on multiple sizes when you add a listing. “Each size has its own stock” is for bottles or packs counted separately. “Sizes share one pool” is for something like paneer: you enter the total you have (for example 2 kg) and sizes such as 250 g, 500 g, and 1 kg. When a buyer orders 500 g, that amount comes out of the same pool, so every size’s remaining portions update together.',
+        keywords: [
+          'shared pool',
+          'paneer',
+          'sizes',
+          'variant',
+          'stock',
+          'weight',
+          'grams',
+        ],
       ),
       HelpFaq(
         id: 'selling-reach',
         question: 'What is Selling Reach?',
         answer:
-            'Selling Reach decides who can find you. My Society stays inside your community. Nearby and Extended let buyers in your city see you, up to the distance set for your city.',
-        keywords: ['reach', 'nearby', 'extended', 'visibility'],
+            'Selling Reach is in Profile → Seller Settings. Choose My society to stay inside your community, or Beyond your society and drag the km bar. Buyers in other societies within that distance can find you. The bar’s maximum is set for your city (the same cap Home uses as “Up to”). You cannot shrink reach while you still have open orders from farther buyers.',
+        keywords: [
+          'reach',
+          'nearby',
+          'extended',
+          'visibility',
+          'slider',
+          'bar',
+          'km',
+          'beyond',
+        ],
+      ),
+      HelpFaq(
+        id: 'selling-hours',
+        question: 'What are kitchen hours?',
+        answer:
+            'In Seller Settings you can set when your kitchen takes orders. Outside those hours buyers still see your dishes, but they cannot place a new order until you are open again.',
+        keywords: ['kitchen hours', 'closed', 'open', 'schedule'],
+      ),
+      HelpFaq(
+        id: 'selling-hide-flat',
+        question: 'Can I hide my flat number?',
+        answer:
+            'Yes. In Seller Settings, under Privacy, turn on Hide my flat number. Your flat stays off public listings and profiles. For a pickup order at My Home (verified), the buyer may see it only after you have accepted that order.',
+        keywords: [
+          'hide flat',
+          'privacy',
+          'flat number',
+          'address',
+          'block',
+        ],
       ),
       HelpFaq(
         id: 'selling-pause-renew',
@@ -143,15 +194,15 @@ const helpCategories = <HelpCategory>[
         id: 'nearby-what',
         question: 'What is Explore Nearby?',
         answer:
-            'Explore Nearby lets you discover sellers from nearby societies who have chosen to sell beyond their own society.',
+            'Explore Nearby lets you discover sellers from nearby societies who chose Beyond your society and whose km reach includes you. Home can show those dishes too, using the “Up to” distance chip.',
         keywords: ['explore', 'nearby', 'discover', 'distance'],
       ),
       HelpFaq(
         id: 'nearby-empty',
         question: 'Why don\'t I see nearby sellers?',
         answer:
-            'Sellers appear here only if they choose Nearby or Extended selling. Many cooks stay on My Society, so they will not show up even if they live close by.',
-        keywords: ['empty', 'no sellers', 'opt in', 'my society'],
+            'Sellers appear here only if they choose Beyond your society and set a km reach that includes you. Cooks who stay on My society will not show up even if they live close by.',
+        keywords: ['empty', 'no sellers', 'opt in', 'my society', 'beyond'],
       ),
       HelpFaq(
         id: 'nearby-order',
@@ -161,33 +212,20 @@ const helpCategories = <HelpCategory>[
         keywords: ['order nearby', 'cross society', 'storefront'],
       ),
       HelpFaq(
-        id: 'nearby-distance',
-        question: 'How far is Nearby and Extended?',
-        answer:
-            'The distance is set for your city, not by each seller. Nearby is the closer radius. Extended reaches a little farther in the same city.',
-        keywords: ['km', 'radius', 'extended', 'city', 'how far'],
-      ),
-      HelpFaq(
         id: 'nearby-home-distance',
         question: 'How do I choose how far Home looks?',
         answer:
-            'On the phone Home screen, tap the distance chip under search. It may say My Society, Within 1 km, or Extended. Choose how far you want to explore, then tap Apply. My Society keeps your own community. Shorter steps, such as 500 m, 1 km, or 3 km, also keep closer dishes. Extended is the widest range your city allows, and Home opens on that range. Your choice lasts for this visit. Dishes from your own society stay in the list.',
+            'On Home, tap the “Up to” chip under search and pick a distance, such as Up to 10 km, 7 km, or 5 km. The widest option is your city’s max reach — the same cap as the seller Selling Reach bar. Dishes from your own society stay in the list. Your choice lasts for this visit.',
         keywords: [
           'distance',
-          'wizard',
+          'up to',
           'how far',
           'home filter',
           'within',
           'my society',
           'km',
+          'chip',
         ],
-      ),
-      HelpFaq(
-        id: 'nearby-opt-in',
-        question: 'How do I appear in Explore Nearby as a seller?',
-        answer:
-            'After you start selling, open Profile and change Selling Reach to Nearby or Extended, if your city has those options turned on.',
-        keywords: ['opt in', 'appear', 'selling reach', 'show up'],
       ),
     ],
   ),
@@ -256,8 +294,8 @@ const helpCategories = <HelpCategory>[
         id: 'orders-collect',
         question: 'When do I collect my order?',
         answer:
-            'Watch the order in the Orders tab. When the seller marks it ready, you will see ready for pickup with their flat and block. Collect the food in person. The seller marks the order complete after handoff — you do not need a separate picked-up button in the app.',
-        keywords: ['picked up', 'collected', 'pickup', 'ready'],
+            'Watch the order in the Orders tab. When the seller marks it ready, collect the food in person. If they hid their flat number, it may appear on a pickup order only after they have accepted it (and only when pickup is at their home). The seller marks the order complete after handoff — you do not need a separate picked-up button in the app.',
+        keywords: ['picked up', 'collected', 'pickup', 'ready', 'flat', 'address'],
       ),
       HelpFaq(
         id: 'orders-upi',
@@ -459,15 +497,15 @@ const helpCategories = <HelpCategory>[
         id: 'issues-empty-home',
         question: 'I don\'t see any food on Home',
         answer:
-            'Home shows cooks in your society plus nearby cooks who opted into Nearby or Extended selling. If the feed is empty, pull to refresh, try Explore Nearby, or start selling yourself.',
+            'Home shows cooks in your society plus nearby cooks who sell Beyond their society within the distance you picked. If the feed is empty, pull to refresh, widen the “Up to” chip, try Explore Nearby, or start selling yourself.',
         keywords: ['blank home', 'no food', 'empty'],
       ),
       HelpFaq(
         id: 'issues-nearby-empty',
         question: 'Explore Nearby is empty',
         answer:
-            'Nearby sellers must opt into Nearby or Extended selling. Distance alone is not enough. Pull to refresh after a cook nearby changes their reach.',
-        keywords: ['nearby empty', '12 km', 'delivery', 'no nearby'],
+            'Nearby sellers must choose Beyond your society and a km reach that includes you. Living close by is not enough if they stay on My society. Pull to refresh after a cook nearby changes Selling Reach.',
+        keywords: ['nearby empty', '12 km', 'delivery', 'no nearby', 'beyond'],
       ),
       HelpFaq(
         id: 'issues-two-carts',

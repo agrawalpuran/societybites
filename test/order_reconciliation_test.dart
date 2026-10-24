@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/screens/payment_screen.dart';
 import 'package:societybites/services/api_service.dart';
@@ -168,6 +169,71 @@ void main() {
     expect(find.text('Loading payment details…'), findsNothing);
     expect(find.text("I've Paid via UPI"), findsOneWidget);
     await tester.pump();
+  });
+
+  testWidgets('PaymentScreen poll does not remount the UPI QR', (tester) async {
+    var fetchCount = 0;
+    final orderWithUpi = Order(
+      id: 'order-1',
+      orderId: 'SB-1001',
+      items: [
+        OrderLineItem(
+          quantity: 1,
+          unitPrice: 95,
+          food: FoodItem(
+            id: 'f1',
+            name: 'Samosa',
+            sellerId: 's1',
+            sellerName: 'Chef',
+            block: 'A',
+            price: 95,
+            rating: 4,
+            pickupTime: '10m',
+            description: '',
+            icon: Icons.restaurant,
+            bgColor: const Color(0xFFF0F2F1),
+            sellerUpiId: 'seller@upi',
+          ),
+        ),
+      ],
+      date: 'Today',
+      status: 'accepted',
+      statusStep: 1,
+      orderTotal: 100,
+      subtotal: 95,
+      communityFee: 5,
+      paymentMethod: 'upi',
+      paymentStatus: 'pending',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PaymentScreen(
+          order: orderWithUpi,
+          fetchOrder: (_) async {
+            fetchCount += 1;
+            return _orderJson();
+          },
+          fetchPaymentInfo: (_) async => {
+            'sellerUpiId': 'seller@upi',
+            'sellerUpiDisplayName': 'Test Seller',
+          },
+          pollInterval: const Duration(milliseconds: 20),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('upi-qr')), findsOneWidget);
+    final qr = tester.element(find.byType(QrImageView));
+
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(fetchCount, greaterThan(1));
+    expect(find.byKey(const ValueKey('upi-qr')), findsOneWidget);
+    expect(identical(tester.element(find.byType(QrImageView)), qr), isTrue);
   });
 
   testWidgets('PaymentScreen immediately fetches the latest order', (

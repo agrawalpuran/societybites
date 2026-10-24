@@ -141,14 +141,11 @@ class _PaymentScreenState extends State<PaymentScreen>
   }
 
   void _seedSellerUpiFromOrder() {
-    for (final item in _order.items) {
-      final embedded = item.food.sellerUpiId?.trim();
-      if (embedded != null &&
-          embedded.isNotEmpty &&
-          isValidUpiId(embedded)) {
-        _sellerUpiId = embedded;
-        return;
-      }
+    final embedded = _order.sellerUpiForOrder;
+    if (embedded != null &&
+        embedded.isNotEmpty &&
+        isValidUpiId(embedded)) {
+      _sellerUpiId = embedded;
     }
   }
 
@@ -250,21 +247,36 @@ class _PaymentScreenState extends State<PaymentScreen>
       if (!mounted) return;
 
       final latest = Order.fromJson(data);
-      setState(() {
-        _order = latest;
-        if (latest.items.isNotEmpty) {
-          final latestUpi = latest.items.first.food.sellerUpiId;
-          if (latestUpi != null && latestUpi.trim().isNotEmpty) {
-            _sellerUpiId = latestUpi.trim();
-          }
-        }
-      });
-
+      final latestUpi = latest.sellerUpiForOrder;
       if (!isOpenPaymentStatus(latest.status) ||
           isPaymentFinished(latest.paymentStatus) ||
           isTerminalPaymentLeaveStatus(latest.status)) {
+        _order = latest;
+        if (latestUpi != null && latestUpi.isNotEmpty) {
+          _sellerUpiId = latestUpi;
+        }
         _leavePayment(true);
+        return;
       }
+
+      final nextUpi =
+          latestUpi != null && latestUpi.isNotEmpty ? latestUpi : _sellerUpiId;
+      final unchanged = latest.status == _order.status &&
+          latest.paymentStatus == _order.paymentStatus &&
+          latest.upiPaymentAmount == _order.upiPaymentAmount &&
+          latest.orderId == _order.orderId &&
+          nextUpi == _sellerUpiId;
+      if (unchanged) {
+        _order = latest;
+        return;
+      }
+
+      setState(() {
+        _order = latest;
+        if (latestUpi != null && latestUpi.isNotEmpty) {
+          _sellerUpiId = latestUpi;
+        }
+      });
     } catch (_) {
       // Keep the last server snapshot and retry on the next poll/resume.
     } finally {
@@ -806,23 +818,9 @@ class _PaymentScreenState extends State<PaymentScreen>
             ),
           ),
           const SizedBox(height: 16),
-          GestureDetector(
+          _UpiQrImage(
+            data: upiLaunchString(_upiPaymentUri),
             onTap: _showUpiIntentButton ? _launchUpiApp : null,
-            child: QrImageView(
-              key: const ValueKey('upi-qr'),
-              data: upiLaunchString(_upiPaymentUri),
-              version: QrVersions.auto,
-              size: 200,
-              backgroundColor: Colors.white,
-              eyeStyle: const QrEyeStyle(
-                eyeShape: QrEyeShape.square,
-                color: Color(0xFF0E5A47),
-              ),
-              dataModuleStyle: const QrDataModuleStyle(
-                dataModuleShape: QrDataModuleShape.square,
-                color: Color(0xFF101617),
-              ),
-            ),
           ),
           const SizedBox(height: 16),
           _buildOrDivider(),
@@ -1105,6 +1103,63 @@ class _PaymentScreenState extends State<PaymentScreen>
                 ),
               ),
       ),
+    );
+  }
+}
+
+/// Rebuilds the QR painter only when the UPI payload string changes.
+class _UpiQrImage extends StatefulWidget {
+  const _UpiQrImage({required this.data, this.onTap});
+
+  final String data;
+  final VoidCallback? onTap;
+
+  @override
+  State<_UpiQrImage> createState() => _UpiQrImageState();
+}
+
+class _UpiQrImageState extends State<_UpiQrImage> {
+  late Widget _qr;
+
+  @override
+  void initState() {
+    super.initState();
+    _qr = _buildQr(widget.data);
+  }
+
+  @override
+  void didUpdateWidget(_UpiQrImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.data != widget.data) {
+      _qr = _buildQr(widget.data);
+    }
+  }
+
+  Widget _buildQr(String data) {
+    return RepaintBoundary(
+      child: QrImageView(
+        data: data,
+        version: QrVersions.auto,
+        size: 200,
+        backgroundColor: Colors.white,
+        eyeStyle: const QrEyeStyle(
+          eyeShape: QrEyeShape.square,
+          color: Color(0xFF0E5A47),
+        ),
+        dataModuleStyle: const QrDataModuleStyle(
+          dataModuleShape: QrDataModuleShape.square,
+          color: Color(0xFF101617),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: const ValueKey('upi-qr'),
+      onTap: widget.onTap,
+      child: _qr,
     );
   }
 }

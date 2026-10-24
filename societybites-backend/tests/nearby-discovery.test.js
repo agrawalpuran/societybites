@@ -290,6 +290,22 @@ async function main() {
     const ids = sellerIds(nearby.json);
 
     assert(ids.includes(sameSocietySeller.id), "same-society seller appears");
+
+    const homeNearby = await jsonRequest(server, {
+      method: "GET",
+      path: "/listings/nearby-sellers?excludeOwnSociety=1",
+      token,
+    });
+    assert(homeNearby.status === 200, "home nearby discovery failed");
+    assert(homeNearby.json.available === true, "home nearby should be available");
+    assert(
+      homeNearby.json.maxSellerRadiusKm === 10,
+      "home nearby still returns city max reach"
+    );
+    const homeIds = sellerIds(homeNearby.json);
+    assert(!homeIds.includes(sameSocietySeller.id), "Home omits same-society sellers");
+    assert(homeIds.includes(nearbyInside.id), "Home still includes other-society nearby");
+    assert(homeIds.includes(extendedInside.id), "Home still includes other-society extended");
     assert(!ids.includes(mySocietyOther.id), "MY_SOCIETY seller from another society hidden");
     assert(ids.includes(nearbyInside.id), "NEARBY seller within radius appears");
     assert(!ids.includes(nearbyOutside.id), "NEARBY seller outside radius hidden");

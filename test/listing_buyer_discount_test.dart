@@ -610,5 +610,40 @@ void main() {
       expect(find.text('₹220'), findsOneWidget);
       expect(find.text('Add Item | ₹80'), findsOneWidget);
     });
+
+    testWidgets('variant picker shows sizes already loaded on Home', (
+      tester,
+    ) async {
+      final small = _food(
+        id: 'paneer-250',
+        price: 100,
+        variantGroupId: 'home-paneer',
+        variantLabel: '250 g',
+      );
+      final large = _food(
+        id: 'paneer-500',
+        price: 180,
+        variantGroupId: 'home-paneer',
+        variantLabel: '500 g',
+      );
+      final collapsed = collapseListingVariants([large, small]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ListingVariantPickerSheet(
+              seed: collapsed.single,
+              asWebDialog: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('250 g'), findsOneWidget);
+      expect(find.text('500 g'), findsOneWidget);
+      expect(find.text('Add Item | ₹100'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+    });
   });
 }

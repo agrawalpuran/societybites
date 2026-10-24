@@ -37,6 +37,27 @@ void main() {
     expect(helpFaqCount, lessThanOrEqualTo(55));
   });
 
+  test('search finds shared pool, selling reach bar, and hide flat', () {
+    expect(
+      searchHelpFaqs('paneer').any(
+        (hit) => hit.faq.id == 'selling-sizes' || hit.faq.id == 'buying-sizes',
+      ),
+      isTrue,
+    );
+    expect(
+      searchHelpFaqs('selling reach').any((hit) => hit.faq.id == 'selling-reach'),
+      isTrue,
+    );
+    expect(
+      searchHelpFaqs('hide flat').any((hit) => hit.faq.id == 'selling-hide-flat'),
+      isTrue,
+    );
+    expect(
+      searchHelpFaqs('extended').any((hit) => hit.faq.id == 'selling-reach'),
+      isTrue,
+    );
+  });
+
   test('search delivery surfaces pickup, orders, selling, and nearby', () {
     final hits = searchHelpFaqs('delivery');
     final titles = hits.map((hit) => hit.faq.question).toList();

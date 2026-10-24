@@ -2,6 +2,7 @@ import '../models/data.dart';
 import '../models/food_type.dart';
 import '../models/listing_categories.dart';
 import '../models/selling_reach.dart';
+import '../services/listing_variants_cache.dart';
 import '../utils/listing_portion_label.dart';
 
 /// Restricts listings to an exact VEG / NON_VEG match.
@@ -131,6 +132,7 @@ List<FoodItem> collapseListingVariants(List<FoodItem> listings) {
         .where((s) => s.canAddToCart && !s.isKitchenClosed)
         .length;
     final optionCount = available > 0 ? available : siblings.length;
+    ListingVariantsCache.rememberFoods(siblings);
     representatives[entry.key] =
         siblings.first.withVariantOptionCount(optionCount);
   }

@@ -5,6 +5,38 @@ import '../../widgets/admin_loading_panel.dart';
 import '../../widgets/screen_loading_note.dart';
 import 'admin_order_detail_screen.dart';
 
+/// Inclusive local-day window sent as `dateFrom` / `dateTo`.
+({DateTime? from, DateTime? to}) adminOrdersQueryRange({
+  required String preset,
+  required DateTime now,
+  DateTime? customFrom,
+  DateTime? customTo,
+}) {
+  DateTime start(DateTime date) => DateTime(date.year, date.month, date.day);
+  DateTime end(DateTime date) =>
+      DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
+
+  switch (preset) {
+    case 'today':
+      return (from: start(now), to: end(now));
+    case 'yesterday':
+      final day = now.subtract(const Duration(days: 1));
+      return (from: start(day), to: end(day));
+    case 'week':
+      return (
+        from: start(now.subtract(const Duration(days: 6))),
+        to: end(now),
+      );
+    case 'custom':
+      if (customFrom == null || customTo == null) {
+        return (from: null, to: null);
+      }
+      return (from: start(customFrom), to: end(customTo));
+    default:
+      return (from: null, to: null);
+  }
+}
+
 String? _sellerNameFromAdminOrder(Map<String, dynamic> order) {
   final direct = (order['seller'] as Map<String, dynamic>?)?['name'];
   if (direct != null && direct.toString().isNotEmpty) {
@@ -34,6 +66,9 @@ class AdminOrdersScreen extends StatefulWidget {
 
 class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   String _statusFilter = '';
+  String _datePreset = 'all';
+  DateTime? _customFrom;
+  DateTime? _customTo;
   List<Map<String, dynamic>> _orders = [];
   bool _isLoading = true;
   String? _error;
@@ -55,8 +90,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       });
     }
     try {
+      final range = adminOrdersQueryRange(
+        preset: _datePreset,
+        now: DateTime.now(),
+        customFrom: _customFrom,
+        customTo: _customTo,
+      );
       final data = await ApiService.getAdminOrders(
         status: _statusFilter.isNotEmpty ? _statusFilter : null,
+        dateFrom: range.from,
+        dateTo: range.to,
         page: _page,
       );
       if (!mounted) return;
@@ -87,6 +130,46 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   void _onStatusChanged(String status) {
     _statusFilter = status;
     _loadOrders();
+  }
+
+  Future<void> _onDatePreset(String preset) async {
+    if (preset == 'custom') {
+      final now = DateTime.now();
+      final picked = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(2024),
+        lastDate: now,
+        initialDateRange: DateTimeRange(
+          start: _customFrom ?? now,
+          end: _customTo ?? now,
+        ),
+        helpText: 'Order dates',
+      );
+      if (picked == null || !mounted) return;
+      setState(() {
+        _datePreset = 'custom';
+        _customFrom = picked.start;
+        _customTo = picked.end;
+      });
+      _loadOrders();
+      return;
+    }
+    if (preset == _datePreset) return;
+    setState(() => _datePreset = preset);
+    _loadOrders();
+  }
+
+  String get _customDateLabel {
+    if (_datePreset != 'custom' || _customFrom == null || _customTo == null) {
+      return 'Pick dates';
+    }
+    String day(DateTime date) => '${date.day}/${date.month}';
+    if (_customFrom!.year == _customTo!.year &&
+        _customFrom!.month == _customTo!.month &&
+        _customFrom!.day == _customTo!.day) {
+      return '${_customFrom!.day}/${_customFrom!.month}/${_customFrom!.year}';
+    }
+    return '${day(_customFrom!)} – ${day(_customTo!)}';
   }
 
   @override
@@ -123,6 +206,38 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                     ),
                   );
                 }).toList(),
+          ),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Row(
+            children: [
+              for (final choice in const [
+                ('all', 'All dates'),
+                ('today', 'Today'),
+                ('yesterday', 'Yesterday'),
+                ('week', 'Last 7 days'),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    selected: _datePreset == choice.$1,
+                    label: Text(choice.$2),
+                    selectedColor: const Color(0xFFE8F5EE),
+                    checkmarkColor: const Color(0xFF0E5A47),
+                    onSelected: (_) => _onDatePreset(choice.$1),
+                  ),
+                ),
+              FilterChip(
+                selected: _datePreset == 'custom',
+                avatar: const Icon(Icons.calendar_today_outlined, size: 16),
+                label: Text(_customDateLabel),
+                selectedColor: const Color(0xFFE8F5EE),
+                checkmarkColor: const Color(0xFF0E5A47),
+                onSelected: (_) => _onDatePreset('custom'),
+              ),
+            ],
           ),
         ),
         Expanded(child: _buildContent()),

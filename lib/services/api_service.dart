@@ -720,8 +720,14 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<Map<String, dynamic>> getNearbySellers() async {
-    final uri = Uri.parse('$baseUrl/listings/nearby-sellers');
+  static Future<Map<String, dynamic>> getNearbySellers({
+    bool excludeOwnSociety = false,
+  }) async {
+    final uri = Uri.parse('$baseUrl/listings/nearby-sellers').replace(
+      queryParameters: {
+        if (excludeOwnSociety) 'excludeOwnSociety': '1',
+      },
+    );
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
@@ -1066,10 +1072,12 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getListingVariants(
     String listingId,
   ) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/listings/$listingId/variants'),
-      headers: await _authHeaders(),
-    );
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/listings/$listingId/variants'),
+          headers: await _authHeaders(),
+        )
+        .timeout(const Duration(seconds: 8));
     if (response.statusCode == 200) {
       final data = _decodeResponse(response) as List;
       return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -2757,10 +2765,14 @@ class ApiService {
 
   static Future<List<Map<String, dynamic>>> getAdminOrders({
     String? status,
+    DateTime? dateFrom,
+    DateTime? dateTo,
     int page = 1,
   }) async {
     final query = <String, String>{'page': '$page'};
     if (status != null && status.isNotEmpty) query['status'] = status;
+    if (dateFrom != null) query['dateFrom'] = dateFrom.toUtc().toIso8601String();
+    if (dateTo != null) query['dateTo'] = dateTo.toUtc().toIso8601String();
     final uri = Uri.parse(
       '$baseUrl/admin/orders',
     ).replace(queryParameters: query);

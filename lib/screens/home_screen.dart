@@ -115,6 +115,7 @@ class HomeScreenState extends State<HomeScreen> {
   HomeListingType _listingType = HomeListingType.all;
   bool _justAdded = false;
   int _listingsLoadGeneration = 0;
+  Future<void>? _diskRestore;
   final Set<String> _homePrecachedImageUrls = {};
   final _reachSectionKeys = <HomeListingReach, GlobalKey>{
     HomeListingReach.inSociety: GlobalKey(),
@@ -132,7 +133,8 @@ class HomeScreenState extends State<HomeScreen> {
     _searchController.addListener(_onSearchChanged);
     CartController.instance.addListener(_onCartUpdated);
     CartController.instance.onOrderPlaced = _onCartOrderPlaced;
-    unawaited(_bootstrapHome());
+    _diskRestore = _restoreHomeFeedFromDisk();
+    unawaited(_loadListings());
     _loadPreOrders();
     unawaited(_loadFestivalBanner());
     FestivalBannerPreview.instance.addListener(_onFestivalPreviewChanged);
@@ -153,12 +155,6 @@ class HomeScreenState extends State<HomeScreen> {
         FestivalBannerPreview.instance.applyServerBanner(null);
       }
     }
-  }
-
-  Future<void> _bootstrapHome() async {
-    await _restoreHomeFeedFromDisk();
-    if (!mounted) return;
-    await _loadListings();
   }
 
   Future<void> _restoreHomeFeedFromDisk() async {
@@ -392,18 +388,17 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadListings() async {
-    final showSpinner = !_hasSuccessfullyLoaded;
     final generation = ++_listingsLoadGeneration;
-    final trackBackgroundRefresh = !showSpinner;
-    if (showSpinner) {
-      _armHomeSlowTimer();
-      setState(() {
-        _isLoading = true;
-        _error = null;
-        _homeSlow = false;
-      });
-    } else if (mounted) {
-      setState(() => _feedRefreshing = true);
+    var showSpinner = !_hasSuccessfullyLoaded;
+    var trackBackgroundRefresh = !showSpinner;
+
+    Future<Map<String, dynamic>>? startNearbyRequest({
+      required bool shouldLoadNearby,
+    }) {
+      if (!shouldLoadNearby) return null;
+      return widget.fetchNearbySellers != null
+          ? widget.fetchNearbySellers!()
+          : ApiService.getNearbySellers(excludeOwnSociety: true);
     }
 
     try {
@@ -413,50 +408,17 @@ class HomeScreenState extends State<HomeScreen> {
       final shouldLoadNearby =
           fetchListings == null || widget.fetchNearbySellers != null;
 
-      Future<Map<String, dynamic>>? startNearbyRequest() {
-        if (!shouldLoadNearby) return null;
-        return widget.fetchNearbySellers != null
-            ? widget.fetchNearbySellers!()
-            : ApiService.getNearbySellers();
-      }
-
+      Future<List<Map<String, dynamic>>>? societyListingsFuture;
       Future<Map<String, dynamic>>? nearbyFuture;
 
       if (fetchListings != null) {
-        nearbyFuture = startNearbyRequest();
-        if (nearbyFuture != null && showSpinner) {
-          raw = await fetchListings();
-          if (!mounted || generation != _listingsLoadGeneration) return;
-          await _paintListings(raw, cityReach, endInitialLoad: true);
-          unawaited(
-            _mergeNearbyIntoListings(
-              generation: generation,
-              societyRaw: raw,
-              nearbyFuture: nearbyFuture,
-            ),
-          );
-          return;
-        }
-        if (nearbyFuture != null) {
-          final results = await Future.wait<Object>([
-            fetchListings(),
-            nearbyFuture,
-          ]);
-          raw = results[0] as List<Map<String, dynamic>>;
-          try {
-            final nearbyRaw = results[1] as Map<String, dynamic>;
-            cityReach = SellingReach.fromAuthMe(nearbyRaw);
-            raw = mergeSocietyAndNearbyListingMaps(
-              raw,
-              listingMapsFromNearbyPayload(nearbyRaw),
-            );
-          } catch (_) {}
-        } else {
-          raw = await fetchListings();
-        }
+        nearbyFuture = startNearbyRequest(shouldLoadNearby: shouldLoadNearby);
+        societyListingsFuture = fetchListings();
       } else {
         final societyId = await SessionService.getSocietyId();
         if (societyId == null || societyId.isEmpty) {
+          final disk = _diskRestore;
+          if (disk != null) await disk;
           if (kIsWeb) {
             await _loadGuestMarketplace();
             return;
@@ -472,44 +434,68 @@ class HomeScreenState extends State<HomeScreen> {
           }
           return;
         }
-        final societyListingsFuture = ApiService.getListings(
+        societyListingsFuture = ApiService.getListings(
           societyId: societyId,
           catalogType: 'REGULAR',
           status: 'discoverable',
         );
-        nearbyFuture = startNearbyRequest();
-        if (nearbyFuture != null && showSpinner) {
-          raw = await societyListingsFuture;
-          if (!mounted || generation != _listingsLoadGeneration) return;
-          await _paintListings(raw, cityReach, endInitialLoad: true);
-          unawaited(
-            _mergeNearbyIntoListings(
-              generation: generation,
-              societyRaw: raw,
-              nearbyFuture: nearbyFuture,
-            ),
+        nearbyFuture = startNearbyRequest(shouldLoadNearby: shouldLoadNearby);
+      }
+
+      // Keep in-flight errors handled while disk restore decides spinner vs cache.
+      unawaited(societyListingsFuture.then((_) {}, onError: (_) {}));
+      if (nearbyFuture != null) {
+        unawaited(nearbyFuture.then((_) {}, onError: (_) {}));
+      }
+
+      final disk = _diskRestore;
+      if (disk != null) await disk;
+      if (!mounted || generation != _listingsLoadGeneration) return;
+
+      showSpinner = !_hasSuccessfullyLoaded;
+      trackBackgroundRefresh = !showSpinner;
+      if (showSpinner) {
+        _armHomeSlowTimer();
+        setState(() {
+          _isLoading = true;
+          _error = null;
+          _homeSlow = false;
+        });
+      } else if (mounted) {
+        setState(() => _feedRefreshing = true);
+      }
+
+      if (nearbyFuture != null && showSpinner) {
+        raw = await societyListingsFuture;
+        if (!mounted || generation != _listingsLoadGeneration) return;
+        await _paintListings(raw, cityReach, endInitialLoad: true);
+        unawaited(
+          _mergeNearbyIntoListings(
+            generation: generation,
+            societyRaw: raw,
+            nearbyFuture: nearbyFuture,
+          ),
+        );
+        return;
+      }
+      if (nearbyFuture != null) {
+        final results = await Future.wait<Object>([
+          societyListingsFuture,
+          nearbyFuture,
+        ]);
+        raw = results[0] as List<Map<String, dynamic>>;
+        try {
+          final nearbyRaw = results[1] as Map<String, dynamic>;
+          cityReach = SellingReach.fromAuthMe(nearbyRaw);
+          raw = mergeSocietyAndNearbyListingMaps(
+            raw,
+            listingMapsFromNearbyPayload(nearbyRaw),
           );
-          return;
+        } catch (_) {
+          // Home still works if nearby discovery is unavailable.
         }
-        if (nearbyFuture != null) {
-          final results = await Future.wait<Object>([
-            societyListingsFuture,
-            nearbyFuture,
-          ]);
-          raw = results[0] as List<Map<String, dynamic>>;
-          try {
-            final nearbyRaw = results[1] as Map<String, dynamic>;
-            cityReach = SellingReach.fromAuthMe(nearbyRaw);
-            raw = mergeSocietyAndNearbyListingMaps(
-              raw,
-              listingMapsFromNearbyPayload(nearbyRaw),
-            );
-          } catch (_) {
-            // Home still works if nearby discovery is unavailable.
-          }
-        } else {
-          raw = await societyListingsFuture;
-        }
+      } else {
+        raw = await societyListingsFuture;
       }
 
       if (!mounted || generation != _listingsLoadGeneration) return;
