@@ -2729,43 +2729,38 @@ class _AvailableItemTile extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                       ],
-                      Flexible(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: MarketplacePurchaseSlot(
-                            food: food,
-                            cartQty: cartQty,
-                            soldOut: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFD94F4F),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text(
-                                'SOLD OUT',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                            addButton: ListingCartAddButton(
-                              onPressed: onAdd,
-                              compact: true,
-                              optionsLabel: listingOptionsLabel(food),
-                            ),
-                            qtyStepper: ListingCartQtyStepper(
-                              qty: cartQty,
-                              onIncrement: onAdd,
-                              onDecrement: onRemove,
-                              compact: true,
+                      MarketplacePurchaseSlot(
+                        food: food,
+                        cartQty: cartQty,
+                        soldOut: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD94F4F),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'SOLD OUT',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
                             ),
                           ),
+                        ),
+                        addButton: ListingCartAddButton(
+                          onPressed: onAdd,
+                          compact: true,
+                          optionsLabel: listingOptionsLabel(food),
+                        ),
+                        qtyStepper: ListingCartQtyStepper(
+                          qty: cartQty,
+                          onIncrement: onAdd,
+                          onDecrement: onRemove,
+                          compact: true,
                         ),
                       ),
                     ],

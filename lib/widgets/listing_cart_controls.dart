@@ -59,6 +59,7 @@ class ListingCartAddButton extends StatelessWidget {
                       Text(
                         'Add',
                         softWrap: false,
+                        maxLines: 1,
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: compact ? 12 : 13,
@@ -69,6 +70,7 @@ class ListingCartAddButton extends StatelessWidget {
                       Text(
                         optionsLabel!,
                         softWrap: false,
+                        maxLines: 1,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.78),
                           fontSize: compact ? 8 : 8.5,
@@ -81,6 +83,7 @@ class ListingCartAddButton extends StatelessWidget {
                 : const Text(
                     'Add',
                     softWrap: false,
+                    maxLines: 1,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 13,

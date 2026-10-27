@@ -392,15 +392,17 @@ class _ReadyCard extends StatelessWidget {
                       const Spacer(),
                       Row(
                         children: [
-                          ListingBuyerPriceText(
-                            food: food,
-                            useCardLabel: true,
-                            chargedStyle: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: webInk,
+                          Expanded(
+                            child: ListingBuyerPriceText(
+                              food: food,
+                              useCardLabel: true,
+                              chargedStyle: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: webInk,
+                              ),
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 8),
                           ListingCartTapShield(
                             child: MarketplacePurchaseSlot(
                               food: food,

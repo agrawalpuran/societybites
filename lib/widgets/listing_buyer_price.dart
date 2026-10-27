@@ -46,6 +46,9 @@ class ListingBuyerPriceText extends StatelessWidget {
 
     final charged = Text(
       chargedLabel,
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.ellipsis,
       style: chargedStyle ??
           const TextStyle(
             fontSize: 18,

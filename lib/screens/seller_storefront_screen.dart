@@ -855,66 +855,61 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  ListingBuyerPriceText(
-                    food: food,
-                    useCardLabel: true,
-                    chargedStyle: const TextStyle(
-                      color: preorderGreen,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
+                  Expanded(
+                    child: ListingBuyerPriceText(
+                      food: food,
+                      useCardLabel: true,
+                      chargedStyle: const TextStyle(
+                        color: preorderGreen,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  if (widget.browseOnly)
-                    const SizedBox.shrink()
-                  else
-                    Flexible(
-                      child: Align(
+                  if (!widget.browseOnly)
+                    MarketplacePurchaseSlot(
+                      food: food,
+                      cartQty: quantity,
+                      compact: true,
+                      soldOut: const Text(
+                        'Sold out',
+                        style: TextStyle(
+                          color: Color(0xFFD94F4F),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      addButton: _smallButton(
+                        label: 'Add',
+                        onTap: () => _changeCart(food, 1),
+                      ),
+                      qtyStepper: FittedBox(
+                        fit: BoxFit.scaleDown,
                         alignment: Alignment.centerRight,
-                        child: MarketplacePurchaseSlot(
-                          food: food,
-                          cartQty: quantity,
-                          compact: true,
-                          soldOut: const Text(
-                            'Sold out',
-                            style: TextStyle(
-                              color: Color(0xFFD94F4F),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _quantityButton(
+                              Icons.remove,
+                              () => _changeCart(food, -1),
                             ),
-                          ),
-                          addButton: _smallButton(
-                            label: 'Add',
-                            onTap: () => _changeCart(food, 1),
-                          ),
-                          qtyStepper: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerRight,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _quantityButton(
-                                  Icons.remove,
-                                  () => _changeCart(food, -1),
+                            SizedBox(
+                              width: 28,
+                              child: Text(
+                                '$quantity',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
                                 ),
-                                SizedBox(
-                                  width: 28,
-                                  child: Text(
-                                    '$quantity',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                                _quantityButton(
-                                  Icons.add,
-                                  () => _changeCart(food, 1),
-                                  filled: true,
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
+                            _quantityButton(
+                              Icons.add,
+                              () => _changeCart(food, 1),
+                              filled: true,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -1032,10 +1027,15 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
       style: FilledButton.styleFrom(
         backgroundColor: preorderGreen,
         visualDensity: VisualDensity.compact,
-        minimumSize: const Size(0, 36),
+        minimumSize: const Size(52, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.symmetric(horizontal: 12),
       ),
-      child: Text(label),
+      child: Text(
+        label,
+        softWrap: false,
+        maxLines: 1,
+      ),
     );
   }
 
