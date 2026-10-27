@@ -1,8 +1,24 @@
 import 'package:flutter/material.dart';
 
+import '../../models/selling_reach.dart';
 import '../../services/api_service.dart';
 import '../../widgets/admin_loading_panel.dart';
 import '../../widgets/screen_loading_note.dart';
+
+/// Admin-facing label for a user's chosen selling reach (read-only).
+String adminUserSellingReachLabel(Map<String, dynamic> user) {
+  final level = parseSellingReachLevel(user['sellingReachLevel']);
+  if (!level.isBeyondSociety) return 'My society';
+
+  final rawKm = user['sellingReachRadiusKm'];
+  final km = rawKm is num
+      ? rawKm.toDouble()
+      : double.tryParse(rawKm?.toString() ?? '');
+  if (km != null && km > 0) {
+    return 'Up to ${formatReachRadiusKm(km)} km';
+  }
+  return 'Beyond society';
+}
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -110,6 +126,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               const SizedBox(height: 4),
               Text(
                 'Role: $currentRole • ${isSuspended ? "Suspended" : "Active"}',
+                style: const TextStyle(color: Color(0xFF6A7774)),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Selling reach: ${adminUserSellingReachLabel(user)}',
                 style: const TextStyle(color: Color(0xFF6A7774)),
               ),
               const SizedBox(height: 20),
@@ -349,6 +370,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   '—';
           final joinedAt = user['createdAt']?.toString() ?? '';
           final isSuspended = user['suspended'] == true;
+          final reach = adminUserSellingReachLabel(user);
 
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
@@ -405,7 +427,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               subtitle: Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  '$phone • $society • Joined ${_formatDate(joinedAt)}',
+                  '$phone • $society • Reach: $reach • Joined ${_formatDate(joinedAt)}',
                   style: const TextStyle(fontSize: 12, color: Color(0xFF6A7774)),
                 ),
               ),
