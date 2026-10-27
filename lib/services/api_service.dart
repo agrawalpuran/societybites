@@ -146,10 +146,12 @@ class ApiService {
   static String get baseUrl {
     const configured = String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'https://societybites.onrender.com',
+      defaultValue: 'https://societyeats-42ird.ondigitalocean.app',
     );
     final normalized = configured.trim();
-    if (normalized.isEmpty) return 'https://societybites.onrender.com';
+    if (normalized.isEmpty) {
+      return 'https://societyeats-42ird.ondigitalocean.app';
+    }
     return normalized.endsWith('/')
         ? normalized.substring(0, normalized.length - 1)
         : normalized;
