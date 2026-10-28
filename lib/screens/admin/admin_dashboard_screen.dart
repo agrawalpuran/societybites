@@ -25,6 +25,10 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Map<String, dynamic>? _stats;
   double _platformFee = 0;
+  int _minIosBuild = 0;
+  int _minAndroidBuild = 0;
+  String _iosUpdateUrl = '';
+  String _androidUpdateUrl = '';
   bool _isLoading = true;
   bool _showGrowthPanel = false;
   String? _error;
@@ -51,12 +55,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     try {
       final results = await Future.wait([
         ApiService.getAdminDashboard(),
-        ApiService.getAdminPlatformFee(),
+        ApiService.getAdminSettings(),
       ]);
       if (!mounted) return;
+      final settings = results[1] as Map<String, dynamic>;
       setState(() {
         _stats = results[0] as Map<String, dynamic>;
-        _platformFee = results[1] as double;
+        _platformFee = (settings['platformFee'] as num?)?.toDouble() ?? 0;
+        _minIosBuild = (settings['minIosBuild'] as num?)?.toInt() ?? 0;
+        _minAndroidBuild = (settings['minAndroidBuild'] as num?)?.toInt() ?? 0;
+        _iosUpdateUrl = settings['iosUpdateUrl']?.toString() ?? '';
+        _androidUpdateUrl = settings['androidUpdateUrl']?.toString() ?? '';
         _isLoading = false;
       });
       _scheduleGrowthPanel();
@@ -66,6 +75,121 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _editForceUpdate() async {
+    final iosBuildController = TextEditingController(text: '$_minIosBuild');
+    final androidBuildController =
+        TextEditingController(text: '$_minAndroidBuild');
+    final iosUrlController = TextEditingController(text: _iosUpdateUrl);
+    final androidUrlController = TextEditingController(text: _androidUpdateUrl);
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Force update'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Builds below these numbers are blocked at startup. '
+                'Set to 0 to disable. Raise only after the new build is on '
+                'TestFlight / Play.',
+                style: TextStyle(fontSize: 13, color: Color(0xFF6A7774)),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: iosBuildController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Min iOS build (+N)',
+                ),
+              ),
+              TextField(
+                controller: androidBuildController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Min Android build (+N)',
+                ),
+              ),
+              TextField(
+                controller: iosUrlController,
+                decoration: const InputDecoration(
+                  labelText: 'iOS update URL (TestFlight / App Store)',
+                ),
+              ),
+              TextField(
+                controller: androidUrlController,
+                decoration: const InputDecoration(
+                  labelText: 'Android update URL (Play)',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final ios = int.tryParse(iosBuildController.text.trim());
+              final android = int.tryParse(androidBuildController.text.trim());
+              if (ios == null || ios < 0 || android == null || android < 0) {
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved != true || !mounted) {
+      iosBuildController.dispose();
+      androidBuildController.dispose();
+      iosUrlController.dispose();
+      androidUrlController.dispose();
+      return;
+    }
+
+    final ios = int.parse(iosBuildController.text.trim());
+    final android = int.parse(androidBuildController.text.trim());
+    final iosUrl = iosUrlController.text.trim();
+    final androidUrl = androidUrlController.text.trim();
+    iosBuildController.dispose();
+    androidBuildController.dispose();
+    iosUrlController.dispose();
+    androidUrlController.dispose();
+
+    try {
+      final updated = await ApiService.updateAdminForceUpdateSettings(
+        minIosBuild: ios,
+        minAndroidBuild: android,
+        iosUpdateUrl: iosUrl,
+        androidUpdateUrl: androidUrl,
+      );
+      if (!mounted) return;
+      setState(() {
+        _minIosBuild = (updated['minIosBuild'] as num?)?.toInt() ?? ios;
+        _minAndroidBuild =
+            (updated['minAndroidBuild'] as num?)?.toInt() ?? android;
+        _iosUpdateUrl = updated['iosUpdateUrl']?.toString() ?? iosUrl;
+        _androidUpdateUrl =
+            updated['androidUpdateUrl']?.toString() ?? androidUrl;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Force update settings saved')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update force settings: $e')),
+      );
     }
   }
 
@@ -313,6 +437,71 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                       ),
                       const SizedBox(width: 4),
+                      const Icon(
+                        Icons.edit_outlined,
+                        size: 18,
+                        color: Color(0xFF8A9491),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                onTap: _editForceUpdate,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFEAEFED)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0E5A47).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.system_update_alt_rounded,
+                          size: 18,
+                          color: Color(0xFF0E5A47),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Force update',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: Color(0xFF101617),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _minIosBuild <= 0 && _minAndroidBuild <= 0
+                                  ? 'Off — all builds allowed'
+                                  : 'iOS ≥ $_minIosBuild · Android ≥ $_minAndroidBuild',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6A7774),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const Icon(
                         Icons.edit_outlined,
                         size: 18,

@@ -1042,9 +1042,18 @@ router.get(
   "/settings",
   asyncHandler(async (_req, res) => {
     const { getPlatformFee } = require("../lib/platformFee");
+    const { getForceUpdateConfig } = require("../lib/appForceUpdate");
     const platformFee = await getPlatformFee();
     const fssaiSellingRequirement = await isFssaiSellingRequirementEnabled();
-    res.json({ platformFee, fssaiSellingRequirement });
+    const forceUpdate = await getForceUpdateConfig({ bypassCache: true });
+    res.json({
+      platformFee,
+      fssaiSellingRequirement,
+      minIosBuild: forceUpdate.minIosBuild,
+      minAndroidBuild: forceUpdate.minAndroidBuild,
+      iosUpdateUrl: forceUpdate.iosUpdateUrl,
+      androidUpdateUrl: forceUpdate.androidUpdateUrl,
+    });
   })
 );
 
@@ -1053,7 +1062,17 @@ router.patch(
   "/settings",
   asyncHandler(async (req, res) => {
     const { setPlatformFee } = require("../lib/platformFee");
-    const { platformFee, fssaiSellingRequirement } = req.body;
+    const { setForceUpdateConfig, getForceUpdateConfig } = require(
+      "../lib/appForceUpdate"
+    );
+    const {
+      platformFee,
+      fssaiSellingRequirement,
+      minIosBuild,
+      minAndroidBuild,
+      iosUpdateUrl,
+      androidUpdateUrl,
+    } = req.body;
 
     const updates = {};
     if (platformFee !== undefined && platformFee !== null) {
@@ -1063,6 +1082,18 @@ router.patch(
       updates.fssaiSellingRequirement = await setFssaiSellingRequirement(
         Boolean(fssaiSellingRequirement)
       );
+    }
+    const forceUpdates = await setForceUpdateConfig({
+      minIosBuild,
+      minAndroidBuild,
+      iosUpdateUrl,
+      androidUpdateUrl,
+    });
+    if (forceUpdates) {
+      updates.minIosBuild = forceUpdates.minIosBuild;
+      updates.minAndroidBuild = forceUpdates.minAndroidBuild;
+      updates.iosUpdateUrl = forceUpdates.iosUpdateUrl;
+      updates.androidUpdateUrl = forceUpdates.androidUpdateUrl;
     }
     if (!Object.keys(updates).length) {
       return res.status(400).json({ error: "Nothing to update" });
@@ -1077,10 +1108,18 @@ router.patch(
       },
     });
 
+    const forceUpdate = await getForceUpdateConfig({ bypassCache: true });
     res.json({
-      platformFee: updates.platformFee ?? (await require("../lib/platformFee").getPlatformFee()),
+      platformFee:
+        updates.platformFee ??
+        (await require("../lib/platformFee").getPlatformFee()),
       fssaiSellingRequirement:
-        updates.fssaiSellingRequirement ?? (await isFssaiSellingRequirementEnabled()),
+        updates.fssaiSellingRequirement ??
+        (await isFssaiSellingRequirementEnabled()),
+      minIosBuild: forceUpdate.minIosBuild,
+      minAndroidBuild: forceUpdate.minAndroidBuild,
+      iosUpdateUrl: forceUpdate.iosUpdateUrl,
+      androidUpdateUrl: forceUpdate.androidUpdateUrl,
     });
   })
 );

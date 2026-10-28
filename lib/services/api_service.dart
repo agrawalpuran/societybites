@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:http/http.dart' as http_client;
 
+import '../models/app_settings.dart';
 import '../models/coupon.dart';
 import '../models/listing_discount.dart';
 import '../models/issue_report.dart';
@@ -1940,19 +1941,29 @@ class ApiService {
   // ─── Admin APIs ───────────────────────────────────────────────────────
 
   static double? _cachedPlatformFee;
+  static AppSettings? _cachedAppSettings;
 
   static double? get cachedPlatformFee => _cachedPlatformFee;
 
-  static Future<double> getPlatformFee() async {
-    if (_cachedPlatformFee != null) return _cachedPlatformFee!;
+  static Future<AppSettings> getAppSettings({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedAppSettings != null) {
+      return _cachedAppSettings!;
+    }
     final response = await http.get(Uri.parse('$baseUrl/settings'));
     if (response.statusCode == 200) {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
-      final fee = (data['platformFee'] as num?)?.toDouble() ?? 0;
-      _cachedPlatformFee = fee;
-      return fee;
+      final settings = AppSettings.fromJson(data);
+      _cachedAppSettings = settings;
+      _cachedPlatformFee = settings.platformFee;
+      return settings;
     }
     _throwFromResponse(response);
+  }
+
+  static Future<double> getPlatformFee() async {
+    if (_cachedPlatformFee != null) return _cachedPlatformFee!;
+    final settings = await getAppSettings();
+    return settings.platformFee;
   }
 
   /// Warm checkout totals while the buyer is still browsing.
@@ -2324,13 +2335,17 @@ class ApiService {
   }
 
   static Future<double> getAdminPlatformFee() async {
+    final data = await getAdminSettings();
+    return (data['platformFee'] as num?)?.toDouble() ?? 0;
+  }
+
+  static Future<Map<String, dynamic>> getAdminSettings() async {
     final response = await http.get(
       Uri.parse('$baseUrl/admin/settings'),
       headers: await _authHeaders(),
     );
     if (response.statusCode == 200) {
-      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
-      return (data['platformFee'] as num?)?.toDouble() ?? 0;
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
     }
     _throwFromResponse(response);
   }
@@ -2343,7 +2358,32 @@ class ApiService {
     );
     if (response.statusCode == 200) {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      _cachedAppSettings = null;
+      _cachedPlatformFee = null;
       return (data['platformFee'] as num?)?.toDouble() ?? platformFee;
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateAdminForceUpdateSettings({
+    int? minIosBuild,
+    int? minAndroidBuild,
+    String? iosUpdateUrl,
+    String? androidUpdateUrl,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/settings'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        if (minIosBuild != null) 'minIosBuild': minIosBuild,
+        if (minAndroidBuild != null) 'minAndroidBuild': minAndroidBuild,
+        if (iosUpdateUrl != null) 'iosUpdateUrl': iosUpdateUrl,
+        if (androidUpdateUrl != null) 'androidUpdateUrl': androidUpdateUrl,
+      }),
+    );
+    if (response.statusCode == 200) {
+      _cachedAppSettings = null;
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
     }
     _throwFromResponse(response);
   }

@@ -7,6 +7,7 @@ import 'firebase_options.dart';
 import 'screens/main_shell_screen.dart';
 import 'screens/guest_landing_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/force_update_screen.dart';
 import 'screens/society_selection_screen.dart';
 import 'theme/app_theme.dart';
 import 'web/web_marketplace_states.dart';
@@ -14,6 +15,7 @@ import 'widgets/app_header.dart' show kAppDisplayName;
 import 'widgets/mobile_startup_frame.dart';
 import 'services/api_service.dart';
 import 'services/auth_config.dart';
+import 'services/force_update_service.dart';
 import 'services/session_service.dart';
 import 'services/push_notification_service.dart';
 
@@ -132,6 +134,10 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<Widget> _safeResolve() async {
     try {
+      final forceUpdate = await ForceUpdateService.check();
+      if (forceUpdate != null) {
+        return ForceUpdateScreen(requirement: forceUpdate);
+      }
       final resolve = widget.resolveStartScreen ?? resolveAuthStartScreen;
       return await resolve();
     } catch (error, stack) {
