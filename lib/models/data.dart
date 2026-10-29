@@ -1637,6 +1637,7 @@ class PreOrderProduct {
   final String sellerName;
   final String block;
   final String? flatNumber;
+  final String? sellerSocietyName;
   final double rating;
   final int reviewCount;
   final double price;
@@ -1645,6 +1646,9 @@ class PreOrderProduct {
   final String? description;
   final String? imageUrl;
   final String? foodType;
+  final String? weightUnit;
+  final String? weightValue;
+  final String? variantLabel;
   final String? kitchenOpensAt;
   final String? kitchenClosesAt;
 
@@ -1655,6 +1659,7 @@ class PreOrderProduct {
     required this.sellerName,
     this.block = '',
     this.flatNumber,
+    this.sellerSocietyName,
     this.rating = 0,
     this.reviewCount = 0,
     required this.price,
@@ -1663,6 +1668,9 @@ class PreOrderProduct {
     this.description,
     this.imageUrl,
     this.foodType,
+    this.weightUnit,
+    this.weightValue,
+    this.variantLabel,
     this.kitchenOpensAt,
     this.kitchenClosesAt,
   });
@@ -1675,6 +1683,11 @@ class PreOrderProduct {
       sellerName: (json['sellerName'] as String?) ?? 'Neighbor',
       block: (json['block'] as String?) ?? '',
       flatNumber: json['flatNumber'] as String?,
+      sellerSocietyName: () {
+        final raw = json['sellerSocietyName']?.toString().trim();
+        if (raw == null || raw.isEmpty || raw == 'null') return null;
+        return raw;
+      }(),
       rating: (json['avgRating'] as num?)?.toDouble() ?? 0,
       reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
       price: (json['price'] as num?)?.toDouble() ?? 0,
@@ -1683,6 +1696,9 @@ class PreOrderProduct {
       description: json['description'] as String?,
       imageUrl: json['imageUrl'] as String?,
       foodType: parseFoodType(json['foodType']),
+      weightUnit: json['weightUnit']?.toString(),
+      weightValue: json['weightValue']?.toString(),
+      variantLabel: json['variantLabel']?.toString(),
       kitchenOpensAt: FoodItem._clock(json['kitchenOpensAt']),
       kitchenClosesAt: FoodItem._clock(json['kitchenClosesAt']),
     );
@@ -1708,6 +1724,7 @@ class PreOrderCampaign {
   final double foodSubtotal;
   final String sellerPaymentPreference;
   final String? societyId;
+  final String? societyName;
   final SellingReachLevel? sellingReachLevel;
   final double? distanceKm;
 
@@ -1736,6 +1753,7 @@ class PreOrderCampaign {
     this.foodSubtotal = 0,
     this.sellerPaymentPreference = 'COD_IN_SOCIETY_UPI_OUTSIDE',
     this.societyId,
+    this.societyName,
     this.sellingReachLevel,
     this.distanceKm,
     this.discoveryReach,
@@ -1784,6 +1802,21 @@ class PreOrderCampaign {
   String get sellerName =>
       products.isNotEmpty ? products.first.sellerName : 'Neighbor';
 
+  /// Society / place line for buyers (campaign society, else product society).
+  String? get buyerLocationLabel {
+    final fromCampaign = societyName?.trim();
+    if (fromCampaign != null && fromCampaign.isNotEmpty) return fromCampaign;
+    for (final product in products) {
+      final society = product.sellerSocietyName?.trim();
+      if (society != null && society.isNotEmpty) return society;
+    }
+    for (final product in products) {
+      final block = product.block.trim();
+      if (block.isNotEmpty && block != 'Block ?') return block;
+    }
+    return null;
+  }
+
   double get startingPrice => products.isEmpty
       ? 0
       : products
@@ -1828,6 +1861,11 @@ class PreOrderCampaign {
               : null) ??
           defaultSellerPaymentPreference.apiValue,
       societyId: json['societyId']?.toString(),
+      societyName: () {
+        final raw = json['societyName']?.toString().trim();
+        if (raw == null || raw.isEmpty || raw == 'null') return null;
+        return raw;
+      }(),
       sellingReachLevel: json['sellingReachLevel'] == null
           ? null
           : parseSellingReachLevel(json['sellingReachLevel']),
@@ -2055,10 +2093,14 @@ Seller sellerFromPreOrderCampaign(PreOrderCampaign campaign) {
               (sum, product) => sum + product.rating * product.reviewCount,
             ) /
             reviewCount;
+  final location = campaign.buyerLocationLabel;
+  final block = firstProduct?.block.trim() ?? '';
   return Seller(
     id: campaign.sellerId,
     name: campaign.sellerName,
-    block: firstProduct?.block ?? '',
+    block: block.isNotEmpty && block != 'Block ?'
+        ? block
+        : (location ?? ''),
     rating: rating,
     reviewCount: reviewCount,
     avatarIcon: avatarIcons[hash % avatarIcons.length],

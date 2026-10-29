@@ -108,7 +108,12 @@ void main() {
     expect(find.text('Friday Evening Specials'), findsOneWidget);
     expect(find.text('Sharma Snacks'), findsOneWidget);
     expect(find.textContaining('PRE-ORDER'), findsOneWidget);
-    expect(find.textContaining('Ready'), findsOneWidget);
+    expect(
+      find.textContaining(
+        RegExp(r'\d+ (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)'),
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining('Samosa'), findsNothing);
   });
 
@@ -210,7 +215,7 @@ void main() {
     );
 
     expect(find.text('ORDERS CLOSED'), findsOneWidget);
-    expect(find.textContaining('Ready'), findsOneWidget);
+    expect(find.textContaining(RegExp(r'\d+ (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)')), findsOneWidget);
   });
 
   testWidgets('pre-order cover picker offers camera and gallery', (

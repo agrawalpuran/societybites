@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/screens/buyer_preorder_detail_screen.dart';
+import 'package:societybites/widgets/preorder_widgets.dart';
 
 PreOrderCampaign _campaign() {
   final now = DateTime.now();
@@ -9,6 +10,7 @@ PreOrderCampaign _campaign() {
     id: 'campaign-1',
     sellerId: 'seller-1',
     title: 'Friday Evening Specials',
+    societyName: 'Springville',
     status: 'open',
     orderOpenAt: now.subtract(const Duration(hours: 1)),
     orderCutoffAt: now.add(const Duration(hours: 5)),
@@ -22,6 +24,10 @@ PreOrderCampaign _campaign() {
         price: 20,
         inventoryMode: 'demand',
         quantity: 0,
+        description: 'Crispy potato filling',
+        imageUrl: '/uploads/samosa.jpg',
+        weightValue: '2',
+        weightUnit: 'portions',
       ),
     ],
   );
@@ -43,9 +49,14 @@ void main() {
 
     expect(find.widgetWithText(AppBar, 'Pre-order'), findsOneWidget);
     expect(find.text('Friday Evening Specials'), findsOneWidget);
+    expect(find.text('Springville'), findsOneWidget);
     expect(find.text('CHOOSE PRODUCTS'), findsOneWidget);
     expect(find.text('Samosa'), findsOneWidget);
+    expect(find.text('2 portions'), findsOneWidget);
+    expect(find.text('Crispy potato filling'), findsOneWidget);
+    expect(find.textContaining('Ready'), findsWidgets);
     expect(find.text('Continue Pre-order'), findsOneWidget);
+    expect(find.byType(PreOrderCoverImage), findsWidgets);
 
     final screenHeight =
         (tester.view.physicalSize / tester.view.devicePixelRatio).height;

@@ -105,6 +105,12 @@ String formatMoney(double value) {
 
 String formatDateTime(DateTime value) {
   final local = value.toLocal();
+  return '${formatCampaignDate(local)} · ${formatTime(local)}';
+}
+
+/// Weekday + calendar day, e.g. "Thu, 20 Aug".
+String formatCampaignDate(DateTime value) {
+  final local = value.toLocal();
   const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const months = [
     'Jan',
@@ -121,7 +127,7 @@ String formatDateTime(DateTime value) {
     'Dec',
   ];
   return '${weekdays[local.weekday - 1]}, ${local.day} '
-      '${months[local.month - 1]} · ${formatTime(local)}';
+      '${months[local.month - 1]}';
 }
 
 String formatTime(DateTime value) {
@@ -137,20 +143,17 @@ String formatTime(DateTime value) {
 
 String formatShortCutoff(DateTime value) {
   final local = value.toLocal();
-  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  return 'By ${weekdays[local.weekday - 1]} ${formatTime(local)}';
+  return 'By ${formatCampaignDate(local)} · ${formatTime(local)}';
 }
 
 String formatReadyAt(DateTime value) {
   final local = value.toLocal();
-  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  return 'Ready ${weekdays[local.weekday - 1]} ${formatTime(local)}';
+  return 'Ready ${formatCampaignDate(local)} · ${formatTime(local)}';
 }
 
 String formatOrderByLabel(DateTime value) {
   final local = value.toLocal();
-  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  return 'Order by ${weekdays[local.weekday - 1]} ${formatTime(local)}';
+  return 'Order by ${formatCampaignDate(local)} · ${formatTime(local)}';
 }
 
 class PreOrderBadge extends StatelessWidget {
@@ -540,10 +543,10 @@ class HomePreOrderCampaignCard extends StatelessWidget {
     final phase = campaign.homePhase();
     final footer = switch (phase) {
       BuyerCampaignHomePhase.upcoming =>
-        'Opens ${formatTime(campaign.orderOpenAt)}',
+        'Opens ${formatCampaignDate(campaign.orderOpenAt)}',
       BuyerCampaignHomePhase.ordersClosed =>
-        formatReadyAt(campaign.fulfilmentAt),
-      _ => formatReadyAt(campaign.fulfilmentAt),
+        formatCampaignDate(campaign.fulfilmentAt),
+      _ => formatCampaignDate(campaign.fulfilmentAt),
     };
     return SizedBox(
       width: cardWidth,
@@ -774,13 +777,13 @@ class BuyerPreOrderCampaignCard extends StatelessWidget {
               if (compact) const Spacer() else const SizedBox(height: 8),
               const SizedBox(height: 8),
               Text(
-                formatOrderByLabel(campaign.orderCutoffAt),
+                'Ready ${formatCampaignDate(campaign.fulfilmentAt)}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: preorderMuted,
+                  color: preorderGreen,
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 3),
@@ -788,13 +791,13 @@ class BuyerPreOrderCampaignCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      formatReadyAt(campaign.fulfilmentAt),
+                      formatOrderByLabel(campaign.orderCutoffAt),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: preorderGreen,
+                        color: preorderMuted,
                         fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),

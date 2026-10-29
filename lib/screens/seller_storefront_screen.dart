@@ -450,6 +450,12 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
 
   String? get _location {
     if (_products.isNotEmpty) return _products.first.buyerPlaceLabel;
+    final society = widget.guestSocietyName?.trim();
+    if (society != null && society.isNotEmpty) return society;
+    if (widget.nearbyContext != null) {
+      final nearbySociety = widget.nearbyContext!.societyName.trim();
+      if (nearbySociety.isNotEmpty) return nearbySociety;
+    }
     final block = widget.seller.block.trim();
     return block.isEmpty || block == 'Block ?' ? null : block;
   }
@@ -994,20 +1000,24 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                     ],
                     const SizedBox(height: 8),
                     Text(
-                      formatOrderByLabel(campaign.orderCutoffAt),
-                      style: const TextStyle(
-                        color: preorderMuted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      formatReadyAt(campaign.fulfilmentAt),
+                      'Ready ${formatCampaignDate(campaign.fulfilmentAt)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: preorderGreen,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      formatOrderByLabel(campaign.orderCutoffAt),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: preorderMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],

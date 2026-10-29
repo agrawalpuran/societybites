@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/data.dart';
 import '../models/kitchen_hours.dart';
 import '../services/api_service.dart';
+import '../utils/listing_portion_label.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/screen_loading_note.dart';
 import 'preorder_checkout_screen.dart';
@@ -161,6 +162,7 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
           seller: sellerFromPreOrderCampaign(campaign),
           cartItems: widget.cartItems,
           onCartChanged: widget.onCartChanged,
+          guestSocietyName: campaign.buyerLocationLabel,
         ),
       ),
     );
@@ -241,7 +243,9 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  formatReadyAt(campaign.fulfilmentAt),
+                  'Ready ${formatCampaignDate(campaign.fulfilmentAt)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: preorderGreen,
                     fontSize: 14,
@@ -251,6 +255,8 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                 const SizedBox(height: 2),
                 Text(
                   formatOrderByLabel(campaign.orderCutoffAt),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: preorderMuted,
                     fontSize: 13,
@@ -263,15 +269,35 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                   borderRadius: BorderRadius.circular(6),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Text(
-                      'By ${campaign.sellerName}',
-                      style: const TextStyle(
-                        color: preorderGreen,
-                        fontSize: 15,
-                        decoration: TextDecoration.underline,
-                        decorationColor: preorderGreen,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'By ${campaign.sellerName}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: preorderGreen,
+                            fontSize: 15,
+                            decoration: TextDecoration.underline,
+                            decorationColor: preorderGreen,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (campaign.buyerLocationLabel != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            campaign.buyerLocationLabel!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: preorderMuted,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ),
@@ -372,6 +398,13 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
     final limited = product.inventoryMode == 'limited';
     final soldOut = limited && product.quantity <= 0;
     final campaign = _campaign!;
+    final portion = product.variantLabel?.trim().isNotEmpty == true
+        ? product.variantLabel!.trim()
+        : listingPortionLabel(
+            weightValue: product.weightValue,
+            weightUnit: product.weightUnit,
+          );
+    final description = product.description?.trim();
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -386,14 +419,11 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0F7F4),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.restaurant_menu, color: preorderGreen),
+              PreOrderCoverImage(
+                imageUrl: product.imageUrl,
+                width: 64,
+                height: 64,
+                borderRadius: 14,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -404,36 +434,60 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                     const SizedBox(height: 6),
                     Text(
                       product.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: preorderText,
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (portion != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        portion,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: preorderMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 2),
                     Text(
                       formatMoney(product.price),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: preorderGreen,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (description != null && description.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: preorderMuted,
+                          fontSize: 12,
+                          height: 1.35,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
-                      formatReadyAt(campaign.fulfilmentAt),
+                      'Ready ${formatDateTime(campaign.fulfilmentAt)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: preorderGreen,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      formatOrderByLabel(campaign.orderCutoffAt),
-                      style: const TextStyle(
-                        color: preorderMuted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -443,6 +497,8 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                                 ? 'Sold out'
                                 : '${product.quantity} remaining'
                           : 'Prepared based on pre-orders',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: soldOut
                             ? const Color(0xFFD94F4F)

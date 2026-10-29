@@ -36,7 +36,7 @@ const campaignInclude = {
   seller: { include: { society: true, flat: true } },
   products: {
     include: {
-      seller: { include: { flat: true } },
+      seller: { include: { society: true, flat: true } },
       reviews: { select: { rating: true } },
     },
     orderBy: { createdAt: "asc" },

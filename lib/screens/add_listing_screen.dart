@@ -8,6 +8,7 @@ import '../widgets/app_header.dart';
 import '../models/data.dart';
 import '../services/api_service.dart';
 import '../services/listing_publish_navigation.dart';
+import '../services/my_listings_cache.dart';
 import '../services/session_service.dart';
 import '../models/food_type.dart';
 import '../models/coupon.dart';
@@ -1641,7 +1642,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
           backgroundColor: const Color(0xFF0E5A47),
         ),
       );
-      if (_isEditing) {
+      if (_isEditing || _isPreorderCatalog) {
+        // Pre-order catalog creates should return to the parent flow so the
+        // seller can add more items / attach them to a campaign.
+        MyListingsCache.clear();
         Navigator.pop(context, true);
       } else {
         ListingPublishNavigation.completeNewListing(context);

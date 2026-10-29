@@ -138,6 +138,11 @@ function serializeCampaign(campaign) {
       (sellerPrefSource && sellerPrefSource.profilePhotoUrl) ||
       null,
     societyId: campaign.societyId,
+    societyName:
+      (campaign.seller &&
+        campaign.seller.society &&
+        campaign.seller.society.name) ||
+      null,
     sellingReachLevel:
       (campaign.seller && campaign.seller.sellingReachLevel) || undefined,
     distanceKm:

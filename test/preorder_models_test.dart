@@ -174,12 +174,14 @@ void main() {
     );
   });
 
-  test('short cutoff uses weekday and local time', () {
+  test('short cutoff uses weekday, date and local time', () {
     final cutoff = DateTime(2026, 8, 20, 20);
-    expect(formatShortCutoff(cutoff), contains('By Thu'));
+    expect(formatShortCutoff(cutoff), contains('By Thu, 20 Aug'));
     expect(formatShortCutoff(cutoff), contains('8:00 PM'));
-    expect(formatReadyAt(cutoff), contains('Ready Thu'));
-    expect(formatOrderByLabel(cutoff), contains('Order by Thu'));
+    expect(formatReadyAt(cutoff), contains('Ready Thu, 20 Aug'));
+    expect(formatReadyAt(cutoff), contains('8:00 PM'));
+    expect(formatOrderByLabel(cutoff), contains('Order by Thu, 20 Aug'));
+    expect(formatCampaignDate(cutoff), 'Thu, 20 Aug');
   });
 
   test('campaignId marks a listing as a pre-order product', () {

@@ -125,6 +125,10 @@ function serializeListing(listing, options = {}) {
     societyId: listing.societyId,
     sellerId: listing.sellerId,
     sellerName: seller.name || "Neighbor",
+    sellerSocietyName:
+      (seller.society && seller.society.name) ||
+      listing.sellerSocietyName ||
+      null,
     sellerProfilePhotoUrl:
       listing.sellerProfilePhotoUrl || seller.profilePhotoUrl || null,
     sellerUpiId: seller.upiId || null,
