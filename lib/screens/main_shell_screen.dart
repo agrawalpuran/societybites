@@ -82,7 +82,7 @@ class _MainShellScreenState extends State<MainShellScreen>
     unawaited(SessionService.warmAuthCache());
     ListingPublishNavigation.onPublished = _onListingPublishedToHome;
     _sessionCheck = _refreshSignedIn();
-    _unreadPoll = Timer.periodic(const Duration(seconds: 12), (_) {
+    _unreadPoll = Timer.periodic(const Duration(seconds: 30), (_) {
       _pollUnread();
     });
     if (widget.focusOrderId != null ||
