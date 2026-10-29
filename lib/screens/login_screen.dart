@@ -367,61 +367,33 @@ class _HeaderSection extends StatelessWidget {
     final isIos = _isIosLayout;
     return Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: isIos ? 46 : 54,
-              height: isIos ? 46 : 54,
-              decoration: BoxDecoration(
-                color: const Color(0xFF0E5A47),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0E5A47).withOpacity(0.2),
-                    blurRadius: 14,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.restaurant_menu_rounded,
-                color: Colors.white,
-                size: isIos ? 22 : 28,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  kAppDisplayName,
-                  maxLines: 1,
-                  softWrap: false,
-                  overflow: TextOverflow.visible,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontSize: isIos ? 22 : null,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0A4638),
-                    letterSpacing: -0.5,
-                  ),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                kAppDisplayName,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.visible,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontSize: isIos ? 22 : 26,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0A4638),
+                  letterSpacing: -0.5,
                 ),
               ),
-            ),
-          ],
-        ),
-        SizedBox(height: isIos ? 12 : 28),
-        Text(
-          'Welcome To SocietyEats',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontSize: isIos ? 28 : null,
-            height: isIos ? 1.15 : null,
-            color: const Color(0xFF101617),
-            fontWeight: FontWeight.w700,
+              const SizedBox(width: 6),
+              Icon(
+                Icons.restaurant_menu_rounded,
+                color: const Color(0xFF0E5A47),
+                size: isIos ? 20 : 24,
+              ),
+            ],
           ),
         ),
-        SizedBox(height: isIos ? 6 : 10),
+        SizedBox(height: isIos ? 10 : 14),
         Text(
           'HomeChefs • Homemade • Neighbourhood',
           textAlign: TextAlign.center,
@@ -444,45 +416,44 @@ class _InputSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    const labelStyle = TextStyle(
+      color: Color(0xFF8A4B3B),
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 1.6,
+    );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        const Text(
-          'MOBILE NUMBER',
-          style: TextStyle(
-            color: Color(0xFF8A4B3B),
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.6,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              flex: 3,
-              child: Container(
-                height: 56,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF2F1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignment: Alignment.center,
-                child: const Text(
-                  '+91',
-                  style: TextStyle(
-                    color: Color(0xFF283734),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 21,
-                  ),
-                ),
+        Expanded(
+          flex: 3,
+          child: Container(
+            height: 52,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF2F1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: const Text(
+              '+91',
+              style: TextStyle(
+                color: Color(0xFF283734),
+                fontWeight: FontWeight.w600,
+                fontSize: 18,
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              flex: 10,
-              child: Container(
-                height: 56,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          flex: 10,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Text('MOBILE NUMBER', style: labelStyle),
+              const SizedBox(height: 8),
+              Container(
+                height: 52,
                 decoration: BoxDecoration(
                   color: const Color(0xFFEFF2F1),
                   borderRadius: BorderRadius.circular(12),
@@ -497,7 +468,7 @@ class _InputSection extends StatelessWidget {
                     LengthLimitingTextInputFormatter(10),
                   ],
                   style: const TextStyle(
-                    fontSize: 24,
+                    fontSize: 20,
                     color: Color(0xFF223531),
                     fontWeight: FontWeight.w600,
                     letterSpacing: 1.2,
@@ -506,7 +477,7 @@ class _InputSection extends StatelessWidget {
                     hintText: '99999 00000',
                     hintStyle: TextStyle(
                       color: Color(0xFFBCC4C1),
-                      fontSize: 24,
+                      fontSize: 20,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.2,
                     ),
@@ -516,8 +487,8 @@ class _InputSection extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
@@ -534,7 +505,7 @@ class _SendOtpButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final isIos = _isIosLayout;
     return SizedBox(
-      height: isIos ? 52 : 62,
+      height: isIos ? 44 : 48,
       child: ElevatedButton(
         onPressed: onTap,
         style:
@@ -544,38 +515,28 @@ class _SendOtpButton extends StatelessWidget {
               shape: const StadiumBorder(),
               elevation: 0,
               shadowColor: Colors.transparent,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
             ).copyWith(
               overlayColor: WidgetStatePropertyAll(
                 Colors.white.withOpacity(0.07),
               ),
             ),
-        child: Container(
-          decoration: BoxDecoration(
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0E5A47).withOpacity(0.35),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: isLoading
-              ? SizedBox(
-                  width: isIos ? 22 : 26,
-                  height: isIos ? 22 : 26,
-                  child: const CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    color: Colors.white,
-                  ),
-                )
-              : Text(
-                  'Send OTP  →',
-                  style: TextStyle(
-                    fontSize: isIos ? 20 : 28,
-                    fontWeight: FontWeight.w700,
-                  ),
+        child: isLoading
+            ? SizedBox(
+                width: isIos ? 18 : 20,
+                height: isIos ? 18 : 20,
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: Colors.white,
                 ),
-        ),
+              )
+            : Text(
+                'Send OTP  →',
+                style: TextStyle(
+                  fontSize: isIos ? 15 : 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
       ),
     );
   }
