@@ -39,20 +39,20 @@ class WebFoodCard extends StatelessWidget {
         : '0 review';
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onOpen,
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: webLine),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                height: 148,
+                height: 120,
                 child: Stack(
                   children: [
                     Positioned.fill(
@@ -63,19 +63,19 @@ class WebFoodCard extends StatelessWidget {
                             width: constraints.maxWidth,
                             height: constraints.maxHeight,
                             borderRadius: 0,
-                            iconSize: 40,
+                            iconSize: 36,
                           );
                         },
                       ),
                     ),
                     Positioned(
-                      left: 10,
-                      top: 10,
+                      left: 8,
+                      top: 8,
                       child: ListingTypeBadge(food: food, compact: true),
                     ),
                     Positioned(
-                      right: 10,
-                      top: 10,
+                      right: 8,
+                      top: 8,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -94,7 +94,7 @@ class WebFoodCard extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -108,7 +108,7 @@ class WebFoodCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 15,
+                          fontSize: 14,
                           height: 1.25,
                           fontWeight: FontWeight.w800,
                           color: webInk,
@@ -119,12 +119,13 @@ class WebFoodCard extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                padding: const EdgeInsets.fromLTRB(10, 3, 10, 0),
                 child: GestureDetector(
                   onTap: onSeller,
                   child: Text(
                     food.sellerName,
                     maxLines: 1,
+                    softWrap: false,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 12,
@@ -136,33 +137,29 @@ class WebFoodCard extends StatelessWidget {
               ),
               if (food.homePlaceLabel.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
+                  padding: const EdgeInsets.fromLTRB(10, 2, 10, 0),
                   child: Text(
                     food.homePlaceLabel,
                     maxLines: 1,
+                    softWrap: false,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w500,
                       color: webMuted,
                     ),
                   ),
                 ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(12, 2, 12, 0),
-                child: SizedBox.shrink(),
-              ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: MadeToOrderHint(food: food, compact: true),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: RecurringAvailabilityHint(food: food, compact: true),
               ),
-              const SizedBox(height: 8),
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                 child: Row(
                   children: [
                     Expanded(
@@ -173,7 +170,7 @@ class WebFoodCard extends StatelessWidget {
                             food: food,
                             useCardLabel: true,
                             chargedStyle: const TextStyle(
-                              fontSize: 16,
+                              fontSize: 15,
                               fontWeight: FontWeight.w800,
                               color: webInk,
                             ),
@@ -190,6 +187,9 @@ class WebFoodCard extends StatelessWidget {
                               .isNotEmpty)
                             Text(
                               listingSoldCaption(food.quantitySold),
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -199,16 +199,19 @@ class WebFoodCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
                     ListingCartTapShield(
                       child: MarketplacePurchaseSlot(
                         food: food,
                         cartQty: cartQty,
                         addButton: ListingCartAddButton(
                           onPressed: onAdd,
+                          compact: true,
                           optionsLabel: listingOptionsLabel(food),
                         ),
                         qtyStepper: ListingCartQtyStepper(
                           qty: cartQty,
+                          compact: true,
                           onIncrement: onAdd,
                           onDecrement: onRemove,
                         ),
@@ -249,7 +252,7 @@ class WebFoodGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = webFoodColumnCount(constraints.maxWidth);
-        const gap = 16.0;
+        const gap = webGridGap;
         final rows = <Widget>[];
         for (var i = 0; i < items.length; i += columns) {
           final slice = items.skip(i).take(columns).toList();

@@ -13,6 +13,7 @@ const root = path.resolve(__dirname, "..");
 const testsDir = path.join(root, "tests");
 const timeoutMs = Number(process.env.TEST_TIMEOUT_MS || 120000);
 
+/** Fast / no-server (or tiny) checks. Keep this list quick for local loops. */
 const UNIT = [
   "order-number",
   "admin-order-detail",
@@ -22,12 +23,32 @@ const UNIT = [
   "geo-distance",
   "buyer-contact",
   "listing-discount",
+  "listing-categories",
+  "listing-image-optimize",
+  "test-listing-names",
   "notifications-payload",
+  "marketing-push",
 ];
 
+/**
+ * Curated end-to-end API journeys (DB + Express). Broader than unit, narrower
+ * than full `npm test`. Prefer critical money/auth/society paths here.
+ */
 const REGRESSION = [
   "notifications-payload",
   "regression-order-journeys",
+  "preorder-deep-link-auth",
+  "order-lifecycle",
+  "order-cancellation",
+  "order-idempotency",
+  "buyer-order-visibility",
+  "seller-order-history",
+  "society-scoping",
+  "cross-society-order",
+  "preorder",
+  "listing-catalog",
+  "test-otp",
+  "app-force-update",
 ];
 
 function suitePath(name) {

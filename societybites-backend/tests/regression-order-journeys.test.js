@@ -98,6 +98,32 @@ async function main() {
   const server = await listen(orderApp());
 
   try {
+    const unauthCreate = await jsonRequest(server, {
+      method: "POST",
+      path: "/orders",
+      body: {
+        paymentMethod: "cash",
+        items: [{ listingId: listing.id, quantity: 1 }],
+      },
+    });
+    assert(
+      unauthCreate.status === 401,
+      `create without Authorization must be 401, got ${unauthCreate.status}`
+    );
+    assert(
+      String(unauthCreate.json?.error || "").toLowerCase().includes("authorization"),
+      "unauthenticated create should mention Authorization"
+    );
+
+    const unauthKitchen = await jsonRequest(server, {
+      method: "GET",
+      path: "/orders?role=seller&scope=active",
+    });
+    assert(
+      unauthKitchen.status === 401,
+      `seller bucket without auth must be 401, got ${unauthKitchen.status}`
+    );
+
     const placed = await createOrder(server, {
       token: buyerToken,
       listingId: listing.id,
@@ -120,6 +146,20 @@ async function main() {
     assert(kitchen.status === 200, "seller active bucket must load");
     const kitchenIds = (kitchen.json.orders || []).map((row) => row.id);
     assert(kitchenIds.includes(placed.id), "new order must appear in seller active bucket");
+
+    const buyerList = await jsonRequest(server, {
+      method: "GET",
+      path: "/orders?role=buyer",
+      token: buyerToken,
+    });
+    assert(buyerList.status === 200, "buyer orders list must load");
+    const buyerListRows = Array.isArray(buyerList.json)
+      ? buyerList.json
+      : buyerList.json?.orders || [];
+    assert(
+      buyerListRows.some((row) => row.id === placed.id),
+      "placed order must appear on buyer orders list"
+    );
 
     const ready = await patchStatus(server, {
       token: sellerToken,
@@ -216,6 +256,65 @@ async function main() {
       blocked.status === 400 || blocked.status === 403,
       `MY_SOCIETY seller must not take another society's order, got ${blocked.status}`
     );
+
+    const upiListing = await prisma.listing.create({
+      data: {
+        sellerId: seller.id,
+        societyId: society.id,
+        name: `Reg UPI ${stamp}`,
+        price: 80,
+        quantity: 2,
+        status: "active",
+      },
+    });
+    listingIds.push(upiListing.id);
+
+    const upiOrder = await createOrder(server, {
+      token: buyerToken,
+      listingId: upiListing.id,
+      paymentMethod: "upi",
+    });
+    orderIds.push(upiOrder.id);
+    assert(
+      upiOrder.paymentStatus === "pending",
+      `UPI create must leave payment pending, got ${upiOrder.paymentStatus}`
+    );
+
+    let upiReadyId = upiOrder.id;
+    if (upiOrder.status === "pending") {
+      const acceptedUpi = await patchStatus(server, {
+        token: sellerToken,
+        orderId: upiOrder.id,
+        status: "accepted",
+      });
+      assert(acceptedUpi.status === 200, "seller can accept UPI order");
+      upiReadyId = acceptedUpi.json.id || upiOrder.id;
+    }
+
+    const markPaid = await jsonRequest(server, {
+      method: "POST",
+      path: `/payments/${upiReadyId}/mark-paid`,
+      token: buyerToken,
+      body: { upiTransactionRef: `REG-UPI-${stamp}` },
+    });
+    assert(markPaid.status === 200, `buyer mark-paid must succeed, got ${markPaid.status}`);
+    assert(
+      markPaid.json.paymentStatus === "buyer_marked_paid",
+      `buyer mark paid should set buyer_marked_paid, got ${markPaid.json.paymentStatus}`
+    );
+
+    const pastBucket = await jsonRequest(server, {
+      method: "GET",
+      path: "/orders?role=seller&scope=recent_past",
+      token: sellerToken,
+    });
+    assert(pastBucket.status === 200, "seller recent_past bucket must load");
+    assert(
+      Array.isArray(pastBucket.json?.orders),
+      "recent_past payload must include orders array"
+    );
+    // Freshly completed/rejected orders stay in Active grace, so they may not
+    // appear in recent_past yet — only assert the bucket is readable.
 
     console.log("regression-order-journeys.test.js passed");
   } finally {

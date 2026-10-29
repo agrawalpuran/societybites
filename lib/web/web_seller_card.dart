@@ -25,16 +25,16 @@ class WebSellerCard extends StatelessWidget {
         : 'New';
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: webLine),
           ),
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -49,9 +49,10 @@ class WebSellerCard extends StatelessWidget {
                         Text(
                           seller.name,
                           maxLines: 1,
+                          softWrap: false,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 14,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w800,
                             color: webInk,
                           ),
@@ -61,29 +62,25 @@ class WebSellerCard extends StatelessWidget {
                           children: [
                             const Icon(
                               Icons.star_rounded,
-                              size: 14,
+                              size: 13,
                               color: Color(0xFFC48A12),
                             ),
                             const SizedBox(width: 2),
-                            Text(
-                              rating,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: webInk,
-                              ),
-                            ),
-                            if (seller.reviewCount > 0) ...[
-                              const SizedBox(width: 4),
-                              Text(
-                                '(${seller.reviewCount})',
+                            Flexible(
+                              child: Text(
+                                seller.reviewCount > 0
+                                    ? '$rating (${seller.reviewCount})'
+                                    : rating,
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 12,
-                                  color: webMuted,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
+                                  color: webInk,
                                 ),
                               ),
-                            ],
+                            ),
                           ],
                         ),
                       ],
@@ -92,26 +89,29 @@ class WebSellerCard extends StatelessWidget {
                 ],
               ),
               if (seller.hasOrderableItems && detail.isNotEmpty) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Text(
                   detail,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 12,
-                    height: 1.35,
+                    height: 1.3,
                     fontWeight: FontWeight.w500,
                     color: webMuted,
                   ),
                 ),
               ],
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
                 seller.hasOrderableItems
                     ? 'View menu'
                     : sellerNotAvailableLabel,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w800,
                   color: seller.hasOrderableItems ? webGreen : webMuted,
                 ),
@@ -125,10 +125,10 @@ class WebSellerCard extends StatelessWidget {
 
   Widget _avatar() {
     final avatar = SellerAvatar(
-      radius: 22,
+      radius: 18,
       backgroundColor: seller.avatarColor,
       photoUrl: seller.profilePhotoUrl,
-      fallback: Icon(seller.avatarIcon, color: webGreen, size: 20),
+      fallback: Icon(seller.avatarIcon, color: webGreen, size: 18),
     );
     if (seller.hasOrderableItems) return avatar;
     return ClipOval(
@@ -157,7 +157,7 @@ class WebSellerGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = webSellerColumnCount(constraints.maxWidth);
-        const gap = 16.0;
+        const gap = webGridGap;
         final rows = <Widget>[];
         for (var i = 0; i < sellers.length; i += columns) {
           final slice = sellers.skip(i).take(columns).toList();

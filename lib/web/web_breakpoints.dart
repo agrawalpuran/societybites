@@ -33,12 +33,21 @@ bool useWebMarketplaceLayout(BuildContext context) {
 
 bool webIsDesktopWidth(double width) => width >= webDesktopMinWidth;
 
+/// Column counts use the marketplace content width (≤ [webFrameMaxWidth]),
+/// not the browser viewport — so thresholds sit below the frame max.
 int webFoodColumnCount(double width) {
-  if (width >= webDesktopMinWidth) return 4;
-  if (width >= 980) return 3;
+  if (width >= 1040) return 4;
+  if (width >= 760) return 3;
   return 2;
 }
 
-int webSellerColumnCount(double width) => width >= webDesktopMinWidth ? 4 : 2;
+int webSellerColumnCount(double width) {
+  if (width >= 1040) return 4;
+  if (width >= 760) return 3;
+  return 2;
+}
+
+/// Shared grid gap — tight enough for fair density, not cramped.
+const webGridGap = 12.0;
 
 double webPagePadding(double width) => webIsDesktopWidth(width) ? 28 : 20;

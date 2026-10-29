@@ -334,6 +334,71 @@ function notifyOrderMessage(order, senderId) {
   );
 }
 
+const MARKETING_BATCH_SIZE = 80;
+
+/**
+ * Broadcast a non-order marketing push to every active device token.
+ * Does not require orderId (unlike sendToUser).
+ */
+async function broadcastMarketing({ title, body }) {
+  const tokens = await prisma.deviceToken.findMany({
+    where: { active: true },
+    select: { id: true, token: true },
+  });
+
+  if (tokens.length === 0) {
+    logger.info("notify", "No active device tokens (marketing)");
+    return { sent: 0, failed: 0, tokenCount: 0 };
+  }
+
+  const messaging = getMessaging();
+  const data = {
+    type: "marketing",
+    notificationType: "marketing",
+  };
+
+  const staleIds = [];
+  let sent = 0;
+  let failed = 0;
+
+  for (let i = 0; i < tokens.length; i += MARKETING_BATCH_SIZE) {
+    const batch = tokens.slice(i, i + MARKETING_BATCH_SIZE);
+    await Promise.all(
+      batch.map(async ({ id, token }) => {
+        try {
+          await messaging.send(
+            buildFcmMessage(token, { title, body, data, urgent: false })
+          );
+          sent += 1;
+        } catch (err) {
+          const code = err?.code || "";
+          if (INVALID_TOKEN_CODES.has(code)) {
+            staleIds.push(id);
+          } else {
+            failed += 1;
+            logger.warn("notify", `FCM marketing send failed: ${err.message || code}`);
+          }
+        }
+      })
+    );
+  }
+
+  if (staleIds.length > 0) {
+    await prisma.deviceToken.updateMany({
+      where: { id: { in: staleIds } },
+      data: { active: false },
+    });
+    logger.info("notify", `Deactivated ${staleIds.length} stale device token(s)`);
+  }
+
+  logger.info(
+    "notify",
+    `FCM marketing sent ${sent}/${tokens.length} (failed ${failed})`
+  );
+
+  return { sent, failed, tokenCount: tokens.length };
+}
+
 module.exports = {
   ANDROID_CHANNEL_ID,
   ANDROID_NEW_ORDER_CHANNEL_ID,
@@ -341,6 +406,7 @@ module.exports = {
   notifyAsync,
   flushNotification,
   sendToUser,
+  broadcastMarketing,
   buildFcmMessage,
   notifyOrderCreated,
   notifyStatusChange,

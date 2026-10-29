@@ -2363,6 +2363,32 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> getAdminMarketingPushStatus() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/marketing-push'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> sendAdminMarketingPush({
+    required String title,
+    required String body,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/marketing-push'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'title': title, 'body': body}),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<double> updateAdminPlatformFee(double platformFee) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/admin/settings'),

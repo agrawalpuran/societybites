@@ -4,9 +4,14 @@ on:
   pull_request:
   push:
     branches: [main, master]
+  schedule:
+    # Nightly ~11:30 PM IST (18:00 UTC)
+    - cron: "0 18 * * *"
+  workflow_dispatch:
 
 jobs:
   flutter:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,6 +23,7 @@ jobs:
       - run: flutter test
 
   backend-unit:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -33,12 +39,18 @@ jobs:
       - run: npm run test:unit
 
   backend-regression:
+    # Full API journeys: nightly, manual, or push to main/master (not every PR).
+    if: >
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'))
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: societybites-backend
     env:
       DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.CI_DIRECT_URL }}
       JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +60,7 @@ jobs:
           cache: npm
           cache-dependency-path: societybites-backend/package-lock.json
       - run: npm ci
-      - name: Order journeys (needs CI_DATABASE_URL)
+      - name: API regression (needs CI_DATABASE_URL)
         if: ${{ env.DATABASE_URL != '' }}
         run: npm run test:regression
       - name: Skip journeys when CI database is not configured

@@ -6,6 +6,7 @@ import '../../widgets/admin_loading_panel.dart';
 import 'admin_city_reach_screen.dart';
 import 'admin_fssai_screen.dart';
 import 'admin_festival_banners_screen.dart';
+import 'admin_marketing_push_screen.dart';
 
 String _formatTotalSales(Object? raw) {
   final amount = raw is num ? raw.toDouble() : double.tryParse('$raw') ?? 0;
@@ -627,6 +628,68 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             SizedBox(height: 2),
                             Text(
                               'Manage the Home announcement banner',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6A7774),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: Color(0xFF8A9491),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            _SectionTitle(title: 'ENGAGEMENT'),
+            const SizedBox(height: 10),
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AdminMarketingPushScreen(),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFEAEFED)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.campaign_outlined,
+                        size: 22,
+                        color: Color(0xFF0E5A47),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Marketing push',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: Color(0xFF101617),
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'One broadcast notification per week',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Color(0xFF6A7774),

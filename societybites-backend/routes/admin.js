@@ -68,6 +68,10 @@ const {
   getPerformanceExportCsv,
 } = require("../lib/adminSellerPerformance");
 const { getAdminOrderDetail } = require("../lib/adminOrderDetail");
+const {
+  getMarketingPushStatus,
+  sendMarketingPush,
+} = require("../lib/marketingPush");
 
 const router = express.Router();
 
@@ -1276,6 +1280,37 @@ router.put(
   asyncHandler(async (req, res) => {
     const coupon = await assignEligibleUsers(req.params.id, req.body && req.body.userIds);
     res.json(coupon);
+  })
+);
+
+// GET /admin/marketing-push — weekly broadcast status
+router.get(
+  "/marketing-push",
+  asyncHandler(async (_req, res) => {
+    const status = await getMarketingPushStatus();
+    res.json(status);
+  })
+);
+
+// POST /admin/marketing-push — send once-per-week broadcast (super admin)
+router.post(
+  "/marketing-push",
+  asyncHandler(async (req, res) => {
+    try {
+      const result = await sendMarketingPush({
+        title: req.body?.title,
+        body: req.body?.body,
+        adminId: req.user.id,
+      });
+      res.json(result);
+    } catch (err) {
+      const status = err.status || 500;
+      if (status >= 500) throw err;
+      return res.status(status).json({
+        error: err.message || "Failed to send marketing push",
+        ...(err.nextAllowedAt ? { nextAllowedAt: err.nextAllowedAt } : {}),
+      });
+    }
   })
 );
 

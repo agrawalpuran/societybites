@@ -22,11 +22,14 @@ void main() {
     expect(webMarketplaceLayoutEnabled(isWeb: false, width: 1440), isFalse);
     expect(webMarketplaceLayoutEnabled(isWeb: true, width: 767), isFalse);
     expect(webMarketplaceLayoutEnabled(isWeb: true, width: 768), isTrue);
-    expect(webFoodColumnCount(1400), 4);
-    expect(webFoodColumnCount(1000), 3);
-    expect(webFoodColumnCount(800), 2);
-    expect(webSellerColumnCount(1400), 4);
-    expect(webSellerColumnCount(800), 2);
+    // Counts use content width (≤ frame max ~1180), not viewport.
+    expect(webFoodColumnCount(1180), 4);
+    expect(webFoodColumnCount(1040), 4);
+    expect(webFoodColumnCount(900), 3);
+    expect(webFoodColumnCount(700), 2);
+    expect(webSellerColumnCount(1180), 4);
+    expect(webSellerColumnCount(900), 3);
+    expect(webSellerColumnCount(700), 2);
   });
 
   testWidgets('startup frame does not show a plain loading line', (

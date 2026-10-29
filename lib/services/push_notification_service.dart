@@ -311,7 +311,14 @@ class PushNotificationService {
     }
   }
 
+  static bool _isMarketingPush(RemoteMessage message) {
+    final type = message.data['notificationType']?.toString() ?? '';
+    final bucket = message.data['type']?.toString() ?? '';
+    return type == 'marketing' || bucket == 'marketing';
+  }
+
   static Future<void> _onOrderPushMessage(RemoteMessage message) async {
+    if (_isMarketingPush(message)) return;
     await OrderPushCoordinator.recordFromMessage(message);
     onForegroundOrderUpdate?.call();
     _maybePresentIncomingOrder(message);
@@ -331,6 +338,10 @@ class PushNotificationService {
   }
 
   static Future<void> _openFromNotification(RemoteMessage message) async {
+    if (_isMarketingPush(message)) {
+      onOpenShellTab?.call(0);
+      return;
+    }
     await OrderPushCoordinator.recordFromMessage(message);
     final type = message.data['notificationType'] ?? '';
     final recipientRole = message.data['recipientRole'] ?? '';
