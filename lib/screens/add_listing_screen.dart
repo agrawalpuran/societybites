@@ -108,7 +108,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
       !_isPreorderCatalog && (_isMadeToOrder || _showStockAndExpiryFields);
 
   bool get _showWeightAndUnitFields =>
-      _isMadeToOrder || _showStockAndExpiryFields;
+      _isPreorderCatalog || _isMadeToOrder || _showStockAndExpiryFields;
 
   bool get _showRecurringSection => !_isMadeToOrder && !_isPreorderCatalog;
   /// Just today already ends today, so an extra stop date is not offered.

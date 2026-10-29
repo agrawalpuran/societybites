@@ -165,6 +165,9 @@ void main() {
     );
     await tester.pump();
     expect(find.text('Pre-order Catalog'), findsOneWidget);
+    expect(find.byKey(const Key('listing-weight-unit-row')), findsOneWidget);
+    expect(find.text('WEIGHT'), findsOneWidget);
+    expect(find.text('UNIT'), findsOneWidget);
   });
 
   testWidgets('Add Listing photo picker offers camera and gallery', (
