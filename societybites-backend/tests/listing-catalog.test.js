@@ -251,6 +251,15 @@ async function main() {
     assert(ownerGetPreorder.status === 200, "owner can load PREORDER listing");
     assert(ownerGetPreorder.json.catalogType === "PREORDER", "owner GET keeps PREORDER");
 
+    await prisma.listing.update({
+      where: { id: preorder.json.id },
+      data: {
+        imageUrl: "/uploads/catalog-ladoo.jpg",
+        weightUnit: "grams",
+        weightValue: "250",
+      },
+    });
+
     const campaign = await jsonRequest(server, {
       method: "POST",
       path: "/preorder-campaigns",
@@ -266,6 +275,7 @@ async function main() {
             price: 95,
             foodType: "VEG",
             inventoryMode: "demand",
+            // image/weight omitted on purpose — server must copy from catalog
           },
         ],
       },
@@ -276,6 +286,12 @@ async function main() {
     assert(campaignProduct, "campaign must include copied product");
     assert(campaignProduct.catalogType === "PREORDER", "campaign copy stays PREORDER");
     assert(campaignProduct.id !== preorder.json.id, "campaign product is a copy");
+    assert(
+      campaignProduct.imageUrl === "/uploads/catalog-ladoo.jpg",
+      "campaign product must copy catalog imageUrl"
+    );
+    assert(campaignProduct.weightUnit === "grams", "campaign product must copy weightUnit");
+    assert(campaignProduct.weightValue === "250", "campaign product must copy weightValue");
     created.listingIds.push(campaignProduct.id);
     const storedCopy = await prisma.listing.findUnique({
       where: { id: campaignProduct.id },
@@ -296,6 +312,35 @@ async function main() {
       (campaignGet.json.products || []).some((item) => item.id === campaignProduct.id),
       "PREORDER listing remains available through pre-order APIs"
     );
+
+    await prisma.listing.update({
+      where: { id: campaignProduct.id },
+      data: { imageUrl: null, weightUnit: null, weightValue: null },
+    });
+    await prisma.listing.update({
+      where: { id: preorder.json.id },
+      data: {
+        imageUrl: "/uploads/catalog-ladoo-v2.jpg",
+        weightUnit: "portions",
+        weightValue: "2",
+      },
+    });
+    const repairedGet = await jsonRequest(server, {
+      method: "GET",
+      path: `/preorder-campaigns/${campaign.json.id}`,
+      token: buyerToken,
+    });
+    assert(repairedGet.status === 200, "campaign get after repair failed");
+    const repairedProduct = (repairedGet.json.products || []).find(
+      (item) => item.id === campaignProduct.id
+    );
+    assert(repairedProduct, "repaired campaign product missing");
+    assert(
+      repairedProduct.imageUrl === "/uploads/catalog-ladoo-v2.jpg",
+      "GET must backfill imageUrl from catalog source"
+    );
+    assert(repairedProduct.weightUnit === "portions", "GET must backfill weightUnit");
+    assert(repairedProduct.weightValue === "2", "GET must backfill weightValue");
 
     const regularSourceCampaign = await jsonRequest(server, {
       method: "POST",

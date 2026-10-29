@@ -43,17 +43,95 @@ const campaignInclude = {
   },
 };
 
-function serializeCampaignWithProducts(campaign, viewerUserId) {
+function pickText(...values) {
+  for (const value of values) {
+    if (value == null) continue;
+    const text = String(value).trim();
+    if (text && text !== "null") return text;
+  }
+  return null;
+}
+
+function mergeCampaignProductFromSource(product, source) {
+  if (!product) return product;
+  if (!source) return product;
+  return {
+    ...product,
+    imageUrl: pickText(product.imageUrl, source.imageUrl),
+    weightUnit: pickText(product.weightUnit, source.weightUnit),
+    weightValue: pickText(product.weightValue, source.weightValue),
+    description: pickText(product.description, source.description),
+  };
+}
+
+async function loadSourceListingsById(ids) {
+  const unique = [...new Set((ids || []).filter(Boolean).map(String))];
+  if (!unique.length) return new Map();
+  const rows = await prisma.listing.findMany({
+    where: { id: { in: unique } },
+    select: {
+      id: true,
+      imageUrl: true,
+      weightUnit: true,
+      weightValue: true,
+      description: true,
+    },
+  });
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
+async function serializeCampaignWithProducts(campaign, viewerUserId) {
   const base = serializeCampaign(campaign);
-  base.products = (campaign.products || []).map((product) =>
-    serializeListing(product, { viewerUserId })
+  const products = campaign.products || [];
+  const sources = await loadSourceListingsById(
+    products.map((product) => product.sourceListingId)
   );
+
+  // Repair older campaign copies that were saved without image/portion.
+  const repairs = [];
+  for (const product of products) {
+    const source = product.sourceListingId
+      ? sources.get(String(product.sourceListingId))
+      : null;
+    if (!source) continue;
+    const data = {};
+    if (!pickText(product.imageUrl) && pickText(source.imageUrl)) {
+      data.imageUrl = pickText(source.imageUrl);
+    }
+    if (!pickText(product.weightUnit) && pickText(source.weightUnit)) {
+      data.weightUnit = pickText(source.weightUnit);
+    }
+    if (!pickText(product.weightValue) && pickText(source.weightValue)) {
+      data.weightValue = pickText(source.weightValue);
+    }
+    if (!pickText(product.description) && pickText(source.description)) {
+      data.description = pickText(source.description);
+    }
+    if (Object.keys(data).length) {
+      repairs.push(
+        prisma.listing.update({ where: { id: product.id }, data }).catch(() => null)
+      );
+      Object.assign(product, data);
+    }
+  }
+  if (repairs.length) {
+    await Promise.all(repairs);
+  }
+
+  base.products = products.map((product) => {
+    const source = product.sourceListingId
+      ? sources.get(String(product.sourceListingId))
+      : null;
+    return serializeListing(mergeCampaignProductFromSource(product, source), {
+      viewerUserId,
+    });
+  });
   return base;
 }
 
 async function assertPreorderCatalogSource(user, product) {
   const listingId = product && product.listingId;
-  if (!listingId) return;
+  if (!listingId) return null;
   const source = await prisma.listing.findUnique({
     where: { id: String(listingId) },
   });
@@ -69,9 +147,10 @@ async function assertPreorderCatalogSource(user, product) {
     err.statusCode = 400;
     throw err;
   }
+  return source;
 }
 
-function buildProductData(user, campaign, product) {
+function buildProductData(user, campaign, product, sourceListing = null) {
   if (!product || !product.name || product.price === undefined) {
     const err = new Error("Each product needs name and price");
     err.statusCode = 400;
@@ -105,22 +184,26 @@ function buildProductData(user, campaign, product) {
       };
     }
   }
+  const merged = mergeCampaignProductFromSource(product, sourceListing);
   return {
     sellerId: user.id,
     societyId: user.societyId,
     campaignId: campaign.id,
     name: product.name,
-    description: product.description || null,
+    description: merged.description,
     price: parseFloat(product.price),
     quantity,
     inventoryMode,
-    imageUrl: product.imageUrl || null,
-    weightUnit: product.weightUnit || null,
-    weightValue: product.weightValue || null,
+    imageUrl: merged.imageUrl,
+    weightUnit: merged.weightUnit,
+    weightValue: merged.weightValue,
     tags,
     foodType,
     ...categoryFields,
-    pickupLocation: product.pickupLocation || "My Home (Verified)",
+    pickupLocation:
+      product.pickupLocation ||
+      sourceListing?.pickupLocation ||
+      "My Home (Verified)",
     status: "active",
     catalogType: "PREORDER",
     sourceListingId: product.listingId ? String(product.listingId) : null,
@@ -141,7 +224,13 @@ router.get(
       status,
     });
 
-    res.json(campaigns.map((campaign) => serializeCampaignWithProducts(campaign, req.user.id)));
+    res.json(
+      await Promise.all(
+        campaigns.map((campaign) =>
+          serializeCampaignWithProducts(campaign, req.user.id)
+        )
+      )
+    );
   })
 );
 
@@ -180,7 +269,7 @@ router.get(
         return res.status(err.statusCode || 404).json({ error: err.message });
       }
     }
-    res.json(serializeCampaignWithProducts(campaign, req.user.id));
+    res.json(await serializeCampaignWithProducts(campaign, req.user.id));
   })
 );
 
@@ -278,8 +367,12 @@ router.post(
     }
 
     const products = Array.isArray(req.body.products) ? req.body.products : [];
+    const sourcesByListingId = new Map();
     for (const product of products) {
-      await assertPreorderCatalogSource(req.user, product);
+      const source = await assertPreorderCatalogSource(req.user, product);
+      if (product.listingId && source) {
+        sourcesByListingId.set(String(product.listingId), source);
+      }
     }
 
     const campaign = await prisma.$transaction(async (tx) => {
@@ -307,8 +400,11 @@ router.post(
       });
 
       for (const product of products) {
+        const source = product.listingId
+          ? sourcesByListingId.get(String(product.listingId))
+          : null;
         await tx.listing.create({
-          data: buildProductData(req.user, created, product),
+          data: buildProductData(req.user, created, product, source),
         });
       }
 
@@ -318,7 +414,9 @@ router.post(
       });
     });
 
-    res.status(201).json(serializeCampaignWithProducts(campaign, req.user.id));
+    res
+      .status(201)
+      .json(await serializeCampaignWithProducts(campaign, req.user.id));
   })
 );
 
@@ -420,6 +518,7 @@ router.patch(
     if (req.body.orderCutoffAt !== undefined) data.orderCutoffAt = orderCutoffAt;
     if (req.body.fulfilmentAt !== undefined) data.fulfilmentAt = fulfilmentAt;
 
+    const sourcesByListingId = new Map();
     if (Array.isArray(req.body.products)) {
       if (hasOrders) {
         return res.status(400).json({
@@ -427,7 +526,10 @@ router.patch(
         });
       }
       for (const product of req.body.products) {
-        await assertPreorderCatalogSource(req.user, product);
+        const source = await assertPreorderCatalogSource(req.user, product);
+        if (product.listingId && source) {
+          sourcesByListingId.set(String(product.listingId), source);
+        }
       }
     }
 
@@ -440,8 +542,11 @@ router.patch(
       if (Array.isArray(req.body.products) && !hasOrders) {
         await tx.listing.deleteMany({ where: { campaignId: existing.id } });
         for (const product of req.body.products) {
+          const source = product.listingId
+            ? sourcesByListingId.get(String(product.listingId))
+            : null;
           await tx.listing.create({
-            data: buildProductData(req.user, existing, product),
+            data: buildProductData(req.user, existing, product, source),
           });
         }
       }
@@ -452,7 +557,7 @@ router.patch(
       });
     });
 
-    res.json(serializeCampaignWithProducts(campaign, req.user.id));
+    res.json(await serializeCampaignWithProducts(campaign, req.user.id));
   })
 );
 
@@ -474,10 +579,10 @@ router.post(
       return res.status(400).json({ error: "Cannot add products to a cancelled campaign" });
     }
 
-    await assertPreorderCatalogSource(req.user, req.body);
+    const source = await assertPreorderCatalogSource(req.user, req.body);
 
     const listing = await prisma.listing.create({
-      data: buildProductData(req.user, campaign, req.body),
+      data: buildProductData(req.user, campaign, req.body, source),
       include: {
         seller: { include: { flat: true } },
         reviews: { select: { rating: true } },
