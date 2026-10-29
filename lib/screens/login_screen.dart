@@ -412,7 +412,7 @@ class _HeaderSection extends StatelessWidget {
         ),
         SizedBox(height: isIos ? 12 : 28),
         Text(
-          'Welcome back',
+          'Welcome To SocietyEats',
           textAlign: TextAlign.center,
           style: theme.textTheme.headlineMedium?.copyWith(
             fontSize: isIos ? 28 : null,
@@ -423,7 +423,7 @@ class _HeaderSection extends StatelessWidget {
         ),
         SizedBox(height: isIos ? 6 : 10),
         Text(
-          'Safe, secure, and exclusive to your\napartment community.',
+          'HomeChefs • Homemade • Neighbourhood',
           textAlign: TextAlign.center,
           style: theme.textTheme.titleMedium?.copyWith(
             fontSize: isIos ? 15 : null,
