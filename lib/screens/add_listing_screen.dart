@@ -1550,7 +1550,9 @@ class _AddListingScreenState extends State<AddListingScreen> {
           : (justToday ? _endOfToday() : null);
 
       final (weightValue, weightUnit) = _weightFieldsForApi();
-      final variantLabel = _variantLabelController.text.trim();
+      final variantLabel = _isPreorderCatalog
+          ? null
+          : _variantLabelController.text.trim();
 
       if (_isEditing) {
         await ApiService.updateListing(
@@ -1565,7 +1567,9 @@ class _AddListingScreenState extends State<AddListingScreen> {
           imageUrl: imageUrl,
           weightUnit: weightUnit,
           weightValue: weightValue,
-          variantLabel: variantLabel.isEmpty ? '' : variantLabel,
+          variantLabel: variantLabel == null
+              ? null
+              : (variantLabel.isEmpty ? '' : variantLabel),
           tags: _selectedTags,
           categories: [..._selectedCategories, ..._legacyCategories],
           foodType: _foodType!,
@@ -1780,7 +1784,9 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           ),
                         ),
                       ],
-                      if (_isEditing) ...[
+                      // Size label is for regular multi-size variants only.
+                      // Pre-order uses WEIGHT + UNIT instead.
+                      if (_isEditing && !_isPreorderCatalog) ...[
                         const SizedBox(height: 18),
                         _buildField(
                           label: 'SIZE LABEL (OPTIONAL)',
