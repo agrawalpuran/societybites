@@ -522,6 +522,15 @@ class PreOrderEmptyState extends StatelessWidget {
   }
 }
 
+String _homeSellerLine(PreOrderCampaign campaign) {
+  final seller = campaign.sellerName.trim().isEmpty
+      ? 'Neighbor'
+      : campaign.sellerName.trim();
+  final distance = campaign.buyerDistanceLabel;
+  if (distance == null) return seller;
+  return '$seller · $distance';
+}
+
 class HomePreOrderCampaignCard extends StatelessWidget {
   const HomePreOrderCampaignCard({
     super.key,
@@ -626,7 +635,7 @@ class HomePreOrderCampaignCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          campaign.sellerName,
+                          _homeSellerLine(campaign),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(

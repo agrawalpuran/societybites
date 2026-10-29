@@ -157,7 +157,7 @@ router.get(
       include: campaignInclude,
     });
     try {
-      await assertBuyerCanViewCampaign({ buyer: req.user, campaign });
+      campaign = await assertBuyerCanViewCampaign({ buyer: req.user, campaign });
     } catch (err) {
       return res.status(err.statusCode || 404).json({ error: err.message });
     }
@@ -171,6 +171,14 @@ router.get(
         where: { id: req.params.id },
         include: campaignInclude,
       });
+      try {
+        campaign = await assertBuyerCanViewCampaign({
+          buyer: req.user,
+          campaign,
+        });
+      } catch (err) {
+        return res.status(err.statusCode || 404).json({ error: err.message });
+      }
     }
     res.json(serializeCampaignWithProducts(campaign, req.user.id));
   })

@@ -10,6 +10,7 @@ PreOrderCampaign _campaign({
   DateTime? orderOpenAt,
   DateTime? orderCutoffAt,
   DateTime? fulfilmentAt,
+  double? distanceKm,
 }) {
   final now = DateTime.now();
   return PreOrderCampaign(
@@ -21,6 +22,7 @@ PreOrderCampaign _campaign({
     orderOpenAt: orderOpenAt ?? now.subtract(const Duration(hours: 1)),
     orderCutoffAt: orderCutoffAt ?? now.add(const Duration(hours: 5)),
     fulfilmentAt: fulfilmentAt ?? now.add(const Duration(days: 1)),
+    distanceKm: distanceKm,
     products: const [
       PreOrderProduct(
         listingId: 'listing-1',
@@ -115,6 +117,26 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('Samosa'), findsNothing);
+  });
+
+  testWidgets('home compact card shows approx distance with seller', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HomePreOrderCampaignCard(
+            campaign: _campaign(distanceKm: 1.2),
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Sharma Snacks · ~1.2 km'), findsOneWidget);
+    expect(find.byType(HomePreOrderCampaignCard), findsOneWidget);
+    final size = tester.getSize(find.byType(HomePreOrderCampaignCard));
+    expect(size.height, HomePreOrderCampaignCard.cardHeight);
   });
 
   testWidgets('home compact card marks the seller own campaign', (tester) async {

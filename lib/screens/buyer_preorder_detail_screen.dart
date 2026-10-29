@@ -55,7 +55,19 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
     }
     try {
       final raw = await ApiService.getPreOrderCampaign(widget.campaignId);
-      final campaign = PreOrderCampaign.fromJson(raw);
+      var campaign = PreOrderCampaign.fromJson(raw);
+      // Detail responses used to omit distanceKm; keep list/card values if so.
+      final prior = _campaign;
+      if (prior != null &&
+          (campaign.distanceKm == null || campaign.distanceKm! <= 0) &&
+          prior.distanceKm != null &&
+          prior.distanceKm! > 0) {
+        campaign = campaign.copyWith(
+          societyName: campaign.societyName ?? prior.societyName,
+          distanceKm: prior.distanceKm,
+          discoveryReach: campaign.discoveryReach ?? prior.discoveryReach,
+        );
+      }
       if (!mounted) return;
       setState(() {
         _campaign = campaign;
@@ -284,10 +296,10 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        if (campaign.buyerLocationLabel != null) ...[
+                        if (campaign.buyerPlaceWithDistance != null) ...[
                           const SizedBox(height: 2),
                           Text(
-                            campaign.buyerLocationLabel!,
+                            campaign.buyerPlaceWithDistance!,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -398,13 +410,9 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
     final limited = product.inventoryMode == 'limited';
     final soldOut = limited && product.quantity <= 0;
     final campaign = _campaign!;
-    final portion = product.variantLabel?.trim().isNotEmpty == true
-        ? product.variantLabel!.trim()
-        : listingPortionLabel(
-            weightValue: product.weightValue,
-            weightUnit: product.weightUnit,
-          );
-    final description = product.description?.trim();
+    final display = _productDisplayCopy(product);
+    final portion = display.portion;
+    final description = display.description;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -442,19 +450,6 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    if (portion != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        portion,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: preorderMuted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 2),
                     Text(
                       formatMoney(product.price),
@@ -476,6 +471,19 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
                           fontSize: 12,
                           height: 1.35,
                           fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    if (portion != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        portion,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: preorderMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -519,6 +527,43 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Prefer structured weight/variant; otherwise peel a trailing
+  /// "portion size …" off the description onto its own line.
+  static ({String? portion, String? description}) _productDisplayCopy(
+    PreOrderProduct product,
+  ) {
+    final structured = product.variantLabel?.trim().isNotEmpty == true
+        ? product.variantLabel!.trim()
+        : listingPortionLabel(
+            weightValue: product.weightValue,
+            weightUnit: product.weightUnit,
+          );
+    final rawDescription = product.description?.trim();
+    if (structured != null && structured.isNotEmpty) {
+      return (portion: structured, description: rawDescription);
+    }
+    if (rawDescription == null || rawDescription.isEmpty) {
+      return (portion: null, description: rawDescription);
+    }
+    final match = RegExp(
+      r'^(.*?)(?:\s*[,.\-]?\s*)(portion\s*size\s*[:\-]?\s*.+)$',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(rawDescription);
+    if (match == null) {
+      return (portion: null, description: rawDescription);
+    }
+    final remaining = match.group(1)?.trim();
+    final portion = match.group(2)?.trim();
+    if (portion == null || portion.isEmpty) {
+      return (portion: null, description: rawDescription);
+    }
+    return (
+      portion: portion,
+      description: remaining == null || remaining.isEmpty ? null : remaining,
     );
   }
 

@@ -457,7 +457,15 @@ async function assertBuyerCanViewCampaign({ buyer, campaign }) {
     err.statusCode = 404;
     throw err;
   }
-  if (buyer && String(buyer.id) === String(campaign.sellerId)) return campaign;
+  if (buyer && String(buyer.id) === String(campaign.sellerId)) {
+    campaign.discoveryEligibility = {
+      eligible: true,
+      reason: "OWNER",
+      distanceKm: 0,
+    };
+    campaign.discoveryReach = "inSociety";
+    return campaign;
+  }
 
   const buyerSociety = await loadBuyerSociety(buyer);
   if (!buyerSociety) {
@@ -487,6 +495,10 @@ async function assertBuyerCanViewCampaign({ buyer, campaign }) {
     err.statusCode = 404;
     throw err;
   }
+  // Detail GET must keep distance/reach, same as the list serializer.
+  campaign.discoveryEligibility = eligibility;
+  campaign.discoveryReach = discoveryDisplayReach(eligibility);
+  if (seller && !campaign.seller) campaign.seller = seller;
   return campaign;
 }
 

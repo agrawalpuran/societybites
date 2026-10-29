@@ -145,10 +145,12 @@ function serializeCampaign(campaign) {
       null,
     sellingReachLevel:
       (campaign.seller && campaign.seller.sellingReachLevel) || undefined,
-    distanceKm:
-      eligibility && eligibility.distanceKm != null
-        ? eligibility.distanceKm
-        : undefined,
+    distanceKm: (() => {
+      if (!eligibility || eligibility.distanceKm == null) return undefined;
+      const n = Number(eligibility.distanceKm);
+      if (!Number.isFinite(n)) return undefined;
+      return Math.round(n * 10) / 10;
+    })(),
     discoveryReach: campaign.discoveryReach || undefined,
     title: campaign.title,
     description: campaign.description || null,

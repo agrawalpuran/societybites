@@ -1817,6 +1817,61 @@ class PreOrderCampaign {
     return null;
   }
 
+  /// Approx distance from the buyer, e.g. "~1.2 km". Null when unknown / same spot.
+  String? get buyerDistanceLabel {
+    final km = distanceKm;
+    if (km == null || km <= 0) return null;
+    final text = km == km.roundToDouble()
+        ? km.toInt().toString()
+        : km.toStringAsFixed(1);
+    return '~$text km';
+  }
+
+  /// Society with optional distance for campaign detail / storefront.
+  String? get buyerPlaceWithDistance {
+    final place = buyerLocationLabel;
+    final distance = buyerDistanceLabel;
+    if (place == null || place.isEmpty) return distance;
+    if (distance == null) return place;
+    return '$place · $distance';
+  }
+
+  PreOrderCampaign copyWith({
+    String? societyName,
+    double? distanceKm,
+    String? discoveryReach,
+    List<PreOrderProduct>? products,
+    String? status,
+  }) {
+    return PreOrderCampaign(
+      id: id,
+      sellerId: sellerId,
+      title: title,
+      description: description,
+      coverImageUrl: coverImageUrl,
+      fulfilmentNotes: fulfilmentNotes,
+      status: status ?? this.status,
+      orderOpenAt: orderOpenAt,
+      orderCutoffAt: orderCutoffAt,
+      fulfilmentAt: fulfilmentAt,
+      offeredFulfilmentMethods: offeredFulfilmentMethods,
+      defaultDeliveryCharge: defaultDeliveryCharge,
+      products: products ?? this.products,
+      totalOrders: totalOrders,
+      totalItems: totalItems,
+      foodSubtotal: foodSubtotal,
+      sellerPaymentPreference: sellerPaymentPreference,
+      societyId: societyId,
+      societyName: societyName ?? this.societyName,
+      sellingReachLevel: sellingReachLevel,
+      distanceKm: distanceKm ?? this.distanceKm,
+      discoveryReach: discoveryReach ?? this.discoveryReach,
+      sellerProfilePhotoUrl: sellerProfilePhotoUrl,
+      kitchenOpensAt: kitchenOpensAt,
+      kitchenClosesAt: kitchenClosesAt,
+    );
+  }
+
   double get startingPrice => products.isEmpty
       ? 0
       : products

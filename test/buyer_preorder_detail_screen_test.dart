@@ -11,6 +11,7 @@ PreOrderCampaign _campaign() {
     sellerId: 'seller-1',
     title: 'Friday Evening Specials',
     societyName: 'Springville',
+    distanceKm: 1.2,
     status: 'open',
     orderOpenAt: now.subtract(const Duration(hours: 1)),
     orderCutoffAt: now.add(const Duration(hours: 5)),
@@ -49,7 +50,7 @@ void main() {
 
     expect(find.widgetWithText(AppBar, 'Pre-order'), findsOneWidget);
     expect(find.text('Friday Evening Specials'), findsOneWidget);
-    expect(find.text('Springville'), findsOneWidget);
+    expect(find.text('Springville · ~1.2 km'), findsOneWidget);
     expect(find.text('CHOOSE PRODUCTS'), findsOneWidget);
     expect(find.text('Samosa'), findsOneWidget);
     expect(find.text('2 portions'), findsOneWidget);
@@ -67,6 +68,50 @@ void main() {
     expect(title.top, greaterThan(40));
     expect(title.bottom, lessThan(footer.top));
     expect(footer.bottom, lessThanOrEqualTo(screenHeight));
+  });
+
+  testWidgets('portion size in description moves to its own line', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final campaign = PreOrderCampaign(
+      id: 'campaign-1',
+      sellerId: 'seller-1',
+      title: 'Diwali Special',
+      status: 'open',
+      orderOpenAt: now.subtract(const Duration(hours: 1)),
+      orderCutoffAt: now.add(const Duration(hours: 5)),
+      fulfilmentAt: now.add(const Duration(days: 1)),
+      products: const [
+        PreOrderProduct(
+          listingId: 'listing-2',
+          name: 'Dry fruits Dates Ladoo',
+          sellerId: 'seller-1',
+          sellerName: 'Ankita',
+          price: 500,
+          inventoryMode: 'demand',
+          quantity: 0,
+          description:
+              'Wholesome, sweet made with dates portion size 250gm',
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BuyerPreOrderDetailScreen(
+          campaignId: 'campaign-1',
+          initialCampaign: campaign,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Wholesome, sweet made with dates'), findsOneWidget);
+    expect(find.text('portion size 250gm'), findsOneWidget);
+    expect(
+      find.text('Wholesome, sweet made with dates portion size 250gm'),
+      findsNothing,
+    );
   });
 
   testWidgets('closed campaign stays viewable without add actions', (
