@@ -1072,6 +1072,19 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> getListing(String listingId) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/listings/$listingId'),
+          headers: await _authHeaders(),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<List<Map<String, dynamic>>> getListingVariants(
     String listingId,
   ) async {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'firebase_options.dart';
 import 'screens/main_shell_screen.dart';
 import 'screens/guest_landing_screen.dart';
@@ -15,14 +16,19 @@ import 'widgets/app_header.dart' show kAppDisplayName;
 import 'widgets/mobile_startup_frame.dart';
 import 'services/api_service.dart';
 import 'services/auth_config.dart';
+import 'services/deep_link_service.dart';
 import 'services/force_update_service.dart';
 import 'services/session_service.dart';
 import 'services/push_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    usePathUrlStrategy();
+  }
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await DeepLinkService.captureBrowserUrlIfWeb();
 
   ApiService.onSessionInvalidated = () {
     WidgetsBinding.instance.addPostFrameCallback((_) {

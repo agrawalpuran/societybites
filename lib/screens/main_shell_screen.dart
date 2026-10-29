@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../services/cart_controller.dart';
+import '../services/deep_link_navigation.dart';
 import '../services/listing_publish_navigation.dart';
 import '../services/order_push_coordinator.dart';
 import '../services/push_notification_service.dart';
@@ -76,6 +77,7 @@ class _MainShellScreenState extends State<MainShellScreen>
     CartController.instance.onSelectShellTab = _selectTab;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.registerIfPossible();
+      unawaited(DeepLinkNavigation.tryOpenPending(context));
     });
     unawaited(SessionService.warmAuthCache());
     ListingPublishNavigation.onPublished = _onListingPublishedToHome;

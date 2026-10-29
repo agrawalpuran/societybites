@@ -13,6 +13,8 @@ import '../models/kitchen_order_category.dart';
 import '../models/order_lifecycle.dart';
 import '../models/seller_order_history.dart';
 import '../services/api_service.dart';
+import '../services/deep_link_navigation.dart';
+import '../services/deep_link_service.dart';
 import '../services/order_push_coordinator.dart';
 import '../services/push_notification_service.dart';
 import '../widgets/order_lifecycle_dialogs.dart';
@@ -1414,6 +1416,34 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                           color: webMuted,
                         ),
                       ),
+                      if (!_isOversight) ...[
+                        const SizedBox(height: 6),
+                        TextButton.icon(
+                          onPressed: () async {
+                            final sellerId = await SessionService.getUserId();
+                            if (!mounted || sellerId == null || sellerId.isEmpty) {
+                              return;
+                            }
+                            await DeepLinkNavigation.copyLink(
+                              context,
+                              url: DeepLinkService.sellerShareUrl(sellerId),
+                              successMessage:
+                                  'Kitchen link copied. Share it with buyers.',
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            foregroundColor: const Color(0xFF0E5A47),
+                          ),
+                          icon: const Icon(Icons.link_rounded, size: 18),
+                          label: const Text(
+                            'Copy kitchen link',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

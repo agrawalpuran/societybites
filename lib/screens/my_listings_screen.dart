@@ -6,6 +6,8 @@ import '../web/web_page_frame.dart';
 import '../models/data.dart';
 import '../models/listing_availability.dart';
 import '../services/api_service.dart';
+import '../services/deep_link_navigation.dart';
+import '../services/deep_link_service.dart';
 import '../services/my_listings_cache.dart';
 import '../services/my_listings_prefetch.dart';
 import '../services/seller_onboarding.dart';
@@ -961,6 +963,14 @@ class MyListingsScreenState extends State<MyListingsScreen>
                   onResume: () => _resumeListing(listing),
                   onRenew: () => _renewListing(listing),
                   onMove: () => _moveListing(listing),
+                  onCopyLink: listing.isPreOrderCatalog
+                      ? null
+                      : () => DeepLinkNavigation.copyLink(
+                            context,
+                            url: DeepLinkService.listingShareUrl(listing.id),
+                            successMessage:
+                                'Dish link copied. Share it with buyers.',
+                          ),
                 );
               },
             ),
@@ -981,6 +991,7 @@ class _SellerListingCard extends StatelessWidget {
     required this.onResume,
     required this.onRenew,
     required this.onMove,
+    this.onCopyLink,
   });
 
   final FoodItem listing;
@@ -991,6 +1002,7 @@ class _SellerListingCard extends StatelessWidget {
   final VoidCallback onResume;
   final VoidCallback onRenew;
   final VoidCallback onMove;
+  final VoidCallback? onCopyLink;
 
   @override
   Widget build(BuildContext context) {
@@ -1115,6 +1127,7 @@ class _SellerListingCard extends StatelessWidget {
             onMove: onMove,
             onEdit: onEdit,
             onDelete: onDelete,
+            onCopyLink: onCopyLink,
           ),
         ],
       ),
@@ -1136,6 +1149,7 @@ class _ListingCardActions extends StatelessWidget {
     required this.onMove,
     required this.onEdit,
     required this.onDelete,
+    this.onCopyLink,
   });
 
   final FoodItem listing;
@@ -1150,6 +1164,7 @@ class _ListingCardActions extends StatelessWidget {
   final VoidCallback onMove;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback? onCopyLink;
 
   @override
   Widget build(BuildContext context) {
@@ -1206,12 +1221,26 @@ class _ListingCardActions extends StatelessWidget {
           color: const Color(0xFF0E5A47),
           onTap: onEdit,
         );
+        final copyAction = onCopyLink == null
+            ? null
+            : _ListingIconAction(
+                icon: Icons.link_rounded,
+                label: 'Copy link',
+                color: const Color(0xFF0E5A47),
+                onTap: onCopyLink!,
+              );
         final deleteAction = _ListingIconAction(
           icon: Icons.delete_outline_rounded,
           label: 'Delete',
           color: const Color(0xFFD94F4F),
           onTap: onDelete,
         );
+
+        Widget divider() => Container(
+              width: 1,
+              height: 28,
+              color: const Color(0xFFEAEFED),
+            );
 
         if (stackEditDelete) {
           return Column(
@@ -1236,11 +1265,11 @@ class _ListingCardActions extends StatelessWidget {
               Row(
                 children: [
                   Expanded(child: editAction),
-                  Container(
-                    width: 1,
-                    height: 28,
-                    color: const Color(0xFFEAEFED),
-                  ),
+                  if (copyAction != null) ...[
+                    divider(),
+                    Expanded(child: copyAction),
+                  ],
+                  divider(),
                   Expanded(child: deleteAction),
                 ],
               ),
@@ -1265,6 +1294,7 @@ class _ListingCardActions extends StatelessWidget {
               ),
             ),
             editAction,
+            if (copyAction != null) copyAction,
             deleteAction,
           ],
         );

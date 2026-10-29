@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../services/api_service.dart';
+import '../services/deep_link_navigation.dart';
+import '../services/deep_link_service.dart';
 import '../widgets/content_skeleton.dart';
 import '../widgets/order_items_list.dart';
 import '../widgets/preorder_widgets.dart';
@@ -392,13 +394,36 @@ class PreOrderDetailScreenState extends State<PreOrderDetailScreen> {
                 ),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: _editCampaign,
-                    icon: const Icon(Icons.edit_outlined, size: 18),
-                    label: const Text(
-                      'Edit Campaign',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
+                  child: Wrap(
+                    spacing: 4,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () {
+                          final id = campaign.id;
+                          unawaited(
+                            DeepLinkNavigation.copyLink(
+                              context,
+                              url: DeepLinkService.campaignShareUrl(id),
+                              successMessage:
+                                  'Campaign link copied. Share it with buyers.',
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.link_rounded, size: 18),
+                        label: const Text(
+                          'Copy link',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _editCampaign,
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text(
+                          'Edit Campaign',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 if (_orders.isNotEmpty)
