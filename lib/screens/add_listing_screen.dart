@@ -1790,8 +1790,6 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 18),
-                      _buildDiscountSection(),
                       if (_showRecurringSection) ...[
                         const SizedBox(height: 18),
                         _buildRecurringSection(),
@@ -1849,6 +1847,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         const SizedBox(height: 18),
                         _buildWeightAndUnitRow(),
                       ],
+                      const SizedBox(height: 18),
+                      _buildDiscountSection(),
                       if (_showStockAndExpiryFields) ...[
                       if (_showUntilField) ...[
                         const SizedBox(height: 18),
