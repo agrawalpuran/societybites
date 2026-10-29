@@ -36,8 +36,9 @@ bool webIsDesktopWidth(double width) => width >= webDesktopMinWidth;
 /// Column counts use the marketplace content width (≤ [webFrameMaxWidth]),
 /// not the browser viewport — so thresholds sit below the frame max.
 int webFoodColumnCount(double width) {
-  if (width >= 1040) return 4;
-  if (width >= 760) return 3;
+  if (width >= 1040) return 5;
+  if (width >= 860) return 4;
+  if (width >= 700) return 3;
   return 2;
 }
 

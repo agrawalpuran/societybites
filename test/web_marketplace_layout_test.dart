@@ -23,10 +23,11 @@ void main() {
     expect(webMarketplaceLayoutEnabled(isWeb: true, width: 767), isFalse);
     expect(webMarketplaceLayoutEnabled(isWeb: true, width: 768), isTrue);
     // Counts use content width (≤ frame max ~1180), not viewport.
-    expect(webFoodColumnCount(1180), 4);
-    expect(webFoodColumnCount(1040), 4);
-    expect(webFoodColumnCount(900), 3);
-    expect(webFoodColumnCount(700), 2);
+    expect(webFoodColumnCount(1180), 5);
+    expect(webFoodColumnCount(1040), 5);
+    expect(webFoodColumnCount(900), 4);
+    expect(webFoodColumnCount(750), 3);
+    expect(webFoodColumnCount(680), 2);
     expect(webSellerColumnCount(1180), 4);
     expect(webSellerColumnCount(900), 3);
     expect(webSellerColumnCount(700), 2);
