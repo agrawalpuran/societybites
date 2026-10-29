@@ -1,7 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/services/deep_link_service.dart';
+import 'package:societybites/services/session_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUp(DeepLinkService.resetForTest);
 
   test('parses /s/:sellerId paths', () {
@@ -82,5 +86,25 @@ void main() {
       DeepLinkService.listingShareUrl('dish-1'),
       endsWith('/l/dish-1'),
     );
+  });
+
+  test('session clear preserves pending deep link for post-login resume', () async {
+    SharedPreferences.setMockInitialValues({
+      DeepLinkService.prefsKey: 'campaign:camp-77',
+      'user_id': 'u-1',
+      'auth_provider': 'firebase',
+    });
+
+    await SessionService.clear();
+
+    DeepLinkService.resetForTest();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('user_id'), isNull);
+    expect(prefs.getString(DeepLinkService.prefsKey), 'campaign:camp-77');
+
+    final pending = await DeepLinkService.peekPending();
+    expect(pending?.kind, DeepLinkKind.campaign);
+    expect(pending?.id, 'camp-77');
   });
 }

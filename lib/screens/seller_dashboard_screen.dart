@@ -1418,31 +1418,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                       ),
                       if (!_isOversight) ...[
                         const SizedBox(height: 6),
-                        TextButton.icon(
-                          onPressed: () async {
-                            final sellerId = await SessionService.getUserId();
-                            if (!mounted || sellerId == null || sellerId.isEmpty) {
-                              return;
-                            }
-                            await DeepLinkNavigation.copyLink(
-                              context,
-                              url: DeepLinkService.sellerShareUrl(sellerId),
-                              successMessage:
-                                  'Kitchen link copied. Share it with buyers.',
-                            );
-                          },
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            foregroundColor: const Color(0xFF0E5A47),
-                          ),
-                          icon: const Icon(Icons.link_rounded, size: 18),
-                          label: const Text(
-                            'Copy kitchen link',
-                            style: TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                        ),
+                        _copyKitchenLinkButton(),
                       ],
                     ],
                   ),
@@ -1698,7 +1674,37 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     );
   }
 
+  Future<void> _copyKitchenLink() async {
+    final sellerId = await SessionService.getUserId();
+    if (!mounted || sellerId == null || sellerId.isEmpty) return;
+    await DeepLinkNavigation.copyLink(
+      context,
+      url: DeepLinkService.sellerShareUrl(sellerId),
+      successMessage: 'Kitchen link copied. Share it with buyers.',
+    );
+  }
+
+  Widget _copyKitchenLinkButton({Key? key}) {
+    return TextButton.icon(
+      key: key,
+      onPressed: _copyKitchenLink,
+      style: TextButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        foregroundColor: const Color(0xFF0E5A47),
+      ),
+      icon: const Icon(Icons.link_rounded, size: 18),
+      label: const Text(
+        'Copy kitchen link',
+        style: TextStyle(fontWeight: FontWeight.w800),
+      ),
+    );
+  }
+
   Widget _buildOrdersHeader() {
+    final showMobileKitchenLink =
+        !_isOversight && !useWebMarketplaceLayout(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
       child: Row(
@@ -1727,6 +1733,12 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
+                if (showMobileKitchenLink) ...[
+                  const SizedBox(height: 6),
+                  _copyKitchenLinkButton(
+                    key: const Key('my-kitchen-copy-link'),
+                  ),
+                ],
               ],
             ),
           ),

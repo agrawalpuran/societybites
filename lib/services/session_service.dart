@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'deep_link_service.dart';
 import 'home_feed_cache.dart';
 import 'my_listings_cache.dart';
 import 'order_message_cache.dart';
@@ -284,7 +285,12 @@ class SessionService {
     _memoryRefresh = null;
     _clearedThisProcess = true;
     final prefs = await SharedPreferences.getInstance();
+    // Keep share-link resume across logout / auth-provider migration clears.
+    final pendingDeepLink = prefs.getString(DeepLinkService.prefsKey);
     await prefs.clear();
+    if (pendingDeepLink != null && pendingDeepLink.isNotEmpty) {
+      await prefs.setString(DeepLinkService.prefsKey, pendingDeepLink);
+    }
     _secureBestEffort(_secureStorage.delete(key: _jwtKey));
     _secureBestEffort(_secureStorage.delete(key: _refreshTokenKey));
   }

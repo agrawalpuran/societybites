@@ -25,15 +25,18 @@ class DeepLinkNavigation {
     final pending = await DeepLinkService.peekPending();
     if (pending == null || !context.mounted) return;
 
-    final token = await SessionService.getToken();
-    final refresh = await SessionService.getRefreshToken();
-    final signedIn = (token != null && token.isNotEmpty) ||
-        (refresh != null && refresh.isNotEmpty);
+    final signedIn = await _isSignedIn();
     if (!signedIn) {
       if (!context.mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
+      // OTP often replaces the whole stack (this context is disposed). A fresh
+      // MainShell will call tryOpenPending again. If login only popped, retry.
+      if (!context.mounted) return;
+      if (!await _isSignedIn()) return;
+      if (!await SessionService.isOnboarded()) return;
+      await _consumeAndOpen(context);
       return;
     }
 
@@ -42,6 +45,18 @@ class DeepLinkNavigation {
       return;
     }
 
+    await _consumeAndOpen(context);
+  }
+
+  static Future<bool> _isSignedIn() async {
+    final token = await SessionService.getToken();
+    final refresh = await SessionService.getRefreshToken();
+    return (token != null && token.isNotEmpty) ||
+        (refresh != null && refresh.isNotEmpty);
+  }
+
+  static Future<void> _consumeAndOpen(BuildContext context) async {
+    if (_opening || !context.mounted) return;
     _opening = true;
     try {
       final target = await DeepLinkService.consumePending();
