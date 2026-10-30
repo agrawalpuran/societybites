@@ -122,9 +122,20 @@ function fssaiStatusAllowsEnableSelling(status) {
   return status === "UNDER_REVIEW" || status === "APPROVED";
 }
 
-function canEnableSellingDespiteFssai(status, requirementEnabled) {
-  if (!requirementEnabled) return true;
-  return fssaiStatusAllowsEnableSelling(status || "NOT_SUBMITTED");
+/**
+ * Enable-selling gate: seller must address FSSAI (submit, request help, or
+ * legacy defer). Receiving orders still requires APPROVED when requirement is on.
+ */
+function canEnableSellingDespiteFssai(
+  status,
+  requirementEnabled,
+  { assistanceRequested = false, detailsDeferred = false } = {}
+) {
+  if (fssaiStatusAllowsEnableSelling(status || "NOT_SUBMITTED")) return true;
+  if (assistanceRequested) return true;
+  // Grandfather sellers who already used "no details now" before this change.
+  if (detailsDeferred) return true;
+  return false;
 }
 
 async function sellerCanReceiveOrders(userId) {
@@ -135,14 +146,15 @@ async function sellerCanReceiveOrders(userId) {
 }
 
 async function assertSellerFssaiForEnableSelling(userId) {
-  const requirement = await isFssaiSellingRequirementEnabled();
-  if (!requirement) return;
   const status = await getSellerFssaiStatus(userId);
   if (fssaiStatusAllowsEnableSelling(status)) return;
+  if (await findActiveFssaiAssistance(userId)) return;
+  const row = await prisma.sellerFssai.findUnique({ where: { userId } });
+  if (row && row.detailsDeferred) return;
   throw httpError(
     400,
-    "Submit your FSSAI registration before enabling selling",
-    { code: "FSSAI_SUBMIT_REQUIRED" }
+    "Complete FSSAI — submit your licence or request assistance before enabling selling",
+    { code: "FSSAI_ADDRESS_REQUIRED" }
   );
 }
 
@@ -171,7 +183,11 @@ async function getMyFssai(user) {
     canSellDespiteFssai: !requirementEnabled || row.status === "APPROVED",
     canEnableSellingDespiteFssai: canEnableSellingDespiteFssai(
       row.status,
-      requirementEnabled
+      requirementEnabled,
+      {
+        assistanceRequested: Boolean(assistance),
+        detailsDeferred: Boolean(row.detailsDeferred),
+      }
     ),
   };
 }
@@ -303,14 +319,25 @@ async function findActiveFssaiAssistance(userId) {
   });
 }
 
-async function requestFssaiAssistance(user) {
+function parseAssistanceNotes(raw) {
+  if (raw == null) return null;
+  const text = String(raw).trim();
+  if (!text) return null;
+  if (text.length > 500) {
+    throw httpError(400, "Assistance note must be 500 characters or fewer");
+  }
+  return text;
+}
+
+async function requestFssaiAssistance(user, body = {}) {
   if (!canManageOwnFssai(user)) {
     throw httpError(400, "Join your society before managing FSSAI registration");
   }
+  const notes = parseAssistanceNotes(body && body.notes);
   await ensureSellerFssaiRow(user.id);
   await prisma.sellerFssai.update({
     where: { userId: user.id },
-    data: { needsAssistance: true },
+    data: { needsAssistance: true, detailsDeferred: false },
   });
   const existing = await prisma.fssaiAssistanceRequest.findFirst({
     where: {
@@ -318,13 +345,22 @@ async function requestFssaiAssistance(user) {
       status: { in: ["NEW", "CONTACTED", "IN_PROGRESS"] },
     },
   });
-  if (existing) return existing;
+  if (existing) {
+    if (notes && notes !== existing.notes) {
+      return prisma.fssaiAssistanceRequest.update({
+        where: { id: existing.id },
+        data: { notes },
+      });
+    }
+    return existing;
+  }
   return prisma.fssaiAssistanceRequest.create({
     data: {
       id: crypto.randomUUID(),
       userId: user.id,
       societyId: user.societyId || null,
       status: "NEW",
+      ...(notes ? { notes } : {}),
     },
   });
 }

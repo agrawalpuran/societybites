@@ -77,7 +77,7 @@ class _MainShellScreenState extends State<MainShellScreen>
     CartController.instance.onSelectShellTab = _selectTab;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.registerIfPossible();
-      unawaited(DeepLinkNavigation.tryOpenPending(context));
+      unawaited(_afterFirstFrameNavigation());
     });
     unawaited(SessionService.warmAuthCache());
     ListingPublishNavigation.onPublished = _onListingPublishedToHome;
@@ -92,6 +92,26 @@ class _MainShellScreenState extends State<MainShellScreen>
         _syncOrdersFromPush();
       });
     }
+  }
+
+  /// Deep links first, then optional post-onboarding seller enable (no extra dialog).
+  Future<void> _afterFirstFrameNavigation() async {
+    await DeepLinkNavigation.tryOpenPending(context);
+    if (!mounted) return;
+    await _maybeOpenPendingSellerOnboarding();
+  }
+
+  Future<void> _maybeOpenPendingSellerOnboarding() async {
+    final intent = await SessionService.consumeOnboardingIntent();
+    if (intent != SessionService.onboardingIntentSeller || !mounted) return;
+    _selectTab(3);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _profileKey.currentState?.openSellerSettingsAfterEnable();
+      });
+    });
   }
 
   Future<void> _refreshSignedIn() async {

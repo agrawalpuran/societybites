@@ -48,12 +48,17 @@ Future<void> _pumpProfile(
       saveUpiDetails,
   Future<Map<String, dynamic>> Function({
     String? sellingReachLevel,
+    int? sellingReachRadiusKm,
     String? fulfilmentMode,
     double? deliveryCharge,
     double? deliveryChargeInSociety,
     double? deliveryChargeNearby,
     double? deliveryChargeExtended,
     String? paymentPreference,
+    String? kitchenOpensAt,
+    String? kitchenClosesAt,
+    bool? clearKitchenHours,
+    bool? hideFlatNumber,
   })? updateProfile,
 }) async {
   SharedPreferences.setMockInitialValues({
@@ -86,6 +91,17 @@ Future<void> _openUpiSheet(WidgetTester tester) async {
   await tester.tap(find.text('UPI for Payments'));
   await tester.pumpAndSettle();
   expect(find.text('Save UPI'), findsOneWidget);
+}
+
+Future<void> _fillUpiSheet(
+  WidgetTester tester, {
+  required String upiId,
+  String displayName = 'Test Seller',
+}) async {
+  final fields = find.byType(TextField);
+  await tester.enterText(fields.at(0), upiId);
+  await tester.enterText(fields.at(1), displayName);
+  await tester.pump();
 }
 
 void main() {
@@ -218,7 +234,7 @@ void main() {
     );
 
     await _openUpiSheet(tester);
-    await tester.enterText(find.byType(TextField).first, 'yourname@bank');
+    await _fillUpiSheet(tester, upiId: 'yourname@bank');
     await tester.tap(find.text('Save UPI'));
     await tester.pumpAndSettle();
 
@@ -251,7 +267,7 @@ void main() {
     );
 
     await _openUpiSheet(tester);
-    await tester.enterText(find.byType(TextField).first, 'anita@oksbi');
+    await _fillUpiSheet(tester, upiId: 'anita@oksbi', displayName: 'Anita');
     await tester.tap(find.text('Save UPI'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('confirm-upi-id-checkbox')));
@@ -274,7 +290,7 @@ void main() {
     );
 
     await _openUpiSheet(tester);
-    await tester.enterText(find.byType(TextField).first, 'new@oksbi');
+    await _fillUpiSheet(tester, upiId: 'new@oksbi');
     await tester.tap(find.text('Save UPI'));
     await tester.pumpAndSettle();
     expect(find.text('new@oksbi'), findsWidgets);

@@ -965,9 +965,12 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   List<FoodItem> _webRegularFor(HomeListingReach reach) {
-    return _listingsForReach(
-      reach,
-    ).where((food) => !food.isMadeToOrder).toList();
+    // Cap per reach section (no sparse backfill). Global feed cap alone lets
+    // one seller's deferred dishes refill after in-society filtering.
+    return limitListingsPerSeller(
+      _listingsForReach(reach).where((food) => !food.isMadeToOrder).toList(),
+      fillTarget: 0,
+    );
   }
 
   List<FoodItem> get _webReadyNow {
@@ -1325,11 +1328,14 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   List<FoodItem> _mobileListingsForReach(HomeListingReach reach) {
-    return listingsForHomeReach(
-      _distanceFiltered,
-      reach: reach,
-      buyerSocietyId: _buyerSocietyId,
-      nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+    return limitListingsPerSeller(
+      listingsForHomeReach(
+        _distanceFiltered,
+        reach: reach,
+        buyerSocietyId: _buyerSocietyId,
+        nearbyRadiusKm: _cityReach.nearbyRadiusKm,
+      ),
+      fillTarget: 0,
     );
   }
 

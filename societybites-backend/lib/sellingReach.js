@@ -283,7 +283,11 @@ async function attachSellingReach(user, prismaClient) {
     canSellDespiteFssai: !requirementEnabled || fssaiStatus === "APPROVED",
     canEnableSellingDespiteFssai: canEnableSellingDespiteFssai(
       fssaiStatus,
-      requirementEnabled
+      requirementEnabled,
+      {
+        assistanceRequested: Boolean(assistance),
+        detailsDeferred: Boolean(sellerFssai && sellerFssai.detailsDeferred),
+      }
     ),
   };
   return {

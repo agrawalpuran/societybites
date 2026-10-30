@@ -277,7 +277,7 @@ async function getAdminGrowth(prisma, range, now = new Date()) {
 }
 
 function normalizeGrowthRange(raw) {
-  const value = String(raw || "week").trim().toLowerCase();
+  const value = String(raw || "day").trim().toLowerCase();
   if (!VALID_RANGES.has(value)) return null;
   return value;
 }

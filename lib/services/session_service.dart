@@ -25,6 +25,10 @@ class SessionService {
   static const _jwtKey = 'auth_token';
   static const _refreshTokenKey = 'refresh_token';
   static const _authProviderKey = 'auth_provider';
+  /// New-user path after OTP: [onboardingIntentBuyer] or [onboardingIntentSeller].
+  static const _onboardingIntentKey = 'onboarding_intent';
+  static const onboardingIntentBuyer = 'buyer';
+  static const onboardingIntentSeller = 'seller';
 
   /// In-process cache so clear()/isSignedIn stay responsive if the secure
   /// storage plugin hangs (common in widget tests / some desktop hosts).
@@ -276,6 +280,39 @@ class SessionService {
       _memoryRefresh = null;
       _secureBestEffort(_secureStorage.delete(key: _refreshTokenKey));
     }
+  }
+
+  static Future<void> setOnboardingIntent(String intent) async {
+    final normalized = intent == onboardingIntentSeller
+        ? onboardingIntentSeller
+        : onboardingIntentBuyer;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_onboardingIntentKey, normalized);
+  }
+
+  static Future<String?> getOnboardingIntent() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString(_onboardingIntentKey);
+    if (value == onboardingIntentSeller || value == onboardingIntentBuyer) {
+      return value;
+    }
+    return null;
+  }
+
+  /// Returns and clears the pending onboarding intent, if any.
+  static Future<String?> consumeOnboardingIntent() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString(_onboardingIntentKey);
+    await prefs.remove(_onboardingIntentKey);
+    if (value == onboardingIntentSeller || value == onboardingIntentBuyer) {
+      return value;
+    }
+    return null;
+  }
+
+  static Future<void> clearOnboardingIntent() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_onboardingIntentKey);
   }
 
   static Future<void> clear() async {

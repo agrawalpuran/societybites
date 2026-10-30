@@ -1,12 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
 import '../models/selling_reach.dart';
 import 'selling_reach_radius_slider.dart';
-import 'confirm_upi_id_dialog.dart';
 import 'kitchen_hours_inline_editor.dart';
 import 'kitchen_hours_sheet.dart';
 
@@ -58,9 +55,6 @@ class SellerFirstTimeSetupForm extends StatefulWidget {
 class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
   late final TextEditingController _upiController;
   late final TextEditingController _upiNameController;
-  late final FocusNode _upiFocus;
-  String? _confirmedUpiSnapshot;
-  bool _confirmingUpi = false;
   late FulfilmentMode _fulfilmentMode;
   late final TextEditingController _inSocietyCharge;
   late final TextEditingController _nearbyCharge;
@@ -83,24 +77,6 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
     _extendedCharge = TextEditingController(
       text: _chargeText(widget.fulfilment.extendedCharge),
     );
-    _upiFocus = FocusNode();
-    _upiFocus.addListener(_handleUpiFocusChange);
-    _syncConfirmedUpiFromWidget();
-  }
-
-  void _syncConfirmedUpiFromWidget() {
-    final initialUpi = widget.upiId?.trim() ?? '';
-    if (widget.upiIdConfirmed &&
-        initialUpi.isNotEmpty &&
-        initialUpi.contains('@')) {
-      _confirmedUpiSnapshot = initialUpi;
-    }
-  }
-
-  void _handleUpiFocusChange() {
-    if (!_upiFocus.hasFocus) {
-      unawaited(_confirmUpiOnBlur());
-    }
   }
 
   @override
@@ -122,16 +98,10 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
       _extendedCharge.text =
           _chargeText(widget.fulfilment.extendedCharge);
     }
-    if (oldWidget.upiIdConfirmed != widget.upiIdConfirmed ||
-        oldWidget.upiId != widget.upiId) {
-      _syncConfirmedUpiFromWidget();
-    }
   }
 
   @override
   void dispose() {
-    _upiFocus.removeListener(_handleUpiFocusChange);
-    _upiFocus.dispose();
     _upiController.dispose();
     _upiNameController.dispose();
     _inSocietyCharge.dispose();
@@ -146,56 +116,33 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
         : amount.toString();
   }
 
-  void _handleUpiTextChanged(String _) {
-    final upi = _upiController.text.trim();
-    if (_confirmedUpiSnapshot != null && upi != _confirmedUpiSnapshot) {
-      _confirmedUpiSnapshot = null;
-      widget.onUpiConfirmationInvalidated?.call();
-      setState(() {});
-    }
+  void _syncUpiDraftToParent() {
+    widget.onUpiChanged(
+      _upiController.text.trim(),
+      _upiNameController.text.trim(),
+    );
   }
 
-  Future<void> _confirmUpiOnBlur() async {
-    if (_confirmingUpi) return;
-    final upi = _upiController.text.trim();
-    final displayName = _upiNameController.text.trim();
-    if (upi.isEmpty) {
-      _confirmedUpiSnapshot = null;
-      widget.onUpiChanged('', displayName);
-      return;
-    }
-    if (!upi.contains('@')) return;
-    if (upi == _confirmedUpiSnapshot) {
-      widget.onUpiChanged(upi, displayName);
-      return;
-    }
-    _confirmingUpi = true;
-    final confirmed = await confirmUpiIdBeforeSave(context, upiId: upi);
-    _confirmingUpi = false;
-    if (!mounted) return;
-    if (!confirmed) {
-      _upiController.text = _confirmedUpiSnapshot ?? '';
+  void _handleUpiTextChanged(String _) {
+    // Editing after a prior confirm requires confirming again on Continue.
+    if (widget.upiIdConfirmed) {
       widget.onUpiConfirmationInvalidated?.call();
-      FocusScope.of(context).requestFocus(_upiFocus);
-      setState(() {});
-      return;
     }
-    _confirmedUpiSnapshot = upi;
-    widget.onUpiChanged(upi, displayName);
-    widget.onUpiConfirmed?.call();
+    // Keep parent draft in sync so Continue works even without tab/blur.
+    _syncUpiDraftToParent();
     setState(() {});
   }
 
-  void _commitDisplayNameOnly() {
+  void _handleDisplayNameChanged(String _) {
+    _syncUpiDraftToParent();
+  }
+
+  bool get _showUpiConfirmed {
     final upi = _upiController.text.trim();
-    final displayName = _upiNameController.text.trim();
-    if (upi.isEmpty) {
-      widget.onUpiChanged('', displayName);
-      return;
-    }
-    if (_confirmedUpiSnapshot == upi) {
-      widget.onUpiChanged(upi, displayName);
-    }
+    return widget.upiIdConfirmed &&
+        upi.isNotEmpty &&
+        upi.contains('@') &&
+        upi == (widget.upiId?.trim() ?? '');
   }
 
   void _commitFulfilment() {
@@ -243,18 +190,17 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
         TextField(
           key: const Key('seller-setup-upi-id'),
           controller: _upiController,
-          focusNode: _upiFocus,
           keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
           onChanged: _handleUpiTextChanged,
-          onEditingComplete: () => unawaited(_confirmUpiOnBlur()),
+          onEditingComplete: _syncUpiDraftToParent,
           decoration: _fieldDecoration(
             label: 'UPI ID',
             hint: 'yourname@oksbi',
             required: true,
           ),
         ),
-        if (_confirmedUpiSnapshot != null &&
-            _upiController.text.trim() == _confirmedUpiSnapshot) ...[
+        if (_showUpiConfirmed) ...[
           const SizedBox(height: 6),
           const Row(
             children: [
@@ -273,11 +219,16 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
         ],
         const SizedBox(height: 10),
         TextField(
+          key: const Key('seller-setup-upi-display-name'),
           controller: _upiNameController,
-          onEditingComplete: _commitDisplayNameOnly,
-          onTapOutside: (_) => _commitDisplayNameOnly(),
+          textInputAction: TextInputAction.done,
+          onChanged: _handleDisplayNameChanged,
+          onEditingComplete: _syncUpiDraftToParent,
+          onTapOutside: (_) => _syncUpiDraftToParent(),
           decoration: _fieldDecoration(
-            label: 'Display name on UPI (optional)',
+            label: 'Display name on UPI',
+            hint: 'Name shown to buyers',
+            required: true,
           ),
         ),
         const SizedBox(height: 24),

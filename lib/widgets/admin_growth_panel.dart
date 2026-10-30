@@ -23,7 +23,7 @@ class _AdminGrowthPanelState extends State<AdminGrowthPanel> {
     'year': 'Yearly',
   };
 
-  String _range = 'week';
+  String _range = 'day';
   Map<String, dynamic>? _data;
   bool _loading = true;
   String? _error;

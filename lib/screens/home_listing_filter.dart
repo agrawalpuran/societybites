@@ -94,7 +94,8 @@ List<FoodItem> applyHomeListingFilters(
   });
   results = indexed.map((entry) => entry.value).toList();
   if (!justAdded) {
-    results = _limitNewListingsPerSeller(results, now: clock);
+    // Cap per seller so one kitchen cannot crowd out others on Home.
+    results = limitListingsPerSeller(results);
   }
 
   if (excludeFssaiBlockedFromBuyerFeed) {
@@ -253,8 +254,10 @@ const homeJustAddedFilter = 'Just Added';
 /// one-review 5-star score, and smaller than a full rating from 10+ reviews.
 const homeFreshnessBoost = 2.0;
 
-/// At most this many new listings from one seller in the first Home preview.
-const homeMaxNewListingsPerSeller = 2;
+/// Preferred max dishes from one seller before Home shows another kitchen.
+/// If the fair pass leaves the first screen under [homeAllItemsPreviewCount],
+/// extras are pulled back in so a sparse catalog still looks full.
+const homeMaxListingsPerSeller = 2;
 
 /// Review-confidence score plus a temporary boost for listings under 48 hours.
 double homeDiscoveryScore(FoodItem food, DateTime now) {
@@ -286,47 +289,43 @@ double _homeDistanceRank(FoodItem food, String? buyerSocietyId) {
   return km;
 }
 
-/// Keeps one seller's brand-new dishes from filling the whole preview when
-/// another listing can take that slot. Does nothing when no alternative exists.
-List<FoodItem> _limitNewListingsPerSeller(
+/// Prefers at most [maxPerSeller] dishes per seller so more kitchens appear,
+/// then backfills from deferred dishes until [fillTarget] (Home preview size)
+/// when the catalog is too sparse. Leftovers stay after the fair/filled head
+/// for See all.
+List<FoodItem> limitListingsPerSeller(
   List<FoodItem> ranked, {
-  required DateTime now,
+  int maxPerSeller = homeMaxListingsPerSeller,
+  int fillTarget = homeAllItemsPreviewCount,
 }) {
-  if (ranked.length <= 1) return ranked;
+  if (ranked.length <= 1 || maxPerSeller < 1) return ranked;
   final head = <FoodItem>[];
   final deferred = <FoodItem>[];
-  final newCounts = <String, int>{};
-  for (var i = 0; i < ranked.length; i++) {
-    final food = ranked[i];
-    if (head.length >= homeAllItemsPreviewCount) {
-      deferred.add(food);
-      continue;
-    }
-    final isNew = food.isNewListing(now);
-    final used = newCounts[food.sellerId] ?? 0;
-    if (isNew &&
-        used >= homeMaxNewListingsPerSeller &&
-        _laterListingCanFillPreview(ranked, i, food.sellerId, now)) {
+  final counts = <String, int>{};
+  for (final food in ranked) {
+    final used = counts[food.sellerId] ?? 0;
+    if (used >= maxPerSeller) {
       deferred.add(food);
       continue;
     }
     head.add(food);
-    if (isNew) newCounts[food.sellerId] = used + 1;
+    counts[food.sellerId] = used + 1;
   }
-  return [...head, ...deferred];
-}
 
-bool _laterListingCanFillPreview(
-  List<FoodItem> ranked,
-  int index,
-  String sellerId,
-  DateTime now,
-) {
-  for (var j = index + 1; j < ranked.length; j++) {
-    final other = ranked[j];
-    if (!other.isNewListing(now) || other.sellerId != sellerId) return true;
+  // fillTarget <= 0: hard cap only (used for per-reach Home sections).
+  if (fillTarget <= 0 || head.length >= fillTarget || deferred.isEmpty) {
+    return [...head, ...deferred];
   }
-  return false;
+
+  final stillDeferred = <FoodItem>[];
+  for (final food in deferred) {
+    if (head.length < fillTarget) {
+      head.add(food);
+    } else {
+      stillDeferred.add(food);
+    }
+  }
+  return [...head, ...stillDeferred];
 }
 
 int homeSearchMatchScore(FoodItem food, String searchQuery) {

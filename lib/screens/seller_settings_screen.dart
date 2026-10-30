@@ -136,9 +136,7 @@ class SellerSettingsScreen extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       isFirstTimeSetup
-                          ? (fssaiRequirementEnabled
-                              ? 'Fill in payment methods, UPI, selling reach, fulfilment, and FSSAI so you can start listing.'
-                              : 'Fill in payment methods, UPI, selling reach, and fulfilment. You can add FSSAI details when ready.')
+                          ? 'Fill in payment methods, UPI, selling reach, fulfilment, and FSSAI so you can start listing.'
                           : 'Manage payments, kitchen hours, fulfilment & FSSAI',
                       style: const TextStyle(
                         fontSize: 14,
@@ -150,12 +148,10 @@ class SellerSettingsScreen extends StatelessWidget {
                     if (inlineSetup) ...[
                       const _SectionLabel('FOOD & COMPLIANCE'),
                       const SizedBox(height: 6),
-                      Text(
-                        fssaiRequirementEnabled
-                            ? 'FSSAI is required before you can enable selling.'
-                            : 'Recommended: open FSSAI registration. You can add details now, '
-                                'say you do not have them yet, or request assistance.',
-                        style: const TextStyle(
+                      const Text(
+                        'FSSAI is required before you can continue. Submit your '
+                        'licence, or say you do not have one yet to request assistance.',
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                           color: Color(0xFF6A7774),
@@ -166,26 +162,12 @@ class SellerSettingsScreen extends StatelessWidget {
                       ProfileMenuTile(
                         key: const Key('seller-setup-fssai-entry'),
                         icon: Icons.badge_outlined,
-                        title: 'FSSAI details',
-                        subtitle: fssaiRequirementEnabled
-                            ? 'Required · $fssaiSubtitle'
-                            : fssaiSubtitle,
-                        trailingLabel: fssaiRequirementEnabled ? 'Complete' : 'Open',
+                        title: 'FSSAI details *',
+                        subtitle: 'Required · $fssaiSubtitle',
+                        trailingLabel:
+                            fssaiAllowsEnableSelling ? 'Done' : 'Complete',
                         onTap: onEditFssai,
                       ),
-                      if (fssaiRequirementEnabled && !fssaiAllowsEnableSelling)
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            'Submit your FSSAI registration before you can enable selling.',
-                            style: TextStyle(
-                              color: Color(0xFFC62828),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                              height: 1.35,
-                            ),
-                          ),
-                        ),
                       const SizedBox(height: 20),
                       SellerFirstTimeSetupForm(
                         paymentPreference: paymentPreference!,
@@ -293,12 +275,11 @@ class SellerSettingsScreen extends StatelessWidget {
                       const SizedBox(height: 10),
                       ProfileMenuTile(
                         icon: Icons.badge_outlined,
-                        title: 'FSSAI details',
+                        title: 'FSSAI details *',
                         subtitle: fssaiRequirementEnabled
-                            ? 'Required on platform · $fssaiSubtitle'
-                            : 'Optional on platform · $fssaiSubtitle',
-                        trailingLabel:
-                            fssaiRequirementEnabled ? 'Update' : 'Fill',
+                            ? 'Required to receive orders · $fssaiSubtitle'
+                            : 'Required for seller setup · $fssaiSubtitle',
+                        trailingLabel: 'Update',
                         onTap: onEditFssai,
                       ),
                     ],
@@ -311,87 +292,62 @@ class SellerSettingsScreen extends StatelessWidget {
                   child: AbsorbPointer(
                     absorbing: saveAndEnableInProgress,
                     child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (fssaiRequirementEnabled && !fssaiAllowsEnableSelling)
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 10),
-                          child: Text(
-                            'Submit your FSSAI details before you can enable selling.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13,
-                              height: 1.35,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF6A7774),
-                            ),
-                          ),
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _SetupContinueChecklist(
+                          fssaiDone: fssaiAllowsEnableSelling,
+                          upiDone: upiReadyForEnableSelling,
                         ),
-                      if (!upiReadyForEnableSelling)
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 10),
-                          child: Text(
-                            'Enter your UPI ID and confirm it before you can enable selling.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13,
-                              height: 1.35,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF6A7774),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            key: const Key('seller-settings-enable'),
+                            // Always tappable so we can explain blockers or
+                            // show the UPI confirm popup — never a dead button.
+                            onPressed:
+                                saveAndEnableInProgress ? null : onSaveAndEnable,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0E5A47),
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: const Color(0xFFB8C4C0),
+                              disabledForegroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                          ),
-                        ),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          key: const Key('seller-settings-enable'),
-                          onPressed:
-                              !saveAndEnableInProgress &&
-                                      fssaiAllowsEnableSelling &&
-                                      upiReadyForEnableSelling
-                                  ? onSaveAndEnable
-                                  : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0E5A47),
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: const Color(0xFFB8C4C0),
-                            disabledForegroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (saveAndEnableInProgress) ...[
-                                const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (saveAndEnableInProgress) ...[
+                                  const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                ],
+                                Text(
+                                  saveAndEnableInProgress
+                                      ? 'Opening next step…'
+                                      : (isFirstTimeSetup
+                                          ? 'Continue'
+                                          : 'Save / Enable Selling'),
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                const SizedBox(width: 10),
                               ],
-                              Text(
-                                saveAndEnableInProgress
-                                    ? 'Opening next step…'
-                                    : (isFirstTimeSetup
-                                        ? 'Continue'
-                                        : 'Save / Enable Selling'),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
                     ),
                   ),
                 ),
@@ -400,6 +356,97 @@ class SellerSettingsScreen extends StatelessWidget {
         ),
       ),
       maxWidth: 720,
+    );
+  }
+}
+
+class _SetupContinueChecklist extends StatelessWidget {
+  const _SetupContinueChecklist({
+    required this.fssaiDone,
+    required this.upiDone,
+  });
+
+  final bool fssaiDone;
+  final bool upiDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final allDone = fssaiDone && upiDone;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: allDone ? const Color(0xFFF0F7F4) : const Color(0xFFFFF8F6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: allDone ? const Color(0xFFC8E0D6) : const Color(0xFFF0D4CC),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              allDone
+                  ? 'Ready — Continue will ask you to confirm your UPI ID.'
+                  : 'Still needed before the next step:',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: allDone
+                    ? const Color(0xFF0E5A47)
+                    : const Color(0xFF9A3412),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _ChecklistRow(
+              done: fssaiDone,
+              label: fssaiDone
+                  ? 'FSSAI addressed'
+                  : 'FSSAI — submit licence or request assistance',
+            ),
+            const SizedBox(height: 4),
+            _ChecklistRow(
+              done: upiDone,
+              label: upiDone
+                  ? 'UPI ID and display name'
+                  : 'UPI ID and display name',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChecklistRow extends StatelessWidget {
+  const _ChecklistRow({required this.done, required this.label});
+
+  final bool done;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          done ? Icons.check_circle : Icons.radio_button_unchecked,
+          size: 18,
+          color: done ? const Color(0xFF0E5A47) : const Color(0xFFB45309),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.3,
+              fontWeight: FontWeight.w500,
+              color: done ? const Color(0xFF3D524C) : const Color(0xFF7C2D12),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

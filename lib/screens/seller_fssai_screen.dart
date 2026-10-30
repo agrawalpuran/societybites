@@ -31,9 +31,9 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
 
   bool get _fssaiRequired => _fssai?.requirementEnabled == true;
 
+  /// Sellers can choose "no licence yet", but must request assistance (not skip).
   bool get _showNoDetailsCheckbox =>
-      !_fssaiRequired &&
-      (_fssai?.status == 'NOT_SUBMITTED' || _fssai?.status == null);
+      _fssai?.status == 'NOT_SUBMITTED' || _fssai?.status == null;
 
   @override
   void initState() {
@@ -60,7 +60,8 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
       _numberController.text = fssai.registrationNumber ?? '';
       _nameController.text = fssai.registeredName ?? '';
       _licenceExpiry = fssai.licenceExpiry;
-      _noDetailsNow = fssai.detailsDeferred && fssai.requirementEnabled != true;
+      _noDetailsNow = fssai.assistanceRequested &&
+          (fssai.status == 'NOT_SUBMITTED' || fssai.detailsDeferred);
       setState(() => _loading = false);
     } catch (e) {
       if (!mounted) return;
@@ -145,11 +146,9 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          fieldsRequired
-              ? 'Fields marked with * are required. We will approve your submission before you can receive orders.'
-              : 'Add whatever FSSAI details you have today. You can save partial information or come back later.',
-          style: const TextStyle(color: Color(0xFF6A7774)),
+        const Text(
+          'Required to finish seller setup. Submit your licence, or check that you do not have FSSAI yet.',
+          style: TextStyle(color: Color(0xFF6A7774), height: 1.35),
         ),
         if (_showNoDetailsCheckbox) ...[
           const SizedBox(height: 12),
@@ -164,21 +163,52 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: const EdgeInsets.symmetric(horizontal: 8),
               title: const Text(
-                'I do not have these details now',
+                'I do not have FSSAI yet',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF101617),
                 ),
               ),
               subtitle: const Text(
-                'You can still finish seller setup and add FSSAI later.',
+                'We’ll mark you as needing assistance so our team can help.',
                 style: TextStyle(color: Color(0xFF6A7774), height: 1.35),
               ),
               activeColor: const Color(0xFF0E5A47),
             ),
           ),
         ],
-        if (!_noDetailsNow) ...[
+        if (_noDetailsNow && _showNoDetailsCheckbox) ...[
+          const SizedBox(height: 12),
+          if (_fssai?.assistanceRequested == true)
+            const Text(
+              'Assistance already requested — you can continue seller setup.',
+              style: TextStyle(
+                color: Color(0xFF0E5A47),
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton(
+                key: const Key('fssai-request-assistance-continue'),
+                onPressed: _submitting ? null : _requestAssistanceAndContinue,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0E5A47),
+                ),
+                child: const Text('Continue'),
+              ),
+            ),
+        ] else ...[
+          const SizedBox(height: 12),
+          Text(
+            fieldsRequired
+                ? 'Fields marked with * are required. We approve before you can receive orders.'
+                : 'Add your FSSAI details and submit for review.',
+            style: const TextStyle(color: Color(0xFF6A7774)),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: _numberController,
@@ -187,7 +217,7 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
             decoration: _fieldDecoration(
               label: _fieldLabel(
                 'FSSAI registration / licence number',
-                required: fieldsRequired,
+                required: true,
               ),
             ).copyWith(counterText: ''),
           ),
@@ -198,7 +228,7 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
             decoration: _fieldDecoration(
               label: _fieldLabel(
                 'Registered name (as on licence)',
-                required: fieldsRequired,
+                required: true,
               ),
             ),
           ),
@@ -210,7 +240,7 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
               decoration: _fieldDecoration(
                 label: _fieldLabel(
                   'Licence expiry date',
-                  required: fieldsRequired,
+                  required: true,
                 ),
               ),
               child: Text(
@@ -228,34 +258,14 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
           ),
           const SizedBox(height: 16),
           DocumentImageUploadSection(
-            title: fieldsRequired ? 'Document *' : 'Document',
+            title: 'Document *',
             subtitle: 'Upload a clear photo of your FSSAI licence.',
             bytes: _documentBytes,
             onPickFromSource: _pickFromSource,
             onRemove: _removeDocument,
             sheetTitle: 'FSSAI document',
           ),
-          const SizedBox(height: 20),
-          _buildHelpSection(),
-        ],
-        const SizedBox(height: 16),
-        if (_noDetailsNow && _showNoDetailsCheckbox) ...[
-          const SizedBox(height: 8),
-          _buildHelpSection(),
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: FilledButton(
-              onPressed: _submitting ? null : _continueWithoutDetails,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF0E5A47),
-              ),
-              child: const Text('Continue without details'),
-            ),
-          ),
-        ]
-        else ...[
           if (!fieldsRequired) ...[
             SizedBox(
               width: double.infinity,
@@ -299,12 +309,12 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
     final number = _numberController.text.trim();
     final name = _nameController.text.trim();
     final fssai = _fssai;
-    if (!_fssaiRequired && !_hasAnySubmitInput(fssai)) {
+    if (!_hasAnySubmitInput(fssai)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Enter complete FSSAI details to submit, save partial details, or check '
-            '"I do not have these details now" to continue.',
+            'Enter your FSSAI details to submit, or choose '
+            '"I do not have FSSAI yet" to request assistance.',
           ),
         ),
       );
@@ -417,12 +427,12 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
     }
   }
 
-  Future<void> _continueWithoutDetails() async {
+  Future<void> _requestAssistanceAndContinue() async {
     setState(() => _submitting = true);
     try {
-      await ApiService.deferFssaiDetails();
+      await ApiService.requestFssaiAssistance();
       if (!mounted) return;
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -451,30 +461,12 @@ class _SellerFssaiScreenState extends State<SellerFssaiScreen> {
             ),
           )
         else
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton(
-              key: const Key('fssai-request-assistance'),
-              onPressed: _requestAssistance,
-              child: const Text('Need assistance'),
-            ),
+          const Text(
+            'If you do not have a licence yet, choose “I do not have FSSAI yet” above and continue.',
+            style: TextStyle(color: Color(0xFF6A7774), height: 1.35),
           ),
       ],
     );
-  }
-
-  Future<void> _requestAssistance() async {
-    try {
-      await ApiService.requestFssaiAssistance();
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ApiService.userFacingError(e))),
-      );
-    }
   }
 
   static const _formMaxWidth = 600.0;

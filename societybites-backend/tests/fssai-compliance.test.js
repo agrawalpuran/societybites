@@ -147,8 +147,14 @@ async function main() {
     assert(me0.json.fssai.status === "NOT_SUBMITTED", "initial status");
 
     const docPath = `fssai-private/${seller.id.slice(0, 8)}/test-doc.jpg`;
-    await prisma.sellerFssai.create({
-      data: {
+    await prisma.sellerFssai.upsert({
+      where: { userId: seller.id },
+      update: {
+        documentStorageReference: docPath,
+        documentType: "image/jpeg",
+        status: "NOT_SUBMITTED",
+      },
+      create: {
         id: crypto.randomUUID(),
         userId: seller.id,
         documentStorageReference: docPath,
@@ -256,8 +262,9 @@ async function main() {
       method: "POST",
       path: "/fssai/me/assistance",
       token: sellerToken,
+      body: {},
     });
-    assert(assistance.status === 201, "assistance");
+    assert(assistance.status === 201, `assistance ${JSON.stringify(assistance.json)}`);
     const adminAssist = await jsonRequest(server, {
       method: "GET",
       path: "/admin/fssai/assistance",

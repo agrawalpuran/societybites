@@ -483,7 +483,7 @@ void main() {
     );
   });
 
-  test('one seller cannot fill the preview with only new listings', () {
+  test('one seller cannot fill Home with more than two dishes before others', () {
     final now = DateTime(2026, 10, 5, 12);
     final crowded = List.generate(
       4,
@@ -510,6 +510,148 @@ void main() {
     ).map((item) => item.name).toList();
 
     expect(names.take(3), ['A0', 'A1', 'Other']);
+    expect(names, ['A0', 'A1', 'Other', 'A2', 'A3']);
+    expect(homeMaxListingsPerSeller, 2);
     expect(homeAllItemsPreviewCount, 12);
+  });
+
+  test('per-seller cap also applies to older listings', () {
+    final now = DateTime(2026, 12, 1);
+    final crowded = List.generate(
+      3,
+      (index) => _food(
+        'Old$index',
+        sellerId: 'seller-a',
+        societyId: 'mine',
+        distanceKm: 0,
+        rating: 5,
+        reviewCount: 20 - index,
+        createdAt: now.subtract(Duration(days: 10 + index)),
+      ),
+    );
+    final other = _food(
+      'Peer',
+      sellerId: 'seller-b',
+      societyId: 'mine',
+      distanceKm: 0,
+      rating: 4,
+      reviewCount: 5,
+      createdAt: now.subtract(const Duration(days: 12)),
+    );
+
+    final names = applyHomeListingFilters(
+      [...crowded, other],
+      buyerSocietyId: 'mine',
+      now: now,
+    ).map((item) => item.name).toList();
+
+    expect(names.take(3), ['Old0', 'Old1', 'Peer']);
+    // Sparse catalog (< 12) backfills the third dish after other sellers.
+    expect(names, ['Old0', 'Old1', 'Peer', 'Old2']);
+  });
+
+  test('sparse catalog backfills more than two dishes from one seller', () {
+    final now = DateTime(2026, 12, 1);
+    final onlySeller = List.generate(
+      5,
+      (index) => _food(
+        'Solo$index',
+        sellerId: 'seller-solo',
+        societyId: 'mine',
+        distanceKm: 0,
+        rating: 5,
+        reviewCount: 10,
+        createdAt: now.subtract(Duration(days: index + 1)),
+      ),
+    );
+
+    final names = applyHomeListingFilters(
+      onlySeller,
+      buyerSocietyId: 'mine',
+      now: now,
+    ).map((item) => item.name).toList();
+
+    expect(names.length, 5);
+    expect(names, ['Solo0', 'Solo1', 'Solo2', 'Solo3', 'Solo4']);
+  });
+
+  test('per-seller cap after reach filter does not revive deferred dishes', () {
+    final now = DateTime(2026, 12, 1);
+    final sirisha = List.generate(
+      4,
+      (index) => _food(
+        'S$index',
+        sellerId: 'sirisha',
+        societyId: 'mine',
+        distanceKm: 0,
+        rating: 5,
+        reviewCount: 20,
+        createdAt: now.subtract(Duration(days: index + 1)),
+      ),
+    );
+    final beyond = List.generate(
+      6,
+      (index) => _food(
+        'B$index',
+        sellerId: 'beyond-$index',
+        societyId: 'other',
+        distanceKm: 2,
+        rating: 4,
+        reviewCount: 8,
+        createdAt: now.subtract(Duration(days: index + 1)),
+      ),
+    );
+    final ranked = applyHomeListingFilters(
+      [...sirisha, ...beyond],
+      buyerSocietyId: 'mine',
+      now: now,
+    );
+    final inSociety = limitListingsPerSeller(
+      ranked.where((food) => food.societyId == 'mine').toList(),
+      fillTarget: 0,
+    );
+    expect(
+      inSociety.take(2).where((food) => food.sellerId == 'sirisha').length,
+      2,
+    );
+    expect(
+      inSociety.where((food) => food.sellerId == 'sirisha').length,
+      4,
+    );
+  });
+
+  test('crowded feed keeps two-per-seller in the first preview slots', () {
+    final now = DateTime(2026, 12, 1);
+    final sellers = <FoodItem>[];
+    for (var s = 0; s < 8; s++) {
+      for (var i = 0; i < 3; i++) {
+        sellers.add(
+          _food(
+            'S${s}L$i',
+            sellerId: 'seller-$s',
+            societyId: 'mine',
+            distanceKm: 0,
+            rating: 5,
+            reviewCount: 20 - s,
+            createdAt: now.subtract(Duration(days: s * 3 + i + 1)),
+          ),
+        );
+      }
+    }
+
+    final names = applyHomeListingFilters(
+      sellers,
+      buyerSocietyId: 'mine',
+      now: now,
+    ).map((item) => item.name).toList();
+
+    final preview = names.take(homeAllItemsPreviewCount).toList();
+    final perSeller = <String, int>{};
+    for (final name in preview) {
+      final seller = name.substring(0, name.indexOf('L'));
+      perSeller[seller] = (perSeller[seller] ?? 0) + 1;
+    }
+    expect(perSeller.values.every((count) => count <= 2), isTrue);
+    expect(perSeller.length, greaterThanOrEqualTo(6));
   });
 }

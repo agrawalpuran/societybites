@@ -4,8 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'society_selection_screen.dart';
 import 'main_shell_screen.dart';
+import 'onboarding_intent_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_config.dart';
 import '../services/session_service.dart';
@@ -233,11 +233,17 @@ class _OtpScreenState extends State<OtpScreen> {
 
     if (!mounted) return;
 
+    // Returning users skip the Order/Sell chooser. New users pick intent first.
+    if (!hasFlat) {
+      await SessionService.clearOnboardingIntent();
+    }
+
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            hasFlat ? const MainShellScreen() : const SocietySelectionScreen(),
+        builder: (_) => hasFlat
+            ? const MainShellScreen()
+            : const OnboardingIntentScreen(),
       ),
       (_) => false,
     );

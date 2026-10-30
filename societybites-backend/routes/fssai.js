@@ -71,7 +71,7 @@ router.post(
   "/me/assistance",
   requireUser,
   asyncHandler(async (req, res) => {
-    const request = await requestFssaiAssistance(req.user);
+    const request = await requestFssaiAssistance(req.user, req.body || {});
     res.status(201).json({ request });
   })
 );

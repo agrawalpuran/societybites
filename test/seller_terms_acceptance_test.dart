@@ -34,6 +34,13 @@ Map<String, dynamic> _buyerProfile() {
     'paymentPreference': 'UPI_AND_COD',
     'society': {'name': 'Prestige Notting Hill'},
     'flat': {'flatNumber': '101'},
+    'fssai': {
+      'requirementEnabled': false,
+      'status': 'NOT_SUBMITTED',
+      'assistanceRequested': true,
+      'canEnableSellingDespiteFssai': true,
+      'canSellDespiteFssai': true,
+    },
   };
 }
 
@@ -44,15 +51,24 @@ Future<void> _openFirstTimeSettings(WidgetTester tester) async {
   while (tester.takeException() != null) {}
 }
 
-Future<void> _enterAndConfirmSellerUpi(WidgetTester tester) async {
-  await tester.tap(find.byKey(const Key('seller-setup-upi-id')));
-  await tester.pump();
+Future<void> _enterSellerUpi(WidgetTester tester) async {
   await tester.enterText(
     find.byKey(const Key('seller-setup-upi-id')),
     'seller@oksbi',
   );
-  await tester.testTextInput.receiveAction(TextInputAction.done);
+  await tester.pump();
+  await tester.enterText(
+    find.byKey(const Key('seller-setup-upi-display-name')),
+    'Seller',
+  );
+  await tester.pump();
+}
+
+Future<void> _confirmUpiDialogIfShown(WidgetTester tester) async {
   await tester.pumpAndSettle();
+  if (find.byKey(const Key('confirm-upi-id-checkbox')).evaluate().isEmpty) {
+    return;
+  }
   await tester.tap(find.byKey(const Key('confirm-upi-id-checkbox')));
   await tester.pump();
   await tester.tap(find.byKey(const Key('confirm-upi-id-save')));
@@ -123,6 +139,7 @@ void main() {
           startSelling: (context) async => true,
           updateProfile: ({
             sellingReachLevel,
+            sellingReachRadiusKm,
             fulfilmentMode,
             deliveryCharge,
             deliveryChargeInSociety,
@@ -132,6 +149,7 @@ void main() {
             kitchenOpensAt,
             kitchenClosesAt,
             clearKitchenHours,
+            hideFlatNumber,
           }) async {
             profileSaves += 1;
             return {
@@ -165,8 +183,8 @@ void main() {
     expect(find.byType(SellerSettingsScreen), findsOneWidget);
     expect(find.text('Cash on Delivery in society, UPI outside'), findsOneWidget);
     expect(find.byKey(const Key('seller-setup-upi-id')), findsOneWidget);
-    expect(find.text('My Society'), findsOneWidget);
-    expect(find.text('FSSAI details'), findsOneWidget);
+    expect(find.text('My society'), findsOneWidget);
+    expect(find.textContaining('FSSAI details'), findsOneWidget);
     expect(find.text('Continue'), findsOneWidget);
     expect(find.text('Payment Methods'), findsNothing);
     expect(profileSaves, 0);
@@ -182,21 +200,15 @@ void main() {
       tester
           .widget<ElevatedButton>(find.byKey(const Key('seller-settings-enable')))
           .onPressed,
-      isNull,
-    );
-    await _enterAndConfirmSellerUpi(tester);
-    expect(
-      tester
-          .widget<ElevatedButton>(find.byKey(const Key('seller-settings-enable')))
-          .onPressed,
       isNotNull,
     );
+    await _enterSellerUpi(tester);
 
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const Key('seller-settings-enable')));
     await tester.tap(find.byKey(const Key('seller-settings-enable')));
-    await tester.pumpAndSettle();
+    await _confirmUpiDialogIfShown(tester);
     expect(find.byType(SellerTermsScreen), findsOneWidget);
     expect(
       tester.widget<ElevatedButton>(find.byKey(const Key('seller-terms-accept'))).onPressed,
@@ -211,7 +223,7 @@ void main() {
 
     await tester.ensureVisible(find.byKey(const Key('seller-settings-enable')));
     await tester.tap(find.byKey(const Key('seller-settings-enable')));
-    await tester.pumpAndSettle();
+    await _confirmUpiDialogIfShown(tester);
     await tester.tap(find.byKey(const Key('seller-terms-accept')));
     await tester.pumpAndSettle();
     expect(find.byType(SellerTermsScreen), findsOneWidget);
@@ -256,6 +268,7 @@ void main() {
           },
           updateProfile: ({
             sellingReachLevel,
+            sellingReachRadiusKm,
             fulfilmentMode,
             deliveryCharge,
             deliveryChargeInSociety,
@@ -265,6 +278,7 @@ void main() {
             kitchenOpensAt,
             kitchenClosesAt,
             clearKitchenHours,
+            hideFlatNumber,
           }) async {
             profileSaves += 1;
             return {

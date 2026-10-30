@@ -136,6 +136,8 @@ model FssaiAssistanceRequest {
   societyId   String?
   /// NEW | CONTACTED | IN_PROGRESS | COMPLETED
   status      String   @default("NEW")
+  /// Optional note from seller when they request help (no licence yet).
+  notes       String?
   requestedAt DateTime @default(now())
   updatedAt   DateTime @updatedAt
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)

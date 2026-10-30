@@ -2082,11 +2082,14 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<void> requestFssaiAssistance() async {
+  static Future<void> requestFssaiAssistance({String? notes}) async {
+    final trimmed = notes?.trim();
     final response = await http.post(
       Uri.parse('$baseUrl/fssai/me/assistance'),
       headers: await _authHeaders(),
-      body: jsonEncode({}),
+      body: jsonEncode({
+        if (trimmed != null && trimmed.isNotEmpty) 'notes': trimmed,
+      }),
     );
     if (response.statusCode == 201) return;
     _throwFromResponse(response);

@@ -6,6 +6,9 @@ import '../models/data.dart';
 import '../widgets/seller_avatar.dart';
 import 'web_breakpoints.dart';
 
+/// Fixed height so kitchen cards stay even when detail/CTA differ.
+const double webSellerCardHeight = 128;
+
 class WebSellerCard extends StatelessWidget {
   const WebSellerCard({
     super.key,
@@ -23,100 +26,107 @@ class WebSellerCard extends StatelessWidget {
     final rating = seller.reviewCount > 0
         ? seller.rating.toStringAsFixed(1)
         : 'New';
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
+    final showDetail = seller.hasOrderableItems && detail.isNotEmpty;
+    return SizedBox(
+      height: webSellerCardHeight,
+      child: Material(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: webLine),
-          ),
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  _avatar(),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          seller.name,
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w800,
-                            color: webInk,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              size: 13,
-                              color: Color(0xFFC48A12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: webLine),
+            ),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _avatar(),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            seller.name,
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: webInk,
                             ),
-                            const SizedBox(width: 2),
-                            Flexible(
-                              child: Text(
-                                seller.reviewCount > 0
-                                    ? '$rating (${seller.reviewCount})'
-                                    : rating,
-                                maxLines: 1,
-                                softWrap: false,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: webInk,
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                size: 13,
+                                color: Color(0xFFC48A12),
+                              ),
+                              const SizedBox(width: 2),
+                              Flexible(
+                                child: Text(
+                                  seller.reviewCount > 0
+                                      ? '$rating (${seller.reviewCount})'
+                                      : rating,
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: webInk,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              if (seller.hasOrderableItems && detail.isNotEmpty) ...[
+                  ],
+                ),
                 const SizedBox(height: 8),
+                SizedBox(
+                  height: 32,
+                  child: showDetail
+                      ? Text(
+                          detail,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.3,
+                            fontWeight: FontWeight.w500,
+                            color: webMuted,
+                          ),
+                        )
+                      : null,
+                ),
+                const Spacer(),
                 Text(
-                  detail,
-                  maxLines: 2,
+                  seller.hasOrderableItems
+                      ? 'View menu'
+                      : sellerNotAvailableLabel,
+                  maxLines: 1,
+                  softWrap: false,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    height: 1.3,
-                    fontWeight: FontWeight.w500,
-                    color: webMuted,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: seller.hasOrderableItems ? webGreen : webMuted,
                   ),
                 ),
               ],
-              const SizedBox(height: 8),
-              Text(
-                seller.hasOrderableItems
-                    ? 'View menu'
-                    : sellerNotAvailableLabel,
-                maxLines: 1,
-                softWrap: false,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  color: seller.hasOrderableItems ? webGreen : webMuted,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -177,7 +187,10 @@ class WebSellerGrid extends StatelessWidget {
             );
           }
           rows.add(
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: cells),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: cells,
+            ),
           );
           if (i + columns < sellers.length) {
             rows.add(const SizedBox(height: gap));

@@ -448,7 +448,12 @@ class ProfileScreenState extends State<ProfileScreen> {
     if (pending == null) return true;
     final upi = pending.upiId?.trim() ?? _upiId?.trim() ?? '';
     if (upi.isEmpty || !upi.contains('@')) return false;
-    return pending.upiIdConfirmed;
+    final displayName =
+        pending.upiDisplayName?.trim() ?? _upiDisplayName?.trim() ?? '';
+    if (displayName.isEmpty) return false;
+    // Confirmation is prompted on Continue if still missing — do not block the
+    // button when the user never blurred the UPI field.
+    return true;
   }
 
   SellerReachPreference get _reachPreference =>
@@ -710,13 +715,9 @@ class ProfileScreenState extends State<ProfileScreen> {
       _paymentPreference = defaultSellerPaymentPreference;
       _syncPendingSellerEnableDefaults();
     }
-    if (firstTime) {
-      unawaited(_readSessionCache().then((_) {
-        if (mounted) setState(() {});
-      }));
-    } else {
-      unawaited(_loadProfile());
-    }
+    // Always refresh profile (incl. FSSAI enable-selling flags). Session cache
+    // alone is not enough for first-time Continue gating.
+    unawaited(_loadProfile());
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -1037,7 +1038,22 @@ class ProfileScreenState extends State<ProfileScreen> {
                   TextField(
                     controller: nameController,
                     decoration: InputDecoration(
-                      labelText: 'Display name on UPI (optional)',
+                      label: Text.rich(
+                        TextSpan(
+                          text: 'Display name on UPI',
+                          style: const TextStyle(color: Color(0xFF6A7774)),
+                          children: const [
+                            TextSpan(
+                              text: ' *',
+                              style: TextStyle(
+                                color: Color(0xFFC62828),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      hintText: 'Name shown to buyers',
                       filled: true,
                       fillColor: const Color(0xFFF5F7F6),
                       border: OutlineInputBorder(
@@ -1061,10 +1077,18 @@ class ProfileScreenState extends State<ProfileScreen> {
                     child: ElevatedButton(
                       onPressed: () async {
                         final upi = upiController.text.trim();
+                        final displayName = nameController.text.trim();
                         if (upi.isEmpty || !upi.contains('@')) {
                           setSheetState(() {
                             errorText =
                                 'Enter a valid UPI ID (e.g. name@oksbi)';
+                          });
+                          return;
+                        }
+                        if (displayName.isEmpty) {
+                          setSheetState(() {
+                            errorText =
+                                'Enter the display name shown on your UPI';
                           });
                           return;
                         }
@@ -1111,16 +1135,17 @@ class ProfileScreenState extends State<ProfileScreen> {
     final displayName = nameController.text.trim();
     upiController.dispose();
     nameController.dispose();
+    if (displayName.isEmpty) return;
 
     final pending = _pendingSellerEnable;
     if (pending != null) {
       setState(() {
         _upiId = upi;
-        _upiDisplayName = displayName.isEmpty ? null : displayName;
+        _upiDisplayName = displayName;
         pending
           ..includeUpi = true
           ..upiId = upi
-          ..upiDisplayName = displayName.isEmpty ? null : displayName
+          ..upiDisplayName = displayName
           ..upiIdConfirmed = true;
       });
       _refreshSellerSettings();
@@ -1134,7 +1159,7 @@ class ProfileScreenState extends State<ProfileScreen> {
       if (widget.saveUpiDetails != null) {
         await widget.saveUpiDetails!(
           upiId: upi,
-          upiDisplayName: displayName.isEmpty ? null : displayName,
+          upiDisplayName: displayName,
         );
       } else {
         await ApiService.updateMyProfile(
@@ -1173,17 +1198,23 @@ class ProfileScreenState extends State<ProfileScreen> {
     final fssai = _asStringKeyedMap(profile['fssai']);
     if (fssai == null) {
       _fssaiRequirementEnabled = false;
-      _fssaiCanEnableSellingFlag = true;
+      // No FSSAI payload yet — treat enable-selling as blocked until profile loads
+      // or the seller submits / requests assistance.
+      _fssaiCanEnableSellingFlag = false;
       _fssaiCanSellDespiteFssai = true;
+      _fssaiAssistanceRequested = false;
+      _fssaiDetailsDeferred = false;
+      _fssaiStatus = null;
       return;
     }
     _fssaiRequirementEnabled = fssai['requirementEnabled'] == true;
     _fssaiStatus = fssai['status']?.toString();
     _fssaiDetailsDeferred = fssai['detailsDeferred'] == true;
     _fssaiAssistanceRequested = fssai['assistanceRequested'] == true;
-    _fssaiCanEnableSellingFlag = _fssaiRequirementEnabled
-        ? fssai['canEnableSellingDespiteFssai'] == true
-        : true;
+    // Enable-selling always requires an FSSAI action (submit or assistance),
+    // even when the platform "must be approved to receive orders" flag is off.
+    _fssaiCanEnableSellingFlag =
+        fssai['canEnableSellingDespiteFssai'] == true;
     _fssaiCanSellDespiteFssai = !_fssaiRequirementEnabled ||
         fssai['canSellDespiteFssai'] == true ||
         _fssaiStatus == 'APPROVED';
@@ -1216,11 +1247,10 @@ class ProfileScreenState extends State<ProfileScreen> {
   String? _fssaiStatus;
   bool _fssaiDetailsDeferred = false;
   bool _fssaiAssistanceRequested = false;
-  bool _fssaiCanEnableSellingFlag = true;
+  bool _fssaiCanEnableSellingFlag = false;
   bool _fssaiCanSellDespiteFssai = true;
 
-  bool get _fssaiAllowsEnableSelling =>
-      !_fssaiRequirementEnabled || _fssaiCanEnableSellingFlag;
+  bool get _fssaiAllowsEnableSelling => _fssaiCanEnableSellingFlag;
 
   bool get _showSellerFssaiComplianceBanner =>
       _isSeller && _fssaiRequirementEnabled && !_fssaiCanSellDespiteFssai;
@@ -1262,23 +1292,17 @@ class ProfileScreenState extends State<ProfileScreen> {
       return 'Assistance requested — we will reach out';
     }
     final deferred = _fssaiDetailsDeferred;
-    if (!_fssaiRequirementEnabled && deferred) {
-      return 'No details yet — add when ready';
-    }
-    if (!_fssaiRequirementEnabled &&
+    if (deferred &&
         (_fssaiStatus == null || _fssaiStatus == 'NOT_SUBMITTED')) {
-      return 'Fill FSSAI details';
+      return 'Marked earlier — add licence or request help';
     }
     if (_fssaiStatus != null) {
       final label = SellerFssaiRegistration.statusLabels[_fssaiStatus!] ??
           _fssaiStatus!;
       return 'Status: $label';
     }
-    if (!_fssaiRequirementEnabled) {
-      return 'Fill FSSAI details';
-    }
     if (_fssaiNumber == null || _fssaiNumber!.isEmpty) {
-      return 'Add your FSSAI registration details';
+      return 'Submit licence or request assistance';
     }
     return _fssaiNumber!;
   }
@@ -1336,17 +1360,52 @@ class ProfileScreenState extends State<ProfileScreen> {
         _finishFirstTimeSellerEnableSuccess();
         return;
       }
+      _applyFssaiFromProfile(liveProfile);
     } catch (_) {}
 
     if (!mounted) return;
 
+    FocusScope.of(context).unfocus();
+
+    // Guide incomplete setup instead of leaving Continue dead.
+    if (!_fssaiAllowsEnableSelling) {
+      _releaseEnableSellingInFlight();
+      _refreshSellerSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Complete FSSAI next — submit your licence or request assistance.',
+          ),
+        ),
+      );
+      await _editFssai();
+      if (!mounted) return;
+      if (_fssaiAllowsEnableSelling && _pendingUpiReadyForEnable) {
+        await _saveAndEnableSelling();
+      }
+      return;
+    }
+
     final upi = pending.upiId?.trim() ?? _upiId?.trim() ?? '';
+    final displayName =
+        pending.upiDisplayName?.trim() ?? _upiDisplayName?.trim() ?? '';
     if (upi.isEmpty || !upi.contains('@')) {
       _releaseEnableSellingInFlight();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Enter a valid UPI ID (e.g. name@oksbi) before enabling selling.',
+            'Enter a valid UPI ID (e.g. name@oksbi), then tap Continue again.',
+          ),
+        ),
+      );
+      return;
+    }
+    if (displayName.isEmpty) {
+      _releaseEnableSellingInFlight();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Enter your UPI display name, then tap Continue again.',
           ),
         ),
       );
@@ -1361,19 +1420,10 @@ class ProfileScreenState extends State<ProfileScreen> {
       pending
         ..includeUpi = true
         ..upiId = upi
-        ..upiDisplayName = pending.upiDisplayName ?? _upiDisplayName;
+        ..upiDisplayName = displayName;
+      _upiId = upi;
+      _upiDisplayName = displayName;
       _refreshSellerSettings();
-    }
-    if (!_fssaiAllowsEnableSelling) {
-      _releaseEnableSellingInFlight();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Submit your FSSAI registration before enabling selling.',
-          ),
-        ),
-      );
-      return;
     }
     final kitchenDraft = pending.includeKitchenHours
         ? (
@@ -2336,6 +2386,32 @@ class ProfileScreenState extends State<ProfileScreen> {
                               onTap: _openSellerSettings,
                             ),
                           ],
+                          const SizedBox(height: 20),
+                          const Text(
+                            'OVERSIGHT',
+                            style: TextStyle(
+                              fontSize: 12,
+                              letterSpacing: 1.4,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF8A9491),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          ProfileMenuTile(
+                            icon: Icons.visibility_outlined,
+                            title: 'Stores I oversee',
+                            subtitle:
+                                'View-only kitchens where you were invited as owner',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const SellerStaffAccessListScreen(),
+                                ),
+                              );
+                            },
+                          ),
                           const SizedBox(height: 20),
                           const Text(
                             'SUPPORT',

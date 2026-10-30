@@ -14,6 +14,9 @@ import '../widgets/listing_cart_controls.dart';
 import '../utils/listing_portion_label.dart';
 import 'web_breakpoints.dart';
 
+/// Fixed height so every web listing card matches, regardless of optional lines.
+const double webFoodCardHeight = 310;
+
 class WebFoodCard extends StatelessWidget {
   const WebFoodCard({
     super.key,
@@ -32,28 +35,39 @@ class WebFoodCard extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback onSeller;
 
+  static const _titleHeight = 35.0;
+  static const _placeHeight = 16.0;
+  static const _hintHeight = 40.0;
+  static const _metaLineHeight = 14.0;
+  /// Fits charged price + optional strike/% off without growing the card.
+  static const _priceBlockHeight = 34.0;
+
   @override
   Widget build(BuildContext context) {
     final ratingLabel = food.reviewCount > 0
         ? food.rating.toStringAsFixed(1)
         : '0 review';
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onOpen,
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: webLine),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: 120,
-                child: Stack(
+    final sold = listingSoldCaption(food.quantitySold);
+    return SizedBox(
+      height: webFoodCardHeight,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onOpen,
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: webLine),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 120,
+                  width: double.infinity,
+                  child: Stack(
                   children: [
                     Positioned.fill(
                       child: LayoutBuilder(
@@ -92,136 +106,179 @@ class WebFoodCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (food.foodType != null) ...[
-                      _DietMark(foodType: food.foodType!),
-                      const SizedBox(width: 6),
-                    ],
-                    Expanded(
-                      child: Text(
-                        food.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          height: 1.25,
-                          fontWeight: FontWeight.w800,
-                          color: webInk,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          height: _titleHeight,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (food.foodType != null) ...[
+                                _DietMark(foodType: food.foodType!),
+                                const SizedBox(width: 6),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  food.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    height: 1.25,
+                                    fontWeight: FontWeight.w800,
+                                    color: webInk,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 3, 10, 0),
-                child: GestureDetector(
-                  onTap: onSeller,
-                  child: Text(
-                    food.sellerName,
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: webGreen,
-                    ),
-                  ),
-                ),
-              ),
-              if (food.homePlaceLabel.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 2, 10, 0),
-                  child: Text(
-                    food.homePlaceLabel,
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w500,
-                      color: webMuted,
-                    ),
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: MadeToOrderHint(food: food, compact: true),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: RecurringAvailabilityHint(food: food, compact: true),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ListingBuyerPriceText(
-                            food: food,
-                            useCardLabel: true,
-                            chargedStyle: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: webInk,
-                            ),
-                          ),
-                          ListingPortionCaption(
-                            food: food,
+                        const SizedBox(height: 3),
+                        GestureDetector(
+                          onTap: onSeller,
+                          child: Text(
+                            food.sellerName,
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: webMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: webGreen,
                             ),
                           ),
-                          if (listingSoldCaption(food.quantitySold)
-                              .isNotEmpty)
-                            Text(
-                              listingSoldCaption(food.quantitySold),
-                              maxLines: 1,
-                              softWrap: false,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: webMuted,
+                        ),
+                        SizedBox(
+                          height: _placeHeight,
+                          child: food.homePlaceLabel.isEmpty
+                              ? null
+                              : Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    food.homePlaceLabel,
+                                    maxLines: 1,
+                                    softWrap: false,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: webMuted,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                        SizedBox(
+                          height: _hintHeight,
+                          child: ClipRect(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                MadeToOrderHint(food: food, compact: true),
+                                RecurringAvailabilityHint(
+                                  food: food,
+                                  compact: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    height: _priceBlockHeight,
+                                    child: ClipRect(
+                                      child: Align(
+                                        alignment: Alignment.topLeft,
+                                        child: ListingBuyerPriceText(
+                                          food: food,
+                                          useCardLabel: true,
+                                          chargedStyle: const TextStyle(
+                                            fontSize: 15,
+                                            height: 1.1,
+                                            fontWeight: FontWeight.w800,
+                                            color: webInk,
+                                          ),
+                                          regularStyle: const TextStyle(
+                                            fontSize: 11,
+                                            height: 1.1,
+                                            fontWeight: FontWeight.w600,
+                                            color: webMuted,
+                                            decoration:
+                                                TextDecoration.lineThrough,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    height: _metaLineHeight,
+                                    child: ListingPortionCaption(
+                                      food: food,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: webMuted,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    height: _metaLineHeight,
+                                    child: sold.isEmpty
+                                        ? null
+                                        : Text(
+                                            sold,
+                                            maxLines: 1,
+                                            softWrap: false,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: webMuted,
+                                            ),
+                                          ),
+                                  ),
+                                ],
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ListingCartTapShield(
-                      child: MarketplacePurchaseSlot(
-                        food: food,
-                        cartQty: cartQty,
-                        addButton: ListingCartAddButton(
-                          onPressed: onAdd,
-                          compact: true,
-                          optionsLabel: listingOptionsLabel(food),
+                            const SizedBox(width: 8),
+                            ListingCartTapShield(
+                              child: MarketplacePurchaseSlot(
+                                food: food,
+                                cartQty: cartQty,
+                                addButton: ListingCartAddButton(
+                                  onPressed: onAdd,
+                                  compact: true,
+                                  optionsLabel: listingOptionsLabel(food),
+                                ),
+                                qtyStepper: ListingCartQtyStepper(
+                                  qty: cartQty,
+                                  compact: true,
+                                  onIncrement: onAdd,
+                                  onDecrement: onRemove,
+                                ),
+                                soldOut: const _SoldOutMark(),
+                              ),
+                            ),
+                          ],
                         ),
-                        qtyStepper: ListingCartQtyStepper(
-                          qty: cartQty,
-                          compact: true,
-                          onIncrement: onAdd,
-                          onDecrement: onRemove,
-                        ),
-                        soldOut: const _SoldOutMark(),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
