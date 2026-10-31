@@ -26,6 +26,8 @@ String parseListingCatalogType(dynamic value) {
       : listingCatalogRegular;
 }
 
+enum HomeSellerSort { rating, distance }
+
 class Seller {
   final String id;
   final String name;
@@ -36,6 +38,8 @@ class Seller {
   final Color avatarColor;
   final bool hasOrderableItems;
   final String? profilePhotoUrl;
+  /// Society-to-society km for beyond-society Home chips. Null in-society.
+  final double? distanceKm;
 
   const Seller({
     required this.id,
@@ -47,7 +51,19 @@ class Seller {
     required this.avatarColor,
     this.hasOrderableItems = true,
     this.profilePhotoUrl,
+    this.distanceKm,
   });
+
+  /// Short chip/list label. Hidden at 0 km (own society).
+  String? get distanceChipLabel {
+    final km = distanceKm;
+    if (km == null || km <= 0) return null;
+    if (km < 1) return '${(km * 1000).round()} m';
+    final text = km == km.roundToDouble()
+        ? km.toInt().toString()
+        : km.toStringAsFixed(1);
+    return '$text km';
+  }
 }
 
 class FoodItem {
@@ -2045,6 +2061,7 @@ Seller sellerFromListing(
   double? rating,
   int? reviewCount,
   bool? hasOrderableItems,
+  double? distanceKm,
 }) {
   final hash = food.sellerId.hashCode.abs();
   const avatarIcons = [
@@ -2072,6 +2089,7 @@ Seller sellerFromListing(
     avatarColor: avatarColors[hash % avatarColors.length],
     hasOrderableItems: hasOrderableItems ?? food.canAddToCart,
     profilePhotoUrl: food.sellerProfilePhotoUrl,
+    distanceKm: distanceKm ?? food.distanceKm,
   );
 }
 
@@ -2083,7 +2101,10 @@ Color sellerPresenceRingColor(bool hasOrderableItems) {
   return hasOrderableItems ? sellerSellingRingColor : sellerOutOfStockRingColor;
 }
 
-List<Seller> sellersFromListings(List<FoodItem> listings) {
+List<Seller> sellersFromListings(
+  List<FoodItem> listings, {
+  HomeSellerSort sort = HomeSellerSort.rating,
+}) {
   final grouped = <String, List<FoodItem>>{};
   for (final food in listings) {
     grouped.putIfAbsent(food.sellerId, () => []).add(food);
@@ -2102,18 +2123,33 @@ List<Seller> sellersFromListings(List<FoodItem> listings) {
               ) /
               reviews;
     final hasOrderableItems = sellerListings.any((item) => item.canAddToCart);
+    double? distanceKm;
+    for (final item in sellerListings) {
+      final km = item.distanceKm;
+      if (km == null) continue;
+      if (distanceKm == null || km < distanceKm) distanceKm = km;
+    }
     return sellerFromListing(
       first,
       rating: weightedRating,
       reviewCount: reviews,
       hasOrderableItems: hasOrderableItems,
+      distanceKm: distanceKm,
     );
   }).toList();
   sellers.sort((a, b) {
     if (a.hasOrderableItems != b.hasOrderableItems) {
       return a.hasOrderableItems ? -1 : 1;
     }
-    return b.rating.compareTo(a.rating);
+    if (sort == HomeSellerSort.distance) {
+      final byKm = (a.distanceKm ?? double.infinity).compareTo(
+        b.distanceKm ?? double.infinity,
+      );
+      if (byKm != 0) return byKm;
+    }
+    final byRating = b.rating.compareTo(a.rating);
+    if (byRating != 0) return byRating;
+    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
   });
   return sellers;
 }

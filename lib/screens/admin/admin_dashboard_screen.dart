@@ -4,6 +4,7 @@ import '../../services/api_service.dart';
 import '../../widgets/admin_growth_panel.dart';
 import '../../widgets/admin_loading_panel.dart';
 import 'admin_city_reach_screen.dart';
+import 'admin_serving_cities_screen.dart';
 import 'admin_fssai_screen.dart';
 import 'admin_festival_banners_screen.dart';
 import 'admin_marketing_push_screen.dart';
@@ -506,6 +507,74 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       const Icon(
                         Icons.edit_outlined,
                         size: 18,
+                        color: Color(0xFF8A9491),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AdminServingCitiesScreen(),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFEAEFED)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0E5A47).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.location_city_outlined,
+                          size: 18,
+                          color: Color(0xFF0E5A47),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Serving cities',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: Color(0xFF101617),
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Which cities can join. Super admin changes this.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6A7774),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
                         color: Color(0xFF8A9491),
                       ),
                     ],

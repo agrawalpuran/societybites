@@ -1,5 +1,5 @@
 const logger = require("./logger");
-const { getLaunchCityConfig } = require("./launchCity");
+const { refreshServingCities } = require("./servingCities");
 
 const AUTOCOMPLETE_URL = "https://places.googleapis.com/v1/places:autocomplete";
 const DETAILS_URL = "https://places.googleapis.com/v1/places";
@@ -77,7 +77,7 @@ async function googleFetch(url, { method = "GET", body } = {}) {
 }
 
 async function autocompletePlaces(query) {
-  const launch = getLaunchCityConfig();
+  const launch = await refreshServingCities();
   const input = String(query || "").trim();
   const body = {
     input,

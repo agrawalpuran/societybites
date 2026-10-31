@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../config/launch_config.dart';
 import '../models/guest_discovery.dart';
+import '../services/serving_city_label.dart';
 import '../web/web_breakpoints.dart';
 import '../widgets/app_header.dart';
 import '../widgets/serving_city_ticker.dart';
@@ -22,11 +23,13 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
   final _scrollController = ScrollController();
   Timer? _timer;
   var _page = 0;
+  String _servingLabel = currentServingCity;
 
   @override
   void initState() {
     super.initState();
     _startAutoRotate();
+    _loadServingLabel();
   }
 
   @override
@@ -79,6 +82,14 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
     );
   }
 
+  Future<void> _loadServingLabel() async {
+    try {
+      final label = await ServingCityLabel.load();
+      if (!mounted || label.trim().isEmpty || label == _servingLabel) return;
+      setState(() => _servingLabel = label.trim());
+    } catch (_) {}
+  }
+
   Widget _buildWebLanding() {
     final width = MediaQuery.sizeOf(context).width;
     final sideBySide = width >= 980;
@@ -93,7 +104,10 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 28),
               children: [
-                _SocietyBitesHeader(onSignIn: _openSignIn),
+                _SocietyBitesHeader(
+                  onSignIn: _openSignIn,
+                  servingLabel: _servingLabel,
+                ),
                 if (sideBySide)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -172,7 +186,12 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
           controller: _scrollController,
           physics: const BouncingScrollPhysics(),
           slivers: [
-            SliverToBoxAdapter(child: _SocietyBitesHeader(onSignIn: _openSignIn)),
+            SliverToBoxAdapter(
+              child: _SocietyBitesHeader(
+                onSignIn: _openSignIn,
+                servingLabel: _servingLabel,
+              ),
+            ),
             SliverToBoxAdapter(
               child: _HeroSection(
                 onExplore: () => _openRealMarketplace(),
@@ -221,9 +240,13 @@ class _GuestLandingScreenState extends State<GuestLandingScreen> {
 }
 
 class _SocietyBitesHeader extends StatelessWidget {
-  const _SocietyBitesHeader({required this.onSignIn});
+  const _SocietyBitesHeader({
+    required this.onSignIn,
+    required this.servingLabel,
+  });
 
   final VoidCallback onSignIn;
+  final String servingLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -284,7 +307,7 @@ class _SocietyBitesHeader extends StatelessWidget {
                   Flexible(
                     child: ServingCityTicker(
                       key: const Key('serving-city-ticker'),
-                      text: 'Now serving $currentServingCity',
+                      text: 'Now serving $servingLabel',
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,

@@ -213,6 +213,7 @@ String webSellerDetail(Seller seller, List<FoodItem> listings) {
   }
   final place = seller.block.trim();
   final bits = <String>[
+    if (seller.distanceChipLabel != null) seller.distanceChipLabel!,
     if (category != null && category.isNotEmpty) category,
     if (place.isNotEmpty) place,
     if (items.isNotEmpty)

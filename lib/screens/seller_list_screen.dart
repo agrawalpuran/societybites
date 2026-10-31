@@ -10,11 +10,13 @@ class SellerListScreen extends StatelessWidget {
     required this.sellers,
     required this.onSellerTap,
     this.title = 'Sellers',
+    this.showDistance = false,
   });
 
   final List<Seller> sellers;
   final ValueChanged<Seller> onSellerTap;
   final String title;
+  final bool showDistance;
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +88,18 @@ class SellerListScreen extends StatelessWidget {
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          if (seller.block.isNotEmpty &&
+                          if (showDistance &&
+                              seller.distanceChipLabel != null) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              seller.distanceChipLabel!,
+                              style: const TextStyle(
+                                color: preorderMuted,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ] else if (seller.block.isNotEmpty &&
                               seller.block != 'Block ?') ...[
                             const SizedBox(height: 3),
                             Text(

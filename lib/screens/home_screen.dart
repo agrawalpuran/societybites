@@ -1012,8 +1012,8 @@ class HomeScreenState extends State<HomeScreen> {
 
   String? _webBeyondSubtitle() {
     final km = _cityReach.maxSellerRadiusKm;
-    if (km == null) return 'From other societies near you';
-    return 'Beyond your society (up to ~${formatReachRadiusKm(km)} km)';
+    if (km == null) return 'Closest kitchens first';
+    return 'Closest first · up to ~${formatReachRadiusKm(km)} km';
   }
 
   String? _webNearbySubtitle() {
@@ -1743,6 +1743,7 @@ class HomeScreenState extends State<HomeScreen> {
 
   List<Seller> get _beyondSellers => sellersFromListings(
         _sellerPresenceForReach(HomeListingReach.beyondSociety),
+        sort: HomeSellerSort.distance,
       );
 
   Widget _buildHomeDiscoverySections() {
@@ -1762,11 +1763,10 @@ class HomeScreenState extends State<HomeScreen> {
           key: const Key('home-sellers-beyond'),
           title: 'Beyond your society',
           subtitle: _cityReach.maxSellerRadiusKm == null
-              ? 'From other societies near you'
-              : 'Sellers up to ~${formatReachRadiusKm(_cityReach.maxSellerRadiusKm!)} km away',
-          sellers: sellersFromListings(
-            _sellerPresenceForReach(HomeListingReach.beyondSociety),
-          ),
+              ? 'Closest kitchens first'
+              : 'Closest first · up to ~${formatReachRadiusKm(_cityReach.maxSellerRadiusKm!)} km',
+          sellers: _beyondSellers,
+          showDistance: true,
         ),
         _buildReachSection(
           reach: HomeListingReach.beyondSociety,
@@ -1786,6 +1786,7 @@ class HomeScreenState extends State<HomeScreen> {
     required String title,
     String? subtitle,
     required List<Seller> sellers,
+    bool showDistance = false,
   }) {
     if (sellers.isEmpty) return const SizedBox.shrink();
     return Column(
@@ -1831,6 +1832,7 @@ class HomeScreenState extends State<HomeScreen> {
                       builder: (_) => SellerListScreen(
                         title: title,
                         sellers: sellers,
+                        showDistance: showDistance,
                         onSellerTap: (seller) => _openSeller(
                           seller,
                           hideUnavailableDishes: !seller.hasOrderableItems,
@@ -1858,6 +1860,7 @@ class HomeScreenState extends State<HomeScreen> {
           separatorBuilder: (context, index) => const SizedBox(width: 16),
           itemBuilder: (_, i) => _SellerChip(
             seller: sellers[i],
+            showDistance: showDistance,
             onTap: () => _openSeller(
               sellers[i],
               hideUnavailableDishes: !sellers[i].hasOrderableItems,
@@ -2184,9 +2187,14 @@ class HomeScreenState extends State<HomeScreen> {
 }
 
 class _SellerChip extends StatelessWidget {
-  const _SellerChip({required this.seller, required this.onTap});
+  const _SellerChip({
+    required this.seller,
+    required this.onTap,
+    this.showDistance = false,
+  });
   final Seller seller;
   final VoidCallback onTap;
+  final bool showDistance;
 
   @override
   Widget build(BuildContext context) {
@@ -2226,7 +2234,7 @@ class _SellerChip extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 4),
-            if (seller.hasOrderableItems)
+            if (seller.hasOrderableItems && !showDistance)
               SizedBox(
                 width: 72,
                 height: 32,
@@ -2259,10 +2267,15 @@ class _SellerChip extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(
+              SizedBox(
                 width: 72,
                 child: Text(
-                  sellerNotAvailableLabel,
+                  showDistance
+                      ? (seller.distanceChipLabel ??
+                          (seller.hasOrderableItems
+                              ? ''
+                              : sellerNotAvailableLabel))
+                      : sellerNotAvailableLabel,
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

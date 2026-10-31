@@ -1,33 +1,71 @@
 /**
  * Launch-city configuration for society discovery.
- * One active city for now; aliases/bias maps are keyed so more cities can be
- * marked active later without changing the onboarding flow.
+ * Known cities (aliases + map bias) live here. Which of them are open is
+ * chosen by a super admin and applied via applyLaunchCityConfig. With one
+ * city open, search keeps that city's map circle.
  */
 
-const CITY_ALIASES = {
-  bengaluru: [
-    "bengaluru",
-    "bangalore",
-    "bengaluruurban",
-    "bangaloreurban",
-    "bengalururural",
-    "bangalorerural",
-  ],
-  pune: ["pune", "pimprichinchwad"],
-  hyderabad: ["hyderabad", "secunderabad"],
-  mumbai: ["mumbai", "bombay", "navimumbai"],
-  delhi: ["delhi", "newdelhi", "nctofdelhi"],
-  chennai: ["chennai", "madras"],
-};
+const CITY_CATALOG = [
+  {
+    cityKey: "bengaluru",
+    displayName: "Bengaluru",
+    state: "Karnataka",
+    aliases: [
+      "bengaluru",
+      "bangalore",
+      "bengaluruurban",
+      "bangaloreurban",
+      "bengalururural",
+      "bangalorerural",
+    ],
+    bias: { latitude: 12.9716, longitude: 77.5946, radiusMeters: 40000 },
+  },
+  {
+    cityKey: "pune",
+    displayName: "Pune",
+    state: "Maharashtra",
+    aliases: ["pune", "pimprichinchwad"],
+    bias: { latitude: 18.5204, longitude: 73.8567, radiusMeters: 35000 },
+  },
+  {
+    cityKey: "hyderabad",
+    displayName: "Hyderabad",
+    state: "Telangana",
+    aliases: ["hyderabad", "secunderabad"],
+    bias: { latitude: 17.385, longitude: 78.4867, radiusMeters: 35000 },
+  },
+  {
+    cityKey: "mumbai",
+    displayName: "Mumbai",
+    state: "Maharashtra",
+    aliases: ["mumbai", "bombay", "navimumbai"],
+    bias: { latitude: 19.076, longitude: 72.8777, radiusMeters: 35000 },
+  },
+  {
+    cityKey: "delhi",
+    displayName: "Delhi",
+    state: "Delhi",
+    aliases: ["delhi", "newdelhi", "nctofdelhi"],
+    bias: { latitude: 28.6139, longitude: 77.209, radiusMeters: 35000 },
+  },
+  {
+    cityKey: "chennai",
+    displayName: "Chennai",
+    state: "Tamil Nadu",
+    aliases: ["chennai", "madras"],
+    bias: { latitude: 13.0827, longitude: 80.2707, radiusMeters: 35000 },
+  },
+];
 
-const CITY_BIAS = {
-  bengaluru: { latitude: 12.9716, longitude: 77.5946, radiusMeters: 40000 },
-  pune: { latitude: 18.5204, longitude: 73.8567, radiusMeters: 35000 },
-  hyderabad: { latitude: 17.385, longitude: 78.4867, radiusMeters: 35000 },
-  mumbai: { latitude: 19.076, longitude: 72.8777, radiusMeters: 35000 },
-  delhi: { latitude: 28.6139, longitude: 77.209, radiusMeters: 35000 },
-  chennai: { latitude: 13.0827, longitude: 80.2707, radiusMeters: 35000 },
-};
+const CITY_ALIASES = Object.fromEntries(
+  CITY_CATALOG.map((city) => [city.cityKey, city.aliases])
+);
+
+const CITY_BIAS = Object.fromEntries(
+  CITY_CATALOG.map((city) => [city.cityKey, city.bias])
+);
+
+let launchCityOverride = null;
 
 function httpError(statusCode, message, code) {
   const err = new Error(message);
@@ -57,7 +95,17 @@ function aliasesForCity(cityName) {
   return CITY_ALIASES[canonical] || (canonical ? [canonical] : []);
 }
 
-function getLaunchCityConfig() {
+function catalogEntry(cityKey) {
+  return CITY_CATALOG.find((city) => city.cityKey === cityKey) || null;
+}
+
+function joinCityLabels(labels) {
+  if (labels.length <= 1) return labels[0] || "";
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+}
+
+function envLaunchCityConfig() {
   const city = String(process.env.SOCIETY_LAUNCH_CITY || "Bengaluru").trim() || "Bengaluru";
   const state = String(process.env.SOCIETY_LAUNCH_STATE || "Karnataka").trim() || "Karnataka";
   const country = String(process.env.SOCIETY_LAUNCH_COUNTRY || "IN")
@@ -79,11 +127,106 @@ function getLaunchCityConfig() {
 
   return {
     city,
+    cities: [city],
     state,
     country,
     canonical,
+    canonicals: canonical ? [canonical] : [],
     aliases: aliasesForCity(city),
     bias,
+  };
+}
+
+function singleCatalogConfig(entry) {
+  return {
+    city: entry.displayName,
+    cities: [entry.displayName],
+    state: entry.state,
+    country: "IN",
+    canonical: entry.cityKey,
+    canonicals: [entry.cityKey],
+    aliases: entry.aliases.slice(),
+    bias: { ...entry.bias },
+  };
+}
+
+function configForActiveKeys(keys) {
+  const normalized = [];
+  for (const raw of keys || []) {
+    const key = canonicalCityKey(raw);
+    if (!catalogEntry(key) || normalized.includes(key)) continue;
+    normalized.push(key);
+  }
+  if (normalized.length === 0) return null;
+  const ordered = CITY_CATALOG.map((city) => city.cityKey).filter((key) =>
+    normalized.includes(key)
+  );
+  if (ordered.length === 1) {
+    const env = envLaunchCityConfig();
+    if (env.canonical === ordered[0]) return env;
+    return singleCatalogConfig(catalogEntry(ordered[0]));
+  }
+  const entries = ordered.map((key) => catalogEntry(key));
+  const labels = entries.map((entry) => entry.displayName);
+  return {
+    city: joinCityLabels(labels),
+    cities: labels,
+    state: "",
+    country: "IN",
+    canonical: ordered[0],
+    canonicals: ordered,
+    aliases: entries.flatMap((entry) => entry.aliases),
+    bias: null,
+  };
+}
+
+function normalizeActiveCityKeys(input) {
+  if (!Array.isArray(input) || input.length === 0) {
+    throw httpError(400, "At least one city must stay on.", "SERVING_CITY_REQUIRED");
+  }
+  const keys = [];
+  for (const raw of input) {
+    const key = canonicalCityKey(raw);
+    if (!catalogEntry(key)) {
+      throw httpError(
+        400,
+        "Only a known city can be turned on.",
+        "SERVING_CITY_UNKNOWN"
+      );
+    }
+    if (!keys.includes(key)) keys.push(key);
+  }
+  return CITY_CATALOG.map((city) => city.cityKey).filter((key) => keys.includes(key));
+}
+
+function getLaunchCityConfig() {
+  return launchCityOverride || envLaunchCityConfig();
+}
+
+function applyLaunchCityConfig(config) {
+  launchCityOverride = config || null;
+}
+
+function clearLaunchCityConfig() {
+  launchCityOverride = null;
+}
+
+function listKnownCities() {
+  return CITY_CATALOG.map((city) => ({
+    cityKey: city.cityKey,
+    displayName: city.displayName,
+    state: city.state,
+  }));
+}
+
+function servingCityPayload(config = getLaunchCityConfig()) {
+  const cities =
+    Array.isArray(config.cities) && config.cities.length > 0
+      ? config.cities
+      : [config.city].filter(Boolean);
+  return {
+    servingCities: cities,
+    servingCityLabel: joinCityLabels(cities),
   };
 }
 
@@ -93,10 +236,17 @@ function isLaunchCityName(value, config = getLaunchCityConfig()) {
   return config.aliases.includes(key);
 }
 
+function activeCanonicals(config) {
+  if (Array.isArray(config.canonicals) && config.canonicals.length > 0) {
+    return config.canonicals;
+  }
+  return config.canonical ? [config.canonical] : [];
+}
+
 function isKnownNonLaunchCity(value, config = getLaunchCityConfig()) {
   const canonical = canonicalCityKey(value);
   if (!canonical) return false;
-  if (canonical === config.canonical) return false;
+  if (activeCanonicals(config).includes(canonical)) return false;
   return Boolean(CITY_ALIASES[canonical]);
 }
 
@@ -178,7 +328,15 @@ function assertPlaceAllowedForLaunch(place, config = getLaunchCityConfig()) {
 
 module.exports = {
   CITY_ALIASES,
+  CITY_BIAS,
   getLaunchCityConfig,
+  envLaunchCityConfig,
+  configForActiveKeys,
+  normalizeActiveCityKeys,
+  applyLaunchCityConfig,
+  clearLaunchCityConfig,
+  listKnownCities,
+  servingCityPayload,
   normalizeCityKey,
   canonicalCityKey,
   isLaunchCityName,

@@ -17,6 +17,7 @@ const timeoutMs = Number(process.env.TEST_TIMEOUT_MS || 120000);
 const UNIT = [
   "order-number",
   "admin-order-detail",
+  "serving-cities",
   "prisma-pool",
   "kitchen-hours",
   "food-type",

@@ -11,6 +11,7 @@ import '../models/issue_report.dart';
 import '../models/seller_order_history.dart';
 import '../models/seller_fssai.dart';
 import '../models/selling_reach.dart';
+import '../models/serving_city.dart';
 import 'auth_config.dart';
 import 'session_service.dart';
 import 'society_search.dart';
@@ -2426,6 +2427,40 @@ class ApiService {
     if (response.statusCode == 200) {
       _cachedAppSettings = null;
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<ServingCity>> getAdminServingCities() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/serving-cities'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      if (data is! List) return const [];
+      return data
+          .map((row) => ServingCity.fromJson(Map<String, dynamic>.from(row as Map)))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<ServingCity>> updateAdminServingCities(
+    List<String> activeCityKeys,
+  ) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/admin/serving-cities'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'activeCityKeys': activeCityKeys}),
+    );
+    if (response.statusCode == 200) {
+      _cachedAppSettings = null;
+      final data = _decodeResponse(response);
+      if (data is! List) return const [];
+      return data
+          .map((row) => ServingCity.fromJson(Map<String, dynamic>.from(row as Map)))
+          .toList();
     }
     _throwFromResponse(response);
   }

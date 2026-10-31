@@ -5,6 +5,7 @@ import 'package:societybites/config/launch_config.dart';
 import 'package:societybites/models/guest_discovery.dart';
 import 'package:societybites/screens/guest_kitchens_screen.dart';
 import 'package:societybites/screens/guest_landing_screen.dart';
+import 'package:societybites/services/serving_city_label.dart';
 import 'package:societybites/widgets/app_header.dart';
 
 void _ignoreKnownLayoutNoise() {
@@ -24,6 +25,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    ServingCityLabel.load = () async => currentServingCity;
   });
 
   testWidgets('logged-out landing shows premium guest copy', (tester) async {

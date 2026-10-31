@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'otp_screen.dart';
+import '../config/launch_config.dart';
 import '../services/api_service.dart';
 import '../services/auth_config.dart';
+import '../services/serving_city_label.dart';
 import '../web/web_auth_aside.dart';
 import '../web/web_breakpoints.dart';
 import '../widgets/app_header.dart';
@@ -23,15 +25,25 @@ class _LoginScreenState extends State<LoginScreen> {
   final FocusNode _phoneFocusNode = FocusNode();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isSendingOtp = false;
+  String _servingLabel = currentServingCity;
 
   @override
   void initState() {
     super.initState();
+    _loadServingLabel();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _phoneFocusNode.requestFocus();
       }
     });
+  }
+
+  Future<void> _loadServingLabel() async {
+    try {
+      final label = await ServingCityLabel.load();
+      if (!mounted || label.trim().isEmpty || label == _servingLabel) return;
+      setState(() => _servingLabel = label.trim());
+    } catch (_) {}
   }
 
   String _normalizeIndianNumber(String raw) {
@@ -191,7 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: const Color(0xFF3A4644),
                   ),
                 ),
-              _HeaderSection(theme: theme),
+              _HeaderSection(theme: theme, servingLabel: _servingLabel),
               const SizedBox(height: 22),
               _InputSection(
                 controller: _phoneController,
@@ -328,7 +340,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: const Color(0xFF3A4644),
                             ),
                           ),
-                        _HeaderSection(theme: theme),
+                        _HeaderSection(theme: theme, servingLabel: _servingLabel),
                         SizedBox(height: sectionGap),
                         _InputSection(
                           controller: _phoneController,
@@ -358,9 +370,10 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 class _HeaderSection extends StatelessWidget {
-  const _HeaderSection({required this.theme});
+  const _HeaderSection({required this.theme, required this.servingLabel});
 
   final ThemeData theme;
+  final String servingLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -401,6 +414,17 @@ class _HeaderSection extends StatelessWidget {
             fontSize: isIos ? 15 : null,
             color: const Color(0xFF4A5A57),
             height: isIos ? 1.35 : 1.45,
+          ),
+        ),
+        SizedBox(height: isIos ? 8 : 10),
+        Text(
+          'Now serving $servingLabel',
+          key: const Key('login-serving-city'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0E5A47),
           ),
         ),
       ],

@@ -22,6 +22,11 @@ const {
   assignEligibleUsers,
 } = require("../lib/coupons");
 const { canonicalCityKey } = require("../lib/launchCity");
+const {
+  listServingCityRows,
+  refreshServingCities,
+  saveActiveCityKeys,
+} = require("../lib/servingCities");
 const { validateCityReachRadii } = require("../lib/sellingReach");
 const {
   getAdminFssaiSummary,
@@ -1188,6 +1193,35 @@ router.put(
     });
 
     res.json(config);
+  })
+);
+
+// GET /admin/serving-cities — view for console admins, changes are super-admin only
+router.get(
+  "/serving-cities",
+  asyncHandler(async (_req, res) => {
+    const config = await refreshServingCities({ bypassCache: true });
+    res.json(listServingCityRows(config));
+  })
+);
+
+// PUT /admin/serving-cities — super admin (non-GET is blocked for console admins)
+router.put(
+  "/serving-cities",
+  asyncHandler(async (req, res) => {
+    const config = await saveActiveCityKeys(req.body && req.body.activeCityKeys);
+    const rows = listServingCityRows(config);
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user.id,
+        action: "UPDATE_SERVING_CITIES",
+        target: "serving_cities",
+        details: JSON.stringify({
+          activeCityKeys: rows.filter((row) => row.active).map((row) => row.cityKey),
+        }),
+      },
+    });
+    res.json(rows);
   })
 );
 

@@ -12,6 +12,7 @@ const {
   suggestionMatchesLaunchCity,
   societyMatchesLaunchCity,
 } = require("../lib/launchCity");
+const { refreshServingCities } = require("../lib/servingCities");
 const {
   mapAutocompleteSuggestions,
   mapPlaceDetails,
@@ -97,6 +98,7 @@ router.get(
     if (query.length < 2) {
       return res.json({ results: [], source: "google" });
     }
+    await refreshServingCities();
 
     if (!isPlacesConfigured()) {
       return res.json({
@@ -135,6 +137,7 @@ router.post(
     if (!placeId) {
       return res.status(400).json({ error: "placeId is required" });
     }
+    await refreshServingCities();
 
     const details = mapPlaceDetails(await getPlaceDetails(placeId));
     const preview = await previewSocietyFromPlace(prisma, details, {
@@ -210,6 +213,7 @@ router.post(
     let society = null;
 
     if (googlePlaceId) {
+      await refreshServingCities();
       const details = mapPlaceDetails(
         await getPlaceDetails(String(googlePlaceId).trim())
       );

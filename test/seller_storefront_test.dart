@@ -151,6 +151,69 @@ void main() {
     },
   );
 
+  test(
+    'beyond-society kitchens sort by distance after kitchens selling today',
+    () {
+      FoodItem listing({
+        required String sellerId,
+        required String sellerName,
+        required double rating,
+        required double distanceKm,
+        int quantity = 1,
+      }) {
+        return FoodItem(
+          id: sellerId,
+          name: 'Dish',
+          sellerId: sellerId,
+          sellerName: sellerName,
+          block: 'Block A',
+          price: 80,
+          rating: rating,
+          pickupTime: '5:00 PM',
+          description: '',
+          quantity: quantity,
+          reviewCount: 8,
+          icon: Icons.restaurant,
+          bgColor: const Color(0xFFE8F5EE),
+          distanceKm: distanceKm,
+        );
+      }
+
+      final sellers = sellersFromListings(
+        [
+          listing(
+            sellerId: 'far-star',
+            sellerName: 'Krunch Cart',
+            rating: 5,
+            distanceKm: 6.8,
+          ),
+          listing(
+            sellerId: 'near',
+            sellerName: 'Priyanka',
+            rating: 3,
+            distanceKm: 0.2,
+          ),
+          listing(
+            sellerId: 'mid',
+            sellerName: 'Micky',
+            rating: 4.9,
+            distanceKm: 3.1,
+            quantity: 0,
+          ),
+        ],
+        sort: HomeSellerSort.distance,
+      );
+
+      expect(sellers.map((seller) => seller.id).toList(), [
+        'near',
+        'far-star',
+        'mid',
+      ]);
+      expect(sellers[0].distanceChipLabel, '200 m');
+      expect(sellers[1].distanceChipLabel, '6.8 km');
+    },
+  );
+
   test('campaign provides seller metadata for storefront navigation', () {
     final seller = sellerFromPreOrderCampaign(_campaign());
 
