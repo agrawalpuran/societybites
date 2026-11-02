@@ -67,7 +67,8 @@ void main() {
         ),
       ),
     );
-    final webHeight = tester.getSize(find.byType(AspectRatio)).height;
+    final webHeight = tester.getSize(find.byKey(const Key('festival-hero-overlay'))).height;
+    expect(find.byKey(const Key('festival-hero-artwork')), findsOneWidget);
 
     await tester.pumpWidget(
       const MediaQuery(
@@ -86,7 +87,9 @@ void main() {
         ),
       ),
     );
-    final phoneArtHeight = tester.getSize(find.byType(AspectRatio)).height;
+    final phoneArtHeight =
+        tester.getSize(find.byKey(const Key('festival-hero-overlay'))).height;
+    expect(find.byKey(const Key('festival-hero-artwork')), findsOneWidget);
     expect(phoneArtHeight, closeTo(webHeight, 0.5));
     expect(webHeight, closeTo(width / kFestivalHeroAspectRatio, 0.5));
   });

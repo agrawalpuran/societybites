@@ -15,13 +15,32 @@ class AdminGrowthPanel extends StatefulWidget {
 
 class _AdminGrowthPanelState extends State<AdminGrowthPanel> {
   static const _ranges = <String, String>{
-    'day': 'Daily',
-    'week': 'Weekly',
-    'month': 'Monthly',
-    'quarter': 'Quarterly',
-    'half_year': 'Half-year',
-    'year': 'Yearly',
+    'day': 'Last 14 days',
+    'week': 'Last 8 weeks',
+    'month': 'Last 6 months',
+    'quarter': 'Last 4 quarters',
+    'half_year': 'Last 4 half-years',
+    'year': 'Last 12 months',
   };
+
+  String get _windowHint {
+    switch (_range) {
+      case 'day':
+        return 'The three cards are the total for the last 14 days. Use the table for a single day.';
+      case 'week':
+        return 'The three cards are the total for the last 8 weeks. Use the table for one week.';
+      case 'month':
+        return 'The three cards are the total for the last 6 months. Use the table for one month.';
+      case 'quarter':
+        return 'The three cards are the total for the last 4 quarters. Use the table for one quarter.';
+      case 'half_year':
+        return 'The three cards are the total for the last 4 half-years. Use the table for one half.';
+      case 'year':
+        return 'The three cards are the total for the last 12 months. Use the table for one month.';
+      default:
+        return 'The three cards total the selected window. Use the table for one period.';
+    }
+  }
 
   String _range = 'day';
   Map<String, dynamic>? _data;
@@ -111,6 +130,16 @@ class _AdminGrowthPanelState extends State<AdminGrowthPanel> {
             );
           }).toList(),
         ),
+        const SizedBox(height: 8),
+        Text(
+          _windowHint,
+          style: const TextStyle(
+            fontSize: 12,
+            height: 1.35,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF6A7774),
+          ),
+        ),
         const SizedBox(height: 16),
         if (_loading)
           const Padding(
@@ -141,7 +170,10 @@ class _AdminGrowthPanelState extends State<AdminGrowthPanel> {
             ),
           )
         else if (_data != null)
-          _GrowthBody(data: _data!),
+          _GrowthBody(
+            data: _data!,
+            windowLabel: _ranges[_range] ?? 'Selected range',
+          ),
       ],
     );
   }
@@ -427,9 +459,10 @@ class _GrowthMembersSheetState extends State<_GrowthMembersSheet> {
 }
 
 class _GrowthBody extends StatelessWidget {
-  const _GrowthBody({required this.data});
+  const _GrowthBody({required this.data, required this.windowLabel});
 
   final Map<String, dynamic> data;
+  final String windowLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -443,49 +476,47 @@ class _GrowthBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final cross = constraints.maxWidth > 520 ? 3 : 1;
-            final cards = [
-              _SummaryTile(
-                label: 'New accounts',
+        Row(
+          children: [
+            Expanded(
+              child: _SummaryTile(
+                label: 'Accounts',
+                sheetTitle: 'New accounts',
                 value: (summary['newAccounts'] as num?)?.toInt() ?? 0,
                 icon: Icons.person_add_alt_1_rounded,
                 metric: 'accounts',
-                periodLabel: 'Full selected range',
+                periodLabel: windowLabel,
                 start: rangeStart,
                 end: rangeEnd,
               ),
-              _SummaryTile(
-                label: 'New buyers (role)',
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _SummaryTile(
+                label: 'Buyers',
+                sheetTitle: 'New buyers',
                 value: (summary['newBuyers'] as num?)?.toInt() ?? 0,
                 icon: Icons.shopping_bag_outlined,
                 metric: 'buyers',
-                periodLabel: 'Full selected range',
+                periodLabel: windowLabel,
                 start: rangeStart,
                 end: rangeEnd,
               ),
-              _SummaryTile(
-                label: 'New sellers',
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _SummaryTile(
+                label: 'Sellers',
+                sheetTitle: 'New sellers',
                 value: (summary['newSellers'] as num?)?.toInt() ?? 0,
                 icon: Icons.storefront_outlined,
                 metric: 'sellers',
-                periodLabel: 'Full selected range',
+                periodLabel: windowLabel,
                 start: rangeStart,
                 end: rangeEnd,
               ),
-            ];
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: cards.map((card) {
-                final width = cross == 1
-                    ? constraints.maxWidth
-                    : (constraints.maxWidth - (cross - 1) * 12) / cross;
-                return SizedBox(width: width, child: card);
-              }).toList(),
-            );
-          },
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         Container(
@@ -701,6 +732,7 @@ class _GrowthCountCell extends StatelessWidget {
 class _SummaryTile extends StatelessWidget {
   const _SummaryTile({
     required this.label,
+    required this.sheetTitle,
     required this.value,
     required this.icon,
     required this.metric,
@@ -710,6 +742,7 @@ class _SummaryTile extends StatelessWidget {
   });
 
   final String label;
+  final String sheetTitle;
   final int value;
   final IconData icon;
   final String metric;
@@ -726,41 +759,34 @@ class _SummaryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = Row(
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 20, color: const Color(0xFF0E5A47)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$value',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF101617),
-                  decoration: _canOpen ? TextDecoration.underline : null,
-                ),
-              ),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF6A7774),
-                ),
-              ),
-              if (_canOpen)
-                const Text(
-                  'Tap to see contacts',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF0E5A47),
-                  ),
-                ),
-            ],
+        Icon(icon, size: 18, color: const Color(0xFF0E5A47)),
+        const SizedBox(height: 6),
+        Text(
+          '$value',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 20,
+            height: 1.1,
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF101617),
+            decoration: _canOpen ? TextDecoration.underline : null,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 11,
+            height: 1.1,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF6A7774),
           ),
         ),
       ],
@@ -774,7 +800,7 @@ class _SummaryTile extends StatelessWidget {
             ? () => _showGrowthMembersSheet(
                 context: context,
                 metric: metric,
-                title: label,
+                title: sheetTitle,
                 periodLabel: periodLabel,
                 start: start!,
                 end: end!,
@@ -787,7 +813,7 @@ class _SummaryTile extends StatelessWidget {
             border: Border.all(color: const Color(0xFFEAEFED)),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
             child: content,
           ),
         ),

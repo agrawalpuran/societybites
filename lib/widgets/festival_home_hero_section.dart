@@ -22,46 +22,51 @@ class FestivalHomeHeroSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final inset = topInset > 0 ? topInset : 0.0;
-    final art = FestivalBannerArtwork(content: content);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (inset > 0)
-          SizedBox(
-            height: inset,
-            width: double.infinity,
-            child: ClipRect(
-              child: FestivalBannerArtwork(
-                content: content,
-                alignment: Alignment.topCenter,
-              ),
-            ),
-          ),
-        AspectRatio(
-          aspectRatio: kFestivalHeroAspectRatio,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final overlayHeight = width / kFestivalHeroAspectRatio;
+        return SizedBox(
+          height: inset + overlayHeight,
+          width: width,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              art,
+              Positioned.fill(
+                child: FestivalBannerArtwork(
+                  key: const Key('festival-hero-artwork'),
+                  content: content,
+                  alignment: Alignment.topCenter,
+                ),
+              ),
               if (content.hasDisplayText)
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color(0x2E000000),
-                        Color(0x14000000),
-                        Color(0x00000000),
-                      ],
+                const Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x2E000000),
+                          Color(0x14000000),
+                          Color(0x00000000),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              child,
+              Positioned(
+                key: const Key('festival-hero-overlay'),
+                top: inset,
+                left: 0,
+                right: 0,
+                height: overlayHeight,
+                child: child,
+              ),
             ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }

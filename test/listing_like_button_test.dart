@@ -27,7 +27,8 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: Scaffold(body: ListingLikeButton(food: _food()))),
     );
-    expect(find.byIcon(Icons.favorite_border_rounded), findsOneWidget);
+    final heart = tester.widget<Icon>(find.byIcon(Icons.favorite_border_rounded));
+    expect(heart.size, 22);
     expect(find.text('0'), findsNothing);
   });
 

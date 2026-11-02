@@ -406,172 +406,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             const SizedBox(height: 20),
             _SectionTitle(title: 'SETTINGS'),
             const SizedBox(height: 10),
-            Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
+            _SettingsPair(
+              left: _SettingCard(
+                icon: Icons.payments_outlined,
+                title: 'Platform fee',
+                subtitle: '₹${_platformFee.toStringAsFixed(0)} at checkout',
                 onTap: _editPlatformFee,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFEAEFED)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0E5A47).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.payments_outlined,
-                          size: 18,
-                          color: Color(0xFF0E5A47),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Platform Fee',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: Color(0xFF101617),
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Charged on every order at checkout',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF6A7774),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '₹${_platformFee.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0E5A47),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.edit_outlined,
-                        size: 18,
-                        color: Color(0xFF8A9491),
-                      ),
-                    ],
-                  ),
+              ),
+              right: _SettingCard(
+                icon: Icons.chat_outlined,
+                title: 'WhatsApp',
+                subtitle: _whatsappOrderNotifications
+                    ? 'Order alerts on'
+                    : 'Order alerts off',
+                onTap: () => _toggleWhatsAppOrderNotifications(
+                  !_whatsappOrderNotifications,
+                ),
+                trailing: Switch.adaptive(
+                  value: _whatsappOrderNotifications,
+                  onChanged: _toggleWhatsAppOrderNotifications,
                 ),
               ),
             ),
-            const SizedBox(height: 10),
-            Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              child: SwitchListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
-                ),
-                title: const Text(
-                  'WhatsApp order notifications',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    color: Color(0xFF101617),
-                  ),
-                ),
-                subtitle: const Text(
-                  'Enable or disable WhatsApp alerts to sellers when new orders are placed.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF6A7774)),
-                ),
-                value: _whatsappOrderNotifications,
-                onChanged: _toggleWhatsAppOrderNotifications,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
+            const SizedBox(height: 8),
+            _SettingsPair(
+              left: _SettingCard(
+                icon: Icons.system_update_alt_rounded,
+                title: 'Force update',
+                subtitle: _minIosBuild <= 0 && _minAndroidBuild <= 0
+                    ? 'Off — all builds'
+                    : 'iOS ≥ $_minIosBuild · And ≥ $_minAndroidBuild',
                 onTap: _editForceUpdate,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFEAEFED)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0E5A47).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.system_update_alt_rounded,
-                          size: 18,
-                          color: Color(0xFF0E5A47),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Force update',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: Color(0xFF101617),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _minIosBuild <= 0 && _minAndroidBuild <= 0
-                                  ? 'Off — all builds allowed'
-                                  : 'iOS ≥ $_minIosBuild · Android ≥ $_minAndroidBuild',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF6A7774),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.edit_outlined,
-                        size: 18,
-                        color: Color(0xFF8A9491),
-                      ),
-                    ],
-                  ),
-                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
+              right: _SettingCard(
+                icon: Icons.location_city_outlined,
+                title: 'Serving cities',
+                subtitle: 'Who can join',
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -579,67 +449,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                   );
                 },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFEAEFED)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0E5A47).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.location_city_outlined,
-                          size: 18,
-                          color: Color(0xFF0E5A47),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Serving cities',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: Color(0xFF101617),
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Which cities can join. Super admin changes this.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF6A7774),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: Color(0xFF8A9491),
-                      ),
-                    ],
-                  ),
-                ),
               ),
             ),
-            const SizedBox(height: 10),
-            Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
+            const SizedBox(height: 8),
+            _SettingsPair(
+              left: _SettingCard(
+                icon: Icons.travel_explore_outlined,
+                title: 'City reach',
+                subtitle: 'Selling radii',
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -647,60 +464,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                   );
                 },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFEAEFED)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0E5A47).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.travel_explore_outlined,
-                          size: 18,
-                          color: Color(0xFF0E5A47),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'City Reach Configuration',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: Color(0xFF101617),
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Level 2 and Level 3 selling radii per city',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF6A7774),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: Color(0xFF8A9491),
-                      ),
-                    ],
-                  ),
-                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -934,6 +697,121 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             ]),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsPair extends StatelessWidget {
+  const _SettingsPair({required this.left, this.right});
+
+  final Widget left;
+  final Widget? right;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 8),
+        Expanded(child: right ?? const SizedBox.shrink()),
+      ],
+    );
+  }
+}
+
+class _SettingCard extends StatelessWidget {
+  const _SettingCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFEAEFED)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0E5A47).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(icon, size: 16, color: const Color(0xFF0E5A47)),
+                    ),
+                    const Spacer(),
+                    if (trailing != null)
+                      SizedBox(
+                        height: 32,
+                        child: FittedBox(
+                          fit: BoxFit.contain,
+                          child: trailing,
+                        ),
+                      )
+                    else
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        size: 20,
+                        color: Color(0xFF8A9491),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    height: 1.15,
+                    color: Color(0xFF101617),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    height: 1.15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6A7774),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

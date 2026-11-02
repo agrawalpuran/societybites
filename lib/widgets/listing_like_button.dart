@@ -92,7 +92,7 @@ class _ListingLikeButtonState extends State<ListingLikeButton> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 18, color: heartColor),
+                Icon(icon, size: 22, color: heartColor),
                 if (count != null) ...[
                   const SizedBox(width: 4),
                   Text(
@@ -110,27 +110,34 @@ class _ListingLikeButtonState extends State<ListingLikeButton> {
         ),
       );
     }
-    return InkWell(
-      onTap: _toggle,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: heartColor),
-            if (count != null) ...[
-              const SizedBox(width: 3),
-              Text(
-                count,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: numberColor,
-                ),
-              ),
-            ],
-          ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _toggle,
+        borderRadius: BorderRadius.circular(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 22, color: heartColor),
+                if (count != null) ...[
+                  const SizedBox(width: 3),
+                  Text(
+                    count,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: numberColor,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
