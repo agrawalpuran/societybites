@@ -17,7 +17,7 @@ class AppHeader extends StatefulWidget {
     this.showUser = true,
     this.cartItemCount,
     this.onCartPressed,
-    this.padding = const EdgeInsets.fromLTRB(20, 14, 20, 0),
+    this.padding,
     this.onFestiveBackground = false,
   });
 
@@ -30,7 +30,13 @@ class AppHeader extends StatefulWidget {
   final bool showUser;
   final int? cartItemCount;
   final VoidCallback? onCartPressed;
-  final EdgeInsets padding;
+  final EdgeInsets? padding;
+
+  EdgeInsets get _resolvedPadding =>
+      padding ??
+      (onFestiveBackground
+          ? const EdgeInsets.fromLTRB(20, 10, 20, 0)
+          : const EdgeInsets.fromLTRB(20, 14, 20, 0));
 
   @override
   State<AppHeader> createState() => _AppHeaderState();
@@ -69,7 +75,7 @@ class _AppHeaderState extends State<AppHeader> {
     return SizedBox(
       width: double.infinity,
       child: Padding(
-        padding: widget.padding,
+        padding: widget._resolvedPadding,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -158,7 +164,7 @@ class _UserInfoColumn extends StatelessWidget {
     if (name == null || name!.isEmpty) {
       return Icon(
         Icons.person_rounded,
-        color: onFestiveBackground ? Colors.white : const Color(0xFF0E5A47),
+        color: const Color(0xFF0E5A47),
         size: 22,
       );
     }
@@ -172,12 +178,9 @@ class _UserInfoColumn extends StatelessWidget {
         fontSize: 13,
         height: 1.2,
         color: onFestiveBackground
-            ? Colors.white
+            ? const Color(0xFF0A4638)
             : const Color(0xFF4A5A57),
-        fontWeight: FontWeight.w600,
-        shadows: onFestiveBackground
-            ? const [Shadow(color: Colors.black26, blurRadius: 4)]
-            : null,
+        fontWeight: FontWeight.w700,
       ),
     );
   }

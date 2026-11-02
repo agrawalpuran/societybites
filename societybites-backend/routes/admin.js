@@ -43,6 +43,10 @@ const {
   isFssaiSellingRequirementEnabled,
   setFssaiSellingRequirement,
 } = require("../lib/fssaiRequirement");
+const {
+  isWhatsAppOrderNotificationsEnabled,
+  setWhatsAppOrderNotifications,
+} = require("../lib/whatsappSetting");
 const { listCouponSellerPayouts } = require("../lib/couponRecon");
 const {
   listAddressProofs,
@@ -73,6 +77,7 @@ const {
   getPerformanceExportCsv,
 } = require("../lib/adminSellerPerformance");
 const { getAdminOrderDetail } = require("../lib/adminOrderDetail");
+const { liveAccountWhere } = require("../lib/accountDeletion");
 const {
   getMarketingPushStatus,
   sendMarketingPush,
@@ -231,9 +236,9 @@ router.get(
       ratingAgg,
       completedFoodSalesAgg,
     ] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { role: "seller" } }),
-      prisma.user.count({ where: { role: "buyer" } }),
+      prisma.user.count({ where: liveAccountWhere }),
+      prisma.user.count({ where: { ...liveAccountWhere, role: "seller" } }),
+      prisma.user.count({ where: { ...liveAccountWhere, role: "buyer" } }),
       prisma.society.count(),
       prisma.listing.count({ where: { status: "active" } }),
       prisma.listing.count({ where: { status: "sold_out" } }),
@@ -1054,10 +1059,13 @@ router.get(
     const { getForceUpdateConfig } = require("../lib/appForceUpdate");
     const platformFee = await getPlatformFee();
     const fssaiSellingRequirement = await isFssaiSellingRequirementEnabled();
+    const whatsappOrderNotifications =
+      await isWhatsAppOrderNotificationsEnabled();
     const forceUpdate = await getForceUpdateConfig({ bypassCache: true });
     res.json({
       platformFee,
       fssaiSellingRequirement,
+      whatsappOrderNotifications,
       minIosBuild: forceUpdate.minIosBuild,
       minAndroidBuild: forceUpdate.minAndroidBuild,
       iosUpdateUrl: forceUpdate.iosUpdateUrl,
@@ -1077,6 +1085,7 @@ router.patch(
     const {
       platformFee,
       fssaiSellingRequirement,
+      whatsappOrderNotifications,
       minIosBuild,
       minAndroidBuild,
       iosUpdateUrl,
@@ -1084,12 +1093,20 @@ router.patch(
     } = req.body;
 
     const updates = {};
+    let whatsappOrderNotificationsPrevious;
     if (platformFee !== undefined && platformFee !== null) {
       updates.platformFee = await setPlatformFee(platformFee);
     }
     if (fssaiSellingRequirement !== undefined) {
       updates.fssaiSellingRequirement = await setFssaiSellingRequirement(
         Boolean(fssaiSellingRequirement)
+      );
+    }
+    if (whatsappOrderNotifications !== undefined) {
+      whatsappOrderNotificationsPrevious =
+        await isWhatsAppOrderNotificationsEnabled();
+      updates.whatsappOrderNotifications = await setWhatsAppOrderNotifications(
+        Boolean(whatsappOrderNotifications)
       );
     }
     const forceUpdates = await setForceUpdateConfig({
@@ -1108,12 +1125,27 @@ router.patch(
       return res.status(400).json({ error: "Nothing to update" });
     }
 
+    const whatsappOnly =
+      Object.keys(updates).length === 1 &&
+      Object.prototype.hasOwnProperty.call(
+        updates,
+        "whatsappOrderNotifications"
+      );
     await prisma.auditLog.create({
       data: {
         adminId: req.user.id,
-        action: "UPDATE_ADMIN_SETTINGS",
+        action: whatsappOnly
+          ? "UPDATE_WHATSAPP_ORDER_NOTIFICATIONS"
+          : "UPDATE_ADMIN_SETTINGS",
         target: "settings",
-        details: JSON.stringify(updates),
+        details: JSON.stringify({
+          ...updates,
+          ...(whatsappOrderNotificationsPrevious === undefined
+            ? {}
+            : {
+                whatsappOrderNotificationsPrevious,
+              }),
+        }),
       },
     });
 
@@ -1125,6 +1157,9 @@ router.patch(
       fssaiSellingRequirement:
         updates.fssaiSellingRequirement ??
         (await isFssaiSellingRequirementEnabled()),
+      whatsappOrderNotifications:
+        updates.whatsappOrderNotifications ??
+        (await isWhatsAppOrderNotificationsEnabled()),
       minIosBuild: forceUpdate.minIosBuild,
       minAndroidBuild: forceUpdate.minAndroidBuild,
       iosUpdateUrl: forceUpdate.iosUpdateUrl,

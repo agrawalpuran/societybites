@@ -33,7 +33,6 @@ class WebMarketplaceHome extends StatefulWidget {
     required this.categoryCounts,
     required this.heroFoods,
     required this.allFiltered,
-    required this.highlights,
     required this.highlightSellers,
     required this.sellerListings,
     required this.readyNow,
@@ -87,7 +86,6 @@ class WebMarketplaceHome extends StatefulWidget {
   final Map<String, int> categoryCounts;
   final List<FoodItem> heroFoods;
   final List<FoodItem> allFiltered;
-  final List<FoodItem> highlights;
   final List<Seller> highlightSellers;
   final List<FoodItem> sellerListings;
   final List<FoodItem> readyNow;
@@ -137,6 +135,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
   final _madeKey = GlobalKey();
   final _preorderKey = GlobalKey();
   final _nearbyKey = GlobalKey();
+  bool _readyExpanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -178,7 +177,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
 
   Widget _body(double width) {
     if (widget.errorMessage != null &&
-        widget.highlights.isEmpty &&
+        widget.highlightSellers.isEmpty &&
         widget.readyNow.isEmpty &&
         widget.madeToOrder.isEmpty &&
         widget.nearbyListings.isEmpty &&
@@ -278,13 +277,6 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
 
   Widget _listingSections() {
     final sections = <Widget>[
-      if (widget.highlights.isNotEmpty)
-        _foodSection(
-          eyebrow: "In your society",
-          title: "Today's kitchen highlights",
-          items: widget.highlights,
-          reach: HomeListingReach.inSociety,
-        ),
       if (widget.highlightSellers.isNotEmpty)
         _sellerSection(
           eyebrow: 'In your society',
@@ -426,23 +418,47 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
     return Padding(
       key: _readyKey,
       padding: const EdgeInsets.only(top: 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const WebSectionHeader(
-            eyebrow: 'Order now',
-            title: 'Ready right now',
-            subtitle: 'Listings you can add to the cart today.',
-          ),
-          const SizedBox(height: 14),
-          WebReadyNowStrip(
-            items: widget.readyNow,
-            cartQtyFor: widget.cartQtyFor,
-            onAdd: widget.onAdd,
-            onRemove: widget.onRemove,
-            onOpen: widget.onOpenFood,
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final preview = webReadyNowPreviewCount(constraints.maxWidth);
+          final items = widget.readyNow;
+          final canToggle = items.length > preview;
+          final expanded = _readyExpanded && canToggle;
+          final visible =
+              expanded ? items : items.take(preview).toList(growable: false);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              WebSectionHeader(
+                eyebrow: 'Order now',
+                title: 'Ready right now',
+                subtitle: 'Listings you can add to the cart today.',
+                trailing: canToggle
+                    ? _SeeAll(
+                        key: Key(
+                          expanded
+                              ? 'web-ready-show-less'
+                              : 'web-ready-see-all',
+                        ),
+                        expanded: expanded,
+                        onTap: () =>
+                            setState(() => _readyExpanded = !expanded),
+                      )
+                    : null,
+              ),
+              const SizedBox(height: 14),
+              WebFoodGrid(
+                items: visible,
+                cartQtyFor: widget.cartQtyFor,
+                onAdd: widget.onAdd,
+                onRemove: widget.onRemove,
+                onOpen: widget.onOpenFood,
+                onSeller: (food) =>
+                    widget.onOpenSeller(sellerFromListing(food)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -456,9 +472,12 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
   }) {
     final expanded = reach != null && widget.expandedReach == reach;
     final preview = webIsDesktopWidth(MediaQuery.sizeOf(context).width) ? 8 : 6;
-    final visible = expanded || items.length <= preview
-        ? items
-        : items.take(preview).toList();
+    final fair = previewListingsPerSeller(items);
+    final collapsed = fair.length <= preview
+        ? fair
+        : fair.take(preview).toList();
+    final visible = expanded ? items : collapsed;
+    final canToggle = reach != null && items.length > collapsed.length;
     return Padding(
       key: key,
       padding: const EdgeInsets.only(top: 32),
@@ -468,14 +487,14 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           WebSectionHeader(
             eyebrow: eyebrow,
             title: title,
-            trailing: reach == null || items.length <= preview
-                ? null
-                : _SeeAll(
+            trailing: canToggle
+                ? _SeeAll(
                     expanded: expanded,
                     onTap: () => expanded
                         ? widget.onCollapseReach(reach)
                         : widget.onExpandReach(reach),
-                  ),
+                  )
+                : null,
           ),
           const SizedBox(height: 14),
           WebFoodGrid(
@@ -801,7 +820,7 @@ class WebSectionHeader extends StatelessWidget {
 }
 
 class _SeeAll extends StatelessWidget {
-  const _SeeAll({required this.expanded, required this.onTap});
+  const _SeeAll({super.key, required this.expanded, required this.onTap});
 
   final bool expanded;
   final VoidCallback onTap;

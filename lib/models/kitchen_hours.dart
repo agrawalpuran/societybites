@@ -24,11 +24,7 @@ int istMinutes(DateTime instant) {
 }
 
 /// Unset hours stay open. A close time earlier than open stays open past midnight.
-bool isKitchenOpen({
-  String? opensAt,
-  String? closesAt,
-  DateTime? now,
-}) {
+bool isKitchenOpen({String? opensAt, String? closesAt, DateTime? now}) {
   final open = clockToMinutes(opensAt);
   final close = clockToMinutes(closesAt);
   if (open == null || close == null) return true;
@@ -69,11 +65,21 @@ TimeOfDay timeOfDayFromClock(String? value, TimeOfDay fallback) {
   return TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
 }
 
-void showKitchenClosedMessage(BuildContext context) {
+String? kitchenClosedHoursLabel(String? opensAt, String? closesAt) {
+  final hours = kitchenHoursSubtitle(opensAt, closesAt);
+  if (hours == 'Always open') return null;
+  return hours;
+}
+
+void showKitchenClosedMessage(BuildContext context, {String? hours}) {
+  final window = hours?.trim() ?? '';
+  final message = window.isEmpty || window == 'Always open'
+      ? kitchenClosedMessage
+      : '$kitchenClosedMessage. $window';
   ScaffoldMessenger.of(context).clearSnackBars();
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      content: const Text(kitchenClosedMessage),
+      content: Text(message),
       duration: const Duration(seconds: 2),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

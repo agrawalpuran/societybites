@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../widgets/listing_image.dart';
+import '../widgets/listing_like_button.dart';
 import '../utils/listing_timing_chip.dart';
 import '../widgets/listing_compact_card_header.dart';
 import '../widgets/listing_buyer_price.dart';
@@ -1042,7 +1043,6 @@ class HomeScreenState extends State<HomeScreen> {
       categoryCounts: _webCategoryCounts(),
       heroFoods: _webHeroFoods(),
       allFiltered: _distanceFiltered,
-      highlights: _webRegularFor(HomeListingReach.inSociety),
       highlightSellers: _societySellers,
       sellerListings: _listings,
       readyNow: _webReadyNow,
@@ -1261,6 +1261,7 @@ class HomeScreenState extends State<HomeScreen> {
             onFestiveBackground: _festiveHeroUsesLightForeground(),
           ),
           FestivalHeroHeadline(content: content),
+          const Spacer(),
           _buildSearchBar(),
           _buildDistanceChip(),
           const SizedBox(height: 10),
@@ -1679,6 +1680,7 @@ class HomeScreenState extends State<HomeScreen> {
     'Pre-order',
     'Snacks',
     'Dairy',
+    'Pickle',
     'Desserts',
   ];
 
@@ -2417,6 +2419,7 @@ class _SpecialCard extends StatelessWidget {
                   height: 112,
                   borderRadius: 0,
                   iconSize: 60,
+                  showTriedBadge: true,
                 ),
               ),
             ),
@@ -2594,7 +2597,13 @@ class _AvailableItemTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            ListingImage(food: food, width: 72, height: 72, iconSize: 36),
+            ListingImage(
+              food: food,
+              width: 72,
+              height: 72,
+              iconSize: 36,
+              showTriedBadge: true,
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -2646,6 +2655,8 @@ class _AvailableItemTile extends StatelessWidget {
                             ),
                           ),
                           ListingPortionCaption(food: food),
+                          const SizedBox(height: 2),
+                          ListingLikeButton(food: food),
                           if (listingSoldCaption(
                             food.quantitySold,
                           ).isNotEmpty) ...[

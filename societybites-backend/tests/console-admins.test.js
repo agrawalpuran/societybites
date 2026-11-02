@@ -109,6 +109,43 @@ async function main() {
     });
     assert(dash.status === 200, "console admin can read dashboard");
 
+    const tombPhone = `deleted_dashboard_${Date.now()}`;
+    const tomb = await prisma.user.create({
+      data: {
+        phone: tombPhone,
+        role: "buyer",
+        suspended: true,
+        name: null,
+      },
+    });
+    try {
+      const afterTomb = await jsonRequest(server, {
+        method: "GET",
+        path: "/admin/dashboard",
+        token: consoleToken,
+      });
+      assert(afterTomb.status === 200, "dashboard still loads with tombstone");
+      const liveUsers = await prisma.user.count({
+        where: { NOT: { phone: { startsWith: "deleted_" } } },
+      });
+      const allUsers = await prisma.user.count();
+      assert(
+        afterTomb.json.totalUsers === liveUsers,
+        "dashboard totalUsers ignores deleted_ accounts"
+      );
+      assert(
+        afterTomb.json.totalUsers === dash.json.totalUsers,
+        "deleted_ tombstone does not change Total Users"
+      );
+      assert(allUsers > liveUsers, "raw user rows still include tombstones");
+      assert(
+        afterTomb.json.totalBuyers === dash.json.totalBuyers,
+        "deleted_ tombstone does not change Total Buyers"
+      );
+    } finally {
+      await prisma.user.delete({ where: { id: tomb.id } });
+    }
+
     const growth = await jsonRequest(server, {
       method: "GET",
       path: "/admin/growth?range=week",

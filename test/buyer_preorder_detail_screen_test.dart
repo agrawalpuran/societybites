@@ -91,8 +91,7 @@ void main() {
           price: 500,
           inventoryMode: 'demand',
           quantity: 0,
-          description:
-              'Wholesome, sweet made with dates portion size 250gm',
+          description: 'Wholesome, sweet made with dates portion size 250gm',
         ),
       ],
     );
@@ -154,5 +153,74 @@ void main() {
       find.widgetWithText(ElevatedButton, 'Continue Pre-order'),
     );
     expect(continueButton.onPressed, isNull);
+  });
+
+  testWidgets('see details opens the full description', (tester) async {
+    final now = DateTime.now();
+    const description =
+        'delicious roll made of Dates, Pista, Badam, coated with coconut. '
+        'No added sugar. Perfect for gifting and tea time.';
+    final campaign = PreOrderCampaign(
+      id: 'campaign-1',
+      sellerId: 'seller-1',
+      title: 'Diwali Sweets',
+      status: 'open',
+      orderOpenAt: now.subtract(const Duration(hours: 1)),
+      orderCutoffAt: now.add(const Duration(hours: 5)),
+      fulfilmentAt: now.add(const Duration(days: 1)),
+      products: const [
+        PreOrderProduct(
+          listingId: 'listing-dates',
+          name: 'Dates Badam Roll',
+          sellerId: 'seller-1',
+          sellerName: 'Ankita',
+          price: 421,
+          inventoryMode: 'demand',
+          quantity: 0,
+          description: description,
+          weightValue: '250',
+          weightUnit: 'g',
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BuyerPreOrderDetailScreen(
+          campaignId: 'campaign-1',
+          initialCampaign: campaign,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('preorder-product-detail')), findsNothing);
+    await tester.ensureVisible(find.text('See details'));
+    await tester.pump();
+    await tester.tap(find.text('See details'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byKey(const Key('preorder-product-detail')), findsOneWidget);
+    expect(find.text('Details'), findsOneWidget);
+    final name = find.text('Dates Badam Roll').last;
+    expect(tester.getSize(name).height, greaterThan(10));
+    expect(tester.getTopLeft(name).dy, lessThan(400));
+    final descriptionFinder = find.byKey(
+      const Key('preorder-product-description'),
+      skipOffstage: false,
+    );
+    await tester.ensureVisible(descriptionFinder);
+    await tester.pump();
+    final body = tester.widget<Text>(descriptionFinder);
+    expect(body.data, description);
+    expect(body.maxLines, isNull);
+    expect(find.text('250 g'), findsWidgets);
+    expect(find.text('Add to Pre-order'), findsWidgets);
+
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Add to Pre-order').last,
+    );
+    await tester.pump();
+    expect(find.text('1'), findsWidgets);
   });
 }

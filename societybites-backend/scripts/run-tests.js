@@ -18,6 +18,7 @@ const UNIT = [
   "order-number",
   "admin-order-detail",
   "serving-cities",
+  "listing-likes",
   "prisma-pool",
   "kitchen-hours",
   "food-type",
@@ -29,6 +30,8 @@ const UNIT = [
   "test-listing-names",
   "notifications-payload",
   "marketing-push",
+  "whatsapp-settings",
+  "whatsapp-cloud",
 ];
 
 /**
@@ -37,6 +40,10 @@ const UNIT = [
  */
 const REGRESSION = [
   "notifications-payload",
+  "whatsapp-cloud",
+  "whatsapp-settings",
+  "regression-whatsapp-orders",
+  "console-admins",
   "regression-order-journeys",
   "preorder-deep-link-auth",
   "order-lifecycle",
@@ -48,6 +55,7 @@ const REGRESSION = [
   "cross-society-order",
   "preorder",
   "listing-catalog",
+  "buyer-purchase-history",
   "test-otp",
   "app-force-update",
 ];

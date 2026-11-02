@@ -62,6 +62,7 @@ model User {
   preOrderCampaigns       PreOrderCampaign[]
   orders                  Order[]                 @relation("BuyerOrders")
   reviews                 Review[]
+  listingLikes            ListingLike[]
   sentMessages            Message[]
   sellerTermsAcceptances  SellerTermsAcceptance[]
   issueReports            IssueReport[]
@@ -228,7 +229,7 @@ model Listing {
   /// VEG | NON_VEG. Nullable for listings created before this field existed.
   foodType               String?
   category               String?
-  /// Multi-select food occasions. Labels in utils/listingCategories.js (e.g. Dairy).
+  /// Multi-select food occasions. Labels in utils/listingCategories.js (e.g. Dairy, Pickle).
   categories             String[]          @default([])
   availableAt            DateTime?
   pickupLocation         String            @default("My Home (Verified)")
@@ -283,6 +284,22 @@ model Listing {
   @@index([campaignId])
   @@index([sourceListingId])
   @@index([variantGroupId])
+}
+
+/// One like per buyer per dish. Sizes in a variant group share dishKey.
+/// listingId is the size that was tapped. It is not a foreign key, so removing
+/// one size leaves the shared dish like in place.
+model ListingLike {
+  id        String   @id @default(uuid())
+  userId    String
+  /// variantGroupId when the dish has sizes, otherwise the listing id.
+  dishKey   String
+  listingId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dishKey])
+  @@index([dishKey])
 }
 
 /// Seller-created future offering. Products are Listings with campaignId set.

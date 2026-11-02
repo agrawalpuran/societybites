@@ -1,10 +1,17 @@
 const prisma = require("./prisma");
 
+const ANONYMIZED_PHONE_PREFIX = "deleted_";
+
 /** Accounts anonymized for privacy; row kept for order/listing FK history. */
 function isAnonymizedDeletedUser(user) {
   if (!user) return true;
-  return String(user.phone || "").startsWith("deleted_");
+  return String(user.phone || "").startsWith(ANONYMIZED_PHONE_PREFIX);
 }
+
+/** Prisma filter for live people (excludes deleted_ tombstones). */
+const liveAccountWhere = {
+  NOT: { phone: { startsWith: ANONYMIZED_PHONE_PREFIX } },
+};
 
 /**
  * Privacy-preserving account deletion for SocietyBites.
@@ -90,6 +97,8 @@ async function deleteAuthenticatedAccount(userId) {
 }
 
 module.exports = {
+  ANONYMIZED_PHONE_PREFIX,
   deleteAuthenticatedAccount,
   isAnonymizedDeletedUser,
+  liveAccountWhere,
 };

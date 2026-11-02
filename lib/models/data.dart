@@ -105,6 +105,10 @@ class FoodItem {
   final DateTime? createdAt;
   final int reviewCount;
   final int quantitySold;
+  final int likeCount;
+  final bool likedByMe;
+  /// Buyer-specific: this viewer completed a purchase of this product in 12 months.
+  final bool purchasedBefore;
   final IconData icon;
   final Color bgColor;
   final String? sellerUpiId;
@@ -185,6 +189,9 @@ class FoodItem {
     this.createdAt,
     this.reviewCount = 0,
     this.quantitySold = 0,
+    this.likeCount = 0,
+    this.likedByMe = false,
+    this.purchasedBefore = false,
     required this.icon,
     required this.bgColor,
     this.sellerUpiId,
@@ -514,6 +521,9 @@ class FoodItem {
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? ''),
       reviewCount: _asInt(json['reviewCount'], 0),
       quantitySold: _asInt(json['quantitySold'], 0),
+      likeCount: _asInt(json['likeCount'], 0),
+      likedByMe: json['likedByMe'] == true,
+      purchasedBefore: json['purchasedBefore'] == true,
       icon: _icons[hash % _icons.length],
       bgColor: _colors[hash % _colors.length],
       sellerUpiId: json['sellerUpiId']?.toString(),
@@ -637,6 +647,9 @@ class FoodItem {
       createdAt: createdAt,
       reviewCount: reviewCount,
       quantitySold: quantitySold,
+      likeCount: likeCount,
+      likedByMe: likedByMe,
+      purchasedBefore: purchasedBefore,
       icon: icon,
       bgColor: bgColor,
       sellerUpiId: sellerUpiId,

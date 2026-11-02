@@ -42,6 +42,12 @@ int webFoodColumnCount(double width) {
   return 2;
 }
 
+/// Ready-right-now Home grid: two rows, then See all.
+const webReadyNowMaxRows = 2;
+
+int webReadyNowPreviewCount(double width) =>
+    webFoodColumnCount(width) * webReadyNowMaxRows;
+
 int webSellerColumnCount(double width) {
   if (width >= 1040) return 4;
   if (width >= 760) return 3;

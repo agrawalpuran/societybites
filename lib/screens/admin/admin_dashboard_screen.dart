@@ -27,6 +27,7 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Map<String, dynamic>? _stats;
   double _platformFee = 0;
+  bool _whatsappOrderNotifications = false;
   int _minIosBuild = 0;
   int _minAndroidBuild = 0;
   String _iosUpdateUrl = '';
@@ -64,6 +65,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       setState(() {
         _stats = results[0] as Map<String, dynamic>;
         _platformFee = (settings['platformFee'] as num?)?.toDouble() ?? 0;
+        _whatsappOrderNotifications =
+            settings['whatsappOrderNotifications'] == true;
         _minIosBuild = (settings['minIosBuild'] as num?)?.toInt() ?? 0;
         _minAndroidBuild = (settings['minAndroidBuild'] as num?)?.toInt() ?? 0;
         _iosUpdateUrl = settings['iosUpdateUrl']?.toString() ?? '';
@@ -246,6 +249,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update fee: $e')),
+      );
+    }
+  }
+
+  Future<void> _toggleWhatsAppOrderNotifications(bool value) async {
+    final previous = _whatsappOrderNotifications;
+    setState(() => _whatsappOrderNotifications = value);
+    try {
+      final on = await ApiService.updateAdminWhatsAppOrderNotifications(value);
+      if (!mounted) return;
+      setState(() => _whatsappOrderNotifications = on);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            on
+                ? 'WhatsApp order notifications enabled'
+                : 'WhatsApp order notifications disabled',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _whatsappOrderNotifications = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update WhatsApp setting: $e')),
       );
     }
   }
@@ -447,6 +475,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ],
                   ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              child: SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
+                title: const Text(
+                  'WhatsApp order notifications',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: Color(0xFF101617),
+                  ),
+                ),
+                subtitle: const Text(
+                  'Enable or disable WhatsApp alerts to sellers when new orders are placed.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF6A7774)),
+                ),
+                value: _whatsappOrderNotifications,
+                onChanged: _toggleWhatsAppOrderNotifications,
               ),
             ),
             const SizedBox(height: 10),

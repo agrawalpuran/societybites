@@ -79,6 +79,17 @@ void main() {
     expect(isAllListingCategoriesSelected(selected), isTrue);
   });
 
+  test('Home Pickle filter matches pickle listings', () {
+    final listings = [
+      _item(id: 'pickle', name: 'Mango pickle', categories: ['Pickle']),
+      _item(id: 'dairy', name: 'Paneer', categories: ['Dairy']),
+    ];
+    expect(
+      applyHomeListingFilters(listings, category: 'Pickle').map((e) => e.id),
+      ['pickle'],
+    );
+  });
+
   test('Home filter matches any selected category', () {
     final listings = [
       _item(

@@ -1073,6 +1073,43 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<({bool liked, int likeCount})> toggleListingLike(
+    String listingId,
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/listings/$listingId/like'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return (
+        liked: data['liked'] == true,
+        likeCount: (data['likeCount'] as num?)?.toInt() ?? 0,
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<String>> getListingLikers(String listingId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/listings/$listingId/likes'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      final rows = data['likes'];
+      if (rows is! List) return const [];
+      return rows
+          .map((row) {
+            if (row is Map) return row['name']?.toString().trim() ?? '';
+            return '';
+          })
+          .where((name) => name.isNotEmpty)
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> getListing(String listingId) async {
     final response = await http
         .get(
@@ -2347,6 +2384,19 @@ class ApiService {
     if (response.statusCode == 200) {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
       return data['fssaiSellingRequirement'] == true;
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<bool> updateAdminWhatsAppOrderNotifications(bool enabled) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/settings'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'whatsappOrderNotifications': enabled}),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return data['whatsappOrderNotifications'] == true;
     }
     _throwFromResponse(response);
   }

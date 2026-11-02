@@ -297,6 +297,7 @@ List<FoodItem> limitListingsPerSeller(
   List<FoodItem> ranked, {
   int maxPerSeller = homeMaxListingsPerSeller,
   int fillTarget = homeAllItemsPreviewCount,
+  bool includeDeferred = true,
 }) {
   if (ranked.length <= 1 || maxPerSeller < 1) return ranked;
   final head = <FoodItem>[];
@@ -314,7 +315,7 @@ List<FoodItem> limitListingsPerSeller(
 
   // fillTarget <= 0: hard cap only (used for per-reach Home sections).
   if (fillTarget <= 0 || head.length >= fillTarget || deferred.isEmpty) {
-    return [...head, ...deferred];
+    return includeDeferred ? [...head, ...deferred] : head;
   }
 
   final stillDeferred = <FoodItem>[];
@@ -326,6 +327,22 @@ List<FoodItem> limitListingsPerSeller(
     }
   }
   return [...head, ...stillDeferred];
+}
+
+/// Collapsed web/Home grids: two dishes per kitchen. If only one kitchen
+/// listed anything, keep that kitchen's dishes so the section is not empty.
+List<FoodItem> previewListingsPerSeller(List<FoodItem> ranked) {
+  if (ranked.length <= 1) return ranked;
+  final sellers = <String>{};
+  for (final food in ranked) {
+    sellers.add(food.sellerId);
+  }
+  if (sellers.length <= 1) return ranked;
+  return limitListingsPerSeller(
+    ranked,
+    fillTarget: 0,
+    includeDeferred: false,
+  );
 }
 
 int homeSearchMatchScore(FoodItem food, String searchQuery) {

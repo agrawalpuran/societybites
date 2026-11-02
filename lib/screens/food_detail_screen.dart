@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../web/web_breakpoints.dart';
 import '../widgets/listing_image.dart';
+import '../widgets/listing_like_button.dart';
 import '../widgets/listing_rating_mark.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/app_header.dart';
@@ -102,10 +103,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
               ],
             ),
           ),
-          _BottomCta(
-            food: food,
-            requireAuthToOrder: widget.requireAuthToOrder,
-          ),
+          _BottomCta(food: food, requireAuthToOrder: widget.requireAuthToOrder),
         ],
       ),
     );
@@ -127,10 +125,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
         _StorySection(food: food),
         _ReviewsSection(food: food),
         const SizedBox(height: 16),
-        _BottomCta(
-          food: food,
-          requireAuthToOrder: widget.requireAuthToOrder,
-        ),
+        _BottomCta(food: food, requireAuthToOrder: widget.requireAuthToOrder),
       ],
     );
     final image = ListingImage(
@@ -184,10 +179,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
                       if (constraints.maxWidth < 860) {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            image,
-                            info,
-                          ],
+                          children: [image, info],
                         );
                       }
                       return Row(
@@ -240,6 +232,11 @@ class _HeroSection extends StatelessWidget {
               onTap: () => Navigator.pop(context),
             ),
           ),
+        ),
+        Positioned(
+          top: 72,
+          right: 16,
+          child: ListingLikeButton(food: food, onPhoto: true),
         ),
         Positioned(
           left: 20,
@@ -369,7 +366,8 @@ class _VariantPicker extends StatelessWidget {
             children: [
               for (final option in variants)
                 _VariantChip(
-                  label: portionLabelForFood(option) ??
+                  label:
+                      portionLabelForFood(option) ??
                       option.variantLabel ??
                       'Option',
                   food: option,
@@ -405,13 +403,13 @@ class _VariantChip extends StatelessWidget {
     final bg = selected
         ? const Color(0xFF0E5A47)
         : enabled
-            ? Colors.white
-            : const Color(0xFFF0F3F2);
+        ? Colors.white
+        : const Color(0xFFF0F3F2);
     final fg = selected
         ? Colors.white
         : enabled
-            ? const Color(0xFF101617)
-            : const Color(0xFF8A9491);
+        ? const Color(0xFF101617)
+        : const Color(0xFF8A9491);
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(14),
@@ -451,7 +449,9 @@ class _VariantChip extends StatelessWidget {
                 regularStyle: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: selected ? const Color(0xFFD7EDE3) : const Color(0xFF8A9491),
+                  color: selected
+                      ? const Color(0xFFD7EDE3)
+                      : const Color(0xFF8A9491),
                   decoration: TextDecoration.lineThrough,
                 ),
               ),
@@ -471,13 +471,15 @@ class _QuickInfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final soldOut = food.isMadeToOrder
         ? food.madeToOrderUnavailableToday ||
-            food.isExpired ||
-            food.quantity <= 0
+              food.isExpired ||
+              food.quantity <= 0
         : food.quantity <= 0;
     final portion = portionLabelForFood(food);
     final timing = listingTimingChipFor(food);
+    final narrow = MediaQuery.sizeOf(context).width < 400;
+    final gap = narrow ? 8.0 : 12.0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+      padding: EdgeInsets.fromLTRB(narrow ? 16 : 20, 18, narrow ? 16 : 20, 0),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -487,17 +489,17 @@ class _QuickInfoRow extends StatelessWidget {
                 label: 'AVAILABILITY',
                 value: soldOut
                     ? (food.madeToOrderUnavailableToday
-                        ? 'Unavailable'
-                        : 'Sold out')
+                          ? 'Unavailable'
+                          : 'Sold out')
                     : '${food.quantity}',
                 sub: soldOut
                     ? 'currently unavailable'
                     : food.isMadeToOrder
-                        ? 'portions · made to order'
-                        : 'portions left',
+                    ? 'portions · made to order'
+                    : 'portions left',
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: gap),
             if (portion != null) ...[
               Expanded(
                 child: _InfoChip(
@@ -506,7 +508,7 @@ class _QuickInfoRow extends StatelessWidget {
                   sub: 'per unit',
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: gap),
             ],
             Expanded(
               child: _InfoChip(
@@ -534,10 +536,20 @@ class _InfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compactValue = value.length > 14;
+    final width = MediaQuery.sizeOf(context).width;
+    final narrow = width < 400;
+    final compactValue = value.length > 10;
+    final labelSize = narrow ? 9.0 : 11.0;
+    final valueSize = narrow
+        ? (compactValue ? 14.0 : 18.0)
+        : (compactValue ? 16.0 : 22.0);
+    final subSize = narrow ? 11.0 : 12.0;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      constraints: const BoxConstraints(minHeight: 104),
+      padding: EdgeInsets.symmetric(
+        horizontal: narrow ? 8 : 12,
+        vertical: narrow ? 10 : 12,
+      ),
+      constraints: BoxConstraints(minHeight: narrow ? 88 : 96),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -546,25 +558,35 @@ class _InfoChip extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              letterSpacing: 1.2,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF8A9491),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              label,
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(
+                fontSize: labelSize,
+                letterSpacing: narrow ? 0.2 : 0.6,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF8A9491),
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: compactValue ? 17 : 24,
-              height: compactValue ? 1.2 : 1.1,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF101617),
+          SizedBox(height: narrow ? 6 : 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(
+                fontSize: valueSize,
+                height: 1.1,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF101617),
+              ),
             ),
           ),
           const Spacer(),
@@ -573,9 +595,9 @@ class _InfoChip extends StatelessWidget {
               sub,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF8A9491),
+              style: TextStyle(
+                fontSize: subSize,
+                color: const Color(0xFF8A9491),
                 fontWeight: FontWeight.w500,
                 height: 1.25,
               ),
@@ -1026,6 +1048,9 @@ class _BottomCta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final closedHours = food.isKitchenClosed
+        ? kitchenClosedHoursLabel(food.kitchenOpensAt, food.kitchenClosesAt)
+        : null;
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 14, 16, 14),
       decoration: BoxDecoration(
@@ -1040,99 +1065,121 @@ class _BottomCta extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
               children: [
-                const Text(
-                  'Total Price',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF8A9491),
-                    fontWeight: FontWeight.w600,
-                  ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Total Price',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF8A9491),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    ListingBuyerPriceText(
+                      food: food,
+                      chargedStyle: const TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF101617),
+                      ),
+                    ),
+                  ],
                 ),
-                ListingBuyerPriceText(
-                  food: food,
-                  chargedStyle: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF101617),
+                const Spacer(),
+                Flexible(
+                  child: SizedBox(
+                    height: 54,
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: food.isKitchenClosed
+                          ? () => showKitchenClosedMessage(
+                              context,
+                              hours: closedHours,
+                            )
+                          : !food.canAddToCart
+                          ? null
+                          : () async {
+                              if (requireAuthToOrder) {
+                                await showGuestOrderAuthDialog(context);
+                                return;
+                              }
+                              if (!context.mounted) return;
+                              final allowed = await confirmCartSellerAllowed(
+                                context,
+                                cart: CartController.instance.items,
+                                sellerId: food.sellerId,
+                                sellerName: food.sellerName,
+                                onViewCart: () => CartController.instance
+                                    .openCheckout(context),
+                              );
+                              if (!allowed || !context.mounted) return;
+                              ApiService.prefetchPlatformFee();
+                              final lines = checkoutLinesForFood(
+                                food: food,
+                                globalCart: CartController.instance.items,
+                              );
+                              if (!context.mounted) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      CheckoutScreen(cartItems: lines),
+                                ),
+                              );
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0E5A47),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFFD94F4F),
+                        disabledForegroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                      ),
+                      icon: Icon(
+                        food.isKitchenClosed || !food.canAddToCart
+                            ? Icons.block_rounded
+                            : Icons.shopping_cart_rounded,
+                        size: 20,
+                      ),
+                      label: Text(
+                        food.isKitchenClosed
+                            ? kitchenClosedMessage
+                            : !food.canAddToCart
+                            ? food.orderActionLabel
+                            : 'Order Now',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
-            const Spacer(),
-            Flexible(
-              child: SizedBox(
-                height: 54,
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                onPressed: food.isKitchenClosed
-                    ? () => showKitchenClosedMessage(context)
-                    : !food.canAddToCart
-                    ? null
-                    : () async {
-                        if (requireAuthToOrder) {
-                          await showGuestOrderAuthDialog(context);
-                          return;
-                        }
-                        if (!context.mounted) return;
-                        final allowed = await confirmCartSellerAllowed(
-                          context,
-                          cart: CartController.instance.items,
-                          sellerId: food.sellerId,
-                          sellerName: food.sellerName,
-                          onViewCart: () =>
-                              CartController.instance.openCheckout(context),
-                        );
-                        if (!allowed || !context.mounted) return;
-                        ApiService.prefetchPlatformFee();
-                        final lines = checkoutLinesForFood(
-                          food: food,
-                          globalCart: CartController.instance.items,
-                        );
-                        if (!context.mounted) return;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CheckoutScreen(cartItems: lines),
-                          ),
-                        );
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0E5A47),
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFFD94F4F),
-                  disabledForegroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
-                icon: Icon(
-                  food.isKitchenClosed || !food.canAddToCart
-                      ? Icons.block_rounded
-                      : Icons.shopping_cart_rounded,
-                  size: 20,
-                ),
-                label: Text(
-                  food.isKitchenClosed
-                      ? kitchenClosedMessage
-                      : !food.canAddToCart
-                      ? food.orderActionLabel
-                      : 'Order Now',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
+            if (closedHours != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                closedHours,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0E5A47),
                 ),
               ),
-            ),
-            ),
+            ],
           ],
         ),
       ),

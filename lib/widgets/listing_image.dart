@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../services/api_service.dart';
+import 'listing_tried_badge.dart';
 import 'listing_type_badge.dart';
 
 class ListingImage extends StatelessWidget {
@@ -13,6 +14,7 @@ class ListingImage extends StatelessWidget {
     this.borderRadius = 16,
     this.iconSize = 36,
     this.showTypeBadge = false,
+    this.showTriedBadge = false,
   });
 
   final FoodItem food;
@@ -21,6 +23,7 @@ class ListingImage extends StatelessWidget {
   final double borderRadius;
   final double iconSize;
   final bool showTypeBadge;
+  final bool showTriedBadge;
 
   int? _cachePixelSize(BuildContext context, double? logical) {
     if (logical == null || !logical.isFinite || logical <= 0) return null;
@@ -92,7 +95,8 @@ class ListingImage extends StatelessWidget {
       ),
     );
 
-    if (!showTypeBadge) return image;
+    final tried = showTriedBadge && food.purchasedBefore;
+    if (!showTypeBadge && !tried) return image;
 
     return SizedBox(
       width: width,
@@ -100,15 +104,22 @@ class ListingImage extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(child: image),
-          Positioned(
-            left: 6,
-            top: 6,
-            right: 6,
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: ListingTypeBadge(food: food, compact: true),
+          if (showTypeBadge)
+            Positioned(
+              left: 6,
+              top: 6,
+              right: 6,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: ListingTypeBadge(food: food, compact: true),
+              ),
             ),
-          ),
+          if (tried)
+            Positioned(
+              right: 6,
+              top: 6,
+              child: ListingTriedBadge(food: food, compact: true),
+            ),
         ],
       ),
     );

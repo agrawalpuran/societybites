@@ -10,6 +10,7 @@ const {
   patchStatus,
   signToken,
 } = require("./helpers/httpHarness");
+const { installMockGraphFetch } = require("./helpers/mockGraphFetch");
 
 function uniquePhone(lead2) {
   const rest = `${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-8);
@@ -96,6 +97,7 @@ async function main() {
   const outsiderToken = signToken(outsider);
 
   const server = await listen(orderApp());
+  const graph = installMockGraphFetch();
 
   try {
     const unauthCreate = await jsonRequest(server, {
@@ -336,6 +338,7 @@ async function main() {
     if (societyIds.length) {
       await prisma.society.deleteMany({ where: { id: { in: societyIds } } }).catch(() => {});
     }
+    graph.restore();
     await closeServer(server);
     await prisma.$disconnect();
   }

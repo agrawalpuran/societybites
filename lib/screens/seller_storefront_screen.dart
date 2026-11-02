@@ -810,6 +810,7 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
                       height: double.infinity,
                       borderRadius: 14,
                       showTypeBadge: true,
+                      showTriedBadge: !_isOwnStorefront,
                     ),
                     if (_isOwnStorefront)
                       Positioned(

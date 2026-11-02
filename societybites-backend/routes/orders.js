@@ -52,6 +52,7 @@ const {
   notifyOrderMessage,
   flushNotification,
 } = require("../utils/notifications");
+const { sendWhatsAppOrderNotification } = require("../lib/whatsappCloud");
 const {
   lazyCloseCampaign,
   assertCampaignAcceptsOrders,
@@ -1256,6 +1257,7 @@ router.post(
     if (!idempotentReplay) {
       logger.info("order", `Created ${order.orderNumber} by ${req.user.phone}`);
       void flushNotification(notifyOrderCreated(order));
+      void sendWhatsAppOrderNotification(order);
     }
 
     res.status(201).json(serializeOrderForUser(order, req.user.id));

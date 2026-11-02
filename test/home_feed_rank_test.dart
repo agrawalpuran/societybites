@@ -654,4 +654,35 @@ void main() {
     expect(perSeller.values.every((count) => count <= 2), isTrue);
     expect(perSeller.length, greaterThanOrEqualTo(6));
   });
+
+  test('previewListingsPerSeller keeps two per seller when others exist', () {
+    final mixed = [
+      _food('Micky1', sellerId: 'micky'),
+      _food('Krunch1', sellerId: 'krunch'),
+      _food('Chaska1', sellerId: 'chaska'),
+      _food('Chaska2', sellerId: 'chaska'),
+      _food('Chaska3', sellerId: 'chaska'),
+      _food('Chaska4', sellerId: 'chaska'),
+    ];
+    final preview = previewListingsPerSeller(mixed);
+    expect(preview.map((food) => food.name), [
+      'Micky1',
+      'Krunch1',
+      'Chaska1',
+      'Chaska2',
+    ]);
+  });
+
+  test('previewListingsPerSeller keeps one kitchen when nobody else listed', () {
+    final only = [
+      _food('Chaska1', sellerId: 'chaska'),
+      _food('Chaska2', sellerId: 'chaska'),
+      _food('Chaska3', sellerId: 'chaska'),
+      _food('Chaska4', sellerId: 'chaska'),
+    ];
+    expect(
+      previewListingsPerSeller(only).map((food) => food.name).toList(),
+      ['Chaska1', 'Chaska2', 'Chaska3', 'Chaska4'],
+    );
+  });
 }

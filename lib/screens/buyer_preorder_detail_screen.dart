@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../utils/listing_portion_label.dart';
 import '../widgets/preorder_widgets.dart';
 import '../widgets/screen_loading_note.dart';
+import 'buyer_preorder_product_screen.dart';
 import 'preorder_checkout_screen.dart';
 import 'seller_storefront_screen.dart';
 
@@ -97,11 +98,11 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
 
   int _quantity(PreOrderProduct product) => _quantities[product.listingId] ?? 0;
 
-  void _changeQuantity(PreOrderProduct product, int delta) {
-    if (!_acceptingOrders) return;
+  bool _changeQuantity(PreOrderProduct product, int delta) {
+    if (!_acceptingOrders) return false;
     final current = _quantity(product);
     final next = current + delta;
-    if (next < 0) return;
+    if (next < 0) return false;
     if (product.inventoryMode == 'limited' && next > product.quantity) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -112,7 +113,7 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
           ),
         ),
       );
-      return;
+      return false;
     }
     setState(() {
       if (next == 0) {
@@ -121,6 +122,34 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
         _quantities[product.listingId] = next;
       }
     });
+    return true;
+  }
+
+  void _openProduct(PreOrderProduct product) {
+    final campaign = _campaign;
+    if (campaign == null) return;
+    final display = _productDisplayCopy(product);
+    final limited = product.inventoryMode == 'limited';
+    final soldOut = limited && product.quantity <= 0;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BuyerPreOrderProductScreen(
+          product: product,
+          description: display.description,
+          portion: display.portion,
+          readyLabel: 'Ready ${formatDateTime(campaign.fulfilmentAt)}',
+          availabilityLabel: !limited
+              ? 'Prepared based on pre-orders'
+              : soldOut
+              ? 'Sold out'
+              : '${product.quantity} remaining',
+          acceptingOrders: _acceptingOrders,
+          initialQuantity: _quantity(product),
+          onChangeQuantity: (delta) => _changeQuantity(product, delta),
+        ),
+      ),
+    );
   }
 
   double get _subtotal {
@@ -415,7 +444,6 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
     final description = display.description;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -424,106 +452,130 @@ class _BuyerPreOrderDetailScreenState extends State<BuyerPreOrderDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              PreOrderCoverImage(
-                imageUrl: product.imageUrl,
-                width: 64,
-                height: 64,
-                borderRadius: 14,
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _openProduct(product),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const PreOrderBadge(compact: true),
-                    const SizedBox(height: 6),
-                    Text(
-                      product.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: preorderText,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    PreOrderCoverImage(
+                      imageUrl: product.imageUrl,
+                      width: 64,
+                      height: 64,
+                      borderRadius: 14,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      formatMoney(product.price),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: preorderGreen,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (description != null && description.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: preorderMuted,
-                          fontSize: 12,
-                          height: 1.35,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                    if (portion != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        portion,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: preorderMuted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 4),
-                    Text(
-                      'Ready ${formatDateTime(campaign.fulfilmentAt)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: preorderGreen,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      limited
-                          ? soldOut
-                                ? 'Sold out'
-                                : '${product.quantity} remaining'
-                          : 'Prepared based on pre-orders',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: soldOut
-                            ? const Color(0xFFD94F4F)
-                            : preorderMuted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const PreOrderBadge(compact: true),
+                          const SizedBox(height: 6),
+                          Text(
+                            product.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: preorderText,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            formatMoney(product.price),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: preorderGreen,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          if (description != null &&
+                              description.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: preorderMuted,
+                                fontSize: 12,
+                                height: 1.35,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                          if (portion != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              portion,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: preorderMuted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 4),
+                          Text(
+                            'Ready ${formatDateTime(campaign.fulfilmentAt)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: preorderGreen,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            limited
+                                ? soldOut
+                                      ? 'Sold out'
+                                      : '${product.quantity} remaining'
+                                : 'Prepared based on pre-orders',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: soldOut
+                                  ? const Color(0xFFD94F4F)
+                                  : preorderMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'See details',
+                            style: TextStyle(
+                              color: preorderGreen,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: _quantityControl(product, quantity, soldOut),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: _quantityControl(product, quantity, soldOut),
+            ),
           ),
         ],
       ),

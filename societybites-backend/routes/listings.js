@@ -8,6 +8,10 @@ const {
 } = require("../utils/listingSerializer");
 const { serializeListingsWithSellerOrderability } = require("../lib/listingOrderability");
 const {
+  toggleListingLike,
+  listListingLikers,
+} = require("../lib/listingLikes");
+const {
   parseFoodType,
   assertFoodTypeTagCompatibility,
 } = require("../utils/foodType");
@@ -269,6 +273,41 @@ router.get(
       : listings;
     const payload = await jsonListings(buyerVisible, req.user.id);
     res.json(payload);
+  })
+);
+
+router.post(
+  "/:id/like",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, variantGroupId: true, sellerId: true },
+    });
+    if (!listing) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+    const result = await toggleListingLike(prisma, {
+      userId: req.user.id,
+      listing,
+    });
+    res.json(result);
+  })
+);
+
+router.get(
+  "/:id/likes",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, variantGroupId: true, sellerId: true },
+    });
+    if (!listing || listing.sellerId !== req.user.id) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+    const likes = await listListingLikers(prisma, listing);
+    res.json({ likes });
   })
 );
 

@@ -15,6 +15,7 @@ class ListingBuyerPriceText extends StatelessWidget {
     this.chargedStyle,
     this.regularStyle,
     this.showBadge = true,
+    this.saleOnOneLine = false,
     this.quote,
   });
 
@@ -25,6 +26,9 @@ class ListingBuyerPriceText extends StatelessWidget {
   final TextStyle? chargedStyle;
   final TextStyle? regularStyle;
   final bool showBadge;
+
+  /// Keep the struck price and percent on one line. Card slots have a fixed height.
+  final bool saleOnOneLine;
 
   /// When set, skip [listingDisplayPrice] (e.g. historical order snapshots).
   final ListingDisplayPrice? quote;
@@ -59,6 +63,62 @@ class ListingBuyerPriceText extends StatelessWidget {
     );
     if (!display.saleActive) return charged;
 
+    final regularStyleResolved = regularStyle ??
+        const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF8A9491),
+          decoration: TextDecoration.lineThrough,
+        );
+    final regular = Text(
+      '₹${display.regularPrice.toStringAsFixed(0)}',
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.ellipsis,
+      style: regularStyleResolved,
+    );
+    final percentLabel = Text(
+      '${percent?.round() ?? 0}% off',
+      maxLines: 1,
+      softWrap: false,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        color: Color(0xFF0E5A47),
+      ),
+    );
+    final Widget saleLine = saleOnOneLine
+        ? Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '₹${display.regularPrice.toStringAsFixed(0)}',
+                  style: regularStyleResolved,
+                ),
+                if (showPercent)
+                  TextSpan(
+                    text: '  ${percent!.round()}% off',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0E5A47),
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          )
+        : Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 6,
+            children: [
+              regular,
+              if (showPercent) percentLabel,
+            ],
+          );
+
     return Column(
       crossAxisAlignment:
           alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -67,31 +127,7 @@ class ListingBuyerPriceText extends StatelessWidget {
         charged,
         Padding(
           padding: const EdgeInsets.only(top: 2),
-          child: Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 6,
-            children: [
-              Text(
-                '₹${display.regularPrice.toStringAsFixed(0)}',
-                style: regularStyle ??
-                    const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF8A9491),
-                      decoration: TextDecoration.lineThrough,
-                    ),
-              ),
-              if (showPercent)
-                Text(
-                  '${percent.round()}% off',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0E5A47),
-                  ),
-                ),
-            ],
-          ),
+          child: saleLine,
         ),
       ],
     );

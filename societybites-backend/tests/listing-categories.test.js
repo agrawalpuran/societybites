@@ -40,6 +40,9 @@ function main() {
   const dairy = parseListingCategories({ category: "dairy" }, { required: true });
   assert(dairy[0] === "Dairy", "Dairy accepted");
 
+  const pickle = parseListingCategories({ category: "pickle" }, { required: true });
+  assert(pickle[0] === "Pickle", "Pickle accepted");
+
   expectThrow(
     () => parseListingCategories({ categories: [] }, { required: true }),
     "at least one category"

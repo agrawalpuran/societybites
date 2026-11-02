@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/data.dart';
 import '../utils/listing_portion_label.dart';
 import 'listing_buyer_price.dart';
+import 'listing_like_button.dart';
 
 /// Compact portion size under price on home / web cards.
 class ListingPortionCaption extends StatelessWidget {
@@ -63,14 +64,28 @@ class ListingCompactPriceRow extends StatelessWidget {
       height: 1.15,
     );
 
+    final heart = isDark ? Colors.white : const Color(0xFF0E5A47);
+    final count = isDark ? Colors.white70 : const Color(0xFF6A7774);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        ListingBuyerPriceText(
-          food: food,
-          useCardLabel: true,
-          chargedStyle: priceStyle,
+        Row(
+          children: [
+            Flexible(
+              child: ListingBuyerPriceText(
+                food: food,
+                useCardLabel: true,
+                chargedStyle: priceStyle,
+              ),
+            ),
+            const SizedBox(width: 4),
+            ListingLikeButton(
+              food: food,
+              iconColor: heart,
+              countColor: count,
+            ),
+          ],
         ),
         if (portion != null)
           Padding(

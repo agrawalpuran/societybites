@@ -95,11 +95,8 @@ class HomeDistanceChip extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: onFestiveBackground
-                    ? Colors.white
+                    ? const Color(0xFF0A4638)
                     : const Color(0xFF6A7774),
-                shadows: onFestiveBackground
-                    ? const [Shadow(color: Colors.black38, blurRadius: 4)]
-                    : null,
               ),
             ),
           ),

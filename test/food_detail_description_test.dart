@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/screens/food_detail_screen.dart';
@@ -61,5 +62,32 @@ void main() {
     );
     expect(find.text('Cart'), findsNothing);
     expect(find.byKey(const Key('home-cart-button')), findsNothing);
+  });
+
+  testWidgets('quick info labels stay on one line on a narrow phone', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FoodDetailScreen(
+          food: _food(name: 'Fresh paneer', description: 'Soft paneer.'),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final label = tester.renderObject<RenderParagraph>(
+      find.text('AVAILABILITY'),
+    );
+    expect(label.size.height, lessThan(20));
+    expect(find.text('15'), findsOneWidget);
+    expect(find.text('Ready now'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

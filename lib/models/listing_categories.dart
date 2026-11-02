@@ -4,6 +4,7 @@ const listingFoodCategories = [
   'Dinner',
   'Snacks',
   'Dairy',
+  'Pickle',
   'Desserts',
   'Beverages',
 ];

@@ -80,6 +80,23 @@ void main() {
     expect(find.byKey(const Key('home-cart-button')), findsNothing);
   });
 
+  testWidgets('festive header keeps the name dark and readable', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'user_id': 'user-1',
+      'user_name': "Agrawal's",
+    });
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: AppHeader(onFestiveBackground: true)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final name = tester.widget<Text>(find.text("Agrawal's"));
+    expect(name.style?.color, const Color(0xFF0A4638));
+  });
+
   testWidgets('header hides cart until an item is added', (tester) async {
     SharedPreferences.setMockInitialValues({
       'user_id': 'user-1',

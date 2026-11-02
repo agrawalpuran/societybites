@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/models/data.dart';
+import 'package:societybites/screens/home_listing_filter.dart';
 import 'package:societybites/web/web_breakpoints.dart';
 import 'package:societybites/web/web_marketplace_home.dart';
 import 'package:societybites/web/web_marketplace_states.dart';
@@ -28,6 +29,8 @@ void main() {
     expect(webFoodColumnCount(900), 4);
     expect(webFoodColumnCount(750), 3);
     expect(webFoodColumnCount(680), 2);
+    expect(webReadyNowPreviewCount(1180), 10);
+    expect(webReadyNowPreviewCount(900), 8);
     expect(webSellerColumnCount(1180), 4);
     expect(webSellerColumnCount(900), 3);
     expect(webSellerColumnCount(700), 2);
@@ -58,7 +61,93 @@ void main() {
     expect(find.text('Mina'), findsWidgets);
     expect(find.text('Add'), findsWidgets);
     expect(find.text('IN YOUR SOCIETY'), findsWidgets);
+    expect(find.text("Today's kitchen highlights"), findsNothing);
+    expect(find.text('Top resident kitchens'), findsOneWidget);
+    expect(find.text('Ready right now'), findsOneWidget);
     expect(find.text('COOKS NEARBY'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ready now shows two rows of detail cards then See all', (
+    tester,
+  ) async {
+    await _setWindow(tester, 1440, 1800);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final ready = List<FoodItem>.generate(
+      11,
+      (index) => _food('r$index', 'Ready dish $index'),
+    );
+    await tester.pumpWidget(MaterialApp(home: _sampleHome(readyNow: ready)));
+    await tester.pump();
+
+    expect(find.text('Ready dish 0'), findsOneWidget);
+    expect(find.text('Ready dish 9'), findsOneWidget);
+    expect(find.text('Ready dish 10'), findsNothing);
+    expect(find.byKey(const Key('web-ready-see-all')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('web-ready-see-all')));
+    await tester.pump();
+
+    expect(find.text('Ready dish 10'), findsOneWidget);
+    expect(find.byKey(const Key('web-ready-show-less')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('nearby listings keep two dishes per seller until See all', (
+    tester,
+  ) async {
+    await _setWindow(tester, 1440, 2200);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final nearby = [
+      _food('m1', 'Dahi Vada', sellerId: 'micky', sellerName: 'Micky'),
+      _food('k1', 'Paneer Veg Puff', sellerId: 'krunch', sellerName: 'Krunch'),
+      _food('c1', 'Kachori khankra', sellerId: 'chaska', sellerName: 'Chaska'),
+      _food('c2', 'Plain khankra', sellerId: 'chaska', sellerName: 'Chaska'),
+      _food('c3', 'Saffron powder', sellerId: 'chaska', sellerName: 'Chaska'),
+      _food('c4', 'Moong Dal', sellerId: 'chaska', sellerName: 'Chaska'),
+      _food('c5', 'Namkin candy', sellerId: 'chaska', sellerName: 'Chaska'),
+    ];
+    HomeListingReach? expanded;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            return _sampleHome(
+              nearbyListings: nearby,
+              nearbySellers: [
+                Seller(
+                  id: 'micky',
+                  name: 'Micky',
+                  block: 'A',
+                  rating: 4,
+                  avatarIcon: Icons.person,
+                  avatarColor: const Color(0xFFE7F2EA),
+                ),
+              ],
+              expandedReach: expanded,
+              onExpandReach: (reach) => setState(() => expanded = reach),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Dahi Vada'), findsOneWidget);
+    expect(find.text('Paneer Veg Puff'), findsOneWidget);
+    expect(find.text('Kachori khankra'), findsOneWidget);
+    expect(find.text('Plain khankra'), findsOneWidget);
+    expect(find.text('Saffron powder'), findsNothing);
+    expect(find.text('Moong Dal'), findsNothing);
+    expect(find.text('See all'), findsWidgets);
+
+    await tester.ensureVisible(find.text('See all').last);
+    await tester.tap(find.text('See all').last);
+    await tester.pump();
+    expect(find.text('Saffron powder'), findsOneWidget);
+    expect(find.text('Moong Dal'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -144,12 +233,17 @@ Future<void> _setWindow(
   await tester.binding.setSurfaceSize(Size(width, height));
 }
 
-WebMarketplaceHome _sampleHome() {
-  final food = FoodItem(
-    id: 'l1',
-    name: 'Lemon rice',
-    sellerId: 's1',
-    sellerName: 'Mina',
+FoodItem _food(
+  String id,
+  String name, {
+  String sellerId = 's1',
+  String sellerName = 'Mina',
+}) {
+  return FoodItem(
+    id: id,
+    name: name,
+    sellerId: sellerId,
+    sellerName: sellerName,
     block: 'A',
     price: 120,
     rating: 4.8,
@@ -162,6 +256,16 @@ WebMarketplaceHome _sampleHome() {
     bgColor: const Color(0xFFF5F0E8),
     reviewCount: 6,
   );
+}
+
+WebMarketplaceHome _sampleHome({
+  List<FoodItem>? readyNow,
+  List<FoodItem>? nearbyListings,
+  List<Seller>? nearbySellers,
+  HomeListingReach? expandedReach,
+  ValueChanged<HomeListingReach>? onExpandReach,
+}) {
+  final food = _food('l1', 'Lemon rice');
   final seller = Seller(
     id: 's1',
     name: 'Mina',
@@ -183,13 +287,12 @@ WebMarketplaceHome _sampleHome() {
     categoryCounts: const {'All': 1, 'Lunch': 1},
     heroFoods: [food],
     allFiltered: [food],
-    highlights: [food],
     highlightSellers: [seller],
     sellerListings: [food],
-    readyNow: [food],
+    readyNow: readyNow ?? [food],
     madeToOrder: const [],
-    nearbyListings: const [],
-    nearbySellers: const [],
+    nearbyListings: nearbyListings ?? const [],
+    nearbySellers: nearbySellers ?? const [],
     nearbySubtitle: null,
     extendedListings: const [],
     extendedSellers: const [],
@@ -200,7 +303,7 @@ WebMarketplaceHome _sampleHome() {
     extendedPreorders: const [],
     preordersLoading: false,
     viewerUserId: null,
-    expandedReach: null,
+    expandedReach: expandedReach,
     cartQtyFor: (_) => 0,
     onAdd: (_) {},
     onRemove: (_) {},
@@ -209,7 +312,7 @@ WebMarketplaceHome _sampleHome() {
     onOpenCampaign: (_) {},
     onSeePreorders: () {},
     onCategorySelected: (_) {},
-    onExpandReach: (_) {},
+    onExpandReach: onExpandReach ?? (_) {},
     onCollapseReach: (_) {},
     onRetry: () {},
     onRefresh: () async {},

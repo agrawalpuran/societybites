@@ -3,10 +3,7 @@ import 'package:societybites/models/kitchen_hours.dart';
 
 void main() {
   test('unset kitchen hours stay open', () {
-    expect(
-      isKitchenOpen(now: DateTime.utc(2026, 10, 4, 3)),
-      isTrue,
-    );
+    expect(isKitchenOpen(now: DateTime.utc(2026, 10, 4, 3)), isTrue);
   });
 
   test('daytime window uses India time and closes at the close minute', () {
@@ -72,6 +69,11 @@ void main() {
     expect(
       kitchenHoursSubtitle(defaultKitchenOpensAt, defaultKitchenClosesAt),
       'Open 8:00 AM · Close 8:00 PM',
+    );
+    expect(kitchenClosedHoursLabel(null, null), isNull);
+    expect(
+      kitchenClosedHoursLabel('09:00', '21:00'),
+      'Open 9:00 AM · Close 9:00 PM',
     );
   });
 }

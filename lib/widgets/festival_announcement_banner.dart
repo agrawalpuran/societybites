@@ -62,9 +62,14 @@ class FestivalAnnouncementBanner extends StatelessWidget {
 
 /// Title + subtitle overlay (admin-managed).
 class FestivalBannerTextOverlay extends StatelessWidget {
-  const FestivalBannerTextOverlay({super.key, required this.content});
+  const FestivalBannerTextOverlay({
+    super.key,
+    required this.content,
+    this.align = TextAlign.start,
+  });
 
   final FestivalBannerContent content;
+  final TextAlign align;
 
   @override
   Widget build(BuildContext context) {
@@ -72,53 +77,66 @@ class FestivalBannerTextOverlay extends StatelessWidget {
 
     final title = content.title?.trim() ?? '';
     final subtitle = content.subtitle?.trim() ?? '';
+    final centered = align == TextAlign.center;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (title.isNotEmpty)
-          Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              height: 1.15,
-              shadows: [
-                Shadow(color: Colors.black38, blurRadius: 6),
-              ],
+    return SizedBox(
+      width: centered ? double.infinity : null,
+      child: Column(
+        crossAxisAlignment: centered
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (title.isNotEmpty)
+            Text(
+              title,
+              textAlign: align,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                height: 1.15,
+                shadows: [
+                  Shadow(color: Colors.black38, blurRadius: 6),
+                ],
+              ),
             ),
-          ),
-        if (subtitle.isNotEmpty) ...[
-          if (title.isNotEmpty) const SizedBox(height: 6),
-          Text(
-            subtitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.95),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              height: 1.25,
-              shadows: const [
-                Shadow(color: Colors.black38, blurRadius: 4),
-              ],
+          if (subtitle.isNotEmpty) ...[
+            if (title.isNotEmpty) const SizedBox(height: 6),
+            Text(
+              subtitle,
+              textAlign: align,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.95),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                height: 1.25,
+                shadows: const [
+                  Shadow(color: Colors.black38, blurRadius: 4),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
 
 /// Shared artwork for card banner and home hero backdrop.
 class FestivalBannerArtwork extends StatelessWidget {
-  const FestivalBannerArtwork({super.key, required this.content});
+  const FestivalBannerArtwork({
+    super.key,
+    required this.content,
+    this.alignment = Alignment.center,
+  });
 
   final FestivalBannerContent content;
+  final Alignment alignment;
 
   @override
   Widget build(BuildContext context) {
@@ -127,12 +145,13 @@ class FestivalBannerArtwork extends StatelessWidget {
       return Image.network(
         url,
         fit: BoxFit.cover,
+        alignment: alignment,
         errorBuilder: (_, __, ___) => const FestivalBannerPlaceholderArtwork(),
       );
     }
     final path = content.imageAssetPath?.trim();
     if (path != null && path.isNotEmpty) {
-      return _FestivalBannerAssetImage(path: path);
+      return _FestivalBannerAssetImage(path: path, alignment: alignment);
     }
     return const FestivalBannerPlaceholderArtwork();
   }
@@ -142,10 +161,12 @@ class FestivalBannerArtwork extends StatelessWidget {
 class _FestivalBannerAssetImage extends StatelessWidget {
   const _FestivalBannerAssetImage({
     required this.path,
+    this.alignment = Alignment.center,
     this.tryIndex = 0,
   });
 
   final String path;
+  final Alignment alignment;
   final int tryIndex;
 
   List<String> get _candidates {
@@ -166,8 +187,10 @@ class _FestivalBannerAssetImage extends StatelessWidget {
     return Image.asset(
       asset,
       fit: BoxFit.cover,
+      alignment: alignment,
       errorBuilder: (_, __, ___) => _FestivalBannerAssetImage(
         path: path,
+        alignment: alignment,
         tryIndex: tryIndex + 1,
       ),
     );

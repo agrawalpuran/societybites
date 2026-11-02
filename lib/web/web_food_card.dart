@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../models/data.dart';
 import '../models/food_type.dart';
 import '../widgets/listing_image.dart';
+import '../widgets/listing_like_button.dart';
 import '../widgets/listing_purchase_slot.dart';
 import '../widgets/listing_rating_mark.dart';
+import '../widgets/listing_tried_badge.dart';
 import '../widgets/listing_type_badge.dart';
 import '../widgets/listing_buyer_price.dart';
 import '../widgets/listing_portion_caption.dart';
@@ -15,7 +17,8 @@ import '../utils/listing_portion_label.dart';
 import 'web_breakpoints.dart';
 
 /// Fixed height so every web listing card matches, regardless of optional lines.
-const double webFoodCardHeight = 310;
+/// Includes the like control beside the price.
+const double webFoodCardHeight = 330;
 
 class WebFoodCard extends StatelessWidget {
   const WebFoodCard({
@@ -35,12 +38,12 @@ class WebFoodCard extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback onSeller;
 
-  static const _titleHeight = 35.0;
+  static const _titleHeight = 38.0;
   static const _placeHeight = 16.0;
   static const _hintHeight = 40.0;
   static const _metaLineHeight = 14.0;
-  /// Fits charged price + optional strike/% off without growing the card.
-  static const _priceBlockHeight = 34.0;
+  /// Charged price, struck price, and the like control.
+  static const _priceBlockHeight = 40.0;
 
   @override
   Widget build(BuildContext context) {
@@ -90,17 +93,26 @@ class WebFoodCard extends StatelessWidget {
                     Positioned(
                       right: 8,
                       top: 8,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          if (food.isNewListing()) ...[
-                            const ListingNewChip(dense: true),
-                            const SizedBox(width: 6),
-                          ],
-                          _RatingPill(
-                            label: ratingLabel,
-                            showStar: food.reviewCount > 0,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (food.isNewListing()) ...[
+                                const ListingNewChip(dense: true),
+                                const SizedBox(width: 6),
+                              ],
+                              _RatingPill(
+                                label: ratingLabel,
+                                showStar: food.reviewCount > 0,
+                              ),
+                            ],
                           ),
+                          if (food.purchasedBefore) ...[
+                            const SizedBox(height: 6),
+                            ListingTriedBadge(food: food, compact: true),
+                          ],
                         ],
                       ),
                     ),
@@ -139,17 +151,21 @@ class WebFoodCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 3),
-                        GestureDetector(
-                          onTap: onSeller,
-                          child: Text(
-                            food.sellerName,
-                            maxLines: 1,
-                            softWrap: false,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: webGreen,
+                        SizedBox(
+                          height: 16,
+                          child: GestureDetector(
+                            onTap: onSeller,
+                            child: Text(
+                              food.sellerName,
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.1,
+                                fontWeight: FontWeight.w700,
+                                color: webGreen,
+                              ),
                             ),
                           ),
                         ),
@@ -201,23 +217,31 @@ class WebFoodCard extends StatelessWidget {
                                     child: ClipRect(
                                       child: Align(
                                         alignment: Alignment.topLeft,
-                                        child: ListingBuyerPriceText(
-                                          food: food,
-                                          useCardLabel: true,
-                                          chargedStyle: const TextStyle(
-                                            fontSize: 15,
-                                            height: 1.1,
-                                            fontWeight: FontWeight.w800,
-                                            color: webInk,
-                                          ),
-                                          regularStyle: const TextStyle(
-                                            fontSize: 11,
-                                            height: 1.1,
-                                            fontWeight: FontWeight.w600,
-                                            color: webMuted,
-                                            decoration:
-                                                TextDecoration.lineThrough,
-                                          ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: ListingBuyerPriceText(
+                                                food: food,
+                                                useCardLabel: true,
+                                                saleOnOneLine: true,
+                                                chargedStyle: const TextStyle(
+                                                  fontSize: 15,
+                                                  height: 1.1,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: webInk,
+                                                ),
+                                                regularStyle: const TextStyle(
+                                                  fontSize: 11,
+                                                  height: 1.1,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: webMuted,
+                                                  decoration:
+                                                      TextDecoration.lineThrough,
+                                                ),
+                                              ),
+                                            ),
+                                            ListingLikeButton(food: food),
+                                          ],
                                         ),
                                       ),
                                     ),
@@ -421,6 +445,7 @@ class _ReadyCard extends StatelessWidget {
                 height: 112,
                 borderRadius: 0,
                 iconSize: 28,
+                showTriedBadge: true,
               ),
               Expanded(
                 child: Padding(

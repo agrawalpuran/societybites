@@ -981,6 +981,77 @@ class MyListingsScreenState extends State<MyListingsScreen>
   }
 }
 
+class _ListingLikesLink extends StatelessWidget {
+  const _ListingLikesLink({required this.listing});
+
+  final FoodItem listing;
+
+  Future<void> _open(BuildContext context) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      final names = await ApiService.getListingLikers(listing.id);
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(
+            listing.likeCount == 1 ? '1 like' : '${listing.likeCount} likes',
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: names.isEmpty
+                ? const Text('No likes yet')
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: names.length,
+                    itemBuilder: (_, index) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Text(names[index]),
+                    ),
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load likes: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = listing.likeCount == 1 ? '1 like' : '${listing.likeCount} likes';
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: InkWell(
+        onTap: () => _open(context),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0E5A47),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SellerListingCard extends StatelessWidget {
   const _SellerListingCard({
     required this.listing,
@@ -1065,6 +1136,8 @@ class _SellerListingCard extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (listing.likeCount > 0)
+                      _ListingLikesLink(listing: listing),
                     if (listingSoldCaption(listing.quantitySold).isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
