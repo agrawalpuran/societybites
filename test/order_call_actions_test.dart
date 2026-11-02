@@ -9,6 +9,7 @@ import 'package:societybites/screens/orders_screen.dart';
 import 'package:societybites/screens/payment_screen.dart';
 import 'package:societybites/screens/seller_dashboard_screen.dart';
 import 'package:societybites/widgets/listing_image.dart';
+import 'package:societybites/widgets/order_call_button.dart';
 
 Map<String, dynamic> _orderJson({
   required String status,
@@ -17,6 +18,8 @@ Map<String, dynamic> _orderJson({
   bool sellerCanDecline = false,
   String? rejectReason,
   bool refundDue = false,
+  bool canRevealBuyerPhone = false,
+  bool canRevealSellerPhone = false,
 }) {
   return {
     'id': 'o1',
@@ -28,6 +31,8 @@ Map<String, dynamic> _orderJson({
     'paymentMethod': paymentMethod,
     'buyerPhone': '+919845154070',
     'buyerName': 'Puran',
+    'canRevealBuyerPhone': canRevealBuyerPhone,
+    'canRevealSellerPhone': canRevealSellerPhone,
     'total': 120,
     'subtotal': 115,
     'communityFee': 5,
@@ -66,7 +71,7 @@ Widget _sellerCard(Order order, {bool rejectBusy = false}) {
     home: Scaffold(
       body: SellerActiveOrderCard(
         order: order,
-        onAction: (_, _) async {},
+        onAction: (_, _, {deliveryCharge, deliveryCollectBy}) async {},
         onOrderUpdated: (_) {},
         onPaymentConfirmed: () async {},
         onReject: (_) async {},
@@ -122,7 +127,8 @@ void main() {
             builder: (context, setState) {
               return SellerActiveOrderCard(
                 order: held,
-                onAction: (_, _) => completer.future,
+                onAction: (_, _, {deliveryCharge, deliveryCollectBy}) =>
+                    completer.future,
                 onOrderUpdated: (updated) => setState(() => held = updated),
                 onPaymentConfirmed: () async {},
                 onReject: (_) async {},
@@ -280,5 +286,87 @@ void main() {
       find.byKey(const Key('seller-reject-button')),
     );
     expect(button.onPressed, isNull);
+  });
+
+  testWidgets('paid kitchen order shows Call next to Message Buyer', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _sellerCard(
+        Order.fromJson(
+          _orderJson(
+            status: 'accepted',
+            paymentStatus: 'seller_confirmed',
+            canRevealBuyerPhone: true,
+          ),
+        ),
+      ),
+    );
+    expect(find.byKey(const Key('order-call-button')), findsOneWidget);
+    expect(find.text('Call'), findsOneWidget);
+    expect(find.text('Message Buyer'), findsOneWidget);
+  });
+
+  testWidgets('paid buyer order shows Call next to Message Seller', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'user_name': 'Test Neighbor',
+      'flat_number': '101',
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OrdersScreen(
+          fetchOrders: ({required String role}) async => [
+            _orderJson(
+              status: 'ready',
+              paymentStatus: 'seller_confirmed',
+              canRevealSellerPhone: true,
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('order-call-button')), findsOneWidget);
+    expect(find.text('Call'), findsOneWidget);
+    expect(find.text('Message Seller'), findsOneWidget);
+  });
+
+  testWidgets('Call on buyer order opens the phone dialer', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'user_name': 'Test Neighbor',
+      'flat_number': '101',
+    });
+    String? dialed;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OrderContactActions(
+            order: Order.fromJson(
+              _orderJson(
+                status: 'ready',
+                paymentStatus: 'seller_confirmed',
+                canRevealSellerPhone: true,
+              ),
+            ),
+            isSellerView: false,
+            revealPhone: (_) async => '+919845154070',
+            dialPhone: (phone) async {
+              dialed = phone;
+              return true;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('order-call-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Call seller?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Call'));
+    await tester.pumpAndSettle();
+    expect(dialed, '+919845154070');
   });
 }

@@ -837,6 +837,9 @@ class Order {
   final String? buyerPhone;
   final String? buyerPhoneMasked;
   final bool canRevealBuyerPhone;
+  final String? sellerPhone;
+  final String? sellerPhoneMasked;
+  final bool canRevealSellerPhone;
   final String? buyerFlatNumber;
   final String? buyerBlock;
   final String? buyerSocietyName;
@@ -889,6 +892,9 @@ class Order {
     this.buyerPhone,
     this.buyerPhoneMasked,
     this.canRevealBuyerPhone = false,
+    this.sellerPhone,
+    this.sellerPhoneMasked,
+    this.canRevealSellerPhone = false,
     this.buyerFlatNumber,
     this.buyerBlock,
     this.buyerSocietyName,
@@ -1090,16 +1096,26 @@ class Order {
   bool get isSellerDelivery =>
       fulfilmentMethod?.trim() == 'seller_delivery';
 
-  /// Client-side gate so a leaked phone in older API payloads is still hidden.
-  bool get sellerMayAccessBuyerPhone {
-    if (canRevealBuyerPhone) return true;
-    if (!isSellerDelivery) return false;
+  bool get _orderCallWindowOpen {
     if (isRejected || isCancelled || status == 'pending') return false;
     if (status != 'accepted' && status != 'ready' && status != 'completed') {
       return false;
     }
     if (paymentMethod == 'cash') return true;
     return foodUpiConfirmed;
+  }
+
+  /// Client-side gate so a leaked phone in older API payloads is still hidden.
+  bool get sellerMayAccessBuyerPhone {
+    if (canRevealBuyerPhone) return true;
+    if (!_orderCallWindowOpen) return false;
+    return isSellerDelivery;
+  }
+
+  bool get buyerMayCallSeller {
+    if (canRevealSellerPhone) return true;
+    if (!_orderCallWindowOpen) return false;
+    return (sellerPhone?.trim() ?? '').isNotEmpty;
   }
 
   /// Rough society-to-society distance. Empty for same-society orders.
@@ -1193,6 +1209,9 @@ class Order {
       buyerPhone: buyerPhone,
       buyerPhoneMasked: buyerPhoneMasked,
       canRevealBuyerPhone: canRevealBuyerPhone,
+      sellerPhone: sellerPhone,
+      sellerPhoneMasked: sellerPhoneMasked,
+      canRevealSellerPhone: canRevealSellerPhone,
       buyerFlatNumber: buyerFlatNumber,
       buyerBlock: buyerBlock,
       buyerSocietyName: buyerSocietyName,
@@ -1243,6 +1262,9 @@ class Order {
       buyerPhone: buyerPhone,
       buyerPhoneMasked: buyerPhoneMasked,
       canRevealBuyerPhone: canRevealBuyerPhone,
+      sellerPhone: sellerPhone,
+      sellerPhoneMasked: sellerPhoneMasked,
+      canRevealSellerPhone: canRevealSellerPhone,
       buyerFlatNumber: buyerFlatNumber,
       buyerBlock: buyerBlock,
       buyerSocietyName: buyerSocietyName,
@@ -1335,6 +1357,9 @@ class Order {
       buyerPhone: json['buyerPhone'] as String?,
       buyerPhoneMasked: json['buyerPhoneMasked'] as String?,
       canRevealBuyerPhone: json['canRevealBuyerPhone'] == true,
+      sellerPhone: json['sellerPhone'] as String?,
+      sellerPhoneMasked: json['sellerPhoneMasked'] as String?,
+      canRevealSellerPhone: json['canRevealSellerPhone'] == true,
       buyerFlatNumber: json['buyerFlatNumber'] as String?,
       buyerBlock: json['buyerBlock'] as String?,
       buyerSocietyName: json['buyerSocietyName'] as String?,
@@ -1437,6 +1462,10 @@ class Order {
       buyerPhoneMasked: updated.buyerPhoneMasked ?? prior.buyerPhoneMasked,
       canRevealBuyerPhone:
           updated.canRevealBuyerPhone || prior.canRevealBuyerPhone,
+      sellerPhone: updated.sellerPhone ?? prior.sellerPhone,
+      sellerPhoneMasked: updated.sellerPhoneMasked ?? prior.sellerPhoneMasked,
+      canRevealSellerPhone:
+          updated.canRevealSellerPhone || prior.canRevealSellerPhone,
       buyerFlatNumber: updated.buyerFlatNumber ?? prior.buyerFlatNumber,
       buyerBlock: updated.buyerBlock ?? prior.buyerBlock,
       buyerSocietyName: updated.buyerSocietyName ?? prior.buyerSocietyName,
@@ -1528,6 +1557,9 @@ class Order {
       buyerPhone: prior.buyerPhone,
       buyerPhoneMasked: prior.buyerPhoneMasked,
       canRevealBuyerPhone: prior.canRevealBuyerPhone,
+      sellerPhone: prior.sellerPhone,
+      sellerPhoneMasked: prior.sellerPhoneMasked,
+      canRevealSellerPhone: prior.canRevealSellerPhone,
       buyerFlatNumber: prior.buyerFlatNumber,
       buyerBlock: prior.buyerBlock,
       buyerSocietyName: prior.buyerSocietyName,

@@ -10,7 +10,7 @@ import '../widgets/order_timing_notice.dart';
 import '../widgets/order_items_list.dart';
 import '../widgets/order_status_tracker.dart';
 import '../widgets/order_lifecycle_dialogs.dart';
-import '../widgets/order_messages_button.dart';
+import '../widgets/order_call_button.dart';
 import '../widgets/requested_ready_summary.dart';
 import '../widgets/content_skeleton.dart';
 import '../widgets/pull_refresh_gate.dart';
@@ -1098,7 +1098,7 @@ class _ActiveOrderCard extends StatelessWidget {
               preOrderFulfilmentAt: order.fulfilmentAt,
             ),
             const SizedBox(height: 10),
-            OrderMessagesButton(
+            OrderContactActions(
               order: order,
               isSellerView: false,
               onClosed: onRefresh,
@@ -1764,7 +1764,7 @@ class _PastOrderTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                      OrderMessagesButton(
+                      OrderContactActions(
                         order: order,
                         isSellerView: false,
                         inline: true,
@@ -1775,7 +1775,7 @@ class _PastOrderTile extends StatelessWidget {
                 ],
                 if (isSellerView) ...[
                   const SizedBox(height: 10),
-                  OrderMessagesButton(
+                  OrderContactActions(
                     order: order,
                     isSellerView: true,
                     onClosed: onRefresh,

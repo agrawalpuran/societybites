@@ -6,7 +6,7 @@ import '../models/data.dart';
 import '../services/api_service.dart';
 import 'order_fulfilment_banner.dart';
 import 'order_items_list.dart';
-import 'order_messages_button.dart';
+import 'order_call_button.dart';
 
 typedef BuyerPhoneRevealer = Future<String> Function(String orderId);
 
@@ -112,7 +112,7 @@ class _SellerOrderDetailSheetState extends State<SellerOrderDetailSheet> {
   }
 
   String? _lockedHint() {
-    if (order.isSellerDelivery && !order.sellerMayAccessBuyerPhone) {
+    if (!order.sellerMayAccessBuyerPhone) {
       if (order.status == 'pending') {
         return 'Buyer number is shown after you accept this order.';
       }
@@ -314,12 +314,9 @@ class _SellerOrderDetailSheetState extends State<SellerOrderDetailSheet> {
               ],
             ),
             const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OrderMessagesButton(
-                order: order,
-                isSellerView: true,
-              ),
+            OrderContactActions(
+              order: order,
+              isSellerView: true,
             ),
           ],
         );

@@ -23,7 +23,7 @@ import '../services/my_listings_prefetch.dart';
 import '../services/seller_onboarding.dart';
 import '../services/session_service.dart';
 import '../widgets/preorder_widgets.dart';
-import '../widgets/order_messages_button.dart';
+import '../widgets/order_call_button.dart';
 import '../widgets/seller_order_detail_sheet.dart';
 import '../widgets/profile_menu_tile.dart';
 import '../widgets/simple_time_picker.dart';
@@ -3241,7 +3241,7 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                     color: Color(0xFF8A9491),
                   ),
                 ),
-              OrderMessagesButton(
+              OrderContactActions(
                 order: order,
                 isSellerView: true,
                 inline: true,
@@ -3921,7 +3921,7 @@ class SellerPastOrderCard extends StatelessWidget {
                 ),
               ),
               _PaymentBadge(paymentStatus: order.paymentStatus),
-              OrderMessagesButton(
+              OrderContactActions(
                 order: order,
                 isSellerView: true,
                 inline: true,

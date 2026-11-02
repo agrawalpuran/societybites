@@ -1336,6 +1336,20 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> revealSellerContact({
+    required String orderId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/orders/$orderId/seller-contact'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'acknowledged': true}),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<List<Map<String, dynamic>>> getOrderMessages(
     String orderId,
   ) async {
