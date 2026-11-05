@@ -9,7 +9,7 @@ void main() {
       upiId: 'seller.name@okaxis',
       payeeName: 'Sharma Snacks & More',
       amount: 245,
-      transactionNote: 'SocietyBites Order SB-1023',
+      transactionNote: 'SocietyEats Order SB-1023',
       transactionRef: 'SB-1023',
     );
 
@@ -21,7 +21,7 @@ void main() {
       'am': '245.00',
       'cu': 'INR',
       'tr': 'SB1023',
-      'tn': 'SocietyBites Order SB-1023',
+      'tn': 'SocietyEats Order SB-1023',
     });
     final encoded = upiLaunchString(uri);
     expect(encoded, contains('Sharma%20Snacks%20%26%20More'));
@@ -39,7 +39,7 @@ void main() {
         upiId: 'invalid',
         payeeName: 'Seller',
         amount: 245,
-        transactionNote: 'SocietyBites Order SB1023',
+        transactionNote: 'SocietyEats Order SB1023',
       ),
       throwsArgumentError,
     );
@@ -48,7 +48,7 @@ void main() {
         upiId: 'seller@upi',
         payeeName: 'Seller',
         amount: 0,
-        transactionNote: 'SocietyBites Order SB1023',
+        transactionNote: 'SocietyEats Order SB1023',
       ),
       throwsArgumentError,
     );
@@ -109,7 +109,7 @@ void main() {
       upiId: 'seller.name@okaxis',
       payeeName: 'Sharma Snacks',
       amount: 245,
-      transactionNote: 'SocietyBites Order SB-1023',
+      transactionNote: 'SocietyEats Order SB-1023',
       transactionRef: 'SB-1023',
     );
     expect(upi.scheme, 'upi');
@@ -163,7 +163,7 @@ void main() {
       upiId: 'seller.name@okaxis',
       payeeName: 'Sharma Snacks',
       amount: 245,
-      transactionNote: 'SocietyBites Order SB-1023',
+      transactionNote: 'SocietyEats Order SB-1023',
       transactionRef: 'SB-1023',
     );
     const target = UpiAppLaunchTarget(scheme: 'gpay', host: 'upi', path: '/pay');
@@ -177,7 +177,7 @@ void main() {
       upiId: 'shop@okbizaxis',
       payeeName: 'Sharma Snacks',
       amount: 245,
-      transactionNote: 'SocietyBites Order SB-1023',
+      transactionNote: 'SocietyEats Order SB-1023',
       transactionRef: 'SB-1023',
     );
     const target = UpiAppLaunchTarget(scheme: 'gpay', host: 'upi', path: '/pay');
@@ -201,7 +201,7 @@ void main() {
       upiId: 'seller@upi',
       payeeName: 'Seller',
       amount: 10,
-      transactionNote: 'SocietyBites Order SB1',
+      transactionNote: 'SocietyEats Order SB1',
       transactionRef: 'SB-1',
     );
 

@@ -130,9 +130,9 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   Uri get _upiPaymentUri => buildUpiPaymentUri(
     upiId: _sellerUpiId ?? '',
-    payeeName: _sellerName.trim().isEmpty ? 'SocietyBites seller' : _sellerName,
+    payeeName: _sellerName.trim().isEmpty ? 'SocietyEats seller' : _sellerName,
     amount: _order.upiPaymentAmount,
-    transactionNote: 'SocietyBites Order ${_order.orderId}',
+    transactionNote: 'SocietyEats Order ${_order.orderId}',
     transactionRef: _order.orderId,
   );
 

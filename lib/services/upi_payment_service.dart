@@ -116,7 +116,7 @@ const configuredUpiApps = <UpiAppOption>[
 ];
 
 /// NPCI wants `%20` for spaces. Dart's [Uri.queryParameters] emits `+`, which
-/// GPay iOS shows literally (`SocietyBites+Order+SB-993150`) and can fail.
+/// GPay iOS shows literally (`SocietyEats+Order+SB-993150`) and can fail.
 String encodeUpiQueryValue(String value) => Uri.encodeComponent(value);
 
 String buildUpiPayQuery({
