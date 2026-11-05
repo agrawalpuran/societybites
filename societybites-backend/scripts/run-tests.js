@@ -32,6 +32,7 @@ const UNIT = [
   "marketing-push",
   "whatsapp-settings",
   "whatsapp-cloud",
+  "upi-account-type",
 ];
 
 /**

@@ -84,8 +84,9 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.byKey(const Key('home-cart-button')), findsOneWidget);
-    expect(find.text('Cart'), findsWidgets);
-    expect(find.text('1'), findsWidgets);
+    expect(find.byKey(const Key('home-cart-button')), findsNothing);
+    expect(find.textContaining('Review your'), findsOneWidget);
+    expect(find.textContaining('community order'), findsOneWidget);
+    expect(find.text('Fresh Kachori Chat'), findsOneWidget);
   });
 }

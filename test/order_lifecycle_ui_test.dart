@@ -202,7 +202,8 @@ void main() {
     final placed = Order.formatPlacedAt(
       DateTime.parse('2026-09-12T10:00:00.000Z'),
     );
-    expect(find.textContaining('SB-up · $placed'), findsOneWidget);
+    expect(find.text('SB-up'), findsOneWidget);
+    expect(find.text(placed), findsOneWidget);
   });
 
   testWidgets('Cancel order dialog shows item name and message', (

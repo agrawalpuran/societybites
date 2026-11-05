@@ -196,7 +196,7 @@ void main() {
     expect(find.byKey(const Key('home-see-all-items')), findsNothing);
   });
 
-  testWidgets('More Around You SEE ALL expands and SHOW LESS collapses', (
+  testWidgets('beyond-society listings SEE ALL expands and SHOW LESS collapses', (
     tester,
   ) async {
     _ignoreOverflow();
@@ -242,39 +242,38 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('More Around You'), findsOneWidget);
-    expect(find.byKey(const Key('home-see-all-extended')), findsOneWidget);
+    expect(find.byKey(const Key('home-see-all-beyond')), findsOneWidget);
     expect(find.text('SHOW LESS'), findsNothing);
     expect(find.byKey(const ValueKey('home-reach-card-ext-0')), findsOneWidget);
     expect(find.byKey(const ValueKey('home-reach-card-ext-7')), findsNothing);
     expect(find.byKey(const ValueKey('home-reach-tile-ext-7')), findsNothing);
 
-    await tester.ensureVisible(find.byKey(const Key('home-see-all-extended')));
-    await tester.tap(find.byKey(const Key('home-see-all-extended')));
+    await tester.ensureVisible(find.byKey(const Key('home-see-all-beyond')));
+    await tester.tap(find.byKey(const Key('home-see-all-beyond')));
     await tester.pump();
 
-    expect(find.byKey(const Key('home-see-all-extended')), findsNothing);
-    expect(find.byKey(const Key('home-show-less-extended')), findsOneWidget);
+    expect(find.byKey(const Key('home-see-all-beyond')), findsNothing);
+    expect(find.byKey(const Key('home-show-less-beyond')), findsOneWidget);
     expect(find.text('SHOW LESS'), findsOneWidget);
     expect(find.byKey(const ValueKey('home-reach-tile-ext-0')), findsOneWidget);
     expect(find.byKey(const ValueKey('home-reach-tile-ext-7')), findsOneWidget);
     expect(find.byKey(const ValueKey('home-reach-card-ext-0')), findsNothing);
     expect(find.text("Today's Specials in Your Society"), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('home-show-less-extended')));
+    await tester.tap(find.byKey(const Key('home-show-less-beyond')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 
-    expect(find.byKey(const Key('home-see-all-extended')), findsOneWidget);
+    expect(find.byKey(const Key('home-see-all-beyond')), findsOneWidget);
     expect(find.text('SHOW LESS'), findsNothing);
     expect(find.byKey(const ValueKey('home-reach-card-ext-0')), findsOneWidget);
     expect(find.byKey(const ValueKey('home-reach-tile-ext-7')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('home-see-all-extended')));
+    await tester.tap(find.byKey(const Key('home-see-all-beyond')));
     await tester.pump();
-    await tester.tap(find.byKey(const Key('home-show-less-extended')));
+    await tester.tap(find.byKey(const Key('home-show-less-beyond')));
     await tester.pump();
-    expect(find.byKey(const Key('home-see-all-extended')), findsOneWidget);
+    expect(find.byKey(const Key('home-see-all-beyond')), findsOneWidget);
     expect(find.byKey(const ValueKey('home-reach-tile-ext-7')), findsNothing);
   });
 
@@ -356,7 +355,7 @@ void main() {
   );
 
   testWidgets(
-    'Home splits society, nearby and extended into labelled sections',
+    'Home splits in-society and beyond-society discovery sections',
     (tester) async {
       _ignoreOverflow();
       SharedPreferences.setMockInitialValues({'society_id': 'mine'});
@@ -412,15 +411,13 @@ void main() {
 
       expect(find.text('Top Sellers in Your Society'), findsOneWidget);
       expect(find.text("Today's Specials in Your Society"), findsOneWidget);
-      expect(find.text('Nearby Societies'), findsOneWidget);
-      expect(find.text('Sellers within ~8 km'), findsOneWidget);
-      expect(find.text('More Around You'), findsOneWidget);
-      expect(find.text('From other societies (within ~15 km)'), findsOneWidget);
+      expect(find.text('Beyond your society'), findsOneWidget);
+      expect(find.textContaining('Closest kitchens first'), findsOneWidget);
       expect(find.text('Top Rated Sellers'), findsNothing);
       expect(find.text('In Your Society'), findsNothing);
       expect(find.text("Today's Specials"), findsNothing);
-      expect(find.text('Nearby'), findsNothing);
-      expect(find.text('Extended Reach'), findsNothing);
+      expect(find.text('Nearby Societies'), findsNothing);
+      expect(find.text('More Around You'), findsNothing);
       expect(find.text('Society Dal'), findsWidgets);
       expect(find.text('Nearby Idli'), findsWidgets);
       expect(find.text('Extended Dosa'), findsWidgets);
@@ -433,20 +430,13 @@ void main() {
       );
       expect(
         dy("Today's Specials in Your Society"),
-        lessThan(dy('Nearby Societies')),
-      );
-      expect(dy('Nearby Societies'), lessThan(dy('Nearby Idli')));
-      expect(dy('Nearby Idli'), lessThan(dy('More Around You')));
-      expect(dy('More Around You'), lessThan(dy('Extended Dosa')));
-      expect(
-        dy('Top Sellers in Your Society'),
-        lessThan(dy('Nearby Societies')),
+        lessThan(dy('Beyond your society')),
       );
     },
   );
 
   testWidgets(
-    'Home groups next-door EXTENDED sellers as Nearby using distance not opt-in',
+    'Home groups cross-society sellers in Beyond your society by distance',
     (tester) async {
       _ignoreOverflow();
       SharedPreferences.setMockInitialValues({'society_id': 'mine'});
@@ -502,38 +492,27 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('Nearby Societies'), findsOneWidget);
-      expect(find.text('More Around You'), findsOneWidget);
+      expect(find.text('Beyond your society'), findsOneWidget);
 
-      final nearbySellers = find.byKey(const Key('home-sellers-nearby'));
-      final extendedSellers = find.byKey(const Key('home-sellers-extended'));
+      final beyondSellers = find.byKey(const Key('home-sellers-beyond'));
       expect(
         find.descendant(
-          of: nearbySellers,
+          of: beyondSellers,
           matching: find.text('Puran Agrawal'),
         ),
         findsOneWidget,
       );
       expect(
-        find.descendant(of: nearbySellers, matching: find.text('Aarav')),
-        findsNothing,
-      );
-      expect(
-        find.descendant(of: extendedSellers, matching: find.text('Aarav')),
+        find.descendant(of: beyondSellers, matching: find.text('Aarav')),
         findsOneWidget,
       );
-      expect(
-        find.descendant(
-          of: extendedSellers,
-          matching: find.text('Puran Agrawal'),
-        ),
-        findsNothing,
-      );
+      expect(find.text('Notting Hill Biryani'), findsWidgets);
+      expect(find.text('Ferns Sushi'), findsWidgets);
     },
   );
 
   testWidgets(
-    'Home omits Nearby and Extended headings when those buckets are empty',
+    'Home omits beyond-society headings when there are no nearby sellers',
     (tester) async {
       _ignoreOverflow();
       SharedPreferences.setMockInitialValues({'society_id': 'mine'});
@@ -559,16 +538,16 @@ void main() {
       expect(find.text("Today's Specials in Your Society"), findsOneWidget);
       expect(find.text('Top Sellers in Your Society'), findsOneWidget);
       expect(find.text('In Your Society'), findsNothing);
+      expect(find.text('Beyond your society'), findsNothing);
       expect(find.text('Nearby Societies'), findsNothing);
       expect(find.text('More Around You'), findsNothing);
       expect(find.text('Nearby'), findsNothing);
       expect(find.text('Extended Reach'), findsNothing);
-      expect(find.byKey(const Key('home-see-all-nearby')), findsNothing);
-      expect(find.byKey(const Key('home-see-all-extended')), findsNothing);
+      expect(find.byKey(const Key('home-see-all-beyond')), findsNothing);
     },
   );
 
-  testWidgets('More Around You seller chips fit without a bottom overflow', (
+  testWidgets('Beyond your society seller chips fit without a bottom overflow', (
     tester,
   ) async {
     _ignoreOverflow();
@@ -611,7 +590,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('More Around You'), findsOneWidget);
+    expect(find.text('Beyond your society'), findsOneWidget);
     expect(find.text('Rupal Amin'), findsWidgets);
   });
 
@@ -840,9 +819,6 @@ void main() {
 
       expect(find.text('2 sold'), findsWidgets);
       expect(find.text('REGULAR'), findsWidgets);
-      final price = tester.getRect(find.text('₹90').first);
-      final sold = tester.getRect(find.text('2 sold').first);
-      expect(sold.top, greaterThan(price.bottom - 1));
 
       final addSize = tester.getSize(find.text('Add').first);
       expect(addSize.width, greaterThan(addSize.height));

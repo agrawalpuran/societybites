@@ -26,10 +26,22 @@ function timeoutMs(raw) {
   return DEFAULT_TIMEOUT_MS;
 }
 
+function isOrderTemplateName(raw) {
+  const value = String(raw ?? "").trim();
+  if (!value || value === TEMPLATE_NAME) return false;
+  return /^[a-z0-9_]+$/.test(value);
+}
+
 function resolveTemplateName(raw) {
   const value = String(raw ?? "").trim();
-  if (value === ORDER_TEMPLATE_NAME) return ORDER_TEMPLATE_NAME;
+  if (isOrderTemplateName(value)) return value;
   return TEMPLATE_NAME;
+}
+
+function resolveTemplateLanguage(raw) {
+  const value = String(raw ?? "").trim();
+  if (value === "en" || value === "en_US") return value;
+  return TEMPLATE_LANGUAGE;
 }
 
 function readConfig(env) {
@@ -41,6 +53,7 @@ function readConfig(env) {
     apiVersion: graphVersion(source.WHATSAPP_API_VERSION),
     timeoutMs: timeoutMs(source.WHATSAPP_TIMEOUT_MS),
     templateName: resolveTemplateName(source.WHATSAPP_TEMPLATE_NAME),
+    templateLanguage: resolveTemplateLanguage(source.WHATSAPP_TEMPLATE_LANGUAGE),
   };
 }
 
@@ -128,6 +141,7 @@ function formatItemsSummary(items) {
   return `${summary.slice(0, MAX_ITEM_SUMMARY_LENGTH - 3).trimEnd()}...`;
 }
 
+/** Body params for order templates: seller, order number, customer, items, amount. */
 function orderTemplateParameters(order) {
   const amount = formatOrderAmount(order && order.total);
   if (amount == null) return null;
@@ -141,15 +155,18 @@ function orderTemplateParameters(order) {
 }
 
 function templatePayload(to, options) {
-  if (options && options.templateName === ORDER_TEMPLATE_NAME) {
+  const templateName = options && options.templateName;
+  if (isOrderTemplateName(templateName)) {
     const parameters = Array.isArray(options.parameters) ? options.parameters : [];
     return {
       messaging_product: "whatsapp",
       to,
       type: "template",
       template: {
-        name: ORDER_TEMPLATE_NAME,
-        language: { code: TEMPLATE_LANGUAGE },
+        name: templateName,
+        language: {
+          code: resolveTemplateLanguage(options.language),
+        },
         components: [
           {
             type: "body",
@@ -207,6 +224,7 @@ async function postTemplate(config, to, deps, parameters) {
       body: JSON.stringify(
         templatePayload(to, {
           templateName: config.templateName,
+          language: config.templateLanguage,
           parameters,
         })
       ),
@@ -266,7 +284,7 @@ async function sendWhatsAppOrderNotificationInner(order, deps) {
   }
 
   let parameters;
-  if (config.templateName === ORDER_TEMPLATE_NAME) {
+  if (isOrderTemplateName(config.templateName)) {
     parameters = orderTemplateParameters(order);
     if (!parameters) {
       return { sent: false, reason: "invalid_amount" };

@@ -73,10 +73,11 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('Payment Methods'), findsOneWidget);
-      expect(find.text('UPI for Payments'), findsOneWidget);
-      expect(find.text('Selling Reach'), findsOneWidget);
-      expect(find.text('FSSAI details'), findsOneWidget);
+      expect(find.text('Payment Methods'), findsNothing);
+      expect(find.text('UPI for Payments'), findsNothing);
+      expect(find.byKey(const Key('seller-setup-upi-id')), findsOneWidget);
+      expect(find.text('My society'), findsOneWidget);
+      expect(find.textContaining('FSSAI details'), findsOneWidget);
       expect(find.text('Add UPI to receive payments'), findsNothing);
     },
   );

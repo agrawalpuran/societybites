@@ -220,9 +220,27 @@ async function main() {
     "hello_world remains the default"
   );
   assert(
-    readConfig({ ...creds, WHATSAPP_TEMPLATE_NAME: "something_else" }).templateName ===
+    readConfig({ ...creds, WHATSAPP_TEMPLATE_NAME: "Not Valid" }).templateName ===
       TEMPLATE_NAME,
-    "unknown template name stays on hello_world"
+    "invalid template name stays on hello_world"
+  );
+  assert(
+    readConfig({ ...creds, WHATSAPP_TEMPLATE_NAME: "se_new_order_notification" })
+      .templateName === "se_new_order_notification",
+    "prefixed Meta name is allowed"
+  );
+  assert(
+    readConfig(creds).templateLanguage === TEMPLATE_LANGUAGE,
+    "order language defaults to en_US"
+  );
+  assert(
+    readConfig({ ...creds, WHATSAPP_TEMPLATE_LANGUAGE: "en" }).templateLanguage === "en",
+    "en is allowed for the order template"
+  );
+  assert(
+    readConfig({ ...creds, WHATSAPP_TEMPLATE_LANGUAGE: "fr" }).templateLanguage ===
+      TEMPLATE_LANGUAGE,
+    "unknown language stays on en_US"
   );
 
   const populatedHello = mockFetch({
@@ -255,6 +273,50 @@ async function main() {
   const mapped = bodyParameters(orderFetch.calls[0]);
   assert(mapped.body.template.name === ORDER_TEMPLATE_NAME, "new template name");
   assert(mapped.body.template.language.code === "en_US", "new template language");
+
+  const englishFetch = mockFetch({
+    body: { messages: [{ id: "wamid.order-en" }] },
+  });
+  await sendWhatsAppOrderNotification(orderNotificationOrder(), {
+    isEnabled: async () => true,
+    env: { ...orderEnv, WHATSAPP_TEMPLATE_LANGUAGE: "en" },
+    fetch: englishFetch,
+  });
+  const englishBody = JSON.parse(englishFetch.calls[0].options.body);
+  assert(englishBody.template.name === ORDER_TEMPLATE_NAME, "en still uses order template");
+  assert(englishBody.template.language.code === "en", "order template can send en");
+  assert(
+    englishBody.template.components[0].parameters.length === 5,
+    "en payload still has five parameters"
+  );
+
+  const helloEnFetch = mockFetch({
+    body: { messages: [{ id: "wamid.hello-en-ignored" }] },
+  });
+  await sendWhatsAppOrderNotification(orderNotificationOrder(), {
+    isEnabled: async () => true,
+    env: { ...creds, WHATSAPP_TEMPLATE_LANGUAGE: "en" },
+    fetch: helloEnFetch,
+  });
+  const helloEnBody = JSON.parse(helloEnFetch.calls[0].options.body);
+  assert(helloEnBody.template.name === TEMPLATE_NAME, "hello_world name unchanged");
+  assert(helloEnBody.template.language.code === "en_US", "hello_world stays en_US");
+
+  const prefixedFetch = mockFetch({
+    body: { messages: [{ id: "wamid.prefixed" }] },
+  });
+  await sendWhatsAppOrderNotification(orderNotificationOrder(), {
+    isEnabled: async () => true,
+    env: { ...creds, WHATSAPP_TEMPLATE_NAME: "se_new_order_notification" },
+    fetch: prefixedFetch,
+  });
+  const prefixed = bodyParameters(prefixedFetch.calls[0]);
+  assert(
+    prefixed.body.template.name === "se_new_order_notification",
+    "Graph uses the env template name"
+  );
+  assert(prefixed.parameters && prefixed.parameters.length === 5, "prefixed name still five params");
+  assert(prefixed.parameters[1].text === "SE-100001", "prefixed name still maps order number");
   assert(mapped.parameters && mapped.parameters.length === 5, "exactly five parameters");
   assert(
     mapped.parameters.every((parameter) => parameter.type === "text"),

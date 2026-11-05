@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/models/seller_fulfilment.dart';
 import 'package:societybites/screens/profile_screen.dart';
+import 'package:societybites/widgets/profile_menu_tile.dart';
 
 void _ignoreKnownLayoutNoise() {
   final original = FlutterError.onError;
@@ -58,12 +59,17 @@ Future<void> _pumpSeller(
   required Map<String, dynamic> profile,
   Future<Map<String, dynamic>> Function({
     String? sellingReachLevel,
+    int? sellingReachRadiusKm,
     String? fulfilmentMode,
     double? deliveryCharge,
     double? deliveryChargeInSociety,
     double? deliveryChargeNearby,
     double? deliveryChargeExtended,
     String? paymentPreference,
+    String? kitchenOpensAt,
+    String? kitchenClosesAt,
+    bool? clearKitchenHours,
+    bool? hideFlatNumber,
   })? updateProfile,
 }) async {
   SharedPreferences.setMockInitialValues({
@@ -93,7 +99,10 @@ Future<void> _openSellerSettings(WidgetTester tester) async {
   while (tester.takeException() != null) {}
 }
 
-Finder _fulfilmentChange() => find.text('Change').last;
+Finder _fulfilmentChange() => find.descendant(
+      of: find.widgetWithText(ProfileMenuTile, 'Buyer Pickup'),
+      matching: find.text('Change'),
+    );
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -114,7 +123,7 @@ void main() {
         deliveryChargeNearby: 40,
         deliveryChargeExtended: 60,
       ).subtitle,
-      'In society ₹0 · Nearby ₹40 · Extended ₹60',
+      'In society ₹0 · Outside society: on actuals',
     );
     expect(
       const SellerFulfilment(
@@ -144,12 +153,17 @@ void main() {
       profile: _sellerMe(),
       updateProfile: ({
         sellingReachLevel,
+        sellingReachRadiusKm,
         fulfilmentMode,
         deliveryCharge,
         deliveryChargeInSociety,
         deliveryChargeNearby,
         deliveryChargeExtended,
         paymentPreference,
+        kitchenOpensAt,
+        kitchenClosesAt,
+        clearKitchenHours,
+        hideFlatNumber,
       }) async {
         savedMode = fulfilmentMode ?? savedMode;
         savedNearby = deliveryChargeNearby ?? deliveryCharge ?? savedNearby;
@@ -226,12 +240,17 @@ void main() {
       profile: _sellerMe(),
       updateProfile: ({
         sellingReachLevel,
+        sellingReachRadiusKm,
         fulfilmentMode,
         deliveryCharge,
         deliveryChargeInSociety,
         deliveryChargeNearby,
         deliveryChargeExtended,
         paymentPreference,
+        kitchenOpensAt,
+        kitchenClosesAt,
+        clearKitchenHours,
+        hideFlatNumber,
       }) async {
         throw Exception('rejected');
       },

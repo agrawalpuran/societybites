@@ -94,7 +94,7 @@ void main() {
       find.text('Please check your connection and try again.'),
       findsOneWidget,
     );
-    expect(find.text('Exception: offline'), findsOneWidget);
+    expect(find.text('offline'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('kitchen-orders-try-again')));
     await tester.pump();

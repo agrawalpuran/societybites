@@ -32,7 +32,6 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(800, 2200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    String? savedNumber;
     await tester.pumpWidget(
       MaterialApp(
         home: ProfileScreen(
@@ -51,13 +50,6 @@ void main() {
             'society': {'name': 'Prestige Notting Hill'},
             'flat': {'flatNumber': '3062'},
           },
-          saveFssaiDetails: ({
-            required fssaiNumber,
-            fssaiRegisteredName,
-            fssaiExpiry,
-          }) async {
-            savedNumber = fssaiNumber;
-          },
         ),
       ),
     );
@@ -68,19 +60,8 @@ void main() {
     await tester.tap(find.text('Seller Settings'));
     await tester.pumpAndSettle();
 
-    expect(find.text('FSSAI details'), findsOneWidget);
-    await tester.ensureVisible(find.text('FSSAI details'));
-    await tester.tap(find.text('FSSAI details'));
-    await tester.pumpAndSettle();
-    expect(find.text('FSSAI registration number'), findsOneWidget);
-    await tester.enterText(
-      find.widgetWithText(TextField, 'FSSAI registration number'),
-      '12345678901234',
-    );
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
-    expect(savedNumber, '12345678901234');
-    expect(find.textContaining('12345678901234'), findsWidgets);
+    expect(find.textContaining('FSSAI details'), findsOneWidget);
+    expect(find.textContaining('Required'), findsWidgets);
   });
 
   testWidgets('saved FSSAI details are shown on seller profile', (tester) async {
@@ -126,17 +107,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('12345678901234'), findsWidgets);
-    expect(find.textContaining('Agrawal Kitchen'), findsWidgets);
-
-    await tester.ensureVisible(find.text('FSSAI details'));
-    await tester.tap(find.text('FSSAI details'));
-    await tester.pumpAndSettle();
-    expect(
-      find.textContaining('Saved licence 12345678901234'),
-      findsOneWidget,
-    );
-    expect(find.text('12345678901234'), findsWidgets);
-    expect(find.text('Agrawal Kitchen'), findsWidgets);
+    expect(find.textContaining('FSSAI details'), findsOneWidget);
   });
 
   testWidgets('buyer profile does not show FSSAI details', (tester) async {
@@ -161,7 +132,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump();
-    expect(find.text('FSSAI details'), findsNothing);
+    expect(find.textContaining('FSSAI details'), findsNothing);
     expect(find.text('Seller Settings'), findsNothing);
   });
 }

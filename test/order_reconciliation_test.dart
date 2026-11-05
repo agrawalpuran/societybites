@@ -46,6 +46,13 @@ Map<String, dynamic> _orderJson({
 Future<Map<String, dynamic>> _paymentInfo(String _) async => {
   'sellerUpiId': 'seller@upi',
   'sellerUpiDisplayName': 'Test Seller',
+  'sellerUpiAccountType': 'PERSONAL',
+};
+
+Future<Map<String, dynamic>> _merchantPaymentInfo(String _) async => {
+  'sellerUpiId': 'shop@okbizaxis',
+  'sellerUpiDisplayName': 'Test Merchant',
+  'sellerUpiAccountType': 'MERCHANT',
 };
 
 Widget _paymentApp({
@@ -452,6 +459,85 @@ void main() {
       expect(find.text("I've Paid via UPI"), findsOneWidget);
       expect(
         find.byKey(const ValueKey('awaiting-seller-confirmation')),
+        findsNothing,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('Android merchant UPI icon launches collect with amount', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    Uri? launchedUri;
+    String? copiedText;
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copiedText = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      );
+    });
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PaymentScreen(
+            order: const Order(
+              id: 'order-1',
+              orderId: 'SB-1001',
+              items: [],
+              date: 'Today',
+              status: 'accepted',
+              statusStep: 1,
+              orderTotal: 245,
+              subtotal: 220,
+              communityFee: 0,
+              deliveryCharge: 25,
+              paymentMethod: 'upi',
+              paymentStatus: 'pending',
+            ),
+            fetchOrder: (_) async => _orderJson(total: 245),
+            fetchPaymentInfo: _merchantPaymentInfo,
+            launchUpi: (uri) async {
+              launchedUri = uri;
+              return true;
+            },
+            canLaunchUpi: (_) async => true,
+            pollInterval: const Duration(hours: 1),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Pay using your UPI app'), findsOneWidget);
+      expect(find.text('Copy the UPI ID and pay'), findsNothing);
+      final gpay = tester.widget<InkWell>(
+        find.byKey(const ValueKey('upi-app-gpay')),
+      );
+      gpay.onTap!();
+      await tester.pump();
+      await tester.pump();
+
+      expect(copiedText, isNull);
+      expect(launchedUri?.scheme, 'gpay');
+      expect(launchedUri?.queryParameters['pa'], 'shop@okbizaxis');
+      expect(launchedUri?.queryParameters['am'], '245.00');
+      expect(
+        find.text('UPI ID copied. Pay ₹245.00 in GPay to the copied ID.'),
         findsNothing,
       );
     } finally {

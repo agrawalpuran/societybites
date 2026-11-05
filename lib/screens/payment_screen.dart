@@ -9,6 +9,7 @@ import 'package:url_launcher_platform_interface/url_launcher_platform_interface.
 
 import '../models/data.dart';
 import '../models/order_lifecycle.dart';
+import '../models/upi_account_type.dart';
 import '../services/api_service.dart';
 import '../services/upi_payment_service.dart';
 import '../widgets/upi_app_brand_icon.dart';
@@ -87,6 +88,7 @@ class _PaymentScreenState extends State<PaymentScreen>
   bool _isLeavingForProgress = false;
   String? _sellerUpiId;
   String? _sellerUpiDisplayName;
+  UpiAccountType _sellerUpiAccountType = defaultUpiAccountType;
   String? _loadError;
   String? _upiLaunchError;
   String? _upiHandoffHint;
@@ -106,8 +108,16 @@ class _PaymentScreenState extends State<PaymentScreen>
       _order.paymentStatus == 'buyer_marked_paid' &&
       isOpenPaymentStatus(_order.status);
 
-  bool get _showUpiIntentButton =>
-      shouldOfferUpiIntent(isWeb: kIsWeb, platform: defaultTargetPlatform);
+  bool get _showUpiIntentButton => shouldOfferUpiIntent(
+        isWeb: kIsWeb,
+        platform: defaultTargetPlatform,
+        accountType: _sellerUpiAccountType,
+      );
+
+  bool get _useUpiHandoff => shouldHandoffUpiCollect(
+        platform: defaultTargetPlatform,
+        accountType: _sellerUpiAccountType,
+      );
 
   String get _sellerName {
     if (_sellerUpiDisplayName != null && _sellerUpiDisplayName!.isNotEmpty) {
@@ -175,6 +185,9 @@ class _PaymentScreenState extends State<PaymentScreen>
           _sellerUpiId = apiUpi.trim();
         }
         _sellerUpiDisplayName = paymentData['sellerUpiDisplayName'] as String?;
+        _sellerUpiAccountType = parseUpiAccountType(
+          paymentData['sellerUpiAccountType'],
+        );
         _isLoadingUpi = false;
       });
 
@@ -300,6 +313,9 @@ class _PaymentScreenState extends State<PaymentScreen>
           _sellerUpiId = apiUpi.trim();
         }
         _sellerUpiDisplayName = data['sellerUpiDisplayName'] as String?;
+        _sellerUpiAccountType = parseUpiAccountType(
+          data['sellerUpiAccountType'],
+        );
         _isLoadingUpi = false;
       });
       _scheduleUpiAppProbe();
@@ -371,6 +387,7 @@ class _PaymentScreenState extends State<PaymentScreen>
       canLaunch: _canLaunchUpiUri,
       isWeb: kIsWeb,
       platform: defaultTargetPlatform,
+      accountType: _sellerUpiAccountType,
     );
     if (!mounted) return;
     setState(() => _availableApps = apps);
@@ -379,14 +396,13 @@ class _PaymentScreenState extends State<PaymentScreen>
   Future<void> _launchSelectedUpiApp(UpiAppOption app) async {
     final resolved = app.resolvedLaunchUri;
     if (resolved == null || _order.upiPaymentAmount <= 0) return;
-    final handoff = shouldHandoffUpiCollect(
-      platform: defaultTargetPlatform,
-    );
+    final handoff = _useUpiHandoff;
     final launchUri = handoff
         ? resolved
         : buildUpiAppLaunchUri(
             upiPayUri: _upiPaymentUri,
             target: launchTargetFromUri(resolved),
+            accountType: _sellerUpiAccountType,
           );
     try {
       setState(() {
@@ -825,9 +841,11 @@ class _PaymentScreenState extends State<PaymentScreen>
           const SizedBox(height: 16),
           _buildOrDivider(),
           const SizedBox(height: 12),
-          const Text(
-            'Copy the UPI ID and pay',
-            style: TextStyle(
+          Text(
+            _useUpiHandoff
+                ? 'Copy the UPI ID and pay'
+                : 'Pay using your UPI app',
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
               color: Color(0xFF101617),

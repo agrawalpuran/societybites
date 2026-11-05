@@ -227,12 +227,17 @@ void main() {
           },
           updateProfile: ({
             sellingReachLevel,
+            sellingReachRadiusKm,
             fulfilmentMode,
             deliveryCharge,
             deliveryChargeInSociety,
             deliveryChargeNearby,
             deliveryChargeExtended,
             paymentPreference,
+            kitchenOpensAt,
+            kitchenClosesAt,
+            clearKitchenHours,
+            hideFlatNumber,
           }) async {
             saved = paymentPreference ?? saved;
             return {
@@ -289,6 +294,7 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
+          couponCode,
           }) async =>
               {'id': 'o1'},
         ),
@@ -319,6 +325,7 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
+          couponCode,
           }) async =>
               _orderJson(status: 'accepted'),
         ),
@@ -352,6 +359,7 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
+          couponCode,
           }) async {
             sent = paymentMethod;
             return {'id': 'o1'};
@@ -393,6 +401,7 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
+          couponCode,
           }) async =>
               {'id': 'o1'},
         ),
@@ -424,6 +433,7 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
+          couponCode,
           }) async {
             sent = paymentMethod;
             return {'id': 'o1'};
@@ -446,6 +456,7 @@ void main() {
       MaterialApp(
         home: PaymentScreen(
           order: Order.fromJson(_orderJson(status: 'accepted')),
+          fetchOrder: (_) async => _orderJson(status: 'accepted'),
           fetchPaymentInfo: (_) async => {
             'sellerUpiId': 'anita@upi',
             'paymentStatus': 'pending',
@@ -460,6 +471,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text("I've Paid via UPI"), findsOneWidget);
   });
 

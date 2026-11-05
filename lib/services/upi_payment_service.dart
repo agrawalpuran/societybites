@@ -1,12 +1,16 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/upi_account_type.dart';
+
 bool shouldOfferUpiIntent({
   required bool isWeb,
   required TargetPlatform platform,
+  UpiAccountType accountType = defaultUpiAccountType,
 }) {
-  // Collect (`upi://pay` / `://upi/pay`) fails on personal VPAs.
-  // Buyers scan the QR or copy the UPI ID instead.
-  return false;
+  // Collect intent is only for merchant / business VPAs.
+  if (!accountType.enablesCollectIntent) return false;
+  return !isWeb &&
+      (platform == TargetPlatform.android || platform == TargetPlatform.iOS);
 }
 
 bool shouldOfferUpiAppShortcuts({
@@ -20,7 +24,11 @@ bool shouldOfferUpiAppShortcuts({
 /// In-app collect (`://upi/pay`) is a merchant rail. Personal neighbour
 /// VPAs fail there with HDFC's fake bank-limit screen. Open the UPI app
 /// instead and let the buyer paste the copied VPA.
-bool shouldHandoffUpiCollect({required TargetPlatform platform}) {
+bool shouldHandoffUpiCollect({
+  required TargetPlatform platform,
+  UpiAccountType accountType = defaultUpiAccountType,
+}) {
+  if (accountType.enablesCollectIntent) return false;
   return platform == TargetPlatform.iOS ||
       platform == TargetPlatform.android;
 }
@@ -156,14 +164,14 @@ String buildUpiPayQuery({
   return parts.join('&');
 }
 
-/// App shortcuts must look like a P2P send-to-VPA. `mc`, `tr`, `tn`, and
-/// `mode` make GPay treat a neighbour's personal VPA as a merchant collect.
-/// HDFC then rejects Pay with a fake "bank limit" even though the same
-/// amount succeeds when the UPI ID is pasted in GPay. QR stays the full
-/// NPCI `upi://pay` string.
+/// App shortcuts for personal VPAs must look like a P2P send-to-VPA.
+/// `mc`, `tr`, `tn`, and `mode` make GPay treat a neighbour's personal VPA
+/// as a merchant collect. Merchant VPAs keep `tn` / `tr` so amount + note
+/// stay prefilled. QR stays the full NPCI `upi://pay` string.
 Uri buildUpiAppLaunchUri({
   required Uri upiPayUri,
   required UpiAppLaunchTarget target,
+  UpiAccountType accountType = defaultUpiAccountType,
 }) {
   final params = Map<String, String>.from(upiPayUri.queryParameters);
   final query = [
@@ -171,6 +179,10 @@ Uri buildUpiAppLaunchUri({
     if (params['pn'] != null) 'pn=${encodeUpiQueryValue(params['pn']!)}',
     if (params['am'] != null) 'am=${params['am']}',
     if (params['cu'] != null) 'cu=${params['cu']}',
+    if (accountType.enablesCollectIntent && params['tn'] != null)
+      'tn=${encodeUpiQueryValue(params['tn']!)}',
+    if (accountType.enablesCollectIntent && params['tr'] != null)
+      'tr=${params['tr']}',
   ].join('&');
   return encodedUpiLaunchUri(Uri.parse('${target.baseUrl}?$query'));
 }
@@ -186,8 +198,12 @@ UpiAppLaunchTarget launchTargetFromUri(Uri uri) {
 List<UpiAppLaunchTarget> launchTargetsFor(
   UpiAppOption app, {
   required TargetPlatform platform,
+  UpiAccountType accountType = defaultUpiAccountType,
 }) {
-  if (shouldHandoffUpiCollect(platform: platform)) {
+  if (shouldHandoffUpiCollect(
+    platform: platform,
+    accountType: accountType,
+  )) {
     if (app.id == 'gpay') {
       if (platform == TargetPlatform.iOS) {
         return const [
@@ -215,11 +231,16 @@ List<UpiAppLaunchTarget> launchTargetsFor(
 List<UpiAppLaunchTarget> handoffProbeTargetsFor(
   UpiAppOption app, {
   required TargetPlatform platform,
+  UpiAccountType accountType = defaultUpiAccountType,
 }) {
   final seen = <String>{};
   return [
     for (final target in [
-      ...launchTargetsFor(app, platform: platform),
+      ...launchTargetsFor(
+        app,
+        platform: platform,
+        accountType: accountType,
+      ),
       ...app.launchTargets,
     ])
       if (seen.add(target.baseUrl)) target,
@@ -279,21 +300,37 @@ Future<List<UpiAppOption>> getAvailableUpiApps(
   required Future<bool> Function(Uri uri) canLaunch,
   required bool isWeb,
   required TargetPlatform platform,
+  UpiAccountType accountType = defaultUpiAccountType,
 }) async {
   if (!shouldOfferUpiAppShortcuts(isWeb: isWeb, platform: platform)) {
     return const [];
   }
 
-  final handoff = shouldHandoffUpiCollect(platform: platform);
+  final handoff = shouldHandoffUpiCollect(
+    platform: platform,
+    accountType: accountType,
+  );
   final probes = configuredUpiApps.map((app) async {
     final targets = handoff
-        ? handoffProbeTargetsFor(app, platform: platform)
-        : launchTargetsFor(app, platform: platform);
+        ? handoffProbeTargetsFor(
+            app,
+            platform: platform,
+            accountType: accountType,
+          )
+        : launchTargetsFor(
+            app,
+            platform: platform,
+            accountType: accountType,
+          );
     final uris = targets
         .map(
           (target) => handoff
               ? buildUpiAppOpenUri(target)
-              : buildUpiAppLaunchUri(upiPayUri: upiPayUri, target: target),
+              : buildUpiAppLaunchUri(
+                  upiPayUri: upiPayUri,
+                  target: target,
+                  accountType: accountType,
+                ),
         )
         .toList();
     final launchable = await Future.wait(

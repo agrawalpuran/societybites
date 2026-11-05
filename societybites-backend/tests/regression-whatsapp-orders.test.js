@@ -36,6 +36,7 @@ async function main() {
   const orderIds = [];
 
   const prevTemplate = process.env.WHATSAPP_TEMPLATE_NAME;
+  const prevLanguage = process.env.WHATSAPP_TEMPLATE_LANGUAGE;
   const prevEnabled = process.env.WHATSAPP_ENABLED;
   const prevToken = process.env.WHATSAPP_TOKEN;
   const prevPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -175,6 +176,8 @@ async function main() {
     graph.restore();
     if (prevTemplate === undefined) delete process.env.WHATSAPP_TEMPLATE_NAME;
     else process.env.WHATSAPP_TEMPLATE_NAME = prevTemplate;
+    if (prevLanguage === undefined) delete process.env.WHATSAPP_TEMPLATE_LANGUAGE;
+    else process.env.WHATSAPP_TEMPLATE_LANGUAGE = prevLanguage;
     if (prevEnabled === undefined) delete process.env.WHATSAPP_ENABLED;
     else process.env.WHATSAPP_ENABLED = prevEnabled;
     if (prevToken === undefined) delete process.env.WHATSAPP_TOKEN;

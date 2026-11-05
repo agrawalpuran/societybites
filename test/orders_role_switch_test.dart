@@ -93,7 +93,7 @@ void main() {
     await tester.fling(find.byType(ListView), const Offset(0, 400), 1000);
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pump();
 
     expect(roles, ['buyer', 'buyer']);

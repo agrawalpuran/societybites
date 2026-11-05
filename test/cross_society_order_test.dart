@@ -101,6 +101,9 @@ void main() {
   });
 
   testWidgets('Nearby seller can add item to cart', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 2000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     final card = _card(mode: 'BOTH', charge: 30);
     await tester.pumpWidget(
       MaterialApp(
@@ -132,8 +135,11 @@ void main() {
     );
     await tester.pump();
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Nearby seller'), findsOneWidget);
+    await tester.ensureVisible(find.text('Add'));
     await tester.tap(find.text('Add'));
+    await tester.pump();
     await tester.pump();
     expect(find.textContaining('items'), findsWidgets);
   });
@@ -203,6 +209,7 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
+          couponCode,
           }) async =>
               {'id': 'o1'},
         ),
@@ -232,6 +239,7 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
+          couponCode,
           }) async =>
               {'id': 'o1'},
         ),
@@ -239,7 +247,10 @@ void main() {
     );
     await tester.pump();
     expect(find.text('🛵 Seller Delivery'), findsOneWidget);
-    expect(find.textContaining('₹30'), findsWidgets);
+    expect(
+      find.textContaining('Outside delivery is on actuals'),
+      findsWidgets,
+    );
     expect(find.text('🏠 Buyer Pickup'), findsNothing);
   });
 
@@ -261,6 +272,7 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
+          couponCode,
           }) async =>
               {'id': 'o1'},
         ),
@@ -299,7 +311,8 @@ void main() {
     );
     await tester.pump();
     await tester.pump();
-    expect(find.text('Delivery Mechanism'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining('Delivery Mechanism'), findsOneWidget);
     expect(find.text("As per the seller's preference"), findsOneWidget);
     expect(find.text('🏠 Buyer Pickup'), findsOneWidget);
     expect(find.text('🛵 Seller Delivery'), findsOneWidget);
@@ -324,6 +337,7 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
+          couponCode,
           }) async {
             sent = fulfilmentMethod;
             return {'id': 'o1'};
@@ -356,6 +370,7 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
+          couponCode,
           }) async {
             throw Exception(
               'This seller is no longer available for delivery to your society.',
@@ -395,13 +410,14 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
+          couponCode,
           }) async =>
               {'id': 'o1'},
         ),
       ),
     );
     await tester.pump();
-    expect(find.text('Delivery Mechanism'), findsOneWidget);
+    expect(find.textContaining('Delivery Mechanism'), findsOneWidget);
     expect(find.text('🏠 Buyer Pickup'), findsOneWidget);
     expect(find.text('🛵 Seller Delivery'), findsNothing);
     expect(find.text('Review your\ncommunity order'), findsOneWidget);

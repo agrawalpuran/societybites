@@ -461,7 +461,7 @@ void main() {
     await tester.pump();
 
     expect(find.byType(OrderTimingNotice), findsOneWidget);
-    expect(find.text('This is not a regular ready-now order'), findsOneWidget);
+    expect(find.text('This is a Made to Order'), findsOneWidget);
     expect(find.textContaining('Usually takes about 4 hours'), findsWidgets);
     expect(find.text('How would you like to receive your order?'), findsNothing);
   });

@@ -6,9 +6,11 @@ void main() {
     expect(parseSellingReachLevel('MY_SOCIETY'), SellingReachLevel.mySociety);
     expect(parseSellingReachLevel('nearby'), SellingReachLevel.nearby);
     expect(parseSellingReachLevel('EXTENDED'), SellingReachLevel.extended);
+    expect(parseSellingReachLevel('BEYOND_SOCIETY'), SellingReachLevel.beyondSociety);
     expect(parseSellingReachLevel(null), SellingReachLevel.mySociety);
     expect(parseSellingReachLevel(''), SellingReachLevel.mySociety);
     expect(SellingReachLevel.mySociety.apiValue, 'MY_SOCIETY');
+    expect(SellingReachLevel.beyondSociety.apiValue, 'BEYOND_SOCIETY');
   });
 
   test('parses city reach configuration from /auth/me', () {
@@ -18,6 +20,7 @@ void main() {
         'cityKey': 'bengaluru',
         'nearbyRadiusKm': 5,
         'extendedRadiusKm': 10,
+        'maxSellerRadiusKm': 10,
       },
     };
 
@@ -26,46 +29,49 @@ void main() {
     expect(reach.cityKey, 'bengaluru');
     expect(reach.nearbyRadiusKm, 5);
     expect(reach.extendedRadiusKm, 10);
+    expect(reach.maxRadiusKm, 10);
   });
 
   test('parses NEARBY and EXTENDED independently', () {
-    expect(parseSellingReachLevel('NEARBY').title, 'Nearby');
-    expect(parseSellingReachLevel('EXTENDED').title, 'Extended');
+    expect(parseSellingReachLevel('NEARBY'), SellingReachLevel.nearby);
+    expect(parseSellingReachLevel('EXTENDED'), SellingReachLevel.extended);
     expect(SellingReachLevel.nearby.apiValue, 'NEARBY');
     expect(SellingReachLevel.extended.apiValue, 'EXTENDED');
+    expect(SellingReachLevel.nearby.isBeyondSociety, isTrue);
+    expect(SellingReachLevel.extended.isBeyondSociety, isTrue);
   });
 
-  test('displays configured radius and disables missing levels', () {
+  test('exposes city availability and preference summaries', () {
     final configured = SellingReach.fromAuthMe({
       'sellingReach': {
         'cityKey': 'bengaluru',
         'nearbyRadiusKm': 5,
         'extendedRadiusKm': 10,
+        'maxSellerRadiusKm': 10,
       },
     });
-    expect(configured.nearbyAvailable, isTrue);
+    expect(configured.beyondSocietyAvailable, isTrue);
     expect(configured.extendedAvailable, isTrue);
-    expect(configured.optionSubtitleFor(SellingReachLevel.nearby), 'Buyers within 5 km');
-    expect(configured.optionSubtitleFor(SellingReachLevel.extended), 'Buyers within 10 km');
-
-    final nearbyOnly = const SellingReach(cityKey: 'bengaluru', nearbyRadiusKm: 5);
-    expect(nearbyOnly.isSelectable(SellingReachLevel.nearby), isTrue);
-    expect(nearbyOnly.isSelectable(SellingReachLevel.extended), isFalse);
+    expect(
+      const SellerReachPreference(mySocietyOnly: true, radiusKm: 5)
+          .summary(configured),
+      'Visible to buyers in your society',
+    );
+    expect(
+      const SellerReachPreference(mySocietyOnly: false, radiusKm: 5)
+          .summary(configured),
+      'Buyers in your society and within 5 km',
+    );
 
     final missing = SellingReach.fromAuthMe({
       'sellingReach': {
-        'cityKey': 'bengaluru',
+        'cityKey': null,
         'nearbyRadiusKm': null,
         'extendedRadiusKm': null,
       },
     });
-    expect(missing.nearbyAvailable, isFalse);
+    expect(missing.beyondSocietyAvailable, isFalse);
     expect(missing.extendedAvailable, isFalse);
-    expect(missing.isSelectable(SellingReachLevel.mySociety), isTrue);
-    expect(
-      missing.optionSubtitleFor(SellingReachLevel.nearby),
-      'Nearby selling is not available in your city yet.',
-    );
   });
 
   test('null radius handling when city config is missing', () {

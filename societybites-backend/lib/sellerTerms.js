@@ -4,6 +4,7 @@ const { canonicalCityKey } = require("./launchCity");
 const { assertSellingReachDecreaseAllowed } = require("./sellerReachDecrease");
 const { assertSellerFulfilmentUpdate } = require("./sellerFulfilment");
 const { assertSellerPaymentPreferenceUpdate, DEFAULT_PAYMENT_PREFERENCE } = require("./sellerPaymentPreference");
+const { normalizeUpiAccountType } = require("./upiAccountType");
 
 // Framework / Draft — Legal Review Required.
 // Not legally approved or counsel approved. Qualified Indian legal counsel
@@ -165,6 +166,9 @@ async function acceptSellerTermsAndEnable({ prisma, user, body }) {
       typeof body.upiDisplayName === "string" && body.upiDisplayName.trim()
         ? body.upiDisplayName.trim()
         : null;
+  }
+  if (body.upiAccountType !== undefined) {
+    data.upiAccountType = normalizeUpiAccountType(body.upiAccountType);
   }
   if (body.paymentPreference !== undefined) {
     data.paymentPreference = assertSellerPaymentPreferenceUpdate({

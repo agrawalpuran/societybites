@@ -35,6 +35,10 @@ const {
   normalizeStoredProfilePhotoUrl,
 } = require("../lib/profileImage");
 const { parseHideFlatNumber } = require("../lib/sellerFlatPrivacy");
+const {
+  DEFAULT_UPI_ACCOUNT_TYPE,
+  normalizeUpiAccountType,
+} = require("../lib/upiAccountType");
 
 const router = express.Router();
 
@@ -56,6 +60,8 @@ function serializeAuthUser(user) {
     consoleAdmin: user.consoleAdmin === true,
     profilePhotoUrl: user.profilePhotoUrl,
     upiId: user.upiId,
+    upiDisplayName: user.upiDisplayName ?? null,
+    upiAccountType: user.upiAccountType || DEFAULT_UPI_ACCOUNT_TYPE,
     societyId: user.societyId,
     flatId: user.flatId,
     society: user.society,
@@ -128,6 +134,8 @@ router.post(
         role: user.role,
         profilePhotoUrl: user.profilePhotoUrl,
         upiId: user.upiId,
+        upiDisplayName: user.upiDisplayName ?? null,
+        upiAccountType: user.upiAccountType || DEFAULT_UPI_ACCOUNT_TYPE,
         societyId: user.societyId,
         flatId: user.flatId,
         society: user.society,
@@ -408,6 +416,7 @@ router.patch(
       profilePhotoUrl,
       upiId,
       upiDisplayName,
+      upiAccountType,
       paymentEnabled,
       sellingReachLevel,
       sellingReachRadiusKm,
@@ -518,6 +527,13 @@ router.patch(
         typeof upiDisplayName === "string" && upiDisplayName.trim()
           ? upiDisplayName.trim()
           : null;
+    }
+    if (upiAccountType !== undefined) {
+      try {
+        data.upiAccountType = normalizeUpiAccountType(upiAccountType);
+      } catch (err) {
+        return res.status(err.statusCode || 400).json({ error: err.message });
+      }
     }
     if (paymentEnabled !== undefined && upiId === undefined) {
       data.paymentEnabled = Boolean(paymentEnabled);

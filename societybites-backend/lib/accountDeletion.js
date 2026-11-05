@@ -72,6 +72,7 @@ async function deleteAuthenticatedAccount(userId) {
         profilePhotoUrl: null,
         upiId: null,
         upiDisplayName: null,
+        upiAccountType: "PERSONAL",
         paymentEnabled: false,
         role: "buyer",
         sellingReachLevel: "MY_SOCIETY",

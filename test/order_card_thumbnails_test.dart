@@ -89,7 +89,7 @@ void main() {
             order: Order.fromJson(
               _order([_line('Besan Kachori'), _line("Dadi's Dhokla")]),
             ),
-            onAction: (_, _) async {},
+            onAction: (_, _, {deliveryCharge, deliveryCollectBy}) async {},
             onOrderUpdated: (_) {},
             onPaymentConfirmed: () async {},
             onReject: (_) async {},

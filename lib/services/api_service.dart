@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart' show VoidCallback;
+import 'package:flutter/foundation.dart' show VoidCallback, visibleForTesting;
 import 'package:http/http.dart' as http_client;
 
 import '../models/app_settings.dart';
@@ -438,10 +438,24 @@ class ApiService {
     return SellingReach.fromAuthMe(me);
   }
 
+  /// When set (widget tests), bypasses HTTP for [previewSellingReachChange].
+  @visibleForTesting
+  static Future<Map<String, dynamic>> Function({
+    required String sellingReachLevel,
+    int? sellingReachRadiusKm,
+  })? previewSellingReachChangeForTest;
+
   static Future<Map<String, dynamic>> previewSellingReachChange({
     required String sellingReachLevel,
     int? sellingReachRadiusKm,
   }) async {
+    final testPreview = previewSellingReachChangeForTest;
+    if (testPreview != null) {
+      return testPreview(
+        sellingReachLevel: sellingReachLevel,
+        sellingReachRadiusKm: sellingReachRadiusKm,
+      );
+    }
     final query = <String, String>{
       'sellingReachLevel': sellingReachLevel,
     };
@@ -465,6 +479,7 @@ class ApiService {
     String? flatId,
     String? upiId,
     String? upiDisplayName,
+    String? upiAccountType,
     bool? paymentEnabled,
     String? sellingReachLevel,
     int? sellingReachRadiusKm,
@@ -493,6 +508,7 @@ class ApiService {
         if (flatId != null) 'flatId': flatId,
         if (upiId != null) 'upiId': upiId,
         if (upiDisplayName != null) 'upiDisplayName': upiDisplayName,
+        if (upiAccountType != null) 'upiAccountType': upiAccountType,
         if (paymentEnabled != null) 'paymentEnabled': paymentEnabled,
         if (sellingReachLevel != null) 'sellingReachLevel': sellingReachLevel,
         if (sellingReachRadiusKm != null)

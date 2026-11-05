@@ -44,8 +44,11 @@ Map<String, dynamic> _sellerProfile({
 Future<void> _pumpProfile(
   WidgetTester tester, {
   required Map<String, dynamic> profile,
-  Future<void> Function({required String upiId, String? upiDisplayName})?
-      saveUpiDetails,
+  Future<void> Function({
+    required String upiId,
+    String? upiDisplayName,
+    String? upiAccountType,
+  })? saveUpiDetails,
   Future<Map<String, dynamic>> Function({
     String? sellingReachLevel,
     int? sellingReachRadiusKm,
@@ -206,7 +209,7 @@ void main() {
     await _pumpProfile(
       tester,
       profile: _sellerProfile(),
-      saveUpiDetails: ({required upiId, upiDisplayName}) async {
+      saveUpiDetails: ({required upiId, upiDisplayName, upiAccountType}) async {
         saved += 1;
       },
     );
@@ -228,7 +231,7 @@ void main() {
     await _pumpProfile(
       tester,
       profile: _sellerProfile(),
-      saveUpiDetails: ({required upiId, upiDisplayName}) async {
+      saveUpiDetails: ({required upiId, upiDisplayName, upiAccountType}) async {
         saved += 1;
       },
     );
@@ -261,7 +264,7 @@ void main() {
     await _pumpProfile(
       tester,
       profile: _sellerProfile(),
-      saveUpiDetails: ({required upiId, upiDisplayName}) async {
+      saveUpiDetails: ({required upiId, upiDisplayName, upiAccountType}) async {
         savedUpi = upiId;
       },
     );
@@ -284,7 +287,7 @@ void main() {
     await _pumpProfile(
       tester,
       profile: _sellerProfile(upiId: 'old@oksbi'),
-      saveUpiDetails: ({required upiId, upiDisplayName}) async {
+      saveUpiDetails: ({required upiId, upiDisplayName, upiAccountType}) async {
         saved.add(upiId);
       },
     );

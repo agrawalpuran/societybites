@@ -109,7 +109,6 @@ void main() {
 
   setUp(() {
     SellerStorefrontMemoryCache.clear();
-    SharedPreferences.setMockInitialValues({});
   });
 
   testWidgets('empty society state appears with Start Selling and Explore Nearby', (
@@ -126,10 +125,12 @@ void main() {
 
     expect(find.text('No sellers available in your society yet'), findsOneWidget);
     expect(
-      find.textContaining('Be the first one to share homemade food'),
+      find.textContaining(
+        'Be the first one to share homemade food in your community. '
+        'Discover home food from nearby societies.',
+      ),
       findsOneWidget,
     );
-    expect(find.text('Discover home food from nearby societies'), findsOneWidget);
 
     await tester.tap(find.text('Start Selling'));
     await tester.pump();

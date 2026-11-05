@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/services/deep_link_service.dart';
@@ -5,6 +6,19 @@ import 'package:societybites/services/session_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  const secureStorageChannel =
+      MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+
+  setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, (_) async => null);
+  });
+
+  tearDownAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, null);
+  });
 
   setUp(DeepLinkService.resetForTest);
 

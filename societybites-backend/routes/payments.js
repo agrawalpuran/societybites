@@ -339,6 +339,7 @@ router.get(
       upiTransactionRef: order.upiTransactionRef || null,
       sellerUpiId: seller?.upiId || null,
       sellerUpiDisplayName: seller?.upiDisplayName || null,
+      sellerUpiAccountType: seller?.upiAccountType || "PERSONAL",
     });
   })
 );

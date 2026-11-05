@@ -365,7 +365,7 @@ void main() {
     expect(dish.locationLabel, isNot('Palm Grove · ~0.2 km'));
   });
 
-  test('home reach buckets use societyId then distance vs nearby radius', () {
+  test('home reach buckets use societyId then beyond-society cross listings', () {
     FoodItem item({
       required String id,
       String? societyId,
@@ -386,13 +386,13 @@ void main() {
 
     const nearbyKm = 8.0;
     final society = item(id: 'dal', societyId: 'mine');
-    final nextDoorExtended = item(
+    final nextDoorCross = item(
       id: 'cake',
       societyId: 'notting',
       sellingReachLevel: 'EXTENDED',
       distanceKm: 0.16,
     );
-    final furtherExtended = item(
+    final furtherCross = item(
       id: 'sushi',
       societyId: 'ferns',
       sellingReachLevel: 'EXTENDED',
@@ -409,19 +409,19 @@ void main() {
     );
     expect(
       homeListingReachFor(
-        nextDoorExtended,
+        nextDoorCross,
         buyerSocietyId: 'mine',
         nearbyRadiusKm: nearbyKm,
       ),
-      HomeListingReach.nearby,
+      HomeListingReach.beyondSociety,
     );
     expect(
       homeListingReachFor(
-        furtherExtended,
+        furtherCross,
         buyerSocietyId: 'mine',
         nearbyRadiusKm: nearbyKm,
       ),
-      HomeListingReach.extended,
+      HomeListingReach.beyondSociety,
     );
     expect(
       homeListingReachFor(
@@ -429,7 +429,7 @@ void main() {
         buyerSocietyId: 'mine',
         nearbyRadiusKm: nearbyKm,
       ),
-      HomeListingReach.nearby,
+      HomeListingReach.beyondSociety,
     );
   });
 
@@ -504,7 +504,7 @@ void main() {
         viewerUserId: 'puran',
         nearbyRadiusKm: 6,
       ),
-      HomeListingReach.extended,
+      HomeListingReach.beyondSociety,
     );
     expect(
       campaignsForHomeReach(
@@ -587,7 +587,7 @@ void main() {
 
     expect(
       effectiveBuyerDistance(null, reach),
-      const BuyerDistanceChoice.extended(),
+      const BuyerDistanceChoice.within(10),
     );
     expect(
       foodMatchesBuyerDistance(
@@ -640,7 +640,7 @@ void main() {
     );
     expect(
       buyerDistanceChoices(reach).map((choice) => choice.optionKey),
-      ['mySociety', '0.5', '1.0', '2.0', '3.0', '5.0', '7.0', 'extended'],
+      ['mySociety', '0.5', '1.0', '2.0', '3.0', '5.0', '7.0', '10.0'],
     );
     expect(
       buyerDistanceChoices(const SellingReach()).map((c) => c.optionKey),

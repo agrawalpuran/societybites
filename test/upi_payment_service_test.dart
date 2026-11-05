@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:societybites/models/upi_account_type.dart';
 import 'package:societybites/services/upi_payment_service.dart';
 
 void main() {
@@ -53,18 +54,34 @@ void main() {
     );
   });
 
-  test('does not offer UPI collect intent on any platform', () {
+  test('offers UPI collect intent only for merchant UPI on mobile', () {
     expect(
       shouldOfferUpiIntent(isWeb: false, platform: TargetPlatform.android),
       isFalse,
     );
     expect(
-      shouldOfferUpiIntent(isWeb: true, platform: TargetPlatform.android),
+      shouldOfferUpiIntent(
+        isWeb: false,
+        platform: TargetPlatform.android,
+        accountType: UpiAccountType.merchant,
+      ),
+      isTrue,
+    );
+    expect(
+      shouldOfferUpiIntent(
+        isWeb: true,
+        platform: TargetPlatform.android,
+        accountType: UpiAccountType.merchant,
+      ),
       isFalse,
     );
     expect(
-      shouldOfferUpiIntent(isWeb: false, platform: TargetPlatform.iOS),
-      isFalse,
+      shouldOfferUpiIntent(
+        isWeb: false,
+        platform: TargetPlatform.iOS,
+        accountType: UpiAccountType.merchant,
+      ),
+      isTrue,
     );
   });
 
@@ -141,7 +158,7 @@ void main() {
     expect(upiLaunchString(bhim), startsWith('bhim://upi/pay?'));
   });
 
-  test('app launch omits merchant collect fields', () {
+  test('personal app launch omits merchant collect fields', () {
     final upi = buildUpiPaymentUri(
       upiId: 'seller.name@okaxis',
       payeeName: 'Sharma Snacks',
@@ -153,6 +170,30 @@ void main() {
     final launched = buildUpiAppLaunchUri(upiPayUri: upi, target: target);
     expect(launched.queryParameters.keys.toList(), ['pa', 'pn', 'am', 'cu']);
     expect(upiLaunchString(launched), 'gpay://upi/pay?pa=seller.name@okaxis&pn=Sharma%20Snacks&am=245.00&cu=INR');
+  });
+
+  test('merchant app launch keeps note and transaction ref', () {
+    final upi = buildUpiPaymentUri(
+      upiId: 'shop@okbizaxis',
+      payeeName: 'Sharma Snacks',
+      amount: 245,
+      transactionNote: 'SocietyBites Order SB-1023',
+      transactionRef: 'SB-1023',
+    );
+    const target = UpiAppLaunchTarget(scheme: 'gpay', host: 'upi', path: '/pay');
+    final launched = buildUpiAppLaunchUri(
+      upiPayUri: upi,
+      target: target,
+      accountType: UpiAccountType.merchant,
+    );
+    expect(
+      launched.queryParameters.keys.toSet(),
+      {'pa', 'pn', 'am', 'cu', 'tn', 'tr'},
+    );
+    expect(shouldHandoffUpiCollect(
+      platform: TargetPlatform.android,
+      accountType: UpiAccountType.merchant,
+    ), isFalse);
   });
 
   test('getAvailableUpiApps hides apps that cannot launch', () async {

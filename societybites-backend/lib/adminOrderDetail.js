@@ -10,6 +10,7 @@ const partySelect = {
   role: true,
   upiId: true,
   upiDisplayName: true,
+  upiAccountType: true,
   fulfilmentMode: true,
   hideFlatNumber: true,
   society: {
@@ -103,6 +104,7 @@ function partyFromUser(user) {
     role: textOrNull(user.role),
     upiId: textOrNull(user.upiId),
     upiDisplayName: textOrNull(user.upiDisplayName),
+    upiAccountType: textOrNull(user.upiAccountType) || "PERSONAL",
     fulfilmentMode: textOrNull(user.fulfilmentMode),
     hideFlatNumber: Boolean(user.hideFlatNumber),
     society: societyFromRow(user.society),

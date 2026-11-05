@@ -16,6 +16,8 @@ model User {
   profilePhotoUrl         String?
   upiId                   String?
   upiDisplayName          String?
+  /// PERSONAL | MERCHANT. Merchant enables in-app UPI collect intent for buyers.
+  upiAccountType          String                  @default("PERSONAL")
   paymentEnabled          Boolean                 @default(false)
   /// MY_SOCIETY | BEYOND_SOCIETY (legacy: NEARBY | EXTENDED). Beyond uses sellingReachRadiusKm.
   sellingReachLevel       String                  @default("MY_SOCIETY")

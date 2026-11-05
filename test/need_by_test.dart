@@ -214,6 +214,7 @@ void main() {
             required paymentMethod,
             fulfilmentMethod,
             requestedReadyAt,
+            couponCode,
           }) async {
             placed = true;
             sentNeedBy = requestedReadyAt;
@@ -278,7 +279,7 @@ void main() {
                 requestedReadyAt: requested.toUtc().toIso8601String(),
               ),
             ),
-            onAction: (_, _) async {},
+            onAction: (_, _, {deliveryCharge, deliveryCollectBy}) async {},
             onOrderUpdated: (_) {},
             onPaymentConfirmed: () async {},
             onReject: (_) async {},
@@ -312,7 +313,7 @@ void main() {
                 requestedReadyAt: requested.toUtc().toIso8601String(),
               ),
             ),
-            onAction: (_, status) async {
+            onAction: (_, status, {deliveryCharge, deliveryCollectBy}) async {
               if (status == 'accepted') accepted = true;
             },
             onOrderUpdated: (_) {},
@@ -325,11 +326,13 @@ void main() {
     );
     await tester.pump();
     await tester.tap(find.text('Accept Order'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Earlier than your usual lead time'), findsOneWidget);
     expect(accepted, isFalse);
     await tester.tap(find.byKey(const Key('accept-confirm-early-need-by')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(accepted, isTrue);
   });
 
@@ -345,7 +348,7 @@ void main() {
         home: Scaffold(
           body: SellerActiveOrderCard(
             order: Order.fromJson(_orderJson()),
-            onAction: (_, status) async {
+            onAction: (_, status, {deliveryCharge, deliveryCollectBy}) async {
               if (status == 'accepted') accepted = true;
             },
             onOrderUpdated: (_) {},
@@ -358,10 +361,11 @@ void main() {
     );
     await tester.pump();
     await tester.tap(find.text('Accept Order'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Earlier than your usual lead time'), findsNothing);
     expect(accepted, isTrue);
-    expect(find.text('Reject'), findsOneWidget);
+    expect(find.text('Accept Order'), findsNothing);
   });
 
   test('existing reject reason is still available', () {

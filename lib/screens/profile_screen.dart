@@ -13,7 +13,9 @@ import '../models/seller_payment_preference.dart';
 import '../models/seller_terms.dart';
 import '../models/seller_terms_accept_result.dart';
 import '../models/selling_reach.dart';
+import '../models/upi_account_type.dart';
 import '../widgets/selling_reach_picker_sheet.dart';
+import '../widgets/upi_account_type_selector.dart';
 import '../services/api_service.dart';
 import '../services/profile_photo_processor.dart';
 import '../services/seller_onboarding.dart';
@@ -86,6 +88,7 @@ class ProfileScreen extends StatefulWidget {
   final Future<void> Function({
     required String upiId,
     String? upiDisplayName,
+    String? upiAccountType,
   })? saveUpiDetails;
 
   /// Test seam. Production uses [ApiService.updateMyProfile] for FSSAI.
@@ -135,6 +138,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   String? _upiId;
   bool _deletingAccount = false;
   String? _upiDisplayName;
+  UpiAccountType _upiAccountType = defaultUpiAccountType;
   SellingReachLevel _sellingReachLevel = SellingReachLevel.mySociety;
   double? _sellingReachRadiusKm;
   SellingReach _sellingReach = const SellingReach();
@@ -273,6 +277,10 @@ class ProfileScreenState extends State<ProfileScreen> {
     _consoleAdmin = await SessionService.isConsoleAdmin();
     _societyName = await SessionService.getSocietyName();
     _flatNumber = await SessionService.getFlatNumber();
+    final cachedUpi = await SessionService.getUpiId();
+    if (cachedUpi != null && cachedUpi.isNotEmpty) {
+      _upiId = cachedUpi;
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -297,6 +305,9 @@ class ProfileScreenState extends State<ProfileScreen> {
         _upiId = profile['upiId'] as String? ?? _upiId;
         _upiDisplayName =
             profile['upiDisplayName'] as String? ?? _upiDisplayName;
+        if (profile.containsKey('upiAccountType')) {
+          _upiAccountType = parseUpiAccountType(profile['upiAccountType']);
+        }
         final society = _asStringKeyedMap(profile['society']);
         final flat = _asStringKeyedMap(profile['flat']);
         _societyName = society?['name'] as String? ?? _societyName;
@@ -335,6 +346,9 @@ class ProfileScreenState extends State<ProfileScreen> {
     if (pending.includeUpi && pending.upiId != null) {
       _upiId = pending.upiId;
       _upiDisplayName = pending.upiDisplayName;
+      if (pending.upiAccountType != null) {
+        _upiAccountType = parseUpiAccountType(pending.upiAccountType);
+      }
     }
     if (pending.paymentPreference != null) {
       _paymentPreference =
@@ -403,22 +417,29 @@ class ProfileScreenState extends State<ProfileScreen> {
     _refreshSellerSettings();
   }
 
-  void _onPendingUpiDetailsChanged(String upiId, String displayName) {
+  void _onPendingUpiDetailsChanged(
+    String upiId,
+    String displayName,
+    UpiAccountType accountType,
+  ) {
     final pending = _pendingSellerEnable;
     if (pending == null) return;
     setState(() {
       _upiId = upiId;
       _upiDisplayName = displayName.isEmpty ? null : displayName;
+      _upiAccountType = accountType;
       if (upiId.isEmpty) {
         pending.includeUpi = false;
         pending.upiId = null;
         pending.upiDisplayName = null;
+        pending.upiAccountType = null;
         pending.upiIdConfirmed = false;
       } else {
         pending
           ..includeUpi = true
           ..upiId = upiId
-          ..upiDisplayName = displayName.isEmpty ? null : displayName;
+          ..upiDisplayName = displayName.isEmpty ? null : displayName
+          ..upiAccountType = accountType.apiValue;
       }
     });
     _refreshSellerSettings();
@@ -762,6 +783,9 @@ class ProfileScreenState extends State<ProfileScreen> {
                   : null,
               upiId: holdingSetup ? _upiId : null,
               upiDisplayName: holdingSetup ? _upiDisplayName : null,
+              upiAccountType: holdingSetup
+                  ? _upiAccountType
+                  : defaultUpiAccountType,
               onUpiDetailsChanged:
                   holdingSetup ? _onPendingUpiDetailsChanged : null,
               onUpiConfirmed:
@@ -961,11 +985,45 @@ class ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _ensureCurrentUpiLoaded() async {
+    try {
+      final profile = widget.fetchProfile != null
+          ? await widget.fetchProfile!()
+          : await ApiService.getMe();
+      if (profile.containsKey('upiId')) {
+        final apiUpi = (profile['upiId'] as String?)?.trim();
+        _upiId = (apiUpi != null && apiUpi.isNotEmpty) ? apiUpi : null;
+      }
+      if (profile.containsKey('upiDisplayName')) {
+        final apiDisplay = (profile['upiDisplayName'] as String?)?.trim();
+        _upiDisplayName =
+            (apiDisplay != null && apiDisplay.isNotEmpty) ? apiDisplay : null;
+      }
+      if (profile.containsKey('upiAccountType')) {
+        _upiAccountType = parseUpiAccountType(profile['upiAccountType']);
+      }
+      try {
+        await SessionService.cacheProfileFromApi(profile);
+      } catch (_) {}
+    } catch (_) {
+      final cachedUpi = await SessionService.getUpiId();
+      if (cachedUpi != null && cachedUpi.isNotEmpty) {
+        _upiId ??= cachedUpi;
+      }
+    }
+  }
+
   Future<void> _editUpi({bool afterEnableSelling = false}) async {
+    await _ensureCurrentUpiLoaded();
+    if (!mounted) return;
+
     final upiController = TextEditingController(text: _upiId ?? '');
     final nameController = TextEditingController(
-      text: _upiDisplayName ?? _name ?? '',
+      text: (_upiDisplayName != null && _upiDisplayName!.trim().isNotEmpty)
+          ? _upiDisplayName!
+          : (_name ?? ''),
     );
+    var selectedAccountType = _upiAccountType;
     String? errorText;
 
     final saved = await showModalBottomSheet<bool>(
@@ -984,140 +1042,149 @@ class ProfileScreenState extends State<ProfileScreen> {
                 24,
                 24 + MediaQuery.of(ctx).viewInsets.bottom,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    afterEnableSelling
-                        ? 'Add UPI to receive payments'
-                        : 'UPI for Payments',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF101617),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    afterEnableSelling
-                        ? 'Selling is on. Add your UPI ID so buyers can pay you for orders.'
-                        : 'Buyers will pay this UPI ID when they order your food.',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF6A7774),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  TextField(
-                    controller: upiController,
-                    autofocus: true,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: 'UPI ID',
-                      hintText: 'yourname@oksbi',
-                      errorText: errorText,
-                      filled: true,
-                      fillColor: const Color(0xFFF5F7F6),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFF0E5A47)),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      afterEnableSelling
+                          ? 'Add UPI to receive payments'
+                          : 'UPI for Payments',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF101617),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      label: Text.rich(
-                        TextSpan(
-                          text: 'Display name on UPI',
-                          style: const TextStyle(color: Color(0xFF6A7774)),
-                          children: const [
-                            TextSpan(
-                              text: ' *',
-                              style: TextStyle(
-                                color: Color(0xFFC62828),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      hintText: 'Name shown to buyers',
-                      filled: true,
-                      fillColor: const Color(0xFFF5F7F6),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFF0E5A47)),
+                    const SizedBox(height: 8),
+                    Text(
+                      afterEnableSelling
+                          ? 'Selling is on. Add your UPI ID so buyers can pay you for orders.'
+                          : 'Buyers will pay this UPI ID when they order your food.',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF6A7774),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final upi = upiController.text.trim();
-                        final displayName = nameController.text.trim();
-                        if (upi.isEmpty || !upi.contains('@')) {
-                          setSheetState(() {
-                            errorText =
-                                'Enter a valid UPI ID (e.g. name@oksbi)';
-                          });
-                          return;
-                        }
-                        if (displayName.isEmpty) {
-                          setSheetState(() {
-                            errorText =
-                                'Enter the display name shown on your UPI';
-                          });
-                          return;
-                        }
-                        final confirmed = await confirmUpiIdBeforeSave(
-                          context,
-                          upiId: upi,
-                        );
-                        if (confirmed && ctx.mounted) {
-                          Navigator.pop(ctx, true);
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0E5A47),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
+                    const SizedBox(height: 18),
+                    TextField(
+                      controller: upiController,
+                      autofocus: true,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'UPI ID',
+                        hintText: 'yourname@oksbi',
+                        errorText: errorText,
+                        filled: true,
+                        fillColor: const Color(0xFFF5F7F6),
+                        border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
                         ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Save UPI',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFF0E5A47)),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        label: Text.rich(
+                          TextSpan(
+                            text: 'Display name on UPI',
+                            style: const TextStyle(color: Color(0xFF6A7774)),
+                            children: const [
+                              TextSpan(
+                                text: ' *',
+                                style: TextStyle(
+                                  color: Color(0xFFC62828),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        hintText: 'Name shown to buyers',
+                        filled: true,
+                        fillColor: const Color(0xFFF5F7F6),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFFE0E5E3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFF0E5A47)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    UpiAccountTypeSelector(
+                      value: selectedAccountType,
+                      onChanged: (type) {
+                        setSheetState(() => selectedAccountType = type);
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final upi = upiController.text.trim();
+                          final displayName = nameController.text.trim();
+                          if (upi.isEmpty || !upi.contains('@')) {
+                            setSheetState(() {
+                              errorText =
+                                  'Enter a valid UPI ID (e.g. name@oksbi)';
+                            });
+                            return;
+                          }
+                          if (displayName.isEmpty) {
+                            setSheetState(() {
+                              errorText =
+                                  'Enter the display name shown on your UPI';
+                            });
+                            return;
+                          }
+                          final confirmed = await confirmUpiIdBeforeSave(
+                            context,
+                            upiId: upi,
+                          );
+                          if (confirmed && ctx.mounted) {
+                            Navigator.pop(ctx, true);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0E5A47),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Save UPI',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -1133,6 +1200,7 @@ class ProfileScreenState extends State<ProfileScreen> {
 
     final upi = upiController.text.trim();
     final displayName = nameController.text.trim();
+    final accountType = selectedAccountType;
     upiController.dispose();
     nameController.dispose();
     if (displayName.isEmpty) return;
@@ -1142,10 +1210,12 @@ class ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _upiId = upi;
         _upiDisplayName = displayName;
+        _upiAccountType = accountType;
         pending
           ..includeUpi = true
           ..upiId = upi
           ..upiDisplayName = displayName
+          ..upiAccountType = accountType.apiValue
           ..upiIdConfirmed = true;
       });
       _refreshSellerSettings();
@@ -1160,12 +1230,17 @@ class ProfileScreenState extends State<ProfileScreen> {
         await widget.saveUpiDetails!(
           upiId: upi,
           upiDisplayName: displayName,
+          upiAccountType: accountType.apiValue,
         );
       } else {
         await ApiService.updateMyProfile(
           upiId: upi,
           upiDisplayName: displayName.isEmpty ? null : displayName,
+          upiAccountType: accountType.apiValue,
         );
+      }
+      if (mounted) {
+        setState(() => _upiAccountType = accountType);
       }
       await _loadProfile();
       if (!mounted) return;
@@ -1420,10 +1495,13 @@ class ProfileScreenState extends State<ProfileScreen> {
       pending
         ..includeUpi = true
         ..upiId = upi
-        ..upiDisplayName = displayName;
+        ..upiDisplayName = displayName
+        ..upiAccountType = _upiAccountType.apiValue;
       _upiId = upi;
       _upiDisplayName = displayName;
       _refreshSellerSettings();
+    } else if (pending.includeUpi) {
+      pending.upiAccountType ??= _upiAccountType.apiValue;
     }
     final kitchenDraft = pending.includeKitchenHours
         ? (
@@ -3072,6 +3150,7 @@ class _PendingSellerEnable {
   bool upiIdConfirmed = false;
   String? upiId;
   String? upiDisplayName;
+  String? upiAccountType;
   String? paymentPreference;
   String? sellingReachLevel;
   int? sellingReachRadiusKm;
@@ -3095,6 +3174,7 @@ class _PendingSellerEnable {
       'termsVersion': sellerTermsVersion,
       if (includeUpi) 'upiId': upiId,
       if (includeUpi) 'upiDisplayName': upiDisplayName,
+      if (includeUpi) 'upiAccountType': upiAccountType ?? 'PERSONAL',
       if (paymentPreference != null) 'paymentPreference': paymentPreference,
       if (sellingReachLevel != null) 'sellingReachLevel': sellingReachLevel,
       if (sellingReachRadiusKm != null)
