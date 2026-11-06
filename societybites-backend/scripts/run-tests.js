@@ -28,6 +28,7 @@ const UNIT = [
   "listing-categories",
   "listing-image-optimize",
   "test-listing-names",
+  "test-accounts",
   "notifications-payload",
   "marketing-push",
   "whatsapp-settings",

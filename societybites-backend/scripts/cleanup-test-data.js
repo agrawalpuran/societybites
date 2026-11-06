@@ -7,59 +7,12 @@
  */
 require("dotenv").config();
 const prisma = require("../lib/prisma");
-
-const PROTECTED_PHONES = new Set(["+919845154070", "+919901844776"]);
-const PROTECTED_SOCIETY_IDS = new Set([
-  "prestige-notting-hill",
-  "brigade-gateway",
-  "sobha-dream-acres",
-]);
-
-const SOCIETY_NAME =
-  /^(Guest BLR |Guest Pune |P4B (Buyer|NearIn|NearOut|ExtOut|NoCoord|Pune) |PO (Buyer|Near|Mid|Far) |P5 (Buyer|Near|Far|NoCoord|Pune) |Catalog (buyer|nearby) )/;
-
-const USER_NAMES = new Set([
-  "Guest Nearby Kitchen",
-  "Guest Extended Kitchen",
-  "Guest My Society Kitchen",
-  "Guest Empty Kitchen",
-  "Guest Preorder Kitchen",
-  "Guest Pune Kitchen",
-  "Guest Buyer",
-  "Issue Buyer",
-  "Issue Seller",
-  "Issue Admin",
-  "Reach Test Admin",
-  "FSSAI Seller",
-  "FSSAI Buyer",
-  "FSSAI Admin",
-  "Terms Buyer",
-  "Delete Me",
-  "Other Bulk Seller",
-  "Bulk Buyer Only",
-]);
-
-const FIXED_TEST_PHONES = [
-  "+919800000091",
-  "+919800000093",
-  "+919800000094",
-  "+919800000095",
-  "+919800000181",
-  "+919800000182",
-  "+919800000201",
-  "+919800000202",
-  "+919111000001",
-  "+919111000002",
-  "+919111000003",
-  "+919111000018",
-  "+919111000019",
-  "+919111000028",
-  "+919111000029",
-  "+919111000039",
-  "+919111000070",
-  "+919111000071",
-];
-
+const {
+  PROTECTED_PHONES,
+  PROTECTED_SOCIETY_IDS,
+  TEST_SOCIETY_NAME,
+  isAutomatedTestAccount,
+} = require("../lib/testAccounts");
 const { isAutomatedTestListingName } = require("../lib/testListingNames");
 
 const CITY_KEYS = ["phase4bville", "phase5ville", "phasepreorderville"];
@@ -71,7 +24,8 @@ async function collect() {
   });
   const testSocieties = societies.filter(
     (society) =>
-      !PROTECTED_SOCIETY_IDS.has(society.id) && SOCIETY_NAME.test(society.name)
+      !PROTECTED_SOCIETY_IDS.has(society.id) &&
+      TEST_SOCIETY_NAME.test(society.name)
   );
   const societyIds = testSocieties.map((society) => society.id);
 
@@ -81,9 +35,7 @@ async function collect() {
   const testUsers = users.filter((user) => {
     if (PROTECTED_PHONES.has(user.phone)) return false;
     if (user.societyId && societyIds.includes(user.societyId)) return true;
-    if (user.name && USER_NAMES.has(user.name)) return true;
-    if (FIXED_TEST_PHONES.includes(user.phone)) return true;
-    return false;
+    return isAutomatedTestAccount(user);
   });
   const userIds = testUsers.map((user) => user.id);
 

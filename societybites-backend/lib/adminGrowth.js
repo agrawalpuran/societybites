@@ -1,3 +1,8 @@
+const {
+  automatedTestAccountExcludeWhere,
+  isAutomatedTestAccount,
+} = require("./testAccounts");
+
 const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 
 const VALID_RANGES = new Set([
@@ -204,6 +209,13 @@ function buildBuckets(range, now = new Date()) {
 const ACCOUNT_WHERE_BASE = {
   suspended: false,
   role: { not: "super_admin" },
+  ...automatedTestAccountExcludeWhere(),
+};
+
+const BUYER_WHERE_BASE = {
+  suspended: false,
+  role: "buyer",
+  ...automatedTestAccountExcludeWhere(),
 };
 
 async function countGrowthForWindow(prisma, start, end) {
@@ -216,14 +228,14 @@ async function countGrowthForWindow(prisma, start, end) {
     }),
     prisma.user.count({
       where: {
-        suspended: false,
-        role: "buyer",
+        ...BUYER_WHERE_BASE,
         createdAt: { gte: start, lt: end },
       },
     }),
     prisma.sellerTermsAcceptance.count({
       where: {
         acceptedAt: { gte: start, lt: end },
+        user: automatedTestAccountExcludeWhere(),
       },
     }),
   ]);
@@ -350,8 +362,7 @@ async function listAdminGrowthMembers(prisma, metric, start, end) {
   if (metric === "buyers") {
     const users = await prisma.user.findMany({
       where: {
-        suspended: false,
-        role: "buyer",
+        ...BUYER_WHERE_BASE,
         createdAt: { gte: start, lt: end },
       },
       select: USER_CONTACT_SELECT,
@@ -364,7 +375,10 @@ async function listAdminGrowthMembers(prisma, metric, start, end) {
   }
 
   const acceptances = await prisma.sellerTermsAcceptance.findMany({
-    where: { acceptedAt: { gte: start, lt: end } },
+    where: {
+      acceptedAt: { gte: start, lt: end },
+      user: automatedTestAccountExcludeWhere(),
+    },
     include: { user: { select: USER_CONTACT_SELECT } },
     orderBy: { acceptedAt: "desc" },
     take: MEMBERS_LIMIT * 3,
@@ -374,7 +388,14 @@ async function listAdminGrowthMembers(prisma, metric, start, end) {
   const members = [];
   for (const row of acceptances) {
     const user = row.user;
-    if (!user || user.role === "super_admin" || seen.has(user.id)) continue;
+    if (
+      !user ||
+      user.role === "super_admin" ||
+      isAutomatedTestAccount(user) ||
+      seen.has(user.id)
+    ) {
+      continue;
+    }
     seen.add(user.id);
     members.push(
       mapUserContact(user, row.acceptedAt, { includeSociety: true })
