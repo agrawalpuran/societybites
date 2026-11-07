@@ -782,6 +782,19 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> getPublicKitchenBySlug(String slug) async {
+    final normalized = slug.trim().toLowerCase();
+    final uri = Uri.parse('$baseUrl/public/kitchens/$normalized');
+    final response = await http.get(
+      uri,
+      headers: {'Accept': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> getGuestKitchenStorefront(
     String sellerId, {
     String city = 'bengaluru',

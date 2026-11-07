@@ -78,6 +78,7 @@ const {
 } = require("../lib/adminSellerPerformance");
 const { getAdminOrderDetail } = require("../lib/adminOrderDetail");
 const { liveAccountWhere } = require("../lib/accountDeletion");
+const { parseStorefrontWrite } = require("../lib/storefront");
 const {
   getMarketingPushStatus,
   sendMarketingPush,
@@ -623,6 +624,15 @@ router.patch(
 
     if (suspended !== undefined) {
       data.suspended = Boolean(suspended);
+    }
+
+    try {
+      Object.assign(data, await parseStorefrontWrite(req.body, { partial: true }));
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({ error: error.message });
+      }
+      throw error;
     }
 
     if (Object.keys(data).length === 0) {

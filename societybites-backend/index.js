@@ -122,6 +122,7 @@ app.use("/coupons", couponRoutes);
 app.use("/fssai", fssaiRoutes);
 app.use("/seller-staff", sellerStaffRoutes);
 app.use("/festival-banners", require("./routes/festivalBanners"));
+app.use("/public", require("./routes/public"));
 
 app.use((err, _req, res, _next) => {
   logger.error("server", err.message, { stack: err.stack });

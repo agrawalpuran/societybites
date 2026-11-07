@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'storefront_host.dart';
+
 /// Web share / deep-link targets. Mobile ignores URL capture for MVP.
 enum DeepLinkKind { seller, campaign, listing }
 
@@ -135,7 +137,13 @@ class DeepLinkService {
   /// Web startup: read the browser URL once.
   static Future<void> captureBrowserUrlIfWeb() async {
     if (!kIsWeb) return;
+    if (StorefrontHost.kitchenSlugFromUri(Uri.base) != null) return;
     await captureFromUri(Uri.base);
+  }
+
+  static String kitchenSiteUrl(String slug) {
+    final normalized = slug.trim().toLowerCase();
+    return '${webBaseUrl()}/kitchen/${Uri.encodeComponent(normalized)}';
   }
 
   static Future<void> savePending(DeepLinkTarget target) async {

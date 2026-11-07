@@ -17,6 +17,8 @@ import 'widgets/mobile_startup_frame.dart';
 import 'services/api_service.dart';
 import 'services/auth_config.dart';
 import 'services/deep_link_service.dart';
+import 'services/storefront_host.dart';
+import 'screens/seller_kitchen_site_screen.dart';
 import 'services/force_update_service.dart';
 import 'services/session_service.dart';
 import 'services/push_notification_service.dart';
@@ -143,6 +145,12 @@ class _AuthGateState extends State<AuthGate> {
       final forceUpdate = await ForceUpdateService.check();
       if (forceUpdate != null) {
         return ForceUpdateScreen(requirement: forceUpdate);
+      }
+      if (kIsWeb) {
+        final slug = StorefrontHost.kitchenSlugFromUri(Uri.base);
+        if (slug != null) {
+          return SellerKitchenSiteScreen(slug: slug);
+        }
       }
       final resolve = widget.resolveStartScreen ?? resolveAuthStartScreen;
       return await resolve();
