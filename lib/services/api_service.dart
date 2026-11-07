@@ -936,14 +936,16 @@ class ApiService {
 
   static Future<CouponQuote?> validateCoupon(
     String code,
-    double orderSubtotal,
-  ) async {
+    double orderSubtotal, {
+    String? sellerId,
+  }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/coupons/validate'),
       headers: await _authHeaders(),
       body: jsonEncode({
         'code': code,
         'orderSubtotal': orderSubtotal,
+        if (sellerId != null && sellerId.isNotEmpty) 'sellerId': sellerId,
       }),
     );
     if (response.statusCode == 200) {

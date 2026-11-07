@@ -8,6 +8,7 @@ const REASONS = {
   USAGE_LIMIT_REACHED: "USAGE_LIMIT_REACHED",
   BUYER_USAGE_LIMIT_REACHED: "BUYER_USAGE_LIMIT_REACHED",
   NOT_ELIGIBLE: "NOT_ELIGIBLE",
+  NOT_ELIGIBLE_SELLER: "NOT_ELIGIBLE_SELLER",
   COUPON_PAUSED: "COUPON_PAUSED",
   COUPON_EXHAUSTED: "COUPON_EXHAUSTED",
   COUPON_ALREADY_APPLIED: "COUPON_ALREADY_APPLIED",
@@ -130,7 +131,27 @@ function buyerBlockedByFrequency(coupon, mine, now) {
   return mine.some((row) => new Date(row.redeemedAt || row.appliedAt) >= windowStart);
 }
 
-async function validateCoupon({ code, userId, orderSubtotal, now = new Date(), db = prisma }) {
+function normalizeSellerId(raw) {
+  const value = String(raw ?? "").trim();
+  return value || null;
+}
+
+function sellerScopeMismatch(coupon, orderSellerId) {
+  if (!coupon.sellerId) return false;
+  const scoped = String(coupon.sellerId);
+  const orderSeller = normalizeSellerId(orderSellerId);
+  if (!orderSeller || orderSeller !== scoped) return true;
+  return false;
+}
+
+async function validateCoupon({
+  code,
+  userId,
+  orderSubtotal,
+  sellerId = null,
+  now = new Date(),
+  db = prisma,
+}) {
   if (!userId) return invalid(REASONS.INVALID_COUPON);
   const normalized = normalizeCode(code);
   if (!normalized) return invalid(REASONS.INVALID_COUPON);
@@ -157,6 +178,10 @@ async function validateCoupon({ code, userId, orderSubtotal, now = new Date(), d
       where: { couponId_userId: { couponId: coupon.id, userId } },
     });
     if (!eligible) return invalid(REASONS.NOT_ELIGIBLE);
+  }
+
+  if (sellerScopeMismatch(coupon, sellerId)) {
+    return invalid(REASONS.NOT_ELIGIBLE_SELLER);
   }
 
   const stats = await redeemedStats(db, coupon.id, userId);
@@ -200,6 +225,7 @@ function couponErrorMessage(reason, context = {}) {
       USAGE_LIMIT_REACHED: "This coupon has reached its usage limit",
       BUYER_USAGE_LIMIT_REACHED: "You have already used this coupon",
       NOT_ELIGIBLE: "This coupon is not available for your account",
+      NOT_ELIGIBLE_SELLER: "This coupon is not valid for this kitchen",
       COUPON_PAUSED: "This coupon is paused",
       COUPON_EXHAUSTED: "This coupon is no longer available",
       COUPON_ALREADY_APPLIED: "A coupon is already applied to this order",
@@ -211,6 +237,7 @@ async function attachCouponRedemption({
   code,
   userId,
   orderSubtotal,
+  sellerId = null,
   orderId = null,
   now = new Date(),
   db,
@@ -228,7 +255,14 @@ async function attachCouponRedemption({
   if (!coupon) return invalid(REASONS.INVALID_COUPON);
   await db.$queryRaw`SELECT "id" FROM "Coupon" WHERE "id" = ${coupon.id} FOR UPDATE`;
 
-  const quote = await validateCoupon({ code, userId, orderSubtotal, now, db });
+  const quote = await validateCoupon({
+    code,
+    userId,
+    orderSubtotal,
+    sellerId,
+    now,
+    db,
+  });
   if (!quote.valid) return quote;
 
   await db.couponRedemption.create({
@@ -245,13 +279,21 @@ async function attachCouponRedemption({
   return quote;
 }
 
-async function applyCoupon({ code, userId, orderSubtotal, orderId = null, now = new Date() }) {
+async function applyCoupon({
+  code,
+  userId,
+  orderSubtotal,
+  sellerId = null,
+  orderId = null,
+  now = new Date(),
+}) {
   try {
     const quote = await prisma.$transaction(async (tx) =>
       attachCouponRedemption({
         code,
         userId,
         orderSubtotal,
+        sellerId,
         orderId,
         now,
         db: tx,
@@ -309,13 +351,32 @@ function serializeCoupon(coupon, summary) {
     audienceType: coupon.audienceType,
     status: coupon.status,
     fundedBy: coupon.fundedBy,
+    sellerId: coupon.sellerId ?? null,
+    sellerName: coupon.seller && coupon.seller.name ? coupon.seller.name : null,
+    sellerPhone: coupon.seller && coupon.seller.phone ? coupon.seller.phone : null,
     createdAt: coupon.createdAt,
     updatedAt: coupon.updatedAt,
     ...summary,
   };
 }
 
-function parseCouponWrite(body, { partial = false } = {}) {
+async function resolveCouponSellerId(raw, { partial = false } = {}) {
+  if (raw === undefined && partial) return undefined;
+  if (raw === null || raw === "" || raw === false) return null;
+  const sellerId = normalizeSellerId(raw);
+  if (!sellerId) return null;
+  const user = await prisma.user.findUnique({
+    where: { id: sellerId },
+    select: { id: true, role: true },
+  });
+  if (!user) throw httpError(400, "Seller was not found");
+  if (user.role !== "seller" && user.role !== "super_admin") {
+    throw httpError(400, "Coupon seller must be a kitchen account");
+  }
+  return sellerId;
+}
+
+async function parseCouponWrite(body, { partial = false } = {}) {
   const source = body && typeof body === "object" ? body : {};
   const data = {};
 
@@ -395,6 +456,9 @@ function parseCouponWrite(body, { partial = false } = {}) {
     if (!["ALL", "SELECTED_USERS"].includes(audience)) throw httpError(400, "Audience is invalid");
     data.audienceType = audience;
   }
+  if (source.sellerId !== undefined) {
+    data.sellerId = await resolveCouponSellerId(source.sellerId, { partial });
+  }
   if (source.status != null) {
     const status = String(source.status).trim().toUpperCase();
     if (!["DRAFT", "ACTIVE", "PAUSED"].includes(status)) {
@@ -416,11 +480,19 @@ async function withSummary(coupon) {
   return serializeCoupon(coupon, usageSummary(coupon, redemptions));
 }
 
+async function loadCouponRow(id) {
+  return prisma.coupon.findUnique({
+    where: { id },
+    include: couponSellerInclude,
+  });
+}
+
 async function createCoupon(body) {
-  const data = parseCouponWrite(body);
+  const data = await parseCouponWrite(body);
   try {
     const coupon = await prisma.coupon.create({ data });
-    return withSummary(coupon);
+    const full = await loadCouponRow(coupon.id);
+    return withSummary(full || coupon);
   } catch (err) {
     if (err.code === "P2002") throw httpError(409, "Coupon code already exists");
     throw err;
@@ -428,14 +500,24 @@ async function createCoupon(body) {
 }
 
 async function listCoupons() {
-  const coupons = await prisma.coupon.findMany({ orderBy: { createdAt: "desc" } });
+  const coupons = await prisma.coupon.findMany({
+    orderBy: { createdAt: "desc" },
+    include: couponSellerInclude,
+  });
   return Promise.all(coupons.map(withSummary));
 }
+
+const couponSellerInclude = {
+  seller: { select: { id: true, name: true, phone: true } },
+};
 
 async function getCoupon(id) {
   const coupon = await prisma.coupon.findUnique({
     where: { id },
-    include: { eligibleUsers: { select: { userId: true } } },
+    include: {
+      eligibleUsers: { select: { userId: true } },
+      ...couponSellerInclude,
+    },
   });
   if (!coupon) throw httpError(404, "Coupon not found");
   const summary = await withSummary(coupon);
@@ -448,15 +530,17 @@ async function updateCoupon(id, body) {
     include: { _count: { select: { redemptions: true } } },
   });
   if (!existing) throw httpError(404, "Coupon not found");
-  const data = parseCouponWrite(body, { partial: true });
+  const data = await parseCouponWrite(body, { partial: true });
   if (existing._count.redemptions > 0) {
     delete data.code;
     delete data.discountType;
     delete data.discountValue;
     delete data.fundedBy;
+    delete data.sellerId;
   }
   const coupon = await prisma.coupon.update({ where: { id }, data });
-  return withSummary(coupon);
+  const full = await loadCouponRow(coupon.id);
+  return withSummary(full || coupon);
 }
 
 async function setCouponStatus(id, status) {

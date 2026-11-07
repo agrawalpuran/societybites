@@ -71,6 +71,7 @@ model User {
   issueMessages           IssueMessage[]
   couponRedemptions       CouponRedemption[]
   couponEligibilities     CouponEligibleUser[]
+  scopedCoupons           Coupon[]                @relation("CouponSellerScope")
   orderIdempotencies      OrderIdempotency[]
   sellerFssai             SellerFssai?
   fssaiAssistanceRequests FssaiAssistanceRequest[]
@@ -624,12 +625,16 @@ model Coupon {
   audienceType       CouponAudienceType    @default(ALL)
   status             CouponStatus          @default(DRAFT)
   fundedBy           CouponFundedBy        @default(SOCIETYEATS)
+  /// When set, the coupon applies only to orders from this kitchen (seller user).
+  sellerId           String?
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
   redemptions        CouponRedemption[]
   eligibleUsers      CouponEligibleUser[]
+  seller             User?                 @relation("CouponSellerScope", fields: [sellerId], references: [id], onDelete: SetNull)
 
   @@index([status, validUntil])
+  @@index([sellerId])
 }
 
 model CouponEligibleUser {

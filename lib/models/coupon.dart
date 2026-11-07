@@ -52,6 +52,7 @@ String couponReasonMessage(
     'USAGE_LIMIT_REACHED' => 'This coupon has reached its usage limit',
     'BUYER_USAGE_LIMIT_REACHED' => 'You have already used this coupon',
     'NOT_ELIGIBLE' => 'This coupon is not available for your account',
+    'NOT_ELIGIBLE_SELLER' => 'This coupon is not valid for this kitchen',
     'COUPON_PAUSED' => 'This coupon is paused',
     'COUPON_EXHAUSTED' => 'This coupon is no longer available',
     'COUPON_ALREADY_APPLIED' => 'A coupon is already applied to this order',
@@ -78,6 +79,9 @@ class AdminCoupon {
     required this.audienceType,
     required this.status,
     required this.fundedBy,
+    this.sellerId,
+    this.sellerName,
+    this.sellerPhone,
     required this.totalUsage,
     required this.appliedCount,
     required this.reversedCount,
@@ -103,6 +107,9 @@ class AdminCoupon {
   final String audienceType;
   final String status;
   final String fundedBy;
+  final String? sellerId;
+  final String? sellerName;
+  final String? sellerPhone;
   final int totalUsage;
   final int appliedCount;
   final int reversedCount;
@@ -153,6 +160,9 @@ class AdminCoupon {
       audienceType: json['audienceType']?.toString() ?? 'ALL',
       status: json['status']?.toString() ?? 'DRAFT',
       fundedBy: json['fundedBy']?.toString() ?? 'SOCIETYEATS',
+      sellerId: json['sellerId']?.toString(),
+      sellerName: json['sellerName']?.toString(),
+      sellerPhone: json['sellerPhone']?.toString(),
       totalUsage: _asInt(json['totalUsage']) ?? 0,
       appliedCount: _asInt(json['appliedCount']) ?? 0,
       reversedCount: _asInt(json['reversedCount']) ?? 0,

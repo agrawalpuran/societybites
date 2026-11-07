@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -200,6 +202,7 @@ class _AdminCouponsScreenState extends State<AdminCouponsScreen>
                                   ),
                                   subtitle: Text(
                                     '${coupon.statusLabel} · ${formatCouponDate(coupon.validFrom)} – ${formatCouponDate(coupon.validUntil)}\n'
+                                    '${_sellerScopeLine(coupon)}'
                                     '${_usageLine(coupon)}',
                                   ),
                                   isThreeLine: true,
@@ -223,6 +226,15 @@ String _statusLabel(String status) => switch (status) {
       'EXHAUSTED' => 'Exhausted',
       _ => status,
     };
+
+String _sellerScopeLine(AdminCoupon coupon) {
+  if (coupon.sellerId == null) return 'All kitchens · ';
+  final label = coupon.sellerName?.trim();
+  if (label != null && label.isNotEmpty) {
+    return 'Kitchen: $label · ';
+  }
+  return 'One kitchen · ';
+}
 
 String _usageLine(AdminCoupon coupon) {
   final limit = coupon.totalUsageLimit == null ? 'no cap' : '${coupon.totalUsageLimit}';
@@ -253,6 +265,7 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
   final _buyerLimit = TextEditingController(text: '1');
   final _budget = TextEditingController();
   final _userSearch = TextEditingController();
+  final _sellerSearch = TextEditingController();
 
   AdminCoupon? _coupon;
   DateTime _validFrom = DateTime.now();
@@ -266,6 +279,13 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
   final Map<String, String> _eligible = {};
   List<Map<String, dynamic>> _userHits = const [];
   bool _searchingUsers = false;
+  String? _sellerId;
+  String? _sellerLabel;
+  List<Map<String, dynamic>> _sellerHits = const [];
+  bool _searchingSellers = false;
+  Timer? _sellerSearchDebounce;
+  int _sellerSearchSeq = 0;
+  String? _sellerSearchApplied;
 
   bool get _editing => widget.couponId != null;
   bool get _locked => _coupon?.hasRedemptions == true;
@@ -288,7 +308,33 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
     _buyerLimit.dispose();
     _budget.dispose();
     _userSearch.dispose();
+    _sellerSearch.dispose();
+    _sellerSearchDebounce?.cancel();
     super.dispose();
+  }
+
+  String _kitchenDisplayName(Map<String, dynamic> user) {
+    final kitchen = user['upiDisplayName']?.toString().trim();
+    if (kitchen != null && kitchen.isNotEmpty) return kitchen;
+    final name = user['name']?.toString().trim();
+    if (name != null && name.isNotEmpty) return name;
+    return user['phone']?.toString() ?? 'Kitchen';
+  }
+
+  void _onSellerSearchChanged(String value) {
+    _sellerSearchDebounce?.cancel();
+    final query = value.trim();
+    if (query.length < 2) {
+      setState(() {
+        _sellerHits = const [];
+        _sellerSearchApplied = null;
+      });
+      return;
+    }
+    _sellerSearchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      _searchSellers(query: query);
+    });
   }
 
   void _apply(AdminCoupon coupon) {
@@ -309,6 +355,9 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
     _frequency = coupon.usageFrequency ?? 'CUSTOM';
     _audience = coupon.audienceType;
     _status = coupon.status;
+    _sellerId = coupon.sellerId;
+    _sellerLabel = coupon.sellerName ??
+        (coupon.sellerPhone != null ? coupon.sellerPhone : null);
     _eligible
       ..clear()
       ..addEntries(coupon.eligibleUserIds.map((id) => MapEntry(id, id)));
@@ -407,6 +456,7 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
       'usageFrequency': _frequency,
       'campaignBudget': ?budget,
       'audienceType': _audience,
+      'sellerId': _sellerId,
       if (!_editing) 'status': _status,
     };
   }
@@ -472,6 +522,37 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
       setState(() => _error = ApiService.userFacingError(error));
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _searchSellers({String? query}) async {
+    final search = (query ?? _sellerSearch.text).trim();
+    if (search.length < 2) {
+      setState(() {
+        _sellerHits = const [];
+        _sellerSearchApplied = null;
+      });
+      return;
+    }
+    final seq = ++_sellerSearchSeq;
+    setState(() {
+      _searchingSellers = true;
+      _sellerSearchApplied = search;
+    });
+    try {
+      final users = await ApiService.getAdminUsers(search: search, role: 'seller');
+      if (!mounted || seq != _sellerSearchSeq) return;
+      setState(() => _sellerHits = users);
+    } catch (error) {
+      if (!mounted || seq != _sellerSearchSeq) return;
+      setState(() {
+        _sellerHits = const [];
+        _error = ApiService.userFacingError(error);
+      });
+    } finally {
+      if (mounted && seq == _sellerSearchSeq) {
+        setState(() => _searchingSellers = false);
+      }
     }
   }
 
@@ -746,6 +827,83 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
                       border: const OutlineInputBorder(),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Kitchen scope (optional)',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _locked
+                        ? 'Kitchen scope is locked after the first use.'
+                        : 'Leave empty for all kitchens. Pick one seller to limit this code.',
+                    style: const TextStyle(color: Color(0xFF5C6B66)),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_sellerId != null)
+                    Chip(
+                      label: Text(_sellerLabel ?? _sellerId!),
+                      onDeleted: _locked
+                          ? null
+                          : () => setState(() {
+                                _sellerId = null;
+                                _sellerLabel = null;
+                              }),
+                    ),
+                  if (!_locked) ...[
+                    TextField(
+                      controller: _sellerSearch,
+                      decoration: InputDecoration(
+                        labelText: 'Find kitchen',
+                        hintText: 'Kitchen name, listing, or phone',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: _searchingSellers
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : const Icon(Icons.search_rounded),
+                      ),
+                      onChanged: _onSellerSearchChanged,
+                      onSubmitted: (_) => _searchSellers(),
+                    ),
+                    if (_sellerSearchApplied != null &&
+                        !_searchingSellers &&
+                        _sellerHits.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'No kitchens match “$_sellerSearchApplied”.',
+                          style: const TextStyle(color: Color(0xFF5C6B66)),
+                        ),
+                      ),
+                    for (final user in _sellerHits)
+                      ListTile(
+                        dense: true,
+                        title: Text(_kitchenDisplayName(user)),
+                        subtitle: Text(
+                          [
+                            user['name']?.toString().trim(),
+                            user['phone']?.toString(),
+                          ].whereType<String>().where((s) => s.isNotEmpty).join(' · '),
+                        ),
+                        onTap: () {
+                          final id = user['id']?.toString();
+                          if (id == null) return;
+                          setState(() {
+                            _sellerId = id;
+                            _sellerLabel = _kitchenDisplayName(user);
+                            _sellerHits = const [];
+                            _sellerSearchApplied = null;
+                            _sellerSearch.clear();
+                          });
+                        },
+                      ),
+                  ],
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: _audience,

@@ -8,6 +8,7 @@ const {
   listen,
   closeServer,
   createOrder,
+  patchStatus,
   signToken,
 } = require("./helpers/httpHarness");
 const {
@@ -17,7 +18,14 @@ const {
 const {
   withWhatsAppOrderNotifications,
 } = require("../lib/whatsappSetting");
-const { ORDER_TEMPLATE_NAME } = require("../lib/whatsappCloud");
+const {
+  ORDER_TEMPLATE_NAME,
+  TEST_ORDER_TEMPLATE_NAME,
+  READY_TEMPLATE_NAME,
+  COMPLETED_TEMPLATE_NAME,
+  READY_TEMPLATE_ENV,
+  COMPLETED_TEMPLATE_ENV,
+} = require("../lib/whatsappCloud");
 
 function uniquePhone(lead2) {
   const rest = `${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-8);
@@ -40,10 +48,15 @@ async function main() {
   const prevEnabled = process.env.WHATSAPP_ENABLED;
   const prevToken = process.env.WHATSAPP_TOKEN;
   const prevPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const prevReadyTemplate = process.env[READY_TEMPLATE_ENV];
+  const prevCompletedTemplate = process.env[COMPLETED_TEMPLATE_ENV];
 
   process.env.WHATSAPP_TOKEN = prevToken || "regression-whatsapp-token";
   process.env.WHATSAPP_PHONE_NUMBER_ID = prevPhoneId || "1356102247597493";
   process.env.WHATSAPP_ENABLED = "true";
+  process.env[READY_TEMPLATE_ENV] = prevReadyTemplate || READY_TEMPLATE_NAME;
+  process.env[COMPLETED_TEMPLATE_ENV] =
+    prevCompletedTemplate || COMPLETED_TEMPLATE_NAME;
 
   const graph = installMockGraphFetch();
   const society = await prisma.society.create({
@@ -94,6 +107,7 @@ async function main() {
   listingIds.push(listing.id);
 
   const buyerToken = signToken(buyer);
+  const sellerToken = signToken(seller);
   const server = await listen(orderApp());
 
   try {
@@ -109,7 +123,7 @@ async function main() {
       assert(graph.calls.length === 0, "admin off must not call Graph");
     });
 
-    process.env.WHATSAPP_TEMPLATE_NAME = ORDER_TEMPLATE_NAME;
+    process.env.WHATSAPP_TEMPLATE_NAME = TEST_ORDER_TEMPLATE_NAME;
     await withWhatsAppOrderNotifications(true, async () => {
       graph.calls.length = 0;
       const mapped = await jsonRequest(server, {
@@ -125,7 +139,7 @@ async function main() {
       orderIds.push(mapped.json.id);
       await waitForCalls(graph.calls, 1, "new_order_notification send");
       const body = graphBody(graph.calls[0]);
-      assert(body.template.name === ORDER_TEMPLATE_NAME, "order template name");
+      assert(body.template.name === TEST_ORDER_TEMPLATE_NAME, "order template name");
       const texts = body.template.components[0].parameters.map((row) => row.text);
       assert(texts.length === 5, "five body parameters");
       assert(texts[0] === "Kavya", "seller name from order");
@@ -135,6 +149,89 @@ async function main() {
       assert(texts[4] === String(mapped.json.total), "amount from order total");
       assert(!JSON.stringify(body).includes("₹"), "amount has no rupee symbol");
       assert(!String(graph.calls[0].options.headers.Authorization || "").includes("undefined"));
+
+      graph.calls.length = 0;
+      const orderId = mapped.json.id;
+      const ready = await patchStatus(server, {
+        token: sellerToken,
+        orderId,
+        status: "ready",
+      });
+      assert(ready.status === 200, "seller marks ready");
+      await waitForCalls(graph.calls, 1, "ready template send");
+      const readyBody = graphBody(graph.calls[0]);
+      assert(
+        readyBody.template.name === READY_TEMPLATE_NAME,
+        "ready template name"
+      );
+      assert(
+        String(readyBody.to).endsWith(buyer.phone.replace(/\D/g, "").slice(-10)),
+        "ready send targets buyer"
+      );
+      const readyTexts = readyBody.template.components[0].parameters.map((row) => row.text);
+      assert(readyTexts.length === 5, "ready five body parameters");
+      assert(readyTexts[0] === "Neel", "ready buyer name");
+      assert(readyTexts[2] === "Kavya", "ready seller name");
+
+      const cash = await jsonRequest(server, {
+        method: "POST",
+        path: `/payments/${orderId}/confirm-cash`,
+        token: sellerToken,
+      });
+      assert(cash.status === 200, "cash confirm before complete");
+
+      graph.calls.length = 0;
+      const completed = await patchStatus(server, {
+        token: sellerToken,
+        orderId,
+        status: "completed",
+      });
+      assert(completed.status === 200, "seller marks completed");
+      await waitForCalls(graph.calls, 1, "completed template send");
+      const completedBody = graphBody(graph.calls[0]);
+      assert(
+        completedBody.template.name === COMPLETED_TEMPLATE_NAME,
+        "completed template name"
+      );
+      const buyerDigits = buyer.phone.replace(/\D/g, "").slice(-10);
+      assert(
+        String(completedBody.to).endsWith(buyerDigits),
+        "completed send targets buyer"
+      );
+      const completedTexts = completedBody.template.components[0].parameters.map(
+        (row) => row.text
+      );
+      assert(completedTexts.length === 5, "completed five body parameters");
+      assert(completedTexts[0] === "Neel", "completed buyer name");
+      assert(completedTexts[2] === "Kavya", "completed seller name");
+    });
+
+    await withWhatsAppOrderNotifications(false, async () => {
+      graph.calls.length = 0;
+      const silent = await createOrder(server, {
+        token: buyerToken,
+        listingId: listing.id,
+        paymentMethod: "cash",
+      });
+      orderIds.push(silent.id);
+      await patchStatus(server, {
+        token: sellerToken,
+        orderId: silent.id,
+        status: "ready",
+      });
+      await jsonRequest(server, {
+        method: "POST",
+        path: `/payments/${silent.id}/confirm-cash`,
+        token: sellerToken,
+      });
+      const blocked = await patchStatus(server, {
+        token: sellerToken,
+        orderId: silent.id,
+        status: "completed",
+      });
+      assert(blocked.status === 200, "status patch still works when whatsapp off");
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      assert(graph.calls.length === 0, "admin off must not call Graph on completed");
     });
 
     delete process.env.WHATSAPP_TEMPLATE_NAME;
@@ -184,6 +281,10 @@ async function main() {
     else process.env.WHATSAPP_TOKEN = prevToken;
     if (prevPhoneId === undefined) delete process.env.WHATSAPP_PHONE_NUMBER_ID;
     else process.env.WHATSAPP_PHONE_NUMBER_ID = prevPhoneId;
+    if (prevReadyTemplate === undefined) delete process.env[READY_TEMPLATE_ENV];
+    else process.env[READY_TEMPLATE_ENV] = prevReadyTemplate;
+    if (prevCompletedTemplate === undefined) delete process.env[COMPLETED_TEMPLATE_ENV];
+    else process.env[COMPLETED_TEMPLATE_ENV] = prevCompletedTemplate;
 
     if (orderIds.length) {
       await prisma.couponRedemption

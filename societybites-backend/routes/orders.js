@@ -52,7 +52,10 @@ const {
   notifyOrderMessage,
   flushNotification,
 } = require("../utils/notifications");
-const { sendWhatsAppOrderNotification } = require("../lib/whatsappCloud");
+const {
+  sendWhatsAppOrderNotification,
+  dispatchWhatsAppStatusNotification,
+} = require("../lib/whatsappCloud");
 const {
   lazyCloseCampaign,
   assertCampaignAcceptsOrders,
@@ -1245,10 +1248,15 @@ router.post(
 
         if (!couponCode) return created;
 
+        const orderSellerId =
+          pricedItems[0] &&
+          pricedItems[0].listing &&
+          pricedItems[0].listing.sellerId;
         const couponResult = await attachCouponRedemption({
           code: couponCode,
           userId: req.user.id,
           orderSubtotal: subtotal,
+          sellerId: orderSellerId,
           orderId: created.id,
           db: tx,
           status: "REDEEMED",
@@ -1526,12 +1534,15 @@ router.patch(
         where: { id: order.id },
         include: orderInclude,
       });
+      void flushNotification(notifyStatusChange(reloaded, status));
+      dispatchWhatsAppStatusNotification(reloaded, status);
       return res.json(serializeOrderForUser(reloaded, req.user.id));
     }
 
     res.json(serializeOrderStatusPatch(updated));
 
     void flushNotification(notifyStatusChange(updated, status));
+    dispatchWhatsAppStatusNotification(updated, status);
   })
 );
 

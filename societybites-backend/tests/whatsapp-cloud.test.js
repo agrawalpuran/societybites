@@ -2,8 +2,15 @@ const assert = require("assert");
 const {
   TEMPLATE_NAME,
   ORDER_TEMPLATE_NAME,
+  READY_TEMPLATE_NAME,
+  COMPLETED_TEMPLATE_NAME,
+  READY_TEMPLATE_ENV,
+  COMPLETED_TEMPLATE_ENV,
   TEMPLATE_LANGUAGE,
   sendWhatsAppOrderNotification,
+  sendWhatsAppReadyNotification,
+  sendWhatsAppCompletedNotification,
+  buyerOrderTemplateParameters,
   templatePayload,
   graphMessagesUrl,
   toWhatsAppRecipient,
@@ -34,7 +41,7 @@ function orderNotificationOrder(overrides = {}) {
     id: "order-1",
     orderNumber: "SE-100001",
     total: 250,
-    buyer: { name: "Asha" },
+    buyer: { name: "Asha", phone: "+919881234567" },
     items: [
       {
         quantity: 2,
@@ -568,6 +575,72 @@ async function main() {
     });
   }
   assert(replayFetch.calls.length === 0, "idempotent replay skips WhatsApp");
+
+  const buyerParams = buyerOrderTemplateParameters(orderNotificationOrder());
+  assert(buyerParams[0] === "Asha", "buyer params start with customer");
+  assert(buyerParams[1] === "SE-100001", "buyer params order number");
+  assert(buyerParams[2] === "Meera", "buyer params seller");
+  assert(buyerParams[3] === "2 x Idli, 1 x Masala Dosa", "buyer params items");
+  assert(buyerParams[4] === "250", "buyer params amount");
+
+  const readyEnv = {
+    ...creds,
+    [READY_TEMPLATE_ENV]: READY_TEMPLATE_NAME,
+  };
+  const readyFetch = mockFetch({
+    body: { messages: [{ id: "wamid.ready" }] },
+  });
+  const readySent = await sendWhatsAppReadyNotification(orderNotificationOrder(), {
+    isEnabled: async () => true,
+    env: readyEnv,
+    fetch: readyFetch,
+  });
+  assert(readySent.sent === true, "ready template sent");
+  const readyBody = JSON.parse(readyFetch.calls[0].options.body);
+  assert(readyBody.template.name === READY_TEMPLATE_NAME, "ready uses env template name");
+  assert(readyBody.to === "919881234567", "ready targets buyer phone");
+
+  const completedEnv = {
+    ...creds,
+    [COMPLETED_TEMPLATE_ENV]: COMPLETED_TEMPLATE_NAME,
+  };
+  const completedFetch = mockFetch({
+    body: { messages: [{ id: "wamid.completed" }] },
+  });
+  const completedSent = await sendWhatsAppCompletedNotification(orderNotificationOrder(), {
+    isEnabled: async () => true,
+    env: completedEnv,
+    fetch: completedFetch,
+  });
+  assert(completedSent.sent === true, "completed template sent");
+  const completedBody = JSON.parse(completedFetch.calls[0].options.body);
+  assert(
+    completedBody.template.name === COMPLETED_TEMPLATE_NAME,
+    "completed uses env template name"
+  );
+  const completedTo = completedBody.to;
+  assert(completedTo === "919881234567", "completed targets buyer phone");
+  const completedTexts = completedBody.template.components[0].parameters.map((row) => row.text);
+  assert(completedTexts.length === 5, "completed has five body parameters");
+  assert(completedTexts[0] === "Asha", "completed buyer name");
+
+  const completedOff = await sendWhatsAppCompletedNotification(orderNotificationOrder(), {
+    isEnabled: async () => false,
+    env: completedEnv,
+    fetch: mockFetch(),
+  });
+  assert(completedOff.reason === "admin_off", "admin off skips completed");
+
+  const noTemplateEnv = { ...creds };
+  delete noTemplateEnv[COMPLETED_TEMPLATE_ENV];
+  const noTemplateFetch = mockFetch();
+  const noTemplate = await sendWhatsAppCompletedNotification(orderNotificationOrder(), {
+    isEnabled: async () => true,
+    env: noTemplateEnv,
+    fetch: noTemplateFetch,
+  });
+  assert(noTemplate.reason === "no_template", "unset completed template skips");
+  assert(noTemplateFetch.calls.length === 0, "no template makes zero calls");
 
   assert(
     typeof notifications.notifyOrderCreated === "function",

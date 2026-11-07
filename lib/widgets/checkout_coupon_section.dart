@@ -8,13 +8,18 @@ class CheckoutCouponSection extends StatefulWidget {
     super.key,
     required this.orderSubtotal,
     required this.onQuoteChanged,
+    this.sellerId,
     this.validateCoupon,
   });
 
   final double orderSubtotal;
+  final String? sellerId;
   final ValueChanged<CouponQuote?> onQuoteChanged;
-  final Future<CouponQuote?> Function(String code, double orderSubtotal)?
-      validateCoupon;
+  final Future<CouponQuote?> Function(
+    String code,
+    double orderSubtotal, {
+    String? sellerId,
+  })? validateCoupon;
 
   @override
   State<CheckoutCouponSection> createState() => _CheckoutCouponSectionState();
@@ -29,7 +34,9 @@ class _CheckoutCouponSectionState extends State<CheckoutCouponSection> {
   @override
   void didUpdateWidget(CheckoutCouponSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.orderSubtotal != widget.orderSubtotal && _applied != null) {
+    if ((oldWidget.orderSubtotal != widget.orderSubtotal ||
+            oldWidget.sellerId != widget.sellerId) &&
+        _applied != null) {
       _clearApplied();
     }
   }
@@ -60,7 +67,11 @@ class _CheckoutCouponSectionState extends State<CheckoutCouponSection> {
     });
     try {
       final validate = widget.validateCoupon ?? ApiService.validateCoupon;
-      final quote = await validate(code, widget.orderSubtotal);
+      final quote = await validate(
+        code,
+        widget.orderSubtotal,
+        sellerId: widget.sellerId,
+      );
       if (!mounted) return;
       if (quote == null) {
         setState(() {

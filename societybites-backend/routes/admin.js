@@ -541,15 +541,39 @@ router.get(
     const take = parseInt(limit, 10);
     const skip = (parseInt(page, 10) - 1) * take;
 
+    const roleKey = role ? String(role) : null;
+    const searchText = search ? String(search).trim() : "";
+    const searchOr = searchText
+      ? [
+          { name: { contains: searchText, mode: "insensitive" } },
+          { phone: { contains: searchText, mode: "insensitive" } },
+          { upiDisplayName: { contains: searchText, mode: "insensitive" } },
+          { fssaiRegisteredName: { contains: searchText, mode: "insensitive" } },
+          ...(roleKey === "seller"
+            ? [
+                {
+                  listings: {
+                    some: {
+                      name: {
+                        contains: searchText,
+                        mode: "insensitive",
+                      },
+                    },
+                  },
+                },
+              ]
+            : []),
+        ]
+      : null;
+
     const where = {
-      ...(role && { role: String(role) }),
+      ...(roleKey === "seller"
+        ? { role: { in: ["seller", "super_admin"] } }
+        : roleKey
+          ? { role: roleKey }
+          : {}),
       ...(societyId && { societyId: String(societyId) }),
-      ...(search && {
-        OR: [
-          { name: { contains: String(search), mode: "insensitive" } },
-          { phone: { contains: String(search), mode: "insensitive" } },
-        ],
-      }),
+      ...(searchOr && { OR: searchOr }),
     };
 
     const [users, total] = await Promise.all([

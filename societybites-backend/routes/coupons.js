@@ -9,10 +9,12 @@ router.post(
   "/validate",
   requireUser,
   asyncHandler(async (req, res) => {
+    const body = req.body || {};
     const result = await validateCoupon({
-      code: req.body && req.body.code,
+      code: body.code,
       userId: req.user.id,
-      orderSubtotal: req.body && req.body.orderSubtotal,
+      orderSubtotal: body.orderSubtotal,
+      sellerId: body.sellerId,
     });
     res.json(result);
   })

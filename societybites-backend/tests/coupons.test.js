@@ -93,6 +93,8 @@ async function main() {
     data: { phone: `+9177${stamp}03`, name: "Coupon Admin", role: "super_admin" },
   });
   const codes = [];
+  let kitchenA = null;
+  let kitchenB = null;
 
   const app = express();
   app.use(express.json());
@@ -174,6 +176,48 @@ async function main() {
     await prisma.couponEligibleUser.create({ data: { couponId: selected.id, userId: buyer.id } });
     assert((await validateCoupon({ code: selected.code, userId: buyer.id, orderSubtotal: 500 })).valid, "selected user allowed");
     assert((await validateCoupon({ code: selected.code, userId: other.id, orderSubtotal: 500 })).reason === REASONS.NOT_ELIGIBLE, "selected user rejected");
+
+    kitchenA = await prisma.user.create({
+      data: { phone: `+9177${stamp}10`, name: "Kitchen A", role: "seller" },
+    });
+    kitchenB = await prisma.user.create({
+      data: { phone: `+9177${stamp}11`, name: "Kitchen B", role: "seller" },
+    });
+    const scoped = await makeCoupon(`KIT${stamp}`, {
+      sellerId: kitchenA.id,
+      minimumOrderValue: 0,
+    });
+    codes.push(scoped.code);
+    assert(
+      (await validateCoupon({
+        code: scoped.code,
+        userId: buyer.id,
+        orderSubtotal: 500,
+        sellerId: kitchenA.id,
+      })).valid,
+      "seller-scoped coupon matches kitchen"
+    );
+    assert(
+      (await validateCoupon({
+        code: scoped.code,
+        userId: buyer.id,
+        orderSubtotal: 500,
+        sellerId: kitchenB.id,
+      })).reason === REASONS.NOT_ELIGIBLE_SELLER,
+      "seller-scoped coupon rejects other kitchen"
+    );
+    assert(
+      (await validateCoupon({
+        code: scoped.code,
+        userId: buyer.id,
+        orderSubtotal: 500,
+      })).reason === REASONS.NOT_ELIGIBLE_SELLER,
+      "seller-scoped coupon requires kitchen context"
+    );
+    assert(
+      (await validateCoupon({ code: fixed.code, userId: buyer.id, orderSubtotal: 500 })).valid,
+      "global coupon unchanged without sellerId"
+    );
 
     const small = await makeCoupon(`SMALL${stamp}`, { discountValue: 100, minimumOrderValue: 0 });
     codes.push(small.code);
@@ -325,7 +369,10 @@ async function main() {
     await prisma.couponEligibleUser.deleteMany({ where: { couponId: { in: couponIds } } });
     await prisma.order.deleteMany({ where: { orderNumber: `COUPON-${stamp}` } });
     await prisma.coupon.deleteMany({ where: { id: { in: couponIds } } });
-    await prisma.user.deleteMany({ where: { id: { in: [buyer.id, other.id, admin.id] } } });
+    const userIds = [buyer.id, other.id, admin.id];
+    if (kitchenA) userIds.push(kitchenA.id);
+    if (kitchenB) userIds.push(kitchenB.id);
+    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     server.close();
     await prisma.$disconnect();
   }

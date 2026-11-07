@@ -13,6 +13,7 @@ const {
   notifyStatusChange,
   flushNotification,
 } = require("../utils/notifications");
+const { sendWhatsAppCompletedNotification } = require("../lib/whatsappCloud");
 const { parseOptionalReadyAt } = require("../lib/orderReadyTime");
 const {
   isUpiFoodCashDeliverySplit,
@@ -303,6 +304,7 @@ router.post(
 
     if (updated.status === "completed") {
       void flushNotification(notifyStatusChange(updated, "completed"));
+      void sendWhatsAppCompletedNotification(updated);
     }
   })
 );

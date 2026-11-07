@@ -4,6 +4,12 @@ const { isWhatsAppOrderNotificationsEnabled } = require("./whatsappSetting");
 
 const TEMPLATE_NAME = "hello_world";
 const ORDER_TEMPLATE_NAME = "new_order_notification";
+/** Example test WABA names (override via env). */
+const TEST_ORDER_TEMPLATE_NAME = "test_new_order_notification";
+const READY_TEMPLATE_NAME = "test_order_ready_pickup";
+const COMPLETED_TEMPLATE_NAME = "test_order_completed";
+const READY_TEMPLATE_ENV = "WHATSAPP_TEMPLATE_READY";
+const COMPLETED_TEMPLATE_ENV = "WHATSAPP_TEMPLATE_COMPLETED";
 const TEMPLATE_LANGUAGE = "en_US";
 const DEFAULT_API_VERSION = "v21.0";
 const DEFAULT_TIMEOUT_MS = 8000;
@@ -44,17 +50,27 @@ function resolveTemplateLanguage(raw) {
   return TEMPLATE_LANGUAGE;
 }
 
-function readConfig(env) {
+function readConfig(env, overrides = {}) {
   const source = env || process.env;
+  const templateRaw =
+    overrides.templateName !== undefined
+      ? overrides.templateName
+      : source.WHATSAPP_TEMPLATE_NAME;
   return {
     emergencyOff: envFlagOff(source.WHATSAPP_ENABLED),
     token: String(source.WHATSAPP_TOKEN || "").trim(),
     phoneNumberId: String(source.WHATSAPP_PHONE_NUMBER_ID || "").trim(),
     apiVersion: graphVersion(source.WHATSAPP_API_VERSION),
     timeoutMs: timeoutMs(source.WHATSAPP_TIMEOUT_MS),
-    templateName: resolveTemplateName(source.WHATSAPP_TEMPLATE_NAME),
+    templateName: resolveTemplateName(templateRaw),
     templateLanguage: resolveTemplateLanguage(source.WHATSAPP_TEMPLATE_LANGUAGE),
   };
+}
+
+function templateNameFromEnv(env, envKey) {
+  const source = env || process.env;
+  const value = String(source[envKey] || "").trim();
+  return isOrderTemplateName(value) ? value : null;
 }
 
 function isConfigured(config) {
@@ -70,6 +86,10 @@ function sellerPhoneFromOrder(order) {
     order.items[0].listing.seller &&
     order.items[0].listing.seller.phone
   );
+}
+
+function buyerPhoneFromOrder(order) {
+  return order && order.buyer && order.buyer.phone;
 }
 
 function toWhatsAppRecipient(raw) {
@@ -141,7 +161,7 @@ function formatItemsSummary(items) {
   return `${summary.slice(0, MAX_ITEM_SUMMARY_LENGTH - 3).trimEnd()}...`;
 }
 
-/** Body params for order templates: seller, order number, customer, items, amount. */
+/** Body params for seller new-order templates: seller, order number, customer, items, amount. */
 function orderTemplateParameters(order) {
   const amount = formatOrderAmount(order && order.total);
   if (amount == null) return null;
@@ -149,6 +169,19 @@ function orderTemplateParameters(order) {
     sellerNameFromOrder(order),
     textParameter(order && order.orderNumber, "Order"),
     customerNameFromOrder(order),
+    formatItemsSummary(order && order.items),
+    amount,
+  ];
+}
+
+/** Body params for buyer status templates: customer, order number, seller, items, amount. */
+function buyerOrderTemplateParameters(order) {
+  const amount = formatOrderAmount(order && order.total);
+  if (amount == null) return null;
+  return [
+    customerNameFromOrder(order),
+    textParameter(order && order.orderNumber, "Order"),
+    sellerNameFromOrder(order),
     formatItemsSummary(order && order.items),
     amount,
   ];
@@ -250,22 +283,69 @@ async function postTemplate(config, to, deps, parameters) {
   return messageIdFromBody(body);
 }
 
+function sendWhatsAppSafely(inner, order, kind) {
+  return Promise.resolve()
+    .then(() => inner(order))
+    .catch((err) => {
+      logger.error(
+        "whatsapp",
+        `${kind}: ${err && err.message ? err.message : String(err)}`
+      );
+      return { sent: false, reason: "error" };
+    });
+}
+
+async function sendWhatsAppTemplatedMessage(order, options, deps) {
+  const isEnabled = deps.isEnabled || isWhatsAppOrderNotificationsEnabled;
+  if (!(await isEnabled())) {
+    return { sent: false, reason: "admin_off" };
+  }
+
+  const templateName = templateNameFromEnv(deps.env, options.templateEnvKey);
+  if (!templateName) {
+    return { sent: false, reason: "no_template" };
+  }
+
+  const config = readConfig(deps.env, { templateName });
+  if (config.emergencyOff) {
+    return { sent: false, reason: "emergency_off" };
+  }
+  if (!isConfigured(config)) {
+    return { sent: false, reason: "unconfigured" };
+  }
+
+  const recipient = toWhatsAppRecipient(options.recipientPhone(order));
+  if (!recipient) {
+    return { sent: false, reason: "no_phone" };
+  }
+
+  const parameters = options.buildParameters(order);
+  if (!parameters) {
+    return { sent: false, reason: "invalid_amount" };
+  }
+
+  const messageId = await postTemplate(config, recipient, deps, parameters);
+  logger.info("whatsapp", `${options.logKind} ${order && order.orderNumber}`, {
+    orderNumber: order && order.orderNumber,
+    messageId,
+  });
+  return { sent: true, messageId, to: recipient };
+}
+
 /**
  * Independent of FCM. Never rejects. Makes no Graph call when disabled,
  * unconfigured, or the seller phone is missing/invalid.
  */
 function sendWhatsAppOrderNotification(order, deps = {}) {
-  return Promise.resolve()
-    .then(() => sendWhatsAppOrderNotificationInner(order, deps))
-    .catch((err) => {
-      logger.error("whatsapp", err && err.message ? err.message : String(err));
-      return { sent: false, reason: "error" };
-    });
+  return sendWhatsAppSafely(
+    (payload) => sendWhatsAppOrderNotificationInner(payload, deps),
+    order,
+    "new_order"
+  );
 }
 
 async function sendWhatsAppOrderNotificationInner(order, deps) {
-  const isEnabled =
-    deps.isEnabled || isWhatsAppOrderNotificationsEnabled;
+  const isEnabled = deps.isEnabled || isWhatsAppOrderNotificationsEnabled;
   if (!(await isEnabled())) {
     return { sent: false, reason: "admin_off" };
   }
@@ -299,16 +379,70 @@ async function sendWhatsAppOrderNotificationInner(order, deps) {
   return { sent: true, messageId, to: recipient };
 }
 
+function sendWhatsAppReadyNotification(order, deps = {}) {
+  return sendWhatsAppSafely(
+    (payload) =>
+      sendWhatsAppTemplatedMessage(
+        payload,
+        {
+          templateEnvKey: READY_TEMPLATE_ENV,
+          recipientPhone: buyerPhoneFromOrder,
+          buildParameters: buyerOrderTemplateParameters,
+          logKind: "ready",
+        },
+        deps
+      ),
+    order,
+    "ready"
+  );
+}
+
+function sendWhatsAppCompletedNotification(order, deps = {}) {
+  return sendWhatsAppSafely(
+    (payload) =>
+      sendWhatsAppTemplatedMessage(
+        payload,
+        {
+          templateEnvKey: COMPLETED_TEMPLATE_ENV,
+          recipientPhone: buyerPhoneFromOrder,
+          buildParameters: buyerOrderTemplateParameters,
+          logKind: "completed",
+        },
+        deps
+      ),
+    order,
+    "completed"
+  );
+}
+
+function dispatchWhatsAppStatusNotification(order, status) {
+  if (status === "ready") {
+    void sendWhatsAppReadyNotification(order);
+  } else if (status === "completed") {
+    void sendWhatsAppCompletedNotification(order);
+  }
+}
+
 module.exports = {
   TEMPLATE_NAME,
   ORDER_TEMPLATE_NAME,
+  TEST_ORDER_TEMPLATE_NAME,
+  READY_TEMPLATE_NAME,
+  COMPLETED_TEMPLATE_NAME,
+  READY_TEMPLATE_ENV,
+  COMPLETED_TEMPLATE_ENV,
   TEMPLATE_LANGUAGE,
   sendWhatsAppOrderNotification,
+  sendWhatsAppReadyNotification,
+  sendWhatsAppCompletedNotification,
+  dispatchWhatsAppStatusNotification,
   readConfig,
   isConfigured,
   toWhatsAppRecipient,
   sellerPhoneFromOrder,
+  buyerPhoneFromOrder,
   graphMessagesUrl,
   templatePayload,
   orderTemplateParameters,
+  buyerOrderTemplateParameters,
 };

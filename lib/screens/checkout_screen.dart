@@ -204,6 +204,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   bool get _showNeedBy => _items.any((item) => item.food.isMadeToOrder);
 
+  String? get _checkoutSellerId =>
+      _items.isEmpty ? null : _items.first.food.sellerId;
+
   bool get _fulfilmentChoiceRequired =>
       _sellerFulfilment?.mode == FulfilmentMode.both;
 
@@ -250,6 +253,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _updateQuantity(int index, int delta) {
+    if (index < 0 || index >= _items.length) return;
     final maxAvailable = _items[index].food.buyerMaxCartQuantity;
     final proposed = _items[index].quantity + delta;
     if (delta > 0 && proposed > maxAvailable) {
@@ -543,6 +547,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ],
                           CheckoutCouponSection(
                             orderSubtotal: _subtotal,
+                            sellerId: _checkoutSellerId,
                             onQuoteChanged: (quote) {
                               setState(() => _couponQuote = quote);
                             },
@@ -723,6 +728,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ],
         CheckoutCouponSection(
           orderSubtotal: _subtotal,
+          sellerId: _checkoutSellerId,
           onQuoteChanged: (quote) {
             setState(() => _couponQuote = quote);
           },
