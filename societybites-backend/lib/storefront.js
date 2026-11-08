@@ -86,7 +86,9 @@ async function getKitchenBySlug(slugInput) {
   if (!slug) throw httpError(404, "Kitchen not found");
 
   const seller = await prisma.user.findFirst({
-    where: { storefrontSlug: slug },
+    where: {
+      storefrontSlug: { equals: slug, mode: "insensitive" },
+    },
     include: {
       society: { select: { id: true, name: true, city: true } },
       flat: { select: { block: true, flatNumber: true } },
