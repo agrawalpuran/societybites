@@ -22,4 +22,11 @@ void main() {
     );
     expect(slug, isNull);
   });
+
+  test('apex suffix maps kitchen subdomain', () {
+    final slug = StorefrontHost.kitchenSlugFromUri(
+      Uri.parse('https://puran.societyeats.com/'),
+    );
+    expect(slug, 'puran');
+  });
 }

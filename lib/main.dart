@@ -61,8 +61,24 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: societyBitesTheme(),
       navigatorKey: PushNotificationService.navigatorKey,
-      home: const AuthGate(),
+      home: const AppEntry(),
     );
+  }
+}
+
+/// Web kitchen hosts (`puran.societyeats.com`, `/kitchen/puran`) skip marketplace auth routing.
+class AppEntry extends StatelessWidget {
+  const AppEntry({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    if (kIsWeb) {
+      final slug = StorefrontHost.kitchenSlugFromUri(Uri.base);
+      if (slug != null) {
+        return SellerKitchenSiteScreen(slug: slug);
+      }
+    }
+    return const AuthGate();
   }
 }
 
@@ -145,12 +161,6 @@ class _AuthGateState extends State<AuthGate> {
       final forceUpdate = await ForceUpdateService.check();
       if (forceUpdate != null) {
         return ForceUpdateScreen(requirement: forceUpdate);
-      }
-      if (kIsWeb) {
-        final slug = StorefrontHost.kitchenSlugFromUri(Uri.base);
-        if (slug != null) {
-          return SellerKitchenSiteScreen(slug: slug);
-        }
       }
       final resolve = widget.resolveStartScreen ?? resolveAuthStartScreen;
       return await resolve();
