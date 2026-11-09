@@ -69,6 +69,14 @@
         if (!/^[a-z0-9](?:[a-z0-9-]{0,28}[a-z0-9])?$/.test(slug)) return '';
         return slug;
       }
+      var cookieMatch = document.cookie.match(/(?:^|; )se_kitchen_slug=([^;]*)/);
+      if (cookieMatch) {
+        var fromCookie = normalizeSlug(decodeURIComponent(cookieMatch[1]));
+        if (fromCookie) {
+          window.__SOCIETYEATS_STOREFRONT_SLUG__ = fromCookie;
+          return;
+        }
+      }
       var host = (window.location.hostname || '').toLowerCase();
       if (host && host.endsWith('.' + apex)) {
         var prefix = host.slice(0, -(apex.length + 1));
