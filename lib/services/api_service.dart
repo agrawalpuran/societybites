@@ -2867,6 +2867,8 @@ class ApiService {
     String userId, {
     String? role,
     bool? suspended,
+    String? storefrontSlug,
+    bool clearStorefrontSlug = false,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/admin/users/$userId'),
@@ -2874,6 +2876,10 @@ class ApiService {
       body: jsonEncode({
         if (role != null) 'role': role,
         if (suspended != null) 'suspended': suspended,
+        if (clearStorefrontSlug)
+          'storefrontSlug': null
+        else if (storefrontSlug != null)
+          'storefrontSlug': storefrontSlug,
       }),
     );
     if (response.statusCode == 200) {
