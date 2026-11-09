@@ -17,6 +17,9 @@ class WebShellHeader extends StatefulWidget {
     this.onSignIn,
     this.signedIn,
     this.kitchenAttentionCount = 0,
+    this.kitchenSiteMode = false,
+    this.kitchenBrandName,
+    this.kitchenBrandLogoUrl,
   });
 
   final int selectedTab;
@@ -27,6 +30,9 @@ class WebShellHeader extends StatefulWidget {
   final VoidCallback? onSignIn;
   final bool? signedIn;
   final int kitchenAttentionCount;
+  final bool kitchenSiteMode;
+  final String? kitchenBrandName;
+  final String? kitchenBrandLogoUrl;
 
   @override
   State<WebShellHeader> createState() => _WebShellHeaderState();
@@ -80,7 +86,15 @@ class _WebShellHeaderState extends State<WebShellHeader> {
                   padding: EdgeInsets.symmetric(horizontal: pad),
                   child: Row(
                     children: [
-                      _Wordmark(onTap: () => widget.onSelectTab(0)),
+                      if (widget.kitchenSiteMode &&
+                          (widget.kitchenBrandName ?? '').trim().isNotEmpty)
+                        _KitchenBrandMark(
+                          name: widget.kitchenBrandName!.trim(),
+                          logoUrl: widget.kitchenBrandLogoUrl,
+                          onTap: () => widget.onSelectTab(0),
+                        )
+                      else
+                        _Wordmark(onTap: () => widget.onSelectTab(0)),
                       const SizedBox(width: 8),
                       _HomeButton(
                         selected: widget.selectedTab == 0,
@@ -104,13 +118,14 @@ class _WebShellHeaderState extends State<WebShellHeader> {
                         },
                       ),
                       const SizedBox(width: 4),
-                      _NavLink(
-                        label: 'Explore',
-                        icon: Icons.explore_outlined,
-                        selected: widget.selectedTab == 0,
-                        compact: compactNav,
-                        onTap: () => widget.onSelectTab(0),
-                      ),
+                      if (!widget.kitchenSiteMode)
+                        _NavLink(
+                          label: 'Explore',
+                          icon: Icons.explore_outlined,
+                          selected: widget.selectedTab == 0,
+                          compact: compactNav,
+                          onTap: () => widget.onSelectTab(0),
+                        ),
                       _NavLink(
                         label: 'My Kitchen',
                         icon: Icons.grid_view_rounded,
@@ -152,6 +167,100 @@ class _WebShellHeaderState extends State<WebShellHeader> {
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _KitchenBrandMark extends StatelessWidget {
+  const _KitchenBrandMark({
+    required this.name,
+    required this.onTap,
+    this.logoUrl,
+  });
+
+  final String name;
+  final String? logoUrl;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = webBrandGreenDark(context);
+    final url = logoUrl?.trim();
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipOval(
+              child: url != null && url.isNotEmpty
+                  ? Image.network(
+                      url,
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          _KitchenLogoFallback(name: name, accent: accent),
+                    )
+                  : _KitchenLogoFallback(name: name, accent: accent),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                    color: accent,
+                    letterSpacing: -0.2,
+                    height: 1.1,
+                  ),
+                ),
+                Text(
+                  'on $kAppDisplayName',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: webMuted,
+                    height: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _KitchenLogoFallback extends StatelessWidget {
+  const _KitchenLogoFallback({required this.name, required this.accent});
+
+  final String name;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'K';
+    return Container(
+      width: 36,
+      height: 36,
+      color: const Color(0xFFE5F2EA),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: 16,
+          color: accent,
         ),
       ),
     );

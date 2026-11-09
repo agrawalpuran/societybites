@@ -24,12 +24,14 @@ class StorefrontKitchenPayload {
     required this.branding,
     required this.seller,
     this.listings = const [],
+    this.campaigns = const [],
   });
 
   final String slug;
   final StorefrontBranding branding;
   final Map<String, dynamic> seller;
   final List<Map<String, dynamic>> listings;
+  final List<Map<String, dynamic>> campaigns;
 
   String get sellerId => seller['id']?.toString() ?? '';
   String get sellerName => seller['name']?.toString() ?? 'Kitchen';
@@ -50,6 +52,12 @@ class StorefrontKitchenPayload {
           : const {},
       listings: listingsRaw is List
           ? listingsRaw
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList()
+          : const [],
+      campaigns: json['campaigns'] is List
+          ? (json['campaigns'] as List)
                 .whereType<Map>()
                 .map((item) => Map<String, dynamic>.from(item))
                 .toList()

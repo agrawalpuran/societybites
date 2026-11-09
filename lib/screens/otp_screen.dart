@@ -4,8 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'main_shell_screen.dart';
-import 'onboarding_intent_screen.dart';
+import '../navigation/kitchen_site_navigation.dart';
 import '../services/api_service.dart';
 import '../services/auth_config.dart';
 import '../services/session_service.dart';
@@ -238,14 +237,9 @@ class _OtpScreenState extends State<OtpScreen> {
       await SessionService.clearOnboardingIntent();
     }
 
-    Navigator.pushAndRemoveUntil(
+    KitchenSiteNavigation.replaceWithPostAuthRoot(
       context,
-      MaterialPageRoute(
-        builder: (_) => hasFlat
-            ? const MainShellScreen()
-            : const OnboardingIntentScreen(),
-      ),
-      (_) => false,
+      hasSocietyFlat: hasFlat,
     );
   }
 

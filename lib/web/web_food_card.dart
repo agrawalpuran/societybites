@@ -160,11 +160,11 @@ class WebFoodCard extends StatelessWidget {
                               maxLines: 1,
                               softWrap: false,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 height: 1.1,
                                 fontWeight: FontWeight.w700,
-                                color: webGreen,
+                                color: webBrandGreen(context),
                               ),
                             ),
                           ),

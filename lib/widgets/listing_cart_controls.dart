@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'storefront_theme_scope.dart';
+
 /// Stops [InkWell] / parent [GestureDetector] on listing cards from opening
 /// detail when the buyer taps Add or +/-.
 class ListingCartTapShield extends StatelessWidget {
@@ -33,6 +35,7 @@ class ListingCartAddButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fill = KitchenBrandScope.resolveGreen(context);
     final radius = compact ? 10.0 : 12.0;
     final hasOptions =
         optionsLabel != null && optionsLabel!.trim().isNotEmpty;
@@ -45,7 +48,7 @@ class ListingCartAddButton extends StatelessWidget {
         : (compact ? 6.0 : 7.0);
     return ListingCartTapShield(
       child: Material(
-        color: const Color(0xFF0E5A47),
+        color: fill,
         borderRadius: BorderRadius.circular(radius),
         child: InkWell(
           onTap: onPressed,
@@ -113,6 +116,7 @@ class ListingCartQtyStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fill = KitchenBrandScope.resolveGreen(context);
     final radius = compact ? 10.0 : 12.0;
     final iconSize = compact ? 16.0 : 18.0;
     final fontSize = compact ? 13.0 : 14.0;
@@ -120,7 +124,7 @@ class ListingCartQtyStepper extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
         decoration: BoxDecoration(
-          color: const Color(0xFF0E5A47),
+          color: fill,
           borderRadius: BorderRadius.circular(radius),
         ),
         child: Row(

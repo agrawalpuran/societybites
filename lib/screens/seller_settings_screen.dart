@@ -56,6 +56,8 @@ class SellerSettingsScreen extends StatelessWidget {
     this.hideFlatNumber = false,
     this.hideFlatNumberSaving = false,
     this.onHideFlatNumberChanged,
+    this.kitchenWebsiteSubtitle = 'Link, colors & banner',
+    this.onOpenKitchenWebsite,
   });
 
   final String upiSubtitle;
@@ -103,6 +105,8 @@ class SellerSettingsScreen extends StatelessWidget {
   final bool hideFlatNumber;
   final bool hideFlatNumberSaving;
   final ValueChanged<bool>? onHideFlatNumberChanged;
+  final String kitchenWebsiteSubtitle;
+  final VoidCallback? onOpenKitchenWebsite;
 
   @override
   Widget build(BuildContext context) {
@@ -246,6 +250,14 @@ class SellerSettingsScreen extends StatelessWidget {
                         trailingLabel: 'Change',
                         onTap: onChangeKitchenHours,
                       ),
+                      if (onOpenKitchenWebsite != null)
+                        ProfileMenuTile(
+                          icon: Icons.language_rounded,
+                          title: 'Kitchen website',
+                          subtitle: kitchenWebsiteSubtitle,
+                          trailingLabel: 'Edit',
+                          onTap: onOpenKitchenWebsite!,
+                        ),
                       ProfileMenuTile(
                         icon: Icons.manage_accounts_outlined,
                         title: 'Owner access',

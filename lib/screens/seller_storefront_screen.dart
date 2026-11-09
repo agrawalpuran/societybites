@@ -331,8 +331,8 @@ class SellerStorefrontScreenState extends State<SellerStorefrontScreen> {
 
   Future<void> _changeCart(FoodItem food, int delta) async {
     if (widget.guestBrowse && delta > 0) {
-      await showGuestOrderAuthDialog(context);
-      return;
+      final allowed = await handleGuestKitchenAddToCart(context);
+      if (!allowed || !mounted) return;
     }
     if (delta > 0 && food.isKitchenClosed) {
       showKitchenClosedMessage(context);

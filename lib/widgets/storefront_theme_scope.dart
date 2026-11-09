@@ -25,17 +25,45 @@ class StorefrontThemeScope extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = _parseHex(accentHex) ?? const Color(0xFF0E5A47);
     final base = societyBitesTheme();
-    return Theme(
-      data: base.copyWith(
-        colorScheme: base.colorScheme.copyWith(
-          primary: accent,
-          secondary: accent,
+    return KitchenBrandScope(
+      accent: accent,
+      child: Theme(
+        data: base.copyWith(
+          colorScheme: base.colorScheme.copyWith(
+            primary: accent,
+            secondary: accent,
+          ),
+          floatingActionButtonTheme: base.floatingActionButtonTheme.copyWith(
+            backgroundColor: accent,
+          ),
         ),
-        floatingActionButtonTheme: base.floatingActionButtonTheme.copyWith(
-          backgroundColor: accent,
-        ),
+        child: child,
       ),
-      child: child,
     );
   }
+}
+
+/// Seller accent on branded kitchen sites only. Main marketplace ignores this.
+class KitchenBrandScope extends InheritedWidget {
+  const KitchenBrandScope({
+    super.key,
+    required this.accent,
+    required super.child,
+  });
+
+  final Color accent;
+
+  static Color? maybeOf(BuildContext context) {
+    final scope =
+        context.dependOnInheritedWidgetOfExactType<KitchenBrandScope>();
+    return scope?.accent;
+  }
+
+  static Color resolveGreen(BuildContext context) {
+    return maybeOf(context) ?? const Color(0xFF0E5A47);
+  }
+
+  @override
+  bool updateShouldNotify(KitchenBrandScope oldWidget) =>
+      oldWidget.accent != accent;
 }

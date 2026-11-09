@@ -1108,8 +1108,9 @@ class _BottomCta extends StatelessWidget {
                           ? null
                           : () async {
                               if (requireAuthToOrder) {
-                                await showGuestOrderAuthDialog(context);
-                                return;
+                                final allowed =
+                                    await handleGuestKitchenAddToCart(context);
+                                if (!allowed || !context.mounted) return;
                               }
                               if (!context.mounted) return;
                               final allowed = await confirmCartSellerAllowed(

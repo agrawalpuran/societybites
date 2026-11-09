@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../widgets/storefront_theme_scope.dart';
+
 /// Web marketplace layout. Android and iOS never enter this path.
 const webCompactMinWidth = 768.0;
 const webDesktopMinWidth = 1200.0;
@@ -32,6 +34,16 @@ bool useWebMarketplaceLayout(BuildContext context) {
 }
 
 bool webIsDesktopWidth(double width) => width >= webDesktopMinWidth;
+
+/// SocietyEats green on main site; seller accent on branded kitchen pages.
+Color webBrandGreen(BuildContext context) =>
+    KitchenBrandScope.maybeOf(context) ?? webGreen;
+
+Color webBrandGreenDark(BuildContext context) {
+  final brand = KitchenBrandScope.maybeOf(context);
+  if (brand == null) return webGreenDark;
+  return Color.lerp(brand, const Color(0xFF000000), 0.22) ?? webGreenDark;
+}
 
 /// Column counts use the marketplace content width (≤ [webFrameMaxWidth]),
 /// not the browser viewport — so thresholds sit below the frame max.

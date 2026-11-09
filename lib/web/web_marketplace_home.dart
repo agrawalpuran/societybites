@@ -72,6 +72,11 @@ class WebMarketplaceHome extends StatefulWidget {
     this.onDistanceSelected,
     this.onListingTypeSelected,
     this.activeFilterLabels,
+    this.kitchenSiteMode = false,
+    this.kitchenHeroEyebrow,
+    this.kitchenHeroTitle,
+    this.kitchenHeroSubtitle,
+    this.kitchenBannerUrl,
   });
 
   final bool isInitialLoading;
@@ -125,6 +130,11 @@ class WebMarketplaceHome extends StatefulWidget {
   final ValueChanged<BuyerDistanceChoice>? onDistanceSelected;
   final ValueChanged<HomeListingType>? onListingTypeSelected;
   final Set<String>? activeFilterLabels;
+  final bool kitchenSiteMode;
+  final String? kitchenHeroEyebrow;
+  final String? kitchenHeroTitle;
+  final String? kitchenHeroSubtitle;
+  final String? kitchenBannerUrl;
 
   @override
   State<WebMarketplaceHome> createState() => _WebMarketplaceHomeState();
@@ -276,8 +286,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
       widget.onListingTypeSelected != null;
 
   Widget _listingSections() {
+    final kitchen = widget.kitchenSiteMode;
     final sections = <Widget>[
-      if (widget.highlightSellers.isNotEmpty)
+      if (!kitchen && widget.highlightSellers.isNotEmpty)
         _sellerSection(
           eyebrow: 'In your society',
           title: 'Top resident kitchens',
@@ -294,10 +305,13 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
       if (widget.preordersLoading || widget.inSocietyPreorders.isNotEmpty)
         _preorderSection(
           key: _preorderKey,
-          title: 'Pre-orders in your society',
+          title: kitchen
+              ? 'Pre-orders from this kitchen'
+              : 'Pre-orders in your society',
           campaigns: widget.inSocietyPreorders,
         ),
-      if (widget.nearbySellers.isNotEmpty || widget.nearbyListings.isNotEmpty)
+      if (!kitchen &&
+          (widget.nearbySellers.isNotEmpty || widget.nearbyListings.isNotEmpty))
         _reachBlock(
           key: _nearbyKey,
           eyebrow: 'Nearby societies',
@@ -307,13 +321,14 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           items: widget.nearbyListings,
           reach: HomeListingReach.nearby,
         ),
-      if (widget.nearbyPreorders.isNotEmpty)
+      if (!kitchen && widget.nearbyPreorders.isNotEmpty)
         _preorderSection(
           title: 'Pre-orders nearby',
           campaigns: widget.nearbyPreorders,
         ),
-      if (widget.extendedSellers.isNotEmpty ||
-          widget.extendedListings.isNotEmpty)
+      if (!kitchen &&
+          (widget.extendedSellers.isNotEmpty ||
+              widget.extendedListings.isNotEmpty))
         _reachBlock(
           eyebrow: 'Further out',
           title: 'More around you',
@@ -322,12 +337,12 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           items: widget.extendedListings,
           reach: HomeListingReach.extended,
         ),
-      if (widget.extendedPreorders.isNotEmpty)
+      if (!kitchen && widget.extendedPreorders.isNotEmpty)
         _preorderSection(
           title: 'Pre-orders around you',
           campaigns: widget.extendedPreorders,
         ),
-      if (widget.otherListings.isNotEmpty)
+      if (!kitchen && widget.otherListings.isNotEmpty)
         _foodSection(
           eyebrow: 'Also available',
           title: 'More listings',
@@ -349,34 +364,48 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
   }
 
   Widget _hero(double width) {
+    final accent = webBrandGreen(context);
+    final accentDark = webBrandGreenDark(context);
     final desktop = width >= 980;
+    final kitchen = widget.kitchenSiteMode;
+    final eyebrow = kitchen
+        ? (widget.kitchenHeroEyebrow ?? 'RESIDENT KITCHEN')
+        : 'YOUR SOCIETY';
+    final title = kitchen
+        ? (widget.kitchenHeroTitle ?? 'Homemade food\nfrom this kitchen.')
+        : 'Fresh flavors from\nyour Society and\nneighbourhood.';
+    final subtitle = kitchen
+        ? (widget.kitchenHeroSubtitle ??
+            'Order for pickup from your neighbour cook on SocietyEats.')
+        : 'Homemade food from neighbours cooking nearby. Pickup from the cook.';
+    final banner = widget.kitchenBannerUrl?.trim();
     final copy = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'YOUR SOCIETY',
+        Text(
+          eyebrow.toUpperCase(),
           style: TextStyle(
             fontSize: 12,
             letterSpacing: 1.1,
             fontWeight: FontWeight.w800,
-            color: webGreen,
+            color: kitchen ? accent : webGreen,
           ),
         ),
         const SizedBox(height: 10),
-        const Text(
-          'Fresh flavors from\nyour Society and\nneighbourhood.',
+        Text(
+          title,
           style: TextStyle(
             fontSize: 40,
             height: 1.05,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.8,
-            color: webGreenDark,
+            color: kitchen ? accentDark : webGreenDark,
           ),
         ),
         const SizedBox(height: 12),
-        const Text(
-          'Homemade food from neighbours cooking nearby. Pickup from the cook.',
-          style: TextStyle(
+        Text(
+          subtitle,
+          style: const TextStyle(
             fontSize: 15,
             height: 1.45,
             fontWeight: FontWeight.w500,
@@ -385,7 +414,20 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
         ),
       ],
     );
-    final visual = _HeroVisual(foods: widget.heroFoods);
+    final visual = banner != null && banner.isNotEmpty
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: AspectRatio(
+              aspectRatio: 4 / 3,
+              child: Image.network(
+                banner,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    _HeroVisual(foods: widget.heroFoods),
+              ),
+            ),
+          )
+        : _HeroVisual(foods: widget.heroFoods);
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
@@ -779,11 +821,11 @@ class WebSectionHeader extends StatelessWidget {
               if (eyebrow.isNotEmpty)
                 Text(
                   eyebrow.toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     letterSpacing: 1.1,
                     fontWeight: FontWeight.w800,
-                    color: webGreen,
+                    color: webBrandGreen(context),
                   ),
                 ),
               if (title.isNotEmpty) ...[

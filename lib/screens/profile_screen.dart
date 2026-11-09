@@ -39,6 +39,7 @@ import 'login_screen.dart';
 import 'profile_photo_crop_screen.dart';
 import 'seller_fssai_screen.dart';
 import 'seller_settings_screen.dart';
+import 'seller_storefront_settings_screen.dart';
 import 'seller_staff_access_list_screen.dart';
 import 'seller_terms_screen.dart';
 import '../models/seller_fssai.dart';
@@ -728,6 +729,22 @@ class ProfileScreenState extends State<ProfileScreen> {
     await _openSellerSettings(firstTime: true);
   }
 
+  String get _kitchenWebsiteSubtitle {
+    return 'Tagline, colors, and banner for your kitchen page';
+  }
+
+  Future<void> _openKitchenWebsiteSettings() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SellerStorefrontSettingsScreen(),
+      ),
+    );
+    if (!mounted) return;
+    await _loadProfile();
+    _sellerSettingsTick.value++;
+  }
+
   Future<void> _openSellerSettings({bool firstTime = false}) async {
     if (!mounted) return;
     if (firstTime) {
@@ -767,6 +784,9 @@ class ProfileScreenState extends State<ProfileScreen> {
               onChangeSellingReach: _changeSellingReach,
               onChangeFulfilment: _changeFulfilment,
               onChangeKitchenHours: _changeKitchenHours,
+              kitchenWebsiteSubtitle: _kitchenWebsiteSubtitle,
+              onOpenKitchenWebsite:
+                  holdingSetup || !_isSeller ? null : _openKitchenWebsiteSettings,
               onEditFssai: _editFssai,
               onSaveAndEnable: holdingSetup ? _saveAndEnableSelling : null,
               saveAndEnableInProgress:

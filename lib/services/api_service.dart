@@ -496,6 +496,14 @@ class ApiService {
     String? fssaiNumber,
     String? fssaiExpiry,
     String? fssaiRegisteredName,
+  String? storefrontSlug,
+  String? storefrontAccentColor,
+  String? storefrontBannerUrl,
+  String? storefrontTagline,
+  bool clearStorefrontSlug = false,
+  bool clearStorefrontAccentColor = false,
+  bool clearStorefrontBannerUrl = false,
+  bool clearStorefrontTagline = false,
     Object? profilePhotoUrl = _omitProfilePhoto,
   }) async {
     final response = await http.patch(
@@ -530,6 +538,22 @@ class ApiService {
           if (kitchenClosesAt != null) 'kitchenClosesAt': kitchenClosesAt,
         },
         if (hideFlatNumber != null) 'hideFlatNumber': hideFlatNumber,
+        if (clearStorefrontSlug)
+          'storefrontSlug': null
+        else if (storefrontSlug != null)
+          'storefrontSlug': storefrontSlug,
+        if (clearStorefrontAccentColor)
+          'storefrontAccentColor': null
+        else if (storefrontAccentColor != null)
+          'storefrontAccentColor': storefrontAccentColor,
+        if (clearStorefrontBannerUrl)
+          'storefrontBannerUrl': null
+        else if (storefrontBannerUrl != null)
+          'storefrontBannerUrl': storefrontBannerUrl,
+        if (clearStorefrontTagline)
+          'storefrontTagline': null
+        else if (storefrontTagline != null)
+          'storefrontTagline': storefrontTagline,
         if (!identical(profilePhotoUrl, _omitProfilePhoto))
           'profilePhotoUrl': profilePhotoUrl,
         if (fssaiNumber != null ||

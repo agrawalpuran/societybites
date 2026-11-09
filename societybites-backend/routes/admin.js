@@ -78,7 +78,10 @@ const {
 } = require("../lib/adminSellerPerformance");
 const { getAdminOrderDetail } = require("../lib/adminOrderDetail");
 const { liveAccountWhere } = require("../lib/accountDeletion");
-const { parseStorefrontWrite } = require("../lib/storefront");
+const {
+  parseStorefrontWrite,
+  sellerRequestedSlugChange,
+} = require("../lib/storefront");
 const {
   getMarketingPushStatus,
   sendMarketingPush,
@@ -626,8 +629,23 @@ router.patch(
       data.suspended = Boolean(suspended);
     }
 
+    if (
+      req.user.role !== "super_admin" &&
+      sellerRequestedSlugChange(req.body)
+    ) {
+      return res.status(403).json({
+        error: "Kitchen link can only be changed by super admin",
+      });
+    }
+
     try {
-      Object.assign(data, await parseStorefrontWrite(req.body, { partial: true }));
+      Object.assign(
+        data,
+        await parseStorefrontWrite(req.body, {
+          partial: true,
+          includeSlug: req.user.role === "super_admin",
+        })
+      );
     } catch (error) {
       if (error.statusCode) {
         return res.status(error.statusCode).json({ error: error.message });

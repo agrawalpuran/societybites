@@ -17,7 +17,7 @@ import 'widgets/mobile_startup_frame.dart';
 import 'services/api_service.dart';
 import 'services/auth_config.dart';
 import 'services/deep_link_service.dart';
-import 'services/storefront_host.dart';
+import 'navigation/kitchen_site_navigation.dart';
 import 'screens/seller_kitchen_site_screen.dart';
 import 'services/force_update_service.dart';
 import 'services/session_service.dart';
@@ -30,7 +30,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (kIsWeb) {
     usePathUrlStrategy();
-    _initialWebKitchenSlug = StorefrontHost.kitchenSlugFromUri(Uri.base);
+    await KitchenSiteNavigation.warmHeldSlug();
+    _initialWebKitchenSlug = KitchenSiteNavigation.activeKitchenSlug();
+    if (_initialWebKitchenSlug != null) {
+      await KitchenSiteNavigation.holdKitchenSlug(_initialWebKitchenSlug!);
+    }
   }
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -38,7 +42,7 @@ void main() async {
 
   ApiService.onSessionInvalidated = () {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (kIsWeb && StorefrontHost.kitchenSlugFromUri(Uri.base) != null) {
+      if (kIsWeb && KitchenSiteNavigation.isKitchenSiteContext) {
         return;
       }
       final navigator = PushNotificationService.navigatorKey.currentState;
@@ -76,6 +80,8 @@ class MyApp extends StatelessWidget {
       theme: societyBitesTheme(),
       navigatorKey: PushNotificationService.navigatorKey,
       home: home,
+      // Web may request /kitchen/{slug} as a route name; we always open [home].
+      onUnknownRoute: (_) => MaterialPageRoute<void>(builder: (_) => home),
     );
   }
 }

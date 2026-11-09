@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../web/web_breakpoints.dart';
+import '../navigation/kitchen_site_navigation.dart';
 import 'main_shell_screen.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_header.dart';
@@ -243,6 +244,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
     if (!await SessionService.isOnboarded()) return;
     if (!mounted) return;
+    if (KitchenSiteNavigation.isKitchenSiteContext) {
+      KitchenSiteNavigation.replaceWithKitchenSiteOrShell(context);
+      return;
+    }
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(

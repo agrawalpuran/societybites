@@ -39,6 +39,10 @@ const {
   DEFAULT_UPI_ACCOUNT_TYPE,
   normalizeUpiAccountType,
 } = require("../lib/upiAccountType");
+const {
+  parseStorefrontWrite,
+  sellerRequestedSlugChange,
+} = require("../lib/storefront");
 
 const router = express.Router();
 
@@ -589,11 +593,50 @@ router.patch(
       });
     }
 
-    const user = await prisma.user.update({
-      where: { id: req.user.id },
-      data,
-      include: { society: true, flat: true },
-    });
+    const sellerRole =
+      req.user.role === "seller" || req.user.role === "super_admin";
+    const nextRole = data.role || req.user.role;
+    if (
+      sellerRole ||
+      nextRole === "seller" ||
+      nextRole === "super_admin"
+    ) {
+      const slugSuperAdminOnly =
+        req.user.role !== "super_admin" && sellerRequestedSlugChange(req.body);
+      if (slugSuperAdminOnly) {
+        return res.status(403).json({
+          error: "Kitchen link can only be changed by SocietyEats admin",
+        });
+      }
+      try {
+        Object.assign(
+          data,
+          await parseStorefrontWrite(req.body, {
+            partial: true,
+            includeSlug: req.user.role === "super_admin",
+          })
+        );
+      } catch (error) {
+        if (error.statusCode) {
+          return res.status(error.statusCode).json({ error: error.message });
+        }
+        throw error;
+      }
+    }
+
+    let user;
+    try {
+      user = await prisma.user.update({
+        where: { id: req.user.id },
+        data,
+        include: { society: true, flat: true },
+      });
+    } catch (error) {
+      if (error && error.code === "P2002") {
+        return res.status(409).json({ error: "This kitchen link is already taken" });
+      }
+      throw error;
+    }
 
     const token = signToken(user);
 

@@ -4,6 +4,7 @@ const { expireDueListings, DISCOVERABLE_STATUSES } = require("../utils/listingEx
 const { attachRecurringAvailability } = require("./recurringAvailability");
 const { sortSellerCatalogListings } = require("./listingCatalogOrder");
 const { withoutAutomatedTestListings } = require("./testListingNames");
+const { serializeCampaign } = require("./preorder");
 const RESERVED_SLUGS = new Set([
   "www",
   "app",
@@ -81,6 +82,26 @@ const ACTIVE_REGULAR_LISTING_WHERE = {
   catalogType: "REGULAR",
 };
 
+async function openCampaignsForStorefront(sellerId) {
+  const now = new Date();
+  const campaigns = await prisma.preOrderCampaign.findMany({
+    where: {
+      sellerId,
+      status: "open",
+      orderCutoffAt: { gt: now },
+    },
+    include: {
+      seller: { include: { society: true } },
+      products: {
+        include: { seller: { include: { society: true } } },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+    orderBy: { fulfilmentAt: "asc" },
+  });
+  return campaigns.map((campaign) => serializeCampaign(campaign)).filter(Boolean);
+}
+
 async function getKitchenBySlug(slugInput) {
   const slug = normalizeSlug(slugInput);
   if (!slug) throw httpError(404, "Kitchen not found");
@@ -151,14 +172,20 @@ async function getKitchenBySlug(slugInput) {
       categories,
     },
     listings,
+    campaigns: await openCampaignsForStorefront(seller.id),
   };
 }
 
-async function parseStorefrontWrite(body, { partial = false } = {}) {
+function sellerRequestedSlugChange(source) {
+  if (!source || typeof source !== "object") return false;
+  return source.storefrontSlug !== undefined;
+}
+
+async function parseStorefrontWrite(body, { partial = false, includeSlug = true } = {}) {
   const source = body && typeof body === "object" ? body : {};
   const data = {};
 
-  if (!partial || source.storefrontSlug !== undefined) {
+  if (includeSlug && (!partial || source.storefrontSlug !== undefined)) {
     if (source.storefrontSlug === null || source.storefrontSlug === "") {
       data.storefrontSlug = null;
     } else {
@@ -185,4 +212,5 @@ module.exports = {
   assertValidStorefrontSlug,
   getKitchenBySlug,
   parseStorefrontWrite,
+  sellerRequestedSlugChange,
 };

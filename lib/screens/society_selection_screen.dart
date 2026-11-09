@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'main_shell_screen.dart';
+import '../navigation/kitchen_site_navigation.dart';
 import '../web/web_breakpoints.dart';
 import '../web/web_page_frame.dart';
 import '../widgets/app_header.dart';
@@ -274,10 +274,9 @@ class _SocietySelectionScreenState extends State<SocietySelectionScreen> {
 
       if (!mounted) return;
 
-      Navigator.pushAndRemoveUntil(
+      KitchenSiteNavigation.replaceWithPostAuthRoot(
         context,
-        MaterialPageRoute(builder: (_) => const MainShellScreen()),
-        (_) => false,
+        hasSocietyFlat: true,
       );
     } catch (e) {
       if (!mounted) return;
