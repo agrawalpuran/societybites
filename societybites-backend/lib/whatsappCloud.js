@@ -298,29 +298,35 @@ function sendWhatsAppSafely(inner, order, kind) {
 async function sendWhatsAppTemplatedMessage(order, options, deps) {
   const isEnabled = deps.isEnabled || isWhatsAppOrderNotificationsEnabled;
   if (!(await isEnabled())) {
+    logWhatsAppSkipped(options.logKind || "status", order, "admin_off");
     return { sent: false, reason: "admin_off" };
   }
 
   const templateName = templateNameFromEnv(deps.env, options.templateEnvKey);
   if (!templateName) {
+    logWhatsAppSkipped(options.logKind || "status", order, "no_template");
     return { sent: false, reason: "no_template" };
   }
 
   const config = readConfig(deps.env, { templateName });
   if (config.emergencyOff) {
+    logWhatsAppSkipped(options.logKind || "status", order, "emergency_off");
     return { sent: false, reason: "emergency_off" };
   }
   if (!isConfigured(config)) {
+    logWhatsAppSkipped(options.logKind || "status", order, "unconfigured");
     return { sent: false, reason: "unconfigured" };
   }
 
   const recipient = toWhatsAppRecipient(options.recipientPhone(order));
   if (!recipient) {
+    logWhatsAppSkipped(options.logKind || "status", order, "no_phone");
     return { sent: false, reason: "no_phone" };
   }
 
   const parameters = options.buildParameters(order);
   if (!parameters) {
+    logWhatsAppSkipped(options.logKind || "status", order, "invalid_amount");
     return { sent: false, reason: "invalid_amount" };
   }
 
@@ -344,22 +350,34 @@ function sendWhatsAppOrderNotification(order, deps = {}) {
   );
 }
 
+function logWhatsAppSkipped(kind, order, reason, extra) {
+  logger.warn("whatsapp", `${kind} skipped ${order && order.orderNumber}: ${reason}`, {
+    orderNumber: order && order.orderNumber,
+    reason,
+    ...(extra && typeof extra === "object" ? extra : {}),
+  });
+}
+
 async function sendWhatsAppOrderNotificationInner(order, deps) {
   const isEnabled = deps.isEnabled || isWhatsAppOrderNotificationsEnabled;
   if (!(await isEnabled())) {
+    logWhatsAppSkipped("new_order", order, "admin_off");
     return { sent: false, reason: "admin_off" };
   }
 
   const config = readConfig(deps.env);
   if (config.emergencyOff) {
+    logWhatsAppSkipped("new_order", order, "emergency_off");
     return { sent: false, reason: "emergency_off" };
   }
   if (!isConfigured(config)) {
+    logWhatsAppSkipped("new_order", order, "unconfigured");
     return { sent: false, reason: "unconfigured" };
   }
 
   const recipient = toWhatsAppRecipient(sellerPhoneFromOrder(order));
   if (!recipient) {
+    logWhatsAppSkipped("new_order", order, "no_phone");
     return { sent: false, reason: "no_phone" };
   }
 
@@ -367,6 +385,7 @@ async function sendWhatsAppOrderNotificationInner(order, deps) {
   if (isOrderTemplateName(config.templateName)) {
     parameters = orderTemplateParameters(order);
     if (!parameters) {
+      logWhatsAppSkipped("new_order", order, "invalid_amount");
       return { sent: false, reason: "invalid_amount" };
     }
   }
@@ -375,6 +394,7 @@ async function sendWhatsAppOrderNotificationInner(order, deps) {
   logger.info("whatsapp", `sent ${order && order.orderNumber}`, {
     orderNumber: order && order.orderNumber,
     messageId,
+    template: config.templateName,
   });
   return { sent: true, messageId, to: recipient };
 }
