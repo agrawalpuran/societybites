@@ -3,6 +3,20 @@
   "installCommand": "echo Flutter dependencies are installed during the web build",
   "buildCommand": "bash scripts/vercel_build.sh",
   "outputDirectory": "build/web",
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "puran.societyeats.com" }],
+      "destination": "/kitchen/puran",
+      "statusCode": 307
+    },
+    {
+      "source": "/index.html",
+      "has": [{ "type": "host", "value": "puran.societyeats.com" }],
+      "destination": "/kitchen/puran",
+      "statusCode": 307
+    }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
