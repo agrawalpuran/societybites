@@ -23,10 +23,14 @@ import 'services/force_update_service.dart';
 import 'services/session_service.dart';
 import 'services/push_notification_service.dart';
 
+/// Resolved before async startup so kitchen hosts never fall through to [AuthGate].
+String? _initialWebKitchenSlug;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (kIsWeb) {
     usePathUrlStrategy();
+    _initialWebKitchenSlug = StorefrontHost.kitchenSlugFromUri(Uri.base);
   }
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -34,6 +38,9 @@ void main() async {
 
   ApiService.onSessionInvalidated = () {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (kIsWeb && StorefrontHost.kitchenSlugFromUri(Uri.base) != null) {
+        return;
+      }
       final navigator = PushNotificationService.navigatorKey.currentState;
       if (navigator == null) return;
       navigator.pushAndRemoveUntil(
@@ -46,39 +53,30 @@ void main() async {
     });
   };
 
-  runApp(const MyApp());
+  runApp(MyApp(initialKitchenSlug: _initialWebKitchenSlug));
 
   unawaited(PushNotificationService.init());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, this.initialKitchenSlug});
+
+  @visibleForTesting
+  final String? initialKitchenSlug;
 
   @override
   Widget build(BuildContext context) {
+    final slug = initialKitchenSlug?.trim();
+    final home = (slug != null && slug.isNotEmpty)
+        ? SellerKitchenSiteScreen(slug: slug)
+        : const AuthGate();
     return MaterialApp(
       title: kAppDisplayName,
       debugShowCheckedModeBanner: false,
       theme: societyBitesTheme(),
       navigatorKey: PushNotificationService.navigatorKey,
-      home: const AppEntry(),
+      home: home,
     );
-  }
-}
-
-/// Web kitchen hosts (`puran.societyeats.com`, `/kitchen/puran`) skip marketplace auth routing.
-class AppEntry extends StatelessWidget {
-  const AppEntry({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    if (kIsWeb) {
-      final slug = StorefrontHost.kitchenSlugFromUri(Uri.base);
-      if (slug != null) {
-        return SellerKitchenSiteScreen(slug: slug);
-      }
-    }
-    return const AuthGate();
   }
 }
 

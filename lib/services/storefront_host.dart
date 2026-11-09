@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'storefront_host_bootstrap.dart';
 import 'storefront_host_hostname.dart';
 
 /// Detects branded kitchen hosts and paths on web, e.g. puran.societyeats.com.
@@ -26,6 +27,11 @@ class StorefrontHost {
   );
 
   static String? kitchenSlugFromUri(Uri uri) {
+    if (kIsWeb) {
+      final fromBootstrap = _normalizeSlug(bootstrappedKitchenSlug() ?? '');
+      if (fromBootstrap != null) return fromBootstrap;
+    }
+
     final fromDev = devSlug.trim().toLowerCase();
     final host = _effectiveWebHost(uri);
     if (kIsWeb && fromDev.isNotEmpty && _looksLikeLocalDev(host)) {

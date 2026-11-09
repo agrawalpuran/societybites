@@ -60,6 +60,35 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script>
+    (function () {
+      var reserved = { www: 1, app: 1, api: 1, admin: 1 };
+      var apex = 'societyeats.com';
+      function normalizeSlug(raw) {
+        var slug = (raw || '').trim().toLowerCase();
+        if (slug.length < 2) return '';
+        if (!/^[a-z0-9](?:[a-z0-9-]{0,28}[a-z0-9])?$/.test(slug)) return '';
+        return slug;
+      }
+      var host = (window.location.hostname || '').toLowerCase();
+      if (host && host.endsWith('.' + apex)) {
+        var prefix = host.slice(0, -(apex.length + 1));
+        var leaf = prefix.indexOf('.') >= 0 ? prefix.split('.').pop() : prefix;
+        if (leaf && !reserved[leaf]) {
+          var fromHost = normalizeSlug(leaf);
+          if (fromHost) {
+            window.__SOCIETYEATS_STOREFRONT_SLUG__ = fromHost;
+            return;
+          }
+        }
+      }
+      var segs = window.location.pathname.split('/').filter(function (s) {
+        return s;
+      });
+      if (segs.length >= 2 && segs[0].toLowerCase() === 'kitchen') {
+        var fromPath = normalizeSlug(segs[1]);
+        if (fromPath) window.__SOCIETYEATS_STOREFRONT_SLUG__ = fromPath;
+      }
+    })();
     // Unregister any cached service workers to prevent stale builds
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
