@@ -397,29 +397,27 @@ class _PaymentScreenState extends State<PaymentScreen>
   Future<void> _launchSelectedUpiApp(UpiAppOption app) async {
     final resolved = app.resolvedLaunchUri;
     if (resolved == null || _order.upiPaymentAmount <= 0) return;
-    final handoff = _useUpiHandoff;
-    final launchUri = handoff
-        ? resolved
-        : buildUpiAppLaunchUri(
-            upiPayUri: _upiPaymentUri,
-            target: launchTargetFromUri(resolved),
-            accountType: _sellerUpiAccountType,
-            transactionNote: _order.orderId,
-          );
+    // Pay intent disabled. GPay, PhonePe, and Paytm block a pay screen
+    // opened by SocietyEats. Open the app only; the buyer pastes the UPI ID.
+    // final launchUri = buildUpiAppLaunchUri(
+    //   upiPayUri: _upiPaymentUri,
+    //   target: launchTargetFromUri(resolved),
+    //   accountType: _sellerUpiAccountType,
+    //   transactionNote: _order.orderId,
+    // );
+    final launchUri = resolved;
     try {
       setState(() {
         _upiLaunchError = null;
         _upiHandoffHint = null;
       });
-      if (handoff) {
-        try {
-          final upiId = _sellerUpiId?.trim();
-          if (upiId != null && upiId.isNotEmpty) {
-            await Clipboard.setData(ClipboardData(text: upiId));
-          }
-        } catch (_) {
-          // Opening the UPI app still works if copy is blocked.
+      try {
+        final upiId = _sellerUpiId?.trim();
+        if (upiId != null && upiId.isNotEmpty) {
+          await Clipboard.setData(ClipboardData(text: upiId));
         }
+      } catch (_) {
+        // Opening the UPI app still works if copy is blocked.
       }
       final launch = widget.launchUpi;
       final launched = launch != null
@@ -430,14 +428,12 @@ class _PaymentScreenState extends State<PaymentScreen>
         setState(() => _upiLaunchError = _noUpiAppMessage);
         return;
       }
-      if (handoff) {
-        setState(() {
-          _upiHandoffHint = upiHandoffCopyHint(
-            appName: app.displayName,
-            amount: _amount,
-          );
-        });
-      }
+      setState(() {
+        _upiHandoffHint = upiHandoffCopyHint(
+          appName: app.displayName,
+          amount: _amount,
+        );
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() => _upiLaunchError = _noUpiAppMessage);

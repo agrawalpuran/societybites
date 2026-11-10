@@ -449,7 +449,7 @@ void main() {
 
       expect(find.text('Pay with UPI App'), findsNothing);
       expect(find.text('Scan QR code to pay'), findsOneWidget);
-      expect(find.text('Pay using your UPI app'), findsOneWidget);
+      expect(find.text('Copy the UPI ID and pay'), findsOneWidget);
       await tester.ensureVisible(find.byKey(const ValueKey('upi-qr')));
       await tester.tap(find.byKey(const ValueKey('upi-qr')));
       await tester.pump();
@@ -523,7 +523,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('Pay using your UPI app'), findsOneWidget);
+      expect(find.text('Copy the UPI ID and pay'), findsOneWidget);
       final gpay = tester.widget<InkWell>(
         find.byKey(const ValueKey('upi-app-gpay')),
       );
@@ -531,15 +531,12 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(copiedText, isNull);
+      expect(copiedText, 'shop@okbizaxis');
       expect(launchedUri?.scheme, 'gpay');
-      expect(launchedUri?.host, 'upi');
-      expect(launchedUri?.queryParameters['pa'], 'shop@okbizaxis');
-      expect(launchedUri?.queryParameters['tn'], 'SB-1001');
-      expect(launchedUri?.queryParameters.containsKey('am'), isFalse);
+      expect(launchedUri?.queryParameters, isEmpty);
       expect(
         find.text('UPI ID copied. Pay ₹245.00 in GPay to the copied ID.'),
-        findsNothing,
+        findsOneWidget,
       );
     } finally {
       debugDefaultTargetPlatformOverride = null;
@@ -603,7 +600,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('Pay using your UPI app'), findsOneWidget);
+      expect(find.text('Copy the UPI ID and pay'), findsOneWidget);
       final gpay = tester.widget<InkWell>(
         find.byKey(const ValueKey('upi-app-gpay')),
       );
@@ -611,15 +608,12 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(copiedText, isNull);
+      expect(copiedText, 'seller@upi');
       expect(launchedUri?.scheme, 'gpay');
-      expect(launchedUri?.host, 'upi');
-      expect(launchedUri?.queryParameters['pa'], 'seller@upi');
-      expect(launchedUri?.queryParameters['tn'], 'SB-1001');
-      expect(launchedUri?.queryParameters.containsKey('am'), isFalse);
+      expect(launchedUri?.queryParameters, isEmpty);
       expect(
         find.text('UPI ID copied. Pay ₹245.00 in GPay to the copied ID.'),
-        findsNothing,
+        findsOneWidget,
       );
     } finally {
       debugDefaultTargetPlatformOverride = null;
@@ -736,7 +730,7 @@ void main() {
 
       expect(find.text('Pay with UPI App'), findsNothing);
       expect(find.text('Scan QR code to pay'), findsOneWidget);
-      expect(find.text('Pay using your UPI app'), findsOneWidget);
+      expect(find.text('Copy the UPI ID and pay'), findsOneWidget);
       expect(find.byKey(const ValueKey('upi-app-gpay')), findsOneWidget);
       expect(find.byKey(const ValueKey('upi-app-phonepe')), findsOneWidget);
       expect(find.byKey(const ValueKey('copy-upi-id')), findsOneWidget);
@@ -802,7 +796,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('Pay using your UPI app'), findsOneWidget);
+      expect(find.text('Copy the UPI ID and pay'), findsOneWidget);
       final gpay = tester.widget<InkWell>(
         find.byKey(const ValueKey('upi-app-gpay')),
       );
@@ -810,15 +804,12 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(copiedText, isNull);
+      expect(copiedText, 'seller@upi');
       expect(launchedUri?.scheme, 'tez');
-      expect(launchedUri?.host, 'upi');
-      expect(launchedUri?.queryParameters['pa'], 'seller@upi');
-      expect(launchedUri?.queryParameters['tn'], 'SB-1001');
-      expect(launchedUri?.queryParameters.containsKey('am'), isFalse);
+      expect(launchedUri?.queryParameters, isEmpty);
       expect(
         find.text('UPI ID copied. Pay ₹220.00 in GPay to the copied ID.'),
-        findsNothing,
+        findsOneWidget,
       );
     } finally {
       debugDefaultTargetPlatformOverride = null;

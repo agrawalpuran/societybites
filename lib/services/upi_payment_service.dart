@@ -23,13 +23,13 @@ bool shouldOfferUpiAppShortcuts({
       (platform == TargetPlatform.android || platform == TargetPlatform.iOS);
 }
 
-/// App icons open a pay link, so this stays off. The link carries the UPI
-/// ID and the order ID as the note, and leaves the amount for the buyer.
+/// Open GPay, PhonePe, or Paytm with no pay link. A pay screen started by
+/// SocietyEats is blocked for a direct seller UPI ID.
 bool shouldHandoffUpiCollect({
   required TargetPlatform platform,
   UpiAccountType accountType = defaultUpiAccountType,
 }) {
-  return false;
+  return platform == TargetPlatform.iOS || platform == TargetPlatform.android;
 }
 
 class UpiAppLaunchTarget {
@@ -198,6 +198,29 @@ List<UpiAppLaunchTarget> launchTargetsFor(
   required TargetPlatform platform,
   UpiAccountType accountType = defaultUpiAccountType,
 }) {
+  if (shouldHandoffUpiCollect(
+    platform: platform,
+    accountType: accountType,
+  )) {
+    if (app.id == 'gpay') {
+      if (platform == TargetPlatform.iOS) {
+        return const [
+          UpiAppLaunchTarget(scheme: 'tez'),
+          UpiAppLaunchTarget(scheme: 'gpay'),
+        ];
+      }
+      return const [
+        UpiAppLaunchTarget(scheme: 'gpay'),
+        UpiAppLaunchTarget(scheme: 'tez'),
+      ];
+    }
+    final seen = <String>{};
+    return [
+      for (final target in app.launchTargets)
+        if (seen.add(target.scheme)) UpiAppLaunchTarget(scheme: target.scheme),
+    ];
+  }
+  // Pay-screen targets. Not used while [shouldHandoffUpiCollect] is on.
   if (app.id == 'gpay' && platform == TargetPlatform.iOS) {
     return const [
       UpiAppLaunchTarget(scheme: 'tez', host: 'upi', path: '/pay'),
