@@ -128,7 +128,8 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   String get _amount => _order.upiPaymentAmount.toStringAsFixed(2);
 
-  /// One transfer link for the QR and for GPay, PhonePe, and Paytm.
+  /// QR contents. App buttons do not launch this link; scanning it is a
+  /// QR payment (mode 01), while opening it from the app would be an intent.
   Uri get _upiPaymentUri => buildUpiPaymentUri(
     upiId: _sellerUpiId ?? '',
     payeeName: _sellerName.trim().isEmpty ? 'SocietyEats seller' : _sellerName,
@@ -403,6 +404,7 @@ class _PaymentScreenState extends State<PaymentScreen>
             upiPayUri: _upiPaymentUri,
             target: launchTargetFromUri(resolved),
             accountType: _sellerUpiAccountType,
+            transactionNote: _order.orderId,
           );
     try {
       setState(() {

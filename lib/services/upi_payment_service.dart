@@ -2,15 +2,17 @@ import 'package:flutter/foundation.dart';
 
 import '../models/upi_account_type.dart';
 
+/// In-app pay links are UPI initiation mode 04. NPCI requires UPI apps to
+/// refuse mode 04 and 05 for person-to-person payments and for offline
+/// merchants that are not verified. Every seller UPI ID stored here is a
+/// direct VPA, so [isWeb], [platform], and [accountType] do not enable it.
+/// Buyers scan the QR (mode 01) or paste the UPI ID inside the UPI app.
 bool shouldOfferUpiIntent({
   required bool isWeb,
   required TargetPlatform platform,
   UpiAccountType accountType = defaultUpiAccountType,
 }) {
-  // Collect intent is only for merchant / business VPAs.
-  if (!accountType.enablesCollectIntent) return false;
-  return !isWeb &&
-      (platform == TargetPlatform.android || platform == TargetPlatform.iOS);
+  return false;
 }
 
 bool shouldOfferUpiAppShortcuts({
@@ -21,16 +23,13 @@ bool shouldOfferUpiAppShortcuts({
       (platform == TargetPlatform.android || platform == TargetPlatform.iOS);
 }
 
-/// In-app collect (`://upi/pay`) is a merchant rail. Personal neighbour
-/// VPAs fail there with HDFC's fake bank-limit screen. Open the UPI app
-/// instead and let the buyer paste the copied VPA.
+/// App icons open a pay link, so this stays off. The link carries the UPI
+/// ID and the order ID as the note, and leaves the amount for the buyer.
 bool shouldHandoffUpiCollect({
   required TargetPlatform platform,
   UpiAccountType accountType = defaultUpiAccountType,
 }) {
-  if (accountType.enablesCollectIntent) return false;
-  return platform == TargetPlatform.iOS ||
-      platform == TargetPlatform.android;
+  return false;
 }
 
 class UpiAppLaunchTarget {
@@ -165,22 +164,23 @@ String buildUpiPayQuery({
   return parts.join('&');
 }
 
-/// Opens the QR payment inside one app. Every seller UPI ID uses the same
-/// transfer: payee, name, amount, and note. `tr`, `mc`, and `mode` are left
-/// out so GPay, PhonePe, and Paytm do not turn it into a merchant collect.
+/// Opens one UPI app on the seller's UPI ID. The note is the order ID.
+/// Amount is omitted so the buyer types it. `tr`, `mc`, and `mode` stay out.
 Uri buildUpiAppLaunchUri({
   required Uri upiPayUri,
   required UpiAppLaunchTarget target,
   UpiAccountType accountType = defaultUpiAccountType,
+  bool includeAmount = false,
+  String? transactionNote,
 }) {
   final params = Map<String, String>.from(upiPayUri.queryParameters);
+  final note = (transactionNote ?? params['tn'])?.trim();
   final query = [
     if (params['pa'] != null) 'pa=${params['pa']}',
     if (params['pn'] != null) 'pn=${encodeUpiQueryValue(params['pn']!)}',
-    if (params['am'] != null) 'am=${params['am']}',
+    if (includeAmount && params['am'] != null) 'am=${params['am']}',
     if (params['cu'] != null) 'cu=${params['cu']}',
-    if (accountType.enablesCollectIntent && params['tn'] != null)
-      'tn=${encodeUpiQueryValue(params['tn']!)}',
+    if (note != null && note.isNotEmpty) 'tn=${encodeUpiQueryValue(note)}',
   ].join('&');
   return encodedUpiLaunchUri(Uri.parse('${target.baseUrl}?$query'));
 }
@@ -198,26 +198,10 @@ List<UpiAppLaunchTarget> launchTargetsFor(
   required TargetPlatform platform,
   UpiAccountType accountType = defaultUpiAccountType,
 }) {
-  if (shouldHandoffUpiCollect(
-    platform: platform,
-    accountType: accountType,
-  )) {
-    if (app.id == 'gpay') {
-      if (platform == TargetPlatform.iOS) {
-        return const [
-          UpiAppLaunchTarget(scheme: 'tez'),
-          UpiAppLaunchTarget(scheme: 'gpay'),
-        ];
-      }
-      return const [
-        UpiAppLaunchTarget(scheme: 'gpay'),
-        UpiAppLaunchTarget(scheme: 'tez'),
-      ];
-    }
-    final seen = <String>{};
-    return [
-      for (final target in app.launchTargets)
-        if (seen.add(target.scheme)) UpiAppLaunchTarget(scheme: target.scheme),
+  if (app.id == 'gpay' && platform == TargetPlatform.iOS) {
+    return const [
+      UpiAppLaunchTarget(scheme: 'tez', host: 'upi', path: '/pay'),
+      UpiAppLaunchTarget(scheme: 'gpay', host: 'upi', path: '/pay'),
     ];
   }
   return app.launchTargets;

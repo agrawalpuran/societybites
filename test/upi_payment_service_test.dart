@@ -54,7 +54,7 @@ void main() {
     );
   });
 
-  test('offers UPI collect intent only for merchant UPI on mobile', () {
+  test('does not offer an in-app UPI intent for any seller account', () {
     expect(
       shouldOfferUpiIntent(isWeb: false, platform: TargetPlatform.android),
       isFalse,
@@ -62,14 +62,6 @@ void main() {
     expect(
       shouldOfferUpiIntent(
         isWeb: false,
-        platform: TargetPlatform.android,
-        accountType: UpiAccountType.merchant,
-      ),
-      isTrue,
-    );
-    expect(
-      shouldOfferUpiIntent(
-        isWeb: true,
         platform: TargetPlatform.android,
         accountType: UpiAccountType.merchant,
       ),
@@ -81,7 +73,7 @@ void main() {
         platform: TargetPlatform.iOS,
         accountType: UpiAccountType.merchant,
       ),
-      isTrue,
+      isFalse,
     );
   });
 
@@ -123,11 +115,11 @@ void main() {
     expect(gpay.host, 'upi');
     expect(gpay.path, '/pay');
     expect(gpay.queryParameters['pa'], upi.queryParameters['pa']);
-    expect(gpay.queryParameters['am'], '245.00');
+    expect(gpay.queryParameters.containsKey('am'), isFalse);
+    expect(gpay.queryParameters['tn'], 'SocietyEats Order SB-1023');
     expect(gpay.queryParameters.containsKey('tr'), isFalse);
     expect(gpay.queryParameters.containsKey('mc'), isFalse);
     expect(gpay.queryParameters.containsKey('mode'), isFalse);
-    expect(gpay.queryParameters.containsKey('tn'), isFalse);
     expect(upiLaunchString(gpay), startsWith('gpay://upi/pay?'));
     expect(upiLaunchString(gpay), contains('pn=Sharma%20Snacks'));
     expect(upiLaunchString(gpay), isNot(contains('SocietyBites')));
@@ -168,8 +160,9 @@ void main() {
     );
     const target = UpiAppLaunchTarget(scheme: 'gpay', host: 'upi', path: '/pay');
     final launched = buildUpiAppLaunchUri(upiPayUri: upi, target: target);
-    expect(launched.queryParameters.keys.toList(), ['pa', 'pn', 'am', 'cu']);
-    expect(upiLaunchString(launched), 'gpay://upi/pay?pa=seller.name@okaxis&pn=Sharma%20Snacks&am=245.00&cu=INR');
+    expect(launched.queryParameters.keys.toSet(), {'pa', 'pn', 'cu', 'tn'});
+    expect(launched.queryParameters.containsKey('am'), isFalse);
+    expect(upiLaunchString(launched), 'gpay://upi/pay?pa=seller.name@okaxis&pn=Sharma%20Snacks&tn=SocietyEats%20Order%20SB-1023&cu=INR');
   });
 
   test('merchant app launch keeps the note and drops the transaction ref', () {
@@ -181,26 +174,24 @@ void main() {
       transactionRef: 'SB-1023',
     );
     const target = UpiAppLaunchTarget(scheme: 'gpay', host: 'upi', path: '/pay');
-    final launched = buildUpiAppLaunchUri(
+    final noted = buildUpiAppLaunchUri(
       upiPayUri: upi,
       target: target,
       accountType: UpiAccountType.merchant,
+      transactionNote: 'SB-1023',
     );
-    expect(
-      launched.queryParameters.keys.toSet(),
-      {'pa', 'pn', 'am', 'cu', 'tn'},
-    );
-    expect(launched.queryParameters['tn'], 'SocietyEats Order SB-1023');
-    expect(launched.queryParameters.containsKey('tr'), isFalse);
-    expect(launched.queryParameters.containsKey('mc'), isFalse);
-    expect(upiLaunchString(launched), isNot(contains('tr=')));
+    expect(noted.queryParameters.keys.toSet(), {'pa', 'pn', 'cu', 'tn'});
+    expect(noted.queryParameters['tn'], 'SB-1023');
+    expect(noted.queryParameters.containsKey('am'), isFalse);
+    expect(noted.queryParameters.containsKey('tr'), isFalse);
+    expect(upiLaunchString(noted), isNot(contains('am=')));
     expect(shouldHandoffUpiCollect(
       platform: TargetPlatform.android,
       accountType: UpiAccountType.merchant,
     ), isFalse);
   });
 
-  test('GPay, PhonePe, and Paytm open the same transfer as the QR', () async {
+  test('GPay, PhonePe, and Paytm open the UPI ID with the order note and no amount', () async {
     final upi = buildUpiPaymentUri(
       upiId: 'seller@oksbi',
       payeeName: 'Sharma Snacks',
@@ -208,7 +199,6 @@ void main() {
       transactionNote: 'SocietyEats Order SB-1023',
       transactionRef: 'SB-1023',
     );
-    expect(upi.queryParameters.containsKey('tr'), isFalse);
 
     final apps = await getAvailableUpiApps(
       upi,
@@ -218,24 +208,15 @@ void main() {
       accountType: UpiAccountType.merchant,
     );
     expect(apps.map((app) => app.id), ['gpay', 'phonepe', 'paytm', 'bhim']);
-
-    void expectSameTransfer(String id, String prefix) {
-      final launched = apps.firstWhere((app) => app.id == id).resolvedLaunchUri!;
-      expect(upiLaunchString(launched), startsWith(prefix));
-      expect(launched.queryParameters['pa'], 'seller@oksbi');
-      expect(launched.queryParameters['pn'], 'Sharma Snacks');
-      expect(launched.queryParameters['am'], '245.00');
-      expect(launched.queryParameters['cu'], 'INR');
-      expect(launched.queryParameters['tn'], 'SocietyEats Order SB-1023');
-      expect(launched.queryParameters.containsKey('tr'), isFalse);
-      expect(launched.queryParameters.containsKey('mc'), isFalse);
-      expect(launched.queryParameters.containsKey('mode'), isFalse);
+    expect(upiLaunchString(apps[0].resolvedLaunchUri!), startsWith('gpay://upi/pay?'));
+    expect(upiLaunchString(apps[1].resolvedLaunchUri!), startsWith('phonepe://pay?'));
+    expect(upiLaunchString(apps[2].resolvedLaunchUri!), startsWith('paytmmp://pay?'));
+    for (final app in apps) {
+      expect(app.resolvedLaunchUri!.queryParameters['pa'], 'seller@oksbi');
+      expect(app.resolvedLaunchUri!.queryParameters['tn'], 'SocietyEats Order SB-1023');
+      expect(app.resolvedLaunchUri!.queryParameters.containsKey('am'), isFalse);
+      expect(app.resolvedLaunchUri!.queryParameters.containsKey('tr'), isFalse);
     }
-
-    expectSameTransfer('gpay', 'gpay://upi/pay?');
-    expectSameTransfer('phonepe', 'phonepe://pay?');
-    expectSameTransfer('paytm', 'paytmmp://pay?');
-    expectSameTransfer('bhim', 'bhim://pay?');
   });
 
   test('getAvailableUpiApps hides apps that cannot launch', () async {
@@ -271,8 +252,9 @@ void main() {
     );
     expect(ios.map((app) => app.id), ['gpay', 'phonepe', 'paytm', 'bhim']);
     expect(ios.first.resolvedLaunchUri?.scheme, 'tez');
-    expect(ios.first.resolvedLaunchUri?.query, isEmpty);
-    expect(upiLaunchString(ios.first.resolvedLaunchUri!), 'tez://');
+    expect(ios.first.resolvedLaunchUri?.host, 'upi');
+    expect(ios.first.resolvedLaunchUri?.queryParameters['pa'], 'seller@upi');
+    expect(ios.first.resolvedLaunchUri?.queryParameters.containsKey('am'), isFalse);
 
     final androidGpay = await getAvailableUpiApps(
       upi,
@@ -282,8 +264,9 @@ void main() {
     );
     expect(androidGpay.first.id, 'gpay');
     expect(androidGpay.first.resolvedLaunchUri?.scheme, 'gpay');
-    expect(androidGpay.first.resolvedLaunchUri?.query, isEmpty);
-    expect(upiLaunchString(androidGpay.first.resolvedLaunchUri!), 'gpay://');
+    expect(androidGpay.first.resolvedLaunchUri?.host, 'upi');
+    expect(androidGpay.first.resolvedLaunchUri?.queryParameters['pa'], 'seller@upi');
+    expect(androidGpay.first.resolvedLaunchUri?.queryParameters.containsKey('am'), isFalse);
 
     final androidGpayViaCollectHost = await getAvailableUpiApps(
       upi,
@@ -295,36 +278,31 @@ void main() {
     expect(androidGpayViaCollectHost.map((app) => app.id), ['gpay']);
     expect(
       upiLaunchString(androidGpayViaCollectHost.single.resolvedLaunchUri!),
-      'gpay://upi/pay',
+      startsWith('gpay://upi/pay?'),
     );
     expect(
-      androidGpayViaCollectHost.single.resolvedLaunchUri?.queryParameters,
-      isEmpty,
+      androidGpayViaCollectHost.single.resolvedLaunchUri?.queryParameters['pa'],
+      'seller@upi',
+    );
+    expect(
+      androidGpayViaCollectHost.single.resolvedLaunchUri?.queryParameters.containsKey('am'),
+      isFalse,
     );
   });
 
-  test('UPI shortcuts open the app without a collect URI', () {
-    expect(shouldHandoffUpiCollect(platform: TargetPlatform.iOS), isTrue);
-    expect(shouldHandoffUpiCollect(platform: TargetPlatform.android), isTrue);
+  test('app icons use each app pay screen', () {
+    expect(shouldHandoffUpiCollect(platform: TargetPlatform.iOS), isFalse);
+    expect(shouldHandoffUpiCollect(platform: TargetPlatform.android), isFalse);
     final iosTargets = launchTargetsFor(
       configuredUpiApps.first,
       platform: TargetPlatform.iOS,
     );
-    expect(iosTargets.map((t) => t.scheme).toList(), ['tez', 'gpay']);
-    expect(upiLaunchString(buildUpiAppOpenUri(iosTargets.first)), 'tez://');
+    expect(iosTargets.map((t) => t.baseUrl).toList(), ['tez://upi/pay', 'gpay://upi/pay']);
     final androidTargets = launchTargetsFor(
       configuredUpiApps.first,
       platform: TargetPlatform.android,
     );
-    expect(androidTargets.map((t) => t.scheme).toList(), ['gpay', 'tez']);
-    expect(upiLaunchString(buildUpiAppOpenUri(androidTargets.first)), 'gpay://');
-    expect(
-      handoffProbeTargetsFor(
-        configuredUpiApps.first,
-        platform: TargetPlatform.android,
-      ).map((t) => t.baseUrl),
-      containsAll(['gpay://', 'gpay://upi/pay', 'tez://upi/pay']),
-    );
+    expect(androidTargets.first.baseUrl, 'gpay://upi/pay');
   });
 
   test('sanitizes UPI transaction references', () {

@@ -16,7 +16,8 @@ model User {
   profilePhotoUrl         String?
   upiId                   String?
   upiDisplayName          String?
-  /// PERSONAL | MERCHANT. Merchant enables in-app UPI collect intent for buyers.
+  /// PERSONAL | MERCHANT. Label for the seller's direct UPI ID. Neither type
+  /// is an NPCI-verified merchant, so buyers are not sent an in-app intent.
   upiAccountType          String                  @default("PERSONAL")
   paymentEnabled          Boolean                 @default(false)
   /// MY_SOCIETY | BEYOND_SOCIETY (legacy: NEARBY | EXTENDED). Beyond uses sellingReachRadiusKm.

@@ -449,7 +449,7 @@ void main() {
 
       expect(find.text('Pay with UPI App'), findsNothing);
       expect(find.text('Scan QR code to pay'), findsOneWidget);
-      expect(find.text('Copy the UPI ID and pay'), findsOneWidget);
+      expect(find.text('Pay using your UPI app'), findsOneWidget);
       await tester.ensureVisible(find.byKey(const ValueKey('upi-qr')));
       await tester.tap(find.byKey(const ValueKey('upi-qr')));
       await tester.pump();
@@ -466,7 +466,7 @@ void main() {
     }
   });
 
-  testWidgets('Android merchant UPI icon launches collect with amount', (
+  testWidgets('Android merchant UPI icon copies the ID and opens the app', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -524,7 +524,6 @@ void main() {
       await tester.pump();
 
       expect(find.text('Pay using your UPI app'), findsOneWidget);
-      expect(find.text('Copy the UPI ID and pay'), findsNothing);
       final gpay = tester.widget<InkWell>(
         find.byKey(const ValueKey('upi-app-gpay')),
       );
@@ -534,10 +533,10 @@ void main() {
 
       expect(copiedText, isNull);
       expect(launchedUri?.scheme, 'gpay');
+      expect(launchedUri?.host, 'upi');
       expect(launchedUri?.queryParameters['pa'], 'shop@okbizaxis');
-      expect(launchedUri?.queryParameters['am'], '245.00');
-      expect(launchedUri?.queryParameters['tn'], 'SocietyEats Order SB-1001');
-      expect(launchedUri?.queryParameters.containsKey('tr'), isFalse);
+      expect(launchedUri?.queryParameters['tn'], 'SB-1001');
+      expect(launchedUri?.queryParameters.containsKey('am'), isFalse);
       expect(
         find.text('UPI ID copied. Pay ₹245.00 in GPay to the copied ID.'),
         findsNothing,
@@ -604,8 +603,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('Copy the UPI ID and pay'), findsOneWidget);
-      expect(find.text('Pay using your UPI app'), findsNothing);
+      expect(find.text('Pay using your UPI app'), findsOneWidget);
       final gpay = tester.widget<InkWell>(
         find.byKey(const ValueKey('upi-app-gpay')),
       );
@@ -613,12 +611,15 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(copiedText, 'seller@upi');
+      expect(copiedText, isNull);
       expect(launchedUri?.scheme, 'gpay');
-      expect(launchedUri?.queryParameters, isEmpty);
+      expect(launchedUri?.host, 'upi');
+      expect(launchedUri?.queryParameters['pa'], 'seller@upi');
+      expect(launchedUri?.queryParameters['tn'], 'SB-1001');
+      expect(launchedUri?.queryParameters.containsKey('am'), isFalse);
       expect(
         find.text('UPI ID copied. Pay ₹245.00 in GPay to the copied ID.'),
-        findsOneWidget,
+        findsNothing,
       );
     } finally {
       debugDefaultTargetPlatformOverride = null;
@@ -735,8 +736,7 @@ void main() {
 
       expect(find.text('Pay with UPI App'), findsNothing);
       expect(find.text('Scan QR code to pay'), findsOneWidget);
-      expect(find.text('Copy the UPI ID and pay'), findsOneWidget);
-      expect(find.text('Pay using your UPI app'), findsNothing);
+      expect(find.text('Pay using your UPI app'), findsOneWidget);
       expect(find.byKey(const ValueKey('upi-app-gpay')), findsOneWidget);
       expect(find.byKey(const ValueKey('upi-app-phonepe')), findsOneWidget);
       expect(find.byKey(const ValueKey('copy-upi-id')), findsOneWidget);
@@ -802,7 +802,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('Copy the UPI ID and pay'), findsOneWidget);
+      expect(find.text('Pay using your UPI app'), findsOneWidget);
       final gpay = tester.widget<InkWell>(
         find.byKey(const ValueKey('upi-app-gpay')),
       );
@@ -810,12 +810,15 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(copiedText, 'seller@upi');
+      expect(copiedText, isNull);
       expect(launchedUri?.scheme, 'tez');
-      expect(launchedUri?.queryParameters, isEmpty);
+      expect(launchedUri?.host, 'upi');
+      expect(launchedUri?.queryParameters['pa'], 'seller@upi');
+      expect(launchedUri?.queryParameters['tn'], 'SB-1001');
+      expect(launchedUri?.queryParameters.containsKey('am'), isFalse);
       expect(
         find.text('UPI ID copied. Pay ₹220.00 in GPay to the copied ID.'),
-        findsOneWidget,
+        findsNothing,
       );
     } finally {
       debugDefaultTargetPlatformOverride = null;
