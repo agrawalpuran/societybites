@@ -20,15 +20,15 @@ void main() {
       'pn': 'Sharma Snacks & More',
       'am': '245.00',
       'cu': 'INR',
-      'tr': 'SB1023',
       'tn': 'SocietyEats Order SB-1023',
     });
     final encoded = upiLaunchString(uri);
     expect(encoded, contains('Sharma%20Snacks%20%26%20More'));
     expect(encoded, isNot(contains('Sharma+')));
-    expect(encoded, contains('tn=SocietyBites%20Order%20SB-1023'));
-    expect(encoded, contains('tr=SB1023'));
-    expect(uri.queryParameters.keys, hasLength(6));
+    expect(encoded, contains('tn=SocietyEats%20Order%20SB-1023'));
+    expect(encoded, isNot(contains('tr=')));
+    expect(encoded, isNot(contains('mc=')));
+    expect(uri.queryParameters.keys, hasLength(5));
   });
 
   test('rejects missing or invalid payment values', () {
@@ -172,7 +172,7 @@ void main() {
     expect(upiLaunchString(launched), 'gpay://upi/pay?pa=seller.name@okaxis&pn=Sharma%20Snacks&am=245.00&cu=INR');
   });
 
-  test('merchant app launch keeps note and transaction ref', () {
+  test('merchant app launch keeps the note and drops the transaction ref', () {
     final upi = buildUpiPaymentUri(
       upiId: 'shop@okbizaxis',
       payeeName: 'Sharma Snacks',
@@ -188,12 +188,54 @@ void main() {
     );
     expect(
       launched.queryParameters.keys.toSet(),
-      {'pa', 'pn', 'am', 'cu', 'tn', 'tr'},
+      {'pa', 'pn', 'am', 'cu', 'tn'},
     );
+    expect(launched.queryParameters['tn'], 'SocietyEats Order SB-1023');
+    expect(launched.queryParameters.containsKey('tr'), isFalse);
+    expect(launched.queryParameters.containsKey('mc'), isFalse);
+    expect(upiLaunchString(launched), isNot(contains('tr=')));
     expect(shouldHandoffUpiCollect(
       platform: TargetPlatform.android,
       accountType: UpiAccountType.merchant,
     ), isFalse);
+  });
+
+  test('GPay, PhonePe, and Paytm open the same transfer as the QR', () async {
+    final upi = buildUpiPaymentUri(
+      upiId: 'seller@oksbi',
+      payeeName: 'Sharma Snacks',
+      amount: 245,
+      transactionNote: 'SocietyEats Order SB-1023',
+      transactionRef: 'SB-1023',
+    );
+    expect(upi.queryParameters.containsKey('tr'), isFalse);
+
+    final apps = await getAvailableUpiApps(
+      upi,
+      canLaunch: (_) async => true,
+      isWeb: false,
+      platform: TargetPlatform.android,
+      accountType: UpiAccountType.merchant,
+    );
+    expect(apps.map((app) => app.id), ['gpay', 'phonepe', 'paytm', 'bhim']);
+
+    void expectSameTransfer(String id, String prefix) {
+      final launched = apps.firstWhere((app) => app.id == id).resolvedLaunchUri!;
+      expect(upiLaunchString(launched), startsWith(prefix));
+      expect(launched.queryParameters['pa'], 'seller@oksbi');
+      expect(launched.queryParameters['pn'], 'Sharma Snacks');
+      expect(launched.queryParameters['am'], '245.00');
+      expect(launched.queryParameters['cu'], 'INR');
+      expect(launched.queryParameters['tn'], 'SocietyEats Order SB-1023');
+      expect(launched.queryParameters.containsKey('tr'), isFalse);
+      expect(launched.queryParameters.containsKey('mc'), isFalse);
+      expect(launched.queryParameters.containsKey('mode'), isFalse);
+    }
+
+    expectSameTransfer('gpay', 'gpay://upi/pay?');
+    expectSameTransfer('phonepe', 'phonepe://pay?');
+    expectSameTransfer('paytm', 'paytmmp://pay?');
+    expectSameTransfer('bhim', 'bhim://pay?');
   });
 
   test('getAvailableUpiApps hides apps that cannot launch', () async {

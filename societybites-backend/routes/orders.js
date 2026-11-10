@@ -791,6 +791,10 @@ router.post(
       orderIncludeForCreate
     );
     if (replayOrder) {
+      logger.info(
+        "order",
+        `Idempotent fast-path ${replayOrder.orderNumber} — WhatsApp not sent on retry`
+      );
       return res.status(201).json(serializeOrderForUser(replayOrder, req.user.id));
     }
 
@@ -1300,6 +1304,8 @@ router.post(
       logger.info("order", `Created ${order.orderNumber} by ${req.user.phone}`);
       void flushNotification(notifyOrderCreated(order));
       void sendWhatsAppOrderNotification(order);
+    } else {
+      logger.info("order", `Idempotent replay ${order.orderNumber} — WhatsApp skipped`);
     }
 
     res.status(201).json(serializeOrderForUser(order, req.user.id));

@@ -3,9 +3,22 @@ const prisma = require("../lib/prisma");
 const { isWhatsAppOrderNotificationsEnabled } = require("../lib/whatsappSetting");
 const { readConfig, isConfigured } = require("../lib/whatsappCloud");
 
+async function graphGet(cfg, path, searchParams = "") {
+  const suffix = searchParams ? (searchParams.startsWith("?") ? searchParams : `?${searchParams}`) : "";
+  const url = `https://graph.facebook.com/${cfg.apiVersion}/${path}${suffix}`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${cfg.token}` },
+  });
+  const body = await response.json();
+  return { response, body };
+}
+
 async function main() {
   const adminOn = await isWhatsAppOrderNotificationsEnabled();
   const cfg = readConfig();
+  const phoneNumberId = String(process.env.WHATSAPP_PHONE_NUMBER_ID || cfg.phoneNumberId || "").trim();
+  const wabaId = String(process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || "").trim();
+
   console.log("--- Local env + DB ---");
   console.log({
     adminWhatsappToggle: adminOn,
@@ -20,18 +33,44 @@ async function main() {
     return;
   }
 
-  const url = `https://graph.facebook.com/${cfg.apiVersion}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/message_templates?limit=50`;
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${cfg.token}` },
-  });
-  const body = await response.json();
-  if (!response.ok) {
-    console.log("--- Meta template list failed ---");
-    console.log(body && body.error ? body.error : body);
+  const phoneFields = [
+    "id",
+    "display_phone_number",
+    "verified_name",
+    "account_mode",
+    "quality_rating",
+  ].join(",");
+  const phoneCheck = await graphGet(cfg, phoneNumberId, `fields=${phoneFields}`);
+  if (!phoneCheck.response.ok) {
+    console.log("--- Meta phone number check failed (token / phone ID) ---");
+    console.log(phoneCheck.body && phoneCheck.body.error ? phoneCheck.body.error : phoneCheck.body);
     return;
   }
 
-  const names = (body.data || []).map((t) => ({
+  console.log("--- Meta phone number (token OK for send API) ---");
+  console.log(phoneCheck.body);
+
+  if (!wabaId) {
+    console.log(
+      "--- Template list skipped ---",
+    );
+    console.log(
+      "message_templates live on the WhatsApp Business Account ID, not the phone number ID.",
+    );
+    console.log(
+      "Optional: set WHATSAPP_BUSINESS_ACCOUNT_ID in .env (WhatsApp Manager → your account URL or Business assets → WhatsApp accounts), then re-run.",
+    );
+    return;
+  }
+
+  const templateCheck = await graphGet(cfg, wabaId, "message_templates?limit=50");
+  if (!templateCheck.response.ok) {
+    console.log("--- Meta template list failed ---");
+    console.log(templateCheck.body && templateCheck.body.error ? templateCheck.body.error : templateCheck.body);
+    return;
+  }
+
+  const names = (templateCheck.body.data || []).map((t) => ({
     name: t.name,
     status: t.status,
     language: t.language,

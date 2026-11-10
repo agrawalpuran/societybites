@@ -240,7 +240,14 @@ async function fetchWithTimeout(fetchFn, url, options, ms) {
   }
 }
 
-async function postTemplate(config, to, deps, parameters) {
+function isTransientWhatsAppError(err, statusCode) {
+  if (err && err.name === "AbortError") return true;
+  if (statusCode === 429) return true;
+  if (statusCode >= 500 && statusCode <= 599) return true;
+  return false;
+}
+
+async function postTemplateOnce(config, to, deps, parameters) {
   const fetchFn = deps.fetch || globalThis.fetch;
   if (typeof fetchFn !== "function") {
     throw new Error("fetch is not available");
@@ -281,6 +288,25 @@ async function postTemplate(config, to, deps, parameters) {
   }
 
   return messageIdFromBody(body);
+}
+
+async function postTemplate(config, to, deps, parameters) {
+  const maxAttempts = 2;
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await postTemplateOnce(config, to, deps, parameters);
+    } catch (err) {
+      lastErr = err;
+      const retryable = isTransientWhatsAppError(err, err.statusCode);
+      if (!retryable || attempt >= maxAttempts) throw err;
+      logger.warn("whatsapp", `Graph send retry ${attempt}/${maxAttempts - 1}`, {
+        error: err.message,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+  }
+  throw lastErr;
 }
 
 function sendWhatsAppSafely(inner, order, kind) {

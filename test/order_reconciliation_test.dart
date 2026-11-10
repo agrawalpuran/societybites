@@ -536,6 +536,8 @@ void main() {
       expect(launchedUri?.scheme, 'gpay');
       expect(launchedUri?.queryParameters['pa'], 'shop@okbizaxis');
       expect(launchedUri?.queryParameters['am'], '245.00');
+      expect(launchedUri?.queryParameters['tn'], 'SocietyEats Order SB-1001');
+      expect(launchedUri?.queryParameters.containsKey('tr'), isFalse);
       expect(
         find.text('UPI ID copied. Pay ₹245.00 in GPay to the copied ID.'),
         findsNothing,

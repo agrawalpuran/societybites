@@ -76,8 +76,9 @@ class UpiAppOption {
   }
 }
 
-/// Installed-app probe targets. Live launches use [shouldHandoffUpiCollect]
-/// open URIs, not these collect hosts.
+/// Pay screens each app registers for a normal UPI transfer. The query is
+/// the same one encoded in the QR, so GPay, PhonePe, and Paytm all open
+/// the same payment. `upi/pay` on PhonePe and Paytm is only a fallback.
 const configuredUpiApps = <UpiAppOption>[
   UpiAppOption(
     id: 'gpay',
@@ -91,26 +92,26 @@ const configuredUpiApps = <UpiAppOption>[
     id: 'phonepe',
     displayName: 'PhonePe',
     launchTargets: [
-      UpiAppLaunchTarget(scheme: 'phonepe', host: 'upi', path: '/pay'),
       UpiAppLaunchTarget(scheme: 'phonepe', host: 'pay'),
+      UpiAppLaunchTarget(scheme: 'phonepe', host: 'upi', path: '/pay'),
     ],
   ),
   UpiAppOption(
     id: 'paytm',
     displayName: 'Paytm',
     launchTargets: [
-      UpiAppLaunchTarget(scheme: 'paytm', host: 'upi', path: '/pay'),
-      UpiAppLaunchTarget(scheme: 'paytmmp', host: 'upi', path: '/pay'),
       UpiAppLaunchTarget(scheme: 'paytmmp', host: 'pay'),
       UpiAppLaunchTarget(scheme: 'paytm', host: 'pay'),
+      UpiAppLaunchTarget(scheme: 'paytmmp', host: 'upi', path: '/pay'),
+      UpiAppLaunchTarget(scheme: 'paytm', host: 'upi', path: '/pay'),
     ],
   ),
   UpiAppOption(
     id: 'bhim',
     displayName: 'BHIM Pay',
     launchTargets: [
-      UpiAppLaunchTarget(scheme: 'bhim', host: 'upi', path: '/pay'),
       UpiAppLaunchTarget(scheme: 'bhim', host: 'pay'),
+      UpiAppLaunchTarget(scheme: 'bhim', host: 'upi', path: '/pay'),
     ],
   ),
 ];
@@ -125,7 +126,7 @@ String buildUpiPayQuery({
   required double amount,
   required String transactionNote,
   String? transactionRef,
-  bool includeTransactionRef = true,
+  bool includeTransactionRef = false,
 }) {
   final normalizedUpiId = upiId.trim();
   final normalizedPayeeName = payeeName.trim();
@@ -164,10 +165,9 @@ String buildUpiPayQuery({
   return parts.join('&');
 }
 
-/// App shortcuts for personal VPAs must look like a P2P send-to-VPA.
-/// `mc`, `tr`, `tn`, and `mode` make GPay treat a neighbour's personal VPA
-/// as a merchant collect. Merchant VPAs keep `tn` / `tr` so amount + note
-/// stay prefilled. QR stays the full NPCI `upi://pay` string.
+/// Opens the QR payment inside one app. Every seller UPI ID uses the same
+/// transfer: payee, name, amount, and note. `tr`, `mc`, and `mode` are left
+/// out so GPay, PhonePe, and Paytm do not turn it into a merchant collect.
 Uri buildUpiAppLaunchUri({
   required Uri upiPayUri,
   required UpiAppLaunchTarget target,
@@ -181,8 +181,6 @@ Uri buildUpiAppLaunchUri({
     if (params['cu'] != null) 'cu=${params['cu']}',
     if (accountType.enablesCollectIntent && params['tn'] != null)
       'tn=${encodeUpiQueryValue(params['tn']!)}',
-    if (accountType.enablesCollectIntent && params['tr'] != null)
-      'tr=${params['tr']}',
   ].join('&');
   return encodedUpiLaunchUri(Uri.parse('${target.baseUrl}?$query'));
 }
@@ -382,6 +380,7 @@ Uri buildUpiPaymentUri({
   required double amount,
   required String transactionNote,
   String? transactionRef,
+  bool includeTransactionRef = false,
 }) {
   final query = buildUpiPayQuery(
     upiId: upiId,
@@ -389,6 +388,7 @@ Uri buildUpiPaymentUri({
     amount: amount,
     transactionNote: transactionNote,
     transactionRef: transactionRef,
+    includeTransactionRef: includeTransactionRef,
   );
   return Uri.parse('upi://pay?$query');
 }

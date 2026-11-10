@@ -128,12 +128,12 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   String get _amount => _order.upiPaymentAmount.toStringAsFixed(2);
 
+  /// One transfer link for the QR and for GPay, PhonePe, and Paytm.
   Uri get _upiPaymentUri => buildUpiPaymentUri(
     upiId: _sellerUpiId ?? '',
     payeeName: _sellerName.trim().isEmpty ? 'SocietyEats seller' : _sellerName,
     amount: _order.upiPaymentAmount,
     transactionNote: 'SocietyEats Order ${_order.orderId}',
-    transactionRef: _order.orderId,
   );
 
   @override
