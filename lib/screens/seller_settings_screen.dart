@@ -26,6 +26,7 @@ class SellerSettingsScreen extends StatelessWidget {
     this.fssaiRequirementEnabled = false,
     this.fssaiAllowsEnableSelling = true,
     required this.onEditUpi,
+    this.onOpenPayout,
     required this.onChangePaymentPreference,
     required this.onChangeSellingReach,
     required this.onChangeFulfilment,
@@ -70,6 +71,7 @@ class SellerSettingsScreen extends StatelessWidget {
   final bool fssaiRequirementEnabled;
   final bool fssaiAllowsEnableSelling;
   final VoidCallback onEditUpi;
+  final VoidCallback? onOpenPayout;
   final VoidCallback onChangePaymentPreference;
   final VoidCallback onChangeSellingReach;
   final VoidCallback onChangeFulfilment;
@@ -226,6 +228,13 @@ class SellerSettingsScreen extends StatelessWidget {
                         subtitle: upiSubtitle,
                         onTap: onEditUpi,
                       ),
+                      if (onOpenPayout != null)
+                        ProfileMenuTile(
+                          icon: Icons.account_balance_outlined,
+                          title: 'Payout account',
+                          subtitle: 'PAN and bank or UPI for Cashfree',
+                          onTap: onOpenPayout!,
+                        ),
                       const SizedBox(height: 20),
                       const _SectionLabel('SELLING'),
                       const SizedBox(height: 10),

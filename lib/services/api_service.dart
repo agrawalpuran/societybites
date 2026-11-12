@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart' show VoidCallback, visibleForTesting;
+import 'package:flutter/foundation.dart' show VoidCallback, kIsWeb, visibleForTesting;
 import 'package:http/http.dart' as http_client;
 
 import '../models/app_settings.dart';
@@ -2453,6 +2453,74 @@ class ApiService {
     if (response.statusCode == 200) {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
       return data['fssaiSellingRequirement'] == true;
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> startPaymentCheckout(String orderId) async {
+    final origin = kIsWeb ? Uri.base.origin : '';
+    final response = await http.post(
+      Uri.parse('$baseUrl/payments/$orderId/checkout'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        if (origin.isNotEmpty && origin != 'null') 'returnOrigin': origin,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getSellerPayoutProfile() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/payments/payout-profile'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> saveSellerPayoutProfile(
+    Map<String, dynamic> body,
+  ) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/payments/payout-profile'),
+      headers: await _authHeaders(),
+      body: jsonEncode(body),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminPaymentSplits() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/payment-splits'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      final rows = data['splits'] as List? ?? const [];
+      return rows
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<String> updateAdminPaymentProvider(String paymentProvider) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/settings'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'paymentProvider': paymentProvider}),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return data['paymentProvider']?.toString() ?? 'direct_upi';
     }
     _throwFromResponse(response);
   }

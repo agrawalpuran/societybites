@@ -47,6 +47,11 @@ const {
   isWhatsAppOrderNotificationsEnabled,
   setWhatsAppOrderNotifications,
 } = require("../lib/whatsappSetting");
+const {
+  getPaymentProvider,
+  setPaymentProvider,
+} = require("../lib/payments/paymentSetting");
+const { sellerShareAmount } = require("../lib/payments/sellerShare");
 const { listCouponSellerPayouts } = require("../lib/couponRecon");
 const {
   listAddressProofs,
@@ -1103,6 +1108,56 @@ router.get(
   })
 );
 
+router.get(
+  "/payment-splits",
+  asyncHandler(async (_req, res) => {
+    const orders = await prisma.order.findMany({
+      where: {
+        paymentProvider: "cashfree",
+        paymentStatus: "paid",
+        splitStatus: { in: ["pending", "failed"] },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+      include: {
+        items: {
+          include: {
+            listing: {
+              include: {
+                seller: {
+                  select: {
+                    name: true,
+                    payoutProfile: { select: { vendorStatus: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    res.json({
+      splits: orders.map((order) => {
+        const seller = order.items[0] && order.items[0].listing.seller;
+        return {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          total: order.total,
+          communityFee: order.communityFee,
+          sellerShare: sellerShareAmount(order),
+          splitStatus: order.splitStatus,
+          splitError: order.splitError,
+          sellerName: (seller && seller.name) || null,
+          vendorStatus:
+            (seller && seller.payoutProfile && seller.payoutProfile.vendorStatus) ||
+            null,
+          updatedAt: order.updatedAt,
+        };
+      }),
+    });
+  })
+);
+
 // GET /admin/settings
 router.get(
   "/settings",
@@ -1113,11 +1168,13 @@ router.get(
     const fssaiSellingRequirement = await isFssaiSellingRequirementEnabled();
     const whatsappOrderNotifications =
       await isWhatsAppOrderNotificationsEnabled();
+    const paymentProvider = await getPaymentProvider();
     const forceUpdate = await getForceUpdateConfig({ bypassCache: true });
     res.json({
       platformFee,
       fssaiSellingRequirement,
       whatsappOrderNotifications,
+      paymentProvider,
       minIosBuild: forceUpdate.minIosBuild,
       minAndroidBuild: forceUpdate.minAndroidBuild,
       iosUpdateUrl: forceUpdate.iosUpdateUrl,
@@ -1138,6 +1195,7 @@ router.patch(
       platformFee,
       fssaiSellingRequirement,
       whatsappOrderNotifications,
+      paymentProvider,
       minIosBuild,
       minAndroidBuild,
       iosUpdateUrl,
@@ -1160,6 +1218,9 @@ router.patch(
       updates.whatsappOrderNotifications = await setWhatsAppOrderNotifications(
         Boolean(whatsappOrderNotifications)
       );
+    }
+    if (paymentProvider !== undefined) {
+      updates.paymentProvider = await setPaymentProvider(paymentProvider);
     }
     const forceUpdates = await setForceUpdateConfig({
       minIosBuild,
@@ -1212,6 +1273,8 @@ router.patch(
       whatsappOrderNotifications:
         updates.whatsappOrderNotifications ??
         (await isWhatsAppOrderNotificationsEnabled()),
+      paymentProvider:
+        updates.paymentProvider ?? (await getPaymentProvider()),
       minIosBuild: forceUpdate.minIosBuild,
       minAndroidBuild: forceUpdate.minAndroidBuild,
       iosUpdateUrl: forceUpdate.iosUpdateUrl,

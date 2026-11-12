@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -54,6 +55,7 @@ class PaymentScreen extends StatefulWidget {
     this.fetchOrder,
     this.fetchPaymentInfo,
     this.markPaid,
+    this.startCheckout,
     this.launchUpi,
     this.canLaunchUpi,
     this.pollInterval = const Duration(seconds: 8),
@@ -68,6 +70,7 @@ class PaymentScreen extends StatefulWidget {
   final PaymentApiCall? fetchOrder;
   final PaymentApiCall? fetchPaymentInfo;
   final PaymentApiCall? markPaid;
+  final PaymentApiCall? startCheckout;
   final UpiLauncher? launchUpi;
   final UpiAvailabilityChecker? canLaunchUpi;
   final Duration pollInterval;
@@ -92,7 +95,18 @@ class _PaymentScreenState extends State<PaymentScreen>
   String? _loadError;
   String? _upiLaunchError;
   String? _upiHandoffHint;
+  String? _gatewayProvider;
+  String? _gatewayUpiLink;
+  String? _gatewayQrPayload;
+  String? _gatewayError;
+  bool _checkoutFailed = false;
   List<UpiAppOption> _availableApps = const [];
+
+  bool get _checkoutRequired =>
+      widget.startCheckout != null ||
+      (widget.fetchPaymentInfo == null && widget.fetchOrder == null);
+
+  bool get _isGateway => _gatewayProvider == 'cashfree';
 
   bool get _hasUpi => _sellerUpiId != null && isValidUpiId(_sellerUpiId!);
 
@@ -143,7 +157,7 @@ class _PaymentScreenState extends State<PaymentScreen>
     _order = widget.order;
     WidgetsBinding.instance.addObserver(this);
     _seedSellerUpiFromOrder();
-    if (_hasUpi) {
+    if (_hasUpi && !_checkoutRequired) {
       _isLoadingUpi = false;
       _scheduleUpiAppProbe();
     }
@@ -169,20 +183,27 @@ class _PaymentScreenState extends State<PaymentScreen>
       });
     }
     try {
+      final checkoutFuture = _startCheckout(_order.id);
       final results = await Future.wait<dynamic>([
         _fetchPaymentInfo(_order.id),
         _fetchOrder(_order.id),
+        if (checkoutFuture != null) checkoutFuture,
       ]);
       if (!mounted) return;
 
       final paymentData = Map<String, dynamic>.from(results[0] as Map);
       final latest = Order.fromJson(results[1] as Map<String, dynamic>);
       final apiUpi = paymentData['sellerUpiId'] as String?;
+      final session = checkoutFuture == null
+          ? null
+          : Map<String, dynamic>.from(results[2] as Map);
 
       setState(() {
         _order = latest;
+        _checkoutFailed = false;
+        _applyCheckout(session);
         _seedSellerUpiFromOrder();
-        if (apiUpi != null && apiUpi.trim().isNotEmpty) {
+        if (!_isGateway && apiUpi != null && apiUpi.trim().isNotEmpty) {
           _sellerUpiId = apiUpi.trim();
         }
         _sellerUpiDisplayName = paymentData['sellerUpiDisplayName'] as String?;
@@ -190,25 +211,32 @@ class _PaymentScreenState extends State<PaymentScreen>
           paymentData['sellerUpiAccountType'],
         );
         _isLoadingUpi = false;
+        _gatewayError = null;
       });
 
       if (!isOpenPaymentStatus(latest.status) ||
-          isPaymentFinished(latest.paymentStatus) ||
-          isTerminalPaymentLeaveStatus(latest.status)) {
+          isTerminalPaymentLeaveStatus(latest.status) ||
+          (isPaymentFinished(latest.paymentStatus) &&
+              !(session != null &&
+                  session['paymentProvider'] == 'cashfree' &&
+                  latest.paymentStatus == 'failed'))) {
         _leavePayment(true);
         return;
       }
 
-      _scheduleUpiAppProbe();
+      if (!_isGateway) _scheduleUpiAppProbe();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isLoadingUpi = false;
-        if (!_hasUpi) {
+        if (_checkoutRequired) {
+          _checkoutFailed = true;
+          _loadError = 'Payment could not be started. Try again.';
+        } else if (!_hasUpi) {
           _loadError = e.toString();
         }
       });
-      _scheduleUpiAppProbe();
+      if (!_checkoutRequired) _scheduleUpiAppProbe();
     }
   }
 
@@ -263,8 +291,22 @@ class _PaymentScreenState extends State<PaymentScreen>
       final latest = Order.fromJson(data);
       final latestUpi = latest.sellerUpiForOrder;
       if (!isOpenPaymentStatus(latest.status) ||
-          isPaymentFinished(latest.paymentStatus) ||
           isTerminalPaymentLeaveStatus(latest.status)) {
+        _order = latest;
+        if (latestUpi != null && latestUpi.isNotEmpty) {
+          _sellerUpiId = latestUpi;
+        }
+        _leavePayment(true);
+        return;
+      }
+      if (isPaymentFinished(latest.paymentStatus)) {
+        if (_isGateway && latest.paymentStatus == 'failed') {
+          setState(() {
+            _order = latest;
+            _gatewayError = 'Payment was not completed. Try again.';
+          });
+          return;
+        }
         _order = latest;
         if (latestUpi != null && latestUpi.isNotEmpty) {
           _sellerUpiId = latestUpi;
@@ -295,6 +337,53 @@ class _PaymentScreenState extends State<PaymentScreen>
       // Keep the last server snapshot and retry on the next poll/resume.
     } finally {
       _isRefreshingOrder = false;
+    }
+  }
+
+  Future<Map<String, dynamic>>? _startCheckout(String orderId) {
+    if (widget.startCheckout != null) return widget.startCheckout!(orderId);
+    if (widget.fetchPaymentInfo == null && widget.fetchOrder == null) {
+      return ApiService.startPaymentCheckout(orderId);
+    }
+    return null;
+  }
+
+  void _applyCheckout(Map<String, dynamic>? session) {
+    if (session == null) return;
+    _gatewayProvider = session['paymentProvider'] as String?;
+    _gatewayUpiLink = session['gatewayUpiLink'] as String?;
+    _gatewayQrPayload = session['gatewayQrPayload'] as String?;
+    if (session['paymentStatus'] == 'failed') {
+      _gatewayError = 'Payment was not completed. Try again.';
+    }
+  }
+
+  Future<void> _retryGatewayCheckout() async {
+    setState(() {
+      _checkoutFailed = false;
+      _isLoadingUpi = true;
+      _loadError = null;
+      _gatewayError = null;
+    });
+    await _bootstrapPaymentScreen();
+  }
+
+  Future<void> _launchGatewayLink() async {
+    final link = _gatewayUpiLink?.trim();
+    if (link == null || link.isEmpty) return;
+    try {
+      setState(() => _upiLaunchError = null);
+      final uri = Uri.parse(link);
+      final launch = widget.launchUpi;
+      final launched = launch != null
+          ? await launch(uri)
+          : await _launchUpiUri(uri);
+      if (!launched && mounted) {
+        setState(() => _upiLaunchError = _noUpiAppMessage);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _upiLaunchError = _noUpiAppMessage);
     }
   }
 
@@ -526,7 +615,11 @@ class _PaymentScreenState extends State<PaymentScreen>
               _buildAwaitingSeller()
             else if (_isLoadingUpi)
               const ScreenLoadingNote(message: 'Loading payment details…')
-            else if (_hasUpi) ...[
+            else if (_checkoutFailed)
+              _buildCheckoutError()
+            else if (_isGateway) ...[
+              _buildGatewayPanel(),
+            ] else if (_hasUpi) ...[
               _buildQrSection(),
               const SizedBox(height: 16),
               _buildMarkPaidButton(
@@ -649,7 +742,11 @@ class _PaymentScreenState extends State<PaymentScreen>
               _buildAwaitingSeller()
             else if (_isLoadingUpi)
               const ScreenLoadingNote(message: 'Loading payment details…')
-            else if (_hasUpi) ...[
+            else if (_checkoutFailed)
+              _buildCheckoutError()
+            else if (_isGateway) ...[
+              _buildGatewayPanel(),
+            ] else if (_hasUpi) ...[
               _buildQrSection(),
               const SizedBox(height: 16),
               _buildMarkPaidButton(
@@ -798,6 +895,113 @@ class _PaymentScreenState extends State<PaymentScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCheckoutError() {
+    return Column(
+      children: [
+        Text(
+          _loadError ?? 'Payment could not be started. Try again.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Color(0xFFD94F4F)),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: _retryGatewayCheckout,
+          child: const Text('Try again'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGatewayPanel() {
+    final qr = _gatewayQrPayload?.trim();
+    Widget? code;
+    if (qr != null && qr.isNotEmpty) {
+      if (qr.startsWith('upi://')) {
+        code = QrImageView(
+          key: ValueKey<String>(qr),
+          data: qr,
+          size: 220,
+          backgroundColor: Colors.white,
+        );
+      } else if (qr.startsWith('data:image')) {
+        final encoded = qr.split(',').last;
+        code = Image.memory(
+          base64Decode(encoded),
+          width: 220,
+          height: 220,
+          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+        );
+      }
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Pay with Cashfree',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF101617),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'The amount is filled in. SocietyEats confirms the payment automatically.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF6A7774),
+            height: 1.4,
+          ),
+        ),
+        if (code != null) ...[
+          const SizedBox(height: 16),
+          Center(child: code),
+        ],
+        const SizedBox(height: 16),
+        if (_gatewayUpiLink != null && _gatewayUpiLink!.isNotEmpty)
+          ElevatedButton(
+            onPressed: _launchGatewayLink,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0E5A47),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child: const Text('Open UPI app'),
+          ),
+        if (_upiLaunchError != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _upiLaunchError!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, color: Color(0xFFD94F4F)),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Text(
+          _gatewayError ?? 'Waiting for payment confirmation.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: _gatewayError == null
+                ? const Color(0xFF6A7774)
+                : const Color(0xFFD94F4F),
+          ),
+        ),
+        if (_gatewayError != null) ...[
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _retryGatewayCheckout,
+            child: const Text('Try again'),
+          ),
+        ],
+      ],
     );
   }
 

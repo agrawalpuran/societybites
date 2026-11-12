@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'storefront_host.dart';
 
 /// Web share / deep-link targets. Mobile ignores URL capture for MVP.
-enum DeepLinkKind { seller, campaign, listing }
+enum DeepLinkKind { seller, campaign, listing, payment }
 
 class DeepLinkTarget {
   const DeepLinkTarget({required this.kind, required this.id});
@@ -65,6 +65,12 @@ class DeepLinkService {
     if (segments.length >= 2) {
       final head = segments[0].toLowerCase();
       final id = segments[1].trim();
+      if (head == 'pay' && id.toLowerCase() == 'return') {
+        final orderId = effective.queryParameters['order']?.trim();
+        if (orderId != null && orderId.isNotEmpty) {
+          return DeepLinkTarget(kind: DeepLinkKind.payment, id: orderId);
+        }
+      }
       if (id.isNotEmpty) {
         if (head == 's' || head == 'seller') {
           return DeepLinkTarget(kind: DeepLinkKind.seller, id: id);

@@ -8,6 +8,7 @@ import 'admin_serving_cities_screen.dart';
 import 'admin_fssai_screen.dart';
 import 'admin_festival_banners_screen.dart';
 import 'admin_marketing_push_screen.dart';
+import 'admin_payment_splits_screen.dart';
 
 String _formatTotalSales(Object? raw) {
   final amount = raw is num ? raw.toDouble() : double.tryParse('$raw') ?? 0;
@@ -28,6 +29,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Map<String, dynamic>? _stats;
   double _platformFee = 0;
   bool _whatsappOrderNotifications = false;
+  String _paymentProvider = 'direct_upi';
   int _minIosBuild = 0;
   int _minAndroidBuild = 0;
   String _iosUpdateUrl = '';
@@ -67,6 +69,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _platformFee = (settings['platformFee'] as num?)?.toDouble() ?? 0;
         _whatsappOrderNotifications =
             settings['whatsappOrderNotifications'] == true;
+        _paymentProvider =
+            settings['paymentProvider']?.toString() ?? 'direct_upi';
         _minIosBuild = (settings['minIosBuild'] as num?)?.toInt() ?? 0;
         _minAndroidBuild = (settings['minAndroidBuild'] as num?)?.toInt() ?? 0;
         _iosUpdateUrl = settings['iosUpdateUrl']?.toString() ?? '';
@@ -253,6 +257,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  Future<void> _togglePaymentProvider(bool cashfree) async {
+    final previous = _paymentProvider;
+    final next = cashfree ? 'cashfree' : 'direct_upi';
+    setState(() => _paymentProvider = next);
+    try {
+      final saved = await ApiService.updateAdminPaymentProvider(next);
+      if (!mounted) return;
+      setState(() => _paymentProvider = saved);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            saved == 'cashfree'
+                ? 'New payments use Cashfree'
+                : 'New payments use direct UPI',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _paymentProvider = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update payments: $e')),
+      );
+    }
+  }
+
   Future<void> _toggleWhatsAppOrderNotifications(bool value) async {
     final previous = _whatsappOrderNotifications;
     setState(() => _whatsappOrderNotifications = value);
@@ -426,6 +456,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   value: _whatsappOrderNotifications,
                   onChanged: _toggleWhatsAppOrderNotifications,
                 ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _SettingsPair(
+              left: _SettingCard(
+                icon: Icons.account_balance_outlined,
+                title: 'Payments',
+                subtitle: _paymentProvider == 'cashfree'
+                    ? 'Cashfree for new orders'
+                    : 'Direct UPI for new orders',
+                onTap: () =>
+                    _togglePaymentProvider(_paymentProvider != 'cashfree'),
+                trailing: Switch.adaptive(
+                  value: _paymentProvider == 'cashfree',
+                  onChanged: _togglePaymentProvider,
+                ),
+              ),
+              right: _SettingCard(
+                icon: Icons.pending_actions_outlined,
+                title: 'Seller payouts',
+                subtitle: 'Splits still waiting',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AdminPaymentSplitsScreen(),
+                    ),
+                  );
+                },
               ),
             ),
             const SizedBox(height: 8),

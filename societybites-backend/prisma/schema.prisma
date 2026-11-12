@@ -89,6 +89,7 @@ model User {
   sellerStaffManaged      SellerStaffMembership[] @relation("SellerStaffKitchen")
   /// Kitchens this user can oversee (e.g. owner view-only).
   sellerStaffAccess       SellerStaffMembership[] @relation("SellerStaffMember")
+  payoutProfile           SellerPayoutProfile?
 }
 
 /// Links a staff user to a seller kitchen. MVP: role=owner is view-only oversight.
@@ -379,6 +380,17 @@ model Order {
   completedAt           DateTime?
   cancelledAt           DateTime?
   paymentStatus         String             @default("pending")
+  /// Locked when checkout starts. null until then. direct_upi | cashfree.
+  /// A later admin switch does not change an order that already has a value.
+  paymentProvider       String?
+  /// Amount sent to the gateway. Seller split is this amount minus communityFee.
+  gatewayAmount         Float?
+  gatewayPaymentId      String?
+  gatewayUpiLink        String?
+  gatewayQrPayload      String?
+  /// pending | created | failed | not_required. Null on direct UPI orders.
+  splitStatus           String?
+  splitError            String?
   buyerMarkedPaidAt     DateTime?
   sellerConfirmedPaidAt DateTime?
   /// Last seller-initiated payment reminder push (cooldown).
@@ -491,6 +503,22 @@ model CityReachConfig {
   extendedRadiusKm   Float
   maxSellerRadiusKm  Float    @default(10)
   updatedAt          DateTime @updatedAt
+}
+
+/// Cashfree Easy Split vendor for one seller. Bank and UPI are not both set.
+model SellerPayoutProfile {
+  userId          String   @id
+  pan             String
+  /// upi | bank
+  settlementMode  String
+  accountNumber   String?
+  ifsc            String?
+  accountHolder   String?
+  vendorId        String?  @unique
+  vendorStatus    String?
+  vendorError     String?
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 /// Key/value platform config (e.g. platform_fee).

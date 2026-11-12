@@ -38,6 +38,7 @@ import 'legal_screen.dart';
 import 'login_screen.dart';
 import 'profile_photo_crop_screen.dart';
 import 'seller_fssai_screen.dart';
+import 'seller_payout_screen.dart';
 import 'seller_settings_screen.dart';
 import 'seller_storefront_settings_screen.dart';
 import 'seller_staff_access_list_screen.dart';
@@ -780,6 +781,16 @@ class ProfileScreenState extends State<ProfileScreen> {
               fssaiRequirementEnabled: _fssaiRequirementEnabled,
               fssaiAllowsEnableSelling: _fssaiAllowsEnableSelling,
               onEditUpi: () => _editUpi(),
+              onOpenPayout: holdingSetup
+                  ? null
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SellerPayoutScreen(),
+                        ),
+                      );
+                    },
               onChangePaymentPreference: _changePaymentPreference,
               onChangeSellingReach: _changeSellingReach,
               onChangeFulfilment: _changeFulfilment,

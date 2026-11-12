@@ -20,8 +20,57 @@ const {
   upiPayableAmountForOrder,
   assertCanCompleteOrder,
 } = require("../lib/delayedDeliveryCharge");
+const { CASHFREE } = require("../lib/payments/providers");
+const {
+  beginCheckout,
+  savePayoutProfile,
+  publicPayoutProfile,
+} = require("../lib/payments/paymentService");
 
 const router = express.Router();
+
+function rejectGatewayManualConfirm(order, res) {
+  if (order.paymentProvider === CASHFREE) {
+    res.status(400).json({
+      error: "This order is paid through Cashfree. Wait for confirmation.",
+    });
+    return true;
+  }
+  return false;
+}
+
+router.get(
+  "/payout-profile",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const profile = await prisma.sellerPayoutProfile.findUnique({
+      where: { userId: req.user.id },
+    });
+    res.json(publicPayoutProfile(profile, req.user));
+  })
+);
+
+router.put(
+  "/payout-profile",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const profile = await savePayoutProfile({ user: req.user, body: req.body || {} });
+    res.json(publicPayoutProfile(profile, req.user));
+  })
+);
+
+router.post(
+  "/:orderId/checkout",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const session = await beginCheckout({
+      orderId: req.params.orderId,
+      userId: req.user.id,
+      returnOrigin: req.body && req.body.returnOrigin,
+    });
+    res.json(session);
+  })
+);
 
 const orderInclude = {
   items: {
@@ -65,6 +114,8 @@ router.post(
           "Mark paid is only for UPI orders. Cash is confirmed by the seller at handover.",
       });
     }
+
+    if (rejectGatewayManualConfirm(order, res)) return;
 
     if (!["accepted", "preparing", "ready"].includes(order.status)) {
       return res.status(400).json({
@@ -114,6 +165,8 @@ router.post(
         error: "Use confirm-cash for cash on delivery orders",
       });
     }
+
+    if (rejectGatewayManualConfirm(order, res)) return;
 
     if (order.paymentStatus !== "buyer_marked_paid") {
       return res.status(400).json({ error: "Payment has not been marked by buyer" });
@@ -334,6 +387,10 @@ router.get(
     res.json({
       paymentStatus: order.paymentStatus || "pending",
       paymentMethod: order.paymentMethod,
+      paymentProvider: order.paymentProvider || "direct_upi",
+      splitStatus: order.splitStatus || null,
+      gatewayUpiLink: order.gatewayUpiLink || null,
+      gatewayQrPayload: order.gatewayQrPayload || null,
       total: order.total,
       upiPayableAmount: upiPayableAmountForOrder(order),
       buyerMarkedPaidAt: order.buyerMarkedPaidAt || null,

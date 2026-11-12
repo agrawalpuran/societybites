@@ -815,6 +815,8 @@ class Order {
   final DateTime? campaignOrderCutoffAt;
   final String? paymentMethod;
   final String paymentStatus;
+  /// direct_upi | cashfree. Null until checkout locks a provider.
+  final String? paymentProvider;
   final bool hasReview;
   final String? rejectReason;
   final DateTime? rejectedAt;
@@ -877,6 +879,7 @@ class Order {
     this.campaignOrderCutoffAt,
     this.paymentMethod,
     this.paymentStatus = 'pending',
+    this.paymentProvider,
     this.hasReview = false,
     this.rejectReason,
     this.rejectedAt,
@@ -1194,6 +1197,7 @@ class Order {
       campaignOrderCutoffAt: campaign.orderCutoffAt,
       paymentMethod: paymentMethod,
       paymentStatus: paymentStatus,
+      paymentProvider: paymentProvider,
       hasReview: hasReview,
       rejectReason: rejectReason,
       rejectedAt: rejectedAt,
@@ -1247,6 +1251,7 @@ class Order {
       campaignOrderCutoffAt: campaignOrderCutoffAt,
       paymentMethod: paymentMethod,
       paymentStatus: paymentStatus,
+      paymentProvider: paymentProvider,
       hasReview: hasReview,
       rejectReason: rejectReason,
       rejectedAt: rejectedAt,
@@ -1342,6 +1347,7 @@ class Order {
       fulfilmentAt: DateTime.tryParse(json['fulfilmentAt']?.toString() ?? ''),
       paymentMethod: json['paymentMethod'] as String?,
       paymentStatus: (json['paymentStatus'] as String?) ?? 'pending',
+      paymentProvider: json['paymentProvider'] as String?,
       hasReview: json['hasReview'] == true,
       rejectReason: json['rejectReason'] as String?,
       rejectedAt: _jsonDate(json, 'rejectedAt'),
@@ -1446,6 +1452,7 @@ class Order {
           updated.campaignOrderCutoffAt ?? prior.campaignOrderCutoffAt,
       paymentMethod: updated.paymentMethod ?? prior.paymentMethod,
       paymentStatus: updated.paymentStatus,
+      paymentProvider: updated.paymentProvider ?? prior.paymentProvider,
       hasReview: updated.hasReview,
       rejectReason: updated.rejectReason ?? prior.rejectReason,
       rejectedAt: updated.rejectedAt ?? prior.rejectedAt,
@@ -1536,6 +1543,7 @@ class Order {
       campaignOrderCutoffAt: prior.campaignOrderCutoffAt,
       paymentMethod: prior.paymentMethod,
       paymentStatus: json['paymentStatus'] as String? ?? prior.paymentStatus,
+      paymentProvider: prior.paymentProvider,
       hasReview: prior.hasReview,
       rejectReason: prior.rejectReason,
       rejectedAt: at('rejectedAt') ?? prior.rejectedAt,

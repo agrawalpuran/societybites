@@ -34,6 +34,7 @@ const UNIT = [
   "whatsapp-settings",
   "whatsapp-cloud",
   "upi-account-type",
+  "payment-provider",
 ];
 
 /**

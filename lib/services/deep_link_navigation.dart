@@ -6,6 +6,7 @@ import '../models/data.dart';
 import '../screens/buyer_preorder_detail_screen.dart';
 import '../screens/food_detail_screen.dart';
 import '../screens/login_screen.dart';
+import '../screens/payment_screen.dart';
 import '../screens/seller_storefront_screen.dart';
 import 'api_service.dart';
 import 'deep_link_service.dart';
@@ -93,6 +94,17 @@ class DeepLinkNavigation {
             builder: (_) => _ListingDeepLinkScreen(listingId: target.id),
           ),
         );
+        return;
+      case DeepLinkKind.payment:
+        try {
+          final data = await ApiService.getOrderById(target.id);
+          if (!context.mounted) return;
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => PaymentScreen(order: Order.fromJson(data)),
+            ),
+          );
+        } catch (_) {}
         return;
     }
   }

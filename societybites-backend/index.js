@@ -41,7 +41,16 @@ function serveStaticWithCors(urlPath, directory) {
 }
 
 app.use(cors());
-app.use(express.json({ limit: "8mb" }));
+app.use(
+  express.json({
+    limit: "8mb",
+    verify: (req, _res, buf) => {
+      if (String(req.originalUrl || "").startsWith("/webhooks/cashfree")) {
+        req.rawBody = buf.toString("utf8");
+      }
+    },
+  })
+);
 app.set("etag", false);
 
 app.use((req, res, next) => {
@@ -112,6 +121,7 @@ app.use("/listings", listingRoutes);
 app.use("/preorder-campaigns", preorderCampaignRoutes);
 app.use("/orders", orderRoutes);
 app.use("/payments", paymentRoutes);
+app.use("/webhooks", require("./routes/paymentWebhooks"));
 app.use("/reviews", reviewRoutes);
 app.use("/media", mediaRoutes);
 app.use("/admin", adminRoutes);

@@ -74,6 +74,16 @@ void main() {
     expect(listing?.id, 'l-3');
   });
 
+  test('parses a Cashfree payment return', () {
+    final target = DeepLinkService.parseUri(
+      Uri.parse(
+        'http://localhost:1234/pay/return?order=order-uuid&order_id=SE-1',
+      ),
+    );
+    expect(target?.kind, DeepLinkKind.payment);
+    expect(target?.id, 'order-uuid');
+  });
+
   test('ignores unrelated URLs', () {
     expect(
       DeepLinkService.parseUri(Uri.parse('https://societyeats.vercel.app/')),
