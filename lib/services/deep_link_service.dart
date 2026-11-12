@@ -66,7 +66,12 @@ class DeepLinkService {
       final head = segments[0].toLowerCase();
       final id = segments[1].trim();
       if (head == 'pay' && id.toLowerCase() == 'return') {
-        final orderId = effective.queryParameters['order']?.trim();
+        final params = effective.queryParameters;
+        final internalId = params['order']?.trim();
+        final orderNumber = params['order_id']?.trim();
+        final orderId = (internalId != null && internalId.isNotEmpty)
+            ? internalId
+            : orderNumber;
         if (orderId != null && orderId.isNotEmpty) {
           return DeepLinkTarget(kind: DeepLinkKind.payment, id: orderId);
         }

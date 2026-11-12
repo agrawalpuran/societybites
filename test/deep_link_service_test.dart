@@ -82,6 +82,12 @@ void main() {
     );
     expect(target?.kind, DeepLinkKind.payment);
     expect(target?.id, 'order-uuid');
+
+    final byNumber = DeepLinkService.parseUri(
+      Uri.parse('https://www.societyeats.com/pay/return?order_id=SE-950032'),
+    );
+    expect(byNumber?.kind, DeepLinkKind.payment);
+    expect(byNumber?.id, 'SE-950032');
   });
 
   test('ignores unrelated URLs', () {

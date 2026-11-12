@@ -155,6 +155,8 @@ async function main() {
       "https://www.societyeats.com/pay/return?order=abc&order_id={order_id}",
     "societyeats.com return url"
   );
+  assert(cashfreeReturnUrl({ origin: "", orderId: "abc" }) ===
+    "https://www.societyeats.com/pay/return?order=abc&order_id={order_id}", "missing origin uses the live site");
   assert(cashfreeReturnUrl({ origin: "https://evil.example", orderId: "abc" }) === null, "foreign return url rejected");
 
   const previous = await prisma.appSetting.findUnique({

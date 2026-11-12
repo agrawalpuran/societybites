@@ -75,6 +75,7 @@ class _MainShellScreenState extends State<MainShellScreen>
     PushNotificationService.tryPresentPendingIncomingOrder();
     CartController.instance.onShowOrdersAfterPlace = _showOrdersAfterCheckout;
     CartController.instance.onSelectShellTab = _selectTab;
+    DeepLinkNavigation.openOrder = _openReturnedOrder;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.registerIfPossible();
       unawaited(_afterFirstFrameNavigation());
@@ -165,6 +166,9 @@ class _MainShellScreenState extends State<MainShellScreen>
     if (PushNotificationService.onOpenShellTab == _selectTab) {
       PushNotificationService.onOpenShellTab = null;
     }
+    if (DeepLinkNavigation.openOrder == _openReturnedOrder) {
+      DeepLinkNavigation.openOrder = null;
+    }
     if (identical(
       CartController.instance.onShowOrdersAfterPlace,
       _showOrdersAfterCheckout,
@@ -194,6 +198,22 @@ class _MainShellScreenState extends State<MainShellScreen>
   void _mountDashboard() {
     if (!mounted || _dashboardMounted) return;
     setState(() => _dashboardMounted = true);
+  }
+
+  /// Cashfree returns the browser to /pay/return. Open that order, not Home.
+  void _openReturnedOrder(String orderId) {
+    if (!mounted) return;
+    setState(() {
+      _navIndex = 1;
+      _ordersMounted = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        _ordersKey.currentState?.prefetchOrdersFromPush(focusOrderId: orderId),
+      );
+      _ordersKey.currentState?.refresh(lightweight: true);
+    });
   }
 
   /// After checkout from Home or a listing/storefront, land on Orders.

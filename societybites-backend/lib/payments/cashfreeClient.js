@@ -76,10 +76,10 @@ function customerPhone(phone) {
 }
 
 function cashfreeReturnUrl({ origin, orderId }) {
-  if (!origin || !orderId) return null;
+  if (!orderId) return null;
   let parsed;
   try {
-    parsed = new URL(String(origin));
+    parsed = new URL(String(origin || "https://www.societyeats.com"));
   } catch {
     return null;
   }

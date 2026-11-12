@@ -728,10 +728,20 @@ router.get(
   "/:id",
   requireUser,
   asyncHandler(async (req, res) => {
-    const order = await prisma.order.findUnique({
-      where: { id: req.params.id },
-      include: orderInclude,
-    });
+    const key = String(req.params.id || "");
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        key
+      );
+    const order = isUuid
+      ? await prisma.order.findUnique({
+          where: { id: key },
+          include: orderInclude,
+        })
+      : await prisma.order.findUnique({
+          where: { orderNumber: key },
+          include: orderInclude,
+        });
 
     if (!order) {
       return res.status(404).json({ error: "Order not found" });

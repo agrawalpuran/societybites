@@ -18,6 +18,9 @@ class DeepLinkNavigation {
 
   static bool _opening = false;
 
+  /// Shell opens My Orders for a Cashfree return instead of the site home.
+  static void Function(String orderId)? openOrder;
+
   /// Call from [MainShellScreen] after first frame.
   /// Requires login + society for campaign/seller/listing targets.
   static Future<void> tryOpenPending(BuildContext context) async {
@@ -96,6 +99,11 @@ class DeepLinkNavigation {
         );
         return;
       case DeepLinkKind.payment:
+        final open = openOrder;
+        if (open != null) {
+          open(target.id);
+          return;
+        }
         try {
           final data = await ApiService.getOrderById(target.id);
           if (!context.mounted) return;
