@@ -104,50 +104,54 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      await _auth.verifyPhoneNumber(
-        phoneNumber: '+91$number',
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          try {
-            await _auth.signInWithCredential(credential);
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Phone number verified successfully.'),
-              ),
-            );
-          } on FirebaseAuthException catch (e) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(e.message ?? 'Auto verification failed.')),
-            );
-          }
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          if (!mounted) return;
-          setState(() => _isSendingOtp = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.message ?? 'Verification failed.')),
-          );
-        },
-        codeSent: (String verificationId, int? resendToken) {
-          if (!mounted) return;
-          setState(() => _isSendingOtp = false);
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OtpScreen(
-                phoneNumber: '+91$number',
-                verificationId: verificationId,
-                resendToken: resendToken,
-              ),
-            ),
-          );
-        },
-        codeAutoRetrievalTimeout: (_) {
-          if (!mounted) return;
-          setState(() => _isSendingOtp = false);
-        },
-      );
+      await _auth
+          .verifyPhoneNumber(
+            phoneNumber: '+91$number',
+            verificationCompleted: (PhoneAuthCredential credential) async {
+              try {
+                await _auth.signInWithCredential(credential);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Phone number verified successfully.'),
+                  ),
+                );
+              } on FirebaseAuthException catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.message ?? 'Auto verification failed.'),
+                  ),
+                );
+              }
+            },
+            verificationFailed: (FirebaseAuthException e) {
+              if (!mounted) return;
+              setState(() => _isSendingOtp = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(e.message ?? 'Verification failed.')),
+              );
+            },
+            codeSent: (String verificationId, int? resendToken) {
+              if (!mounted) return;
+              setState(() => _isSendingOtp = false);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OtpScreen(
+                    phoneNumber: '+91$number',
+                    verificationId: verificationId,
+                    resendToken: resendToken,
+                  ),
+                ),
+              );
+            },
+            codeAutoRetrievalTimeout: (_) {
+              if (!mounted) return;
+              setState(() => _isSendingOtp = false);
+            },
+          )
+          .timeout(const Duration(seconds: 45));
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSendingOtp = false);
@@ -323,7 +327,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           vertical: 24,
                         ),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -340,7 +346,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: const Color(0xFF3A4644),
                             ),
                           ),
-                        _HeaderSection(theme: theme, servingLabel: _servingLabel),
+                        _HeaderSection(
+                          theme: theme,
+                          servingLabel: _servingLabel,
+                        ),
                         SizedBox(height: sectionGap),
                         _InputSection(
                           controller: _phoneController,
@@ -607,10 +616,7 @@ class _TrustItem extends StatelessWidget {
     final isIos = _isIosLayout;
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: 4,
-        vertical: isIos ? 10 : 14,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 4, vertical: isIos ? 10 : 14),
       decoration: BoxDecoration(
         color: const Color(0xFFF1F4F3),
         borderRadius: BorderRadius.circular(22),

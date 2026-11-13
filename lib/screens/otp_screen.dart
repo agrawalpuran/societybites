@@ -269,33 +269,35 @@ class _OtpScreenState extends State<OtpScreen> {
         return;
       }
 
-      await _auth.verifyPhoneNumber(
-        phoneNumber: widget.phoneNumber,
-        forceResendingToken: _resendToken,
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          await _auth.signInWithCredential(credential);
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.message ?? 'Failed to resend OTP.')),
-          );
-        },
-        codeSent: (String verificationId, int? resendToken) {
-          if (!mounted) return;
-          setState(() {
-            _verificationId = verificationId;
-            _resendToken = resendToken;
-          });
-          _startResendCountdown();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('OTP resent successfully.')),
-          );
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          _verificationId = verificationId;
-        },
-      );
+      await _auth
+          .verifyPhoneNumber(
+            phoneNumber: widget.phoneNumber,
+            forceResendingToken: _resendToken,
+            verificationCompleted: (PhoneAuthCredential credential) async {
+              await _auth.signInWithCredential(credential);
+            },
+            verificationFailed: (FirebaseAuthException e) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(e.message ?? 'Failed to resend OTP.')),
+              );
+            },
+            codeSent: (String verificationId, int? resendToken) {
+              if (!mounted) return;
+              setState(() {
+                _verificationId = verificationId;
+                _resendToken = resendToken;
+              });
+              _startResendCountdown();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('OTP resent successfully.')),
+              );
+            },
+            codeAutoRetrievalTimeout: (String verificationId) {
+              _verificationId = verificationId;
+            },
+          )
+          .timeout(const Duration(seconds: 45));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -714,51 +716,51 @@ class _OtpInputBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(borderRadius);
     final field = TextField(
-        controller: controller,
-        focusNode: focusNode,
-        autofocus: autoFocus,
-        keyboardType: TextInputType.number,
-        textInputAction: enableOtpAutofill
-            ? TextInputAction.done
-            : TextInputAction.next,
-        textAlign: TextAlign.center,
-        // Allow the full 6-digit SMS code so OS autofill is not truncated to 1.
-        maxLength: kOtpLength,
-        autofillHints: enableOtpAutofill
-            ? const [AutofillHints.oneTimeCode]
-            : null,
-        autocorrect: false,
-        // iOS shows the SMS OTP chip on the QuickType bar only if suggestions stay on.
-        enableSuggestions: enableOtpAutofill,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        onChanged: onChanged,
-        style: TextStyle(
-          fontSize: fontSize,
-          fontWeight: FontWeight.w600,
-          color: const Color(0xFF1D2E2B),
-          height: 1.1,
-        ),
-        decoration: InputDecoration(
-          counterText: '',
-          isDense: true,
-          filled: true,
-          fillColor: Colors.white.withOpacity(0.78),
-          contentPadding: const EdgeInsets.symmetric(vertical: 2),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: radius,
-            borderSide: BorderSide(
-              color: isPrimary
-                  ? const Color(0xFF2D7BFF)
-                  : const Color(0xFFE8ECEA),
-              width: isPrimary ? 1.4 : 1,
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: radius,
-            borderSide: const BorderSide(color: Color(0xFF2D7BFF), width: 1.6),
+      controller: controller,
+      focusNode: focusNode,
+      autofocus: autoFocus,
+      keyboardType: TextInputType.number,
+      textInputAction: enableOtpAutofill
+          ? TextInputAction.done
+          : TextInputAction.next,
+      textAlign: TextAlign.center,
+      // Allow the full 6-digit SMS code so OS autofill is not truncated to 1.
+      maxLength: kOtpLength,
+      autofillHints: enableOtpAutofill
+          ? const [AutofillHints.oneTimeCode]
+          : null,
+      autocorrect: false,
+      // iOS shows the SMS OTP chip on the QuickType bar only if suggestions stay on.
+      enableSuggestions: enableOtpAutofill,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      onChanged: onChanged,
+      style: TextStyle(
+        fontSize: fontSize,
+        fontWeight: FontWeight.w600,
+        color: const Color(0xFF1D2E2B),
+        height: 1.1,
+      ),
+      decoration: InputDecoration(
+        counterText: '',
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.78),
+        contentPadding: const EdgeInsets.symmetric(vertical: 2),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(
+            color: isPrimary
+                ? const Color(0xFF2D7BFF)
+                : const Color(0xFFE8ECEA),
+            width: isPrimary ? 1.4 : 1,
           ),
         ),
-      );
+        focusedBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: const BorderSide(color: Color(0xFF2D7BFF), width: 1.6),
+        ),
+      ),
+    );
 
     if (boxSize != null) {
       return SizedBox(width: boxSize, height: boxSize, child: field);

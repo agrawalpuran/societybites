@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart' show VoidCallback, kIsWeb, visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show VoidCallback, kIsWeb, visibleForTesting;
 import 'package:http/http.dart' as http_client;
 
 import '../models/app_settings.dart';
@@ -239,6 +240,9 @@ class ApiService {
       }
     }
     final lower = message.toLowerCase();
+    if (lower.contains('timeoutexception') || lower.contains('timed out')) {
+      return 'The request took too long. Check your connection and try again.';
+    }
     if (lower.contains('failed to fetch') ||
         lower.contains('xmlhttprequest') ||
         lower.contains('connection refused') ||
@@ -353,12 +357,16 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static const Duration _authRequestTimeout = Duration(seconds: 20);
+
   static Future<void> sendOtp(String phone) async {
-    final response = await http_client.post(
-      Uri.parse('$baseUrl/auth/send-otp'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'phone': phone}),
-    );
+    final response = await http_client
+        .post(
+          Uri.parse('$baseUrl/auth/send-otp'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'phone': phone}),
+        )
+        .timeout(_authRequestTimeout);
     if (response.statusCode == 200) return;
     _throwFromResponse(response);
   }
@@ -367,11 +375,13 @@ class ApiService {
     required String phone,
     required String otp,
   }) async {
-    final response = await http_client.post(
-      Uri.parse('$baseUrl/auth/verify-otp'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'phone': phone, 'otp': otp}),
-    );
+    final response = await http_client
+        .post(
+          Uri.parse('$baseUrl/auth/verify-otp'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'phone': phone, 'otp': otp}),
+        )
+        .timeout(_authRequestTimeout);
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
     }
@@ -443,7 +453,8 @@ class ApiService {
   static Future<Map<String, dynamic>> Function({
     required String sellingReachLevel,
     int? sellingReachRadiusKm,
-  })? previewSellingReachChangeForTest;
+  })?
+  previewSellingReachChangeForTest;
 
   static Future<Map<String, dynamic>> previewSellingReachChange({
     required String sellingReachLevel,
@@ -456,9 +467,7 @@ class ApiService {
         sellingReachRadiusKm: sellingReachRadiusKm,
       );
     }
-    final query = <String, String>{
-      'sellingReachLevel': sellingReachLevel,
-    };
+    final query = <String, String>{'sellingReachLevel': sellingReachLevel};
     if (sellingReachRadiusKm != null) {
       query['sellingReachRadiusKm'] = '$sellingReachRadiusKm';
     }
@@ -496,14 +505,14 @@ class ApiService {
     String? fssaiNumber,
     String? fssaiExpiry,
     String? fssaiRegisteredName,
-  String? storefrontSlug,
-  String? storefrontAccentColor,
-  String? storefrontBannerUrl,
-  String? storefrontTagline,
-  bool clearStorefrontSlug = false,
-  bool clearStorefrontAccentColor = false,
-  bool clearStorefrontBannerUrl = false,
-  bool clearStorefrontTagline = false,
+    String? storefrontSlug,
+    String? storefrontAccentColor,
+    String? storefrontBannerUrl,
+    String? storefrontTagline,
+    bool clearStorefrontSlug = false,
+    bool clearStorefrontAccentColor = false,
+    bool clearStorefrontBannerUrl = false,
+    bool clearStorefrontTagline = false,
     Object? profilePhotoUrl = _omitProfilePhoto,
   }) async {
     final response = await http.patch(
@@ -562,7 +571,8 @@ class ApiService {
           'fssai': {
             if (fssaiNumber != null) 'number': fssaiNumber,
             if (fssaiExpiry != null) 'expiry': fssaiExpiry,
-            if (fssaiRegisteredName != null) 'registeredName': fssaiRegisteredName,
+            if (fssaiRegisteredName != null)
+              'registeredName': fssaiRegisteredName,
           },
       }),
     );
@@ -615,15 +625,17 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<List<Map<String, dynamic>>> searchSocieties(String query) async {
+  static Future<List<Map<String, dynamic>>> searchSocieties(
+    String query,
+  ) async {
     final q = query.trim();
     if (q.length < 2) return const [];
 
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/societies/places/search').replace(
-          queryParameters: {'q': q},
-        ),
+        Uri.parse(
+          '$baseUrl/societies/places/search',
+        ).replace(queryParameters: {'q': q}),
         headers: await _authHeaders(),
       );
       if (response.statusCode == 200) {
@@ -659,7 +671,9 @@ class ApiService {
     return filterSocieties(societies: societies, query: query);
   }
 
-  static Future<Map<String, dynamic>> previewSocietyPlace(String placeId) async {
+  static Future<Map<String, dynamic>> previewSocietyPlace(
+    String placeId,
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/societies/places/preview'),
       headers: await _authHeaders(),
@@ -768,9 +782,7 @@ class ApiService {
     bool excludeOwnSociety = false,
   }) async {
     final uri = Uri.parse('$baseUrl/listings/nearby-sellers').replace(
-      queryParameters: {
-        if (excludeOwnSociety) 'excludeOwnSociety': '1',
-      },
+      queryParameters: {if (excludeOwnSociety) 'excludeOwnSociety': '1'},
     );
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
@@ -793,9 +805,9 @@ class ApiService {
   static Future<Map<String, dynamic>> getGuestKitchens({
     String city = 'bengaluru',
   }) async {
-    final uri = Uri.parse('$baseUrl/listings/guest-kitchens').replace(
-      queryParameters: {'city': city},
-    );
+    final uri = Uri.parse(
+      '$baseUrl/listings/guest-kitchens',
+    ).replace(queryParameters: {'city': city});
     final response = await http.get(
       uri,
       headers: {'Accept': 'application/json'},
@@ -806,7 +818,9 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<Map<String, dynamic>> getPublicKitchenBySlug(String slug) async {
+  static Future<Map<String, dynamic>> getPublicKitchenBySlug(
+    String slug,
+  ) async {
     final normalized = slug.trim().toLowerCase();
     final uri = Uri.parse('$baseUrl/public/kitchens/$normalized');
     final response = await http.get(
@@ -823,9 +837,9 @@ class ApiService {
     String sellerId, {
     String city = 'bengaluru',
   }) async {
-    final uri = Uri.parse('$baseUrl/listings/guest-kitchens/$sellerId').replace(
-      queryParameters: {'city': city},
-    );
+    final uri = Uri.parse(
+      '$baseUrl/listings/guest-kitchens/$sellerId',
+    ).replace(queryParameters: {'city': city});
     final response = await http.get(
       uri,
       headers: {'Accept': 'application/json'},
@@ -889,7 +903,8 @@ class ApiService {
           'weightValue': weightValue,
         if (tags != null && tags.isNotEmpty) 'tags': tags,
         if (category != null && category.isNotEmpty) 'category': category,
-        if (categories != null && categories.isNotEmpty) 'categories': categories,
+        if (categories != null && categories.isNotEmpty)
+          'categories': categories,
         'foodType': foodType,
         'catalogType': catalogType,
         'availabilityMode': availabilityMode,
@@ -1333,10 +1348,7 @@ class ApiService {
     int? limit,
     String? kitchenSellerId,
   }) async {
-    final query = <String, String>{
-      'role': 'seller',
-      'scope': scope,
-    };
+    final query = <String, String>{'role': 'seller', 'scope': scope};
     if (page != null) query['page'] = '$page';
     if (limit != null) query['limit'] = '$limit';
     if (kitchenSellerId != null && kitchenSellerId.isNotEmpty) {
@@ -1532,9 +1544,9 @@ class ApiService {
     if (kitchenSellerId != null && kitchenSellerId.isNotEmpty) {
       query['kitchenSellerId'] = kitchenSellerId;
     }
-    final uri = Uri.parse('$baseUrl/orders/seller/stats').replace(
-      queryParameters: query.isEmpty ? null : query,
-    );
+    final uri = Uri.parse(
+      '$baseUrl/orders/seller/stats',
+    ).replace(queryParameters: query.isEmpty ? null : query);
     final response = await http.get(uri, headers: await _authHeaders());
 
     if (response.statusCode == 200) {
@@ -1637,7 +1649,8 @@ class ApiService {
     if (locationType != null && locationType.isNotEmpty) {
       query['locationType'] = locationType;
     }
-    if (societyId != null && societyId.isNotEmpty) query['societyId'] = societyId;
+    if (societyId != null && societyId.isNotEmpty)
+      query['societyId'] = societyId;
     if (buyerId != null && buyerId.isNotEmpty) query['buyerId'] = buyerId;
     if (paymentMethod != null && paymentMethod.isNotEmpty) {
       query['paymentMethod'] = paymentMethod;
@@ -1847,7 +1860,8 @@ class ApiService {
           'weightValue': weightValue,
         if (tags != null && tags.isNotEmpty) 'tags': tags,
         if (category != null && category.isNotEmpty) 'category': category,
-        if (categories != null && categories.isNotEmpty) 'categories': categories,
+        if (categories != null && categories.isNotEmpty)
+          'categories': categories,
         if (pickupLocation != null && pickupLocation.isNotEmpty)
           'pickupLocation': pickupLocation,
         'foodType': foodType,
@@ -1941,9 +1955,9 @@ class ApiService {
     if (kitchenSellerId != null && kitchenSellerId.isNotEmpty) {
       query['kitchenSellerId'] = kitchenSellerId;
     }
-    final uri = Uri.parse('$baseUrl/reviews/seller/me').replace(
-      queryParameters: query.isEmpty ? null : query,
-    );
+    final uri = Uri.parse(
+      '$baseUrl/reviews/seller/me',
+    ).replace(queryParameters: query.isEmpty ? null : query);
     final response = await http.get(uri, headers: await _authHeaders());
 
     if (response.statusCode == 200) {
@@ -2134,7 +2148,8 @@ class ApiService {
       Uri.parse('$baseUrl/fssai/me/draft'),
       headers: await _authHeaders(),
       body: jsonEncode({
-        if (registrationNumber != null) 'registrationNumber': registrationNumber,
+        if (registrationNumber != null)
+          'registrationNumber': registrationNumber,
         if (registeredName != null) 'registeredName': registeredName,
         if (licenceExpiry != null) 'licenceExpiry': licenceExpiry,
       }),
@@ -2308,9 +2323,9 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getAdminFssaiSubmissions({
     String? status,
   }) async {
-    final uri = Uri.parse('$baseUrl/admin/fssai/submissions').replace(
-      queryParameters: status != null ? {'status': status} : null,
-    );
+    final uri = Uri.parse(
+      '$baseUrl/admin/fssai/submissions',
+    ).replace(queryParameters: status != null ? {'status': status} : null);
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
@@ -2324,9 +2339,9 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getAdminAddressProofs({
     String status = 'PENDING',
   }) async {
-    final uri = Uri.parse('$baseUrl/admin/address-proofs').replace(
-      queryParameters: {'status': status},
-    );
+    final uri = Uri.parse(
+      '$baseUrl/admin/address-proofs',
+    ).replace(queryParameters: {'status': status});
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
@@ -2337,7 +2352,9 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<Map<String, dynamic>> getAdminAddressProof(String userId) async {
+  static Future<Map<String, dynamic>> getAdminAddressProof(
+    String userId,
+  ) async {
     final response = await http.get(
       Uri.parse('$baseUrl/admin/address-proofs/$userId'),
       headers: await _authHeaders(),
@@ -2457,7 +2474,9 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<Map<String, dynamic>> startPaymentCheckout(String orderId) async {
+  static Future<Map<String, dynamic>> startPaymentCheckout(
+    String orderId,
+  ) async {
     final origin = kIsWeb ? Uri.base.origin : '';
     final response = await http.post(
       Uri.parse('$baseUrl/payments/$orderId/checkout'),
@@ -2505,14 +2524,14 @@ class ApiService {
     if (response.statusCode == 200) {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
       final rows = data['splits'] as List? ?? const [];
-      return rows
-          .map((row) => Map<String, dynamic>.from(row as Map))
-          .toList();
+      return rows.map((row) => Map<String, dynamic>.from(row as Map)).toList();
     }
     _throwFromResponse(response);
   }
 
-  static Future<String> updateAdminPaymentProvider(String paymentProvider) async {
+  static Future<String> updateAdminPaymentProvider(
+    String paymentProvider,
+  ) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/admin/settings'),
       headers: await _authHeaders(),
@@ -2525,7 +2544,9 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<bool> updateAdminWhatsAppOrderNotifications(bool enabled) async {
+  static Future<bool> updateAdminWhatsAppOrderNotifications(
+    bool enabled,
+  ) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/admin/settings'),
       headers: await _authHeaders(),
@@ -2627,7 +2648,10 @@ class ApiService {
       final data = _decodeResponse(response);
       if (data is! List) return const [];
       return data
-          .map((row) => ServingCity.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) =>
+                ServingCity.fromJson(Map<String, dynamic>.from(row as Map)),
+          )
           .toList();
     }
     _throwFromResponse(response);
@@ -2646,7 +2670,10 @@ class ApiService {
       final data = _decodeResponse(response);
       if (data is! List) return const [];
       return data
-          .map((row) => ServingCity.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) =>
+                ServingCity.fromJson(Map<String, dynamic>.from(row as Map)),
+          )
           .toList();
     }
     _throwFromResponse(response);
@@ -2661,7 +2688,10 @@ class ApiService {
       final data = _decodeResponse(response);
       if (data is! List) return const [];
       return data
-          .map((row) => CityReachConfig.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) =>
+                CityReachConfig.fromJson(Map<String, dynamic>.from(row as Map)),
+          )
           .toList();
     }
     _throwFromResponse(response);
@@ -2747,9 +2777,9 @@ class ApiService {
   static Future<Map<String, dynamic>> getAdminGrowth({
     String range = 'week',
   }) async {
-    final uri = Uri.parse('$baseUrl/admin/growth').replace(
-      queryParameters: {'range': range},
-    );
+    final uri = Uri.parse(
+      '$baseUrl/admin/growth',
+    ).replace(queryParameters: {'range': range});
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
@@ -2769,8 +2799,9 @@ class ApiService {
     if (societyId != null && societyId.isNotEmpty) {
       query['societyId'] = societyId;
     }
-    final uri = Uri.parse('$baseUrl/admin/performance/summary')
-        .replace(queryParameters: query);
+    final uri = Uri.parse(
+      '$baseUrl/admin/performance/summary',
+    ).replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
@@ -2794,8 +2825,9 @@ class ApiService {
     };
     if (from != null && from.isNotEmpty) query['from'] = from;
     if (to != null && to.isNotEmpty) query['to'] = to;
-    final uri = Uri.parse('$baseUrl/admin/performance/sellers')
-        .replace(queryParameters: query);
+    final uri = Uri.parse(
+      '$baseUrl/admin/performance/sellers',
+    ).replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
@@ -2812,8 +2844,9 @@ class ApiService {
     final query = <String, String>{'preset': preset};
     if (from != null && from.isNotEmpty) query['from'] = from;
     if (to != null && to.isNotEmpty) query['to'] = to;
-    final uri = Uri.parse('$baseUrl/admin/performance/sellers/$sellerId')
-        .replace(queryParameters: query);
+    final uri = Uri.parse(
+      '$baseUrl/admin/performance/sellers/$sellerId',
+    ).replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
@@ -2829,8 +2862,9 @@ class ApiService {
     final query = <String, String>{'preset': preset};
     if (from != null && from.isNotEmpty) query['from'] = from;
     if (to != null && to.isNotEmpty) query['to'] = to;
-    final uri = Uri.parse('$baseUrl/admin/performance/campaigns')
-        .replace(queryParameters: query);
+    final uri = Uri.parse(
+      '$baseUrl/admin/performance/campaigns',
+    ).replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
@@ -2853,9 +2887,9 @@ class ApiService {
     };
     if (from != null && from.isNotEmpty) query['from'] = from;
     if (to != null && to.isNotEmpty) query['to'] = to;
-    final uri =
-        Uri.parse('$baseUrl/admin/performance/sellers/$sellerId/orders')
-            .replace(queryParameters: query);
+    final uri = Uri.parse(
+      '$baseUrl/admin/performance/sellers/$sellerId/orders',
+    ).replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       return Map<String, dynamic>.from(_decodeResponse(response) as Map);
@@ -2872,9 +2906,9 @@ class ApiService {
     final query = <String, String>{'preset': preset, 'sort': sort};
     if (from != null && from.isNotEmpty) query['from'] = from;
     if (to != null && to.isNotEmpty) query['to'] = to;
-    final uri = Uri.parse('$baseUrl/admin/performance/export').replace(
-      queryParameters: query,
-    );
+    final uri = Uri.parse(
+      '$baseUrl/admin/performance/export',
+    ).replace(queryParameters: query);
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       return response.body;
@@ -2887,20 +2921,14 @@ class ApiService {
     required String start,
     required String end,
   }) async {
-    final uri = Uri.parse('$baseUrl/admin/growth/members').replace(
-      queryParameters: {
-        'metric': metric,
-        'start': start,
-        'end': end,
-      },
-    );
+    final uri = Uri.parse(
+      '$baseUrl/admin/growth/members',
+    ).replace(queryParameters: {'metric': metric, 'start': start, 'end': end});
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       final body = Map<String, dynamic>.from(_decodeResponse(response) as Map);
       final members = body['members'] as List<dynamic>? ?? [];
-      return members
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList();
+      return members.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     }
     _throwFromResponse(response);
   }
@@ -3083,7 +3111,8 @@ class ApiService {
   }) async {
     final query = <String, String>{'page': '$page'};
     if (status != null && status.isNotEmpty) query['status'] = status;
-    if (dateFrom != null) query['dateFrom'] = dateFrom.toUtc().toIso8601String();
+    if (dateFrom != null)
+      query['dateFrom'] = dateFrom.toUtc().toIso8601String();
     if (dateTo != null) query['dateTo'] = dateTo.toUtc().toIso8601String();
     final uri = Uri.parse(
       '$baseUrl/admin/orders',
@@ -3242,7 +3271,10 @@ class ApiService {
       final data = _decodeResponse(response);
       final issues = data is Map ? data['issues'] : data;
       return (issues as List)
-          .map((row) => IssueReport.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) =>
+                IssueReport.fromJson(Map<String, dynamic>.from(row as Map)),
+          )
           .toList();
     }
     _throwFromResponse(response);
@@ -3262,15 +3294,18 @@ class ApiService {
   }
 
   static Future<List<IssueReport>> getAdminIssues({String? status}) async {
-    final uri = Uri.parse('$baseUrl/admin/issues').replace(
-      queryParameters: {'status': ?status},
-    );
+    final uri = Uri.parse(
+      '$baseUrl/admin/issues',
+    ).replace(queryParameters: {'status': ?status});
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       final data = _decodeResponse(response);
       final issues = data is Map ? data['issues'] : data;
       return (issues as List)
-          .map((row) => IssueReport.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) =>
+                IssueReport.fromJson(Map<String, dynamic>.from(row as Map)),
+          )
           .toList();
     }
     _throwFromResponse(response);
@@ -3320,7 +3355,10 @@ class ApiService {
       final data = _decodeResponse(response);
       final coupons = data is Map ? data['coupons'] : data;
       return (coupons as List)
-          .map((row) => AdminCoupon.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) =>
+                AdminCoupon.fromJson(Map<String, dynamic>.from(row as Map)),
+          )
           .toList();
     }
     _throwFromResponse(response);
@@ -3339,7 +3377,9 @@ class ApiService {
     _throwFromResponse(response);
   }
 
-  static Future<AdminCoupon> createAdminCoupon(Map<String, dynamic> body) async {
+  static Future<AdminCoupon> createAdminCoupon(
+    Map<String, dynamic> body,
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/admin/coupons'),
       headers: await _authHeaders(),
@@ -3428,8 +3468,9 @@ class ApiService {
     if (sellerId != null && sellerId.trim().isNotEmpty) {
       query['sellerId'] = sellerId.trim();
     }
-    final uri = Uri.parse('$baseUrl/admin/reports/coupon-seller-payouts')
-        .replace(queryParameters: query.isEmpty ? null : query);
+    final uri = Uri.parse(
+      '$baseUrl/admin/reports/coupon-seller-payouts',
+    ).replace(queryParameters: query.isEmpty ? null : query);
     final response = await http.get(uri, headers: await _authHeaders());
     if (response.statusCode == 200) {
       return AdminCouponSellerPayoutReport.fromJson(

@@ -40,8 +40,22 @@ function smsReachabilityMessage(cause) {
   return "Could not reach the SMS provider. Check network access to 2factor.in.";
 }
 
+const REQUEST_TIMEOUT_MS = Number(process.env.TWOFACTOR_TIMEOUT_MS) || 12000;
+
 function getJson(url) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const succeed = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    };
+
     const agent = twoFactorHttpsAgent();
     const req = https.get(url, { agent }, (res) => {
       let body = "";
@@ -55,11 +69,19 @@ function getJson(url) {
         } catch {
           data = { Status: "Error", Details: "Invalid 2Factor response" };
         }
-        resolve({
+        succeed({
           ok: res.statusCode >= 200 && res.statusCode < 300,
           data,
         });
       });
+    });
+    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+      req.destroy();
+      const smsErr = new Error(
+        "Could not reach the SMS provider. Check network access to 2factor.in."
+      );
+      smsErr.statusCode = 504;
+      fail(smsErr);
     });
     req.on("error", (err) => {
       logger.warn("twofactor", "HTTP request failed", {
@@ -68,7 +90,7 @@ function getJson(url) {
       });
       const smsErr = new Error(smsReachabilityMessage(err));
       smsErr.statusCode = 502;
-      reject(smsErr);
+      fail(smsErr);
     });
   });
 }
