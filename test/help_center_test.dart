@@ -31,10 +31,33 @@ void main() {
     });
   });
 
-  test('help catalog has ten categories and 45-55 FAQs', () {
+  test('help catalog has ten categories and 45-60 FAQs', () {
     expect(helpCategories.length, 10);
     expect(helpFaqCount, greaterThanOrEqualTo(45));
-    expect(helpFaqCount, lessThanOrEqualTo(55));
+    expect(helpFaqCount, lessThanOrEqualTo(60));
+  });
+
+  test('search finds saved addresses help', () {
+    expect(
+      searchHelpFaqs('save more than one address')
+          .any((hit) => hit.faq.id == 'profile-addresses'),
+      isTrue,
+    );
+    expect(
+      searchHelpFaqs('switch society').any((hit) => hit.faq.id == 'profile-addresses'),
+      isTrue,
+    );
+  });
+
+  test('search finds coupon help', () {
+    expect(
+      searchHelpFaqs('coupon').any((hit) => hit.faq.id == 'buying-coupons'),
+      isTrue,
+    );
+    expect(
+      searchHelpFaqs('not apply').any((hit) => hit.faq.id == 'issues-coupon'),
+      isTrue,
+    );
   });
 
   test('search finds shared pool, selling reach bar, and hide flat', () {

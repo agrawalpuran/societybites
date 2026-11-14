@@ -714,6 +714,66 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<Map<String, dynamic>> listBuyerAddresses() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/auth/me/addresses'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> addBuyerAddress({
+    required String label,
+    String? societyId,
+    String? googlePlaceId,
+    String? block,
+    String? flatNumber,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/me/addresses'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        'label': label,
+        if (societyId != null && societyId.trim().isNotEmpty)
+          'societyId': societyId.trim(),
+        if (googlePlaceId != null && googlePlaceId.trim().isNotEmpty)
+          'googlePlaceId': googlePlaceId.trim(),
+        if (block != null && block.trim().isNotEmpty) 'block': block.trim(),
+        if (flatNumber != null && flatNumber.trim().isNotEmpty)
+          'flatNumber': flatNumber.trim(),
+      }),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> selectBuyerAddress(String id) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/me/addresses/$id/select'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> deleteBuyerAddress(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/auth/me/addresses/$id'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<Map<String, dynamic>> validateFlat({
     required String societyId,
     required String flatNumber,
@@ -2382,6 +2442,150 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Map<String, dynamic> _moveFrom(dynamic decoded) {
+    final data = Map<String, dynamic>.from(decoded as Map);
+    return Map<String, dynamic>.from(data['move'] as Map);
+  }
+
+  static Future<Map<String, dynamic>> getMyKitchenMove() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/auth/me/kitchen-move'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> submitKitchenMove({
+    String? societyId,
+    String? googlePlaceId,
+    String? block,
+    String? flatNumber,
+    required String addressProofUrl,
+    Map<String, dynamic>? fssai,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/me/kitchen-move'),
+      headers: await _authHeaders(),
+      body: jsonEncode({
+        if (societyId != null) 'societyId': societyId,
+        if (googlePlaceId != null) 'googlePlaceId': googlePlaceId,
+        if (block != null && block.isNotEmpty) 'block': block,
+        if (flatNumber != null && flatNumber.isNotEmpty) 'flatNumber': flatNumber,
+        'addressProofUrl': addressProofUrl,
+        if (fssai != null) 'fssai': fssai,
+      }),
+    );
+    if (response.statusCode == 201) {
+      return _moveFrom(_decodeResponse(response));
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<void> cancelMyKitchenMove() async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/me/kitchen-move/cancel'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) return;
+    _throwFromResponse(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminKitchenMoves({
+    String status = 'PENDING',
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/admin/kitchen-moves',
+    ).replace(queryParameters: {'status': status});
+    final response = await http.get(uri, headers: await _authHeaders());
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return (data['moves'] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getAdminKitchenMove(String id) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/kitchen-moves/$id'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      return _moveFrom(_decodeResponse(response));
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> _postAdminKitchenMove(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/kitchen-moves/$path'),
+      headers: await _authHeaders(),
+      body: body == null ? null : jsonEncode(body),
+    );
+    if (response.statusCode == 200) {
+      return _moveFrom(_decodeResponse(response));
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> reviewAdminKitchenMoveProof(
+    String id, {
+    required String status,
+  }) {
+    return _postAdminKitchenMove('$id/address-proof', body: {'status': status});
+  }
+
+  static Future<Map<String, dynamic>> sendAdminKitchenMoveFssaiToReview(String id) {
+    return _postAdminKitchenMove('$id/fssai/needs-review');
+  }
+
+  static Future<Map<String, dynamic>> approveAdminKitchenMoveFssai(String id) {
+    return _postAdminKitchenMove('$id/fssai/approve');
+  }
+
+  static Future<Map<String, dynamic>> rejectAdminKitchenMoveFssai(
+    String id, {
+    required String reason,
+  }) {
+    return _postAdminKitchenMove(
+      '$id/fssai/reject',
+      body: {'rejectionReason': reason},
+    );
+  }
+
+  static Future<Map<String, dynamic>> approveAdminKitchenMove(String id) {
+    return _postAdminKitchenMove('$id/approve');
+  }
+
+  static Future<Map<String, dynamic>> rejectAdminKitchenMove(
+    String id, {
+    String? reason,
+  }) {
+    return _postAdminKitchenMove(
+      '$id/reject',
+      body: {'rejectionReason': reason ?? ''},
+    );
+  }
+
+  static Future<String> getAdminKitchenMoveFssaiDocumentUrl(String id) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/kitchen-moves/$id/fssai-document-url'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
+      return data['url'] as String;
+    }
+    _throwFromResponse(response);
+  }
+
   static Future<String> getAdminFssaiDocumentUrl(String sellerId) async {
     final response = await http.get(
       Uri.parse('$baseUrl/admin/fssai/submissions/$sellerId/document-url'),
@@ -3444,6 +3648,23 @@ class ApiService {
       Uri.parse('$baseUrl/admin/coupons/$id/eligible-users'),
       headers: await _authHeaders(),
       body: jsonEncode({'userIds': userIds}),
+    );
+    if (response.statusCode == 200) {
+      return AdminCoupon.fromJson(
+        Map<String, dynamic>.from(_decodeResponse(response) as Map),
+      );
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<AdminCoupon> setAdminCouponEligibleSocieties(
+    String id,
+    List<String> societyIds,
+  ) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/admin/coupons/$id/eligible-societies'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'societyIds': societyIds}),
     );
     if (response.statusCode == 200) {
       return AdminCoupon.fromJson(

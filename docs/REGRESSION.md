@@ -39,6 +39,13 @@ npm run test:regression
 | Seeded push order survives empty Kitchen refresh | `test/kitchen_order_organization_test.dart` |
 | Push hint / payload `orderId` + `notificationType` | `test/order_push_coordinator_test.dart`, `societybites-backend/tests/notifications-payload.test.js` |
 | Place order → seller active bucket, auto-accept | `societybites-backend/tests/regression-order-journeys.test.js` |
+| Buyer marks UPI paid; seller confirms; amounts match | `societybites-backend/tests/order-reconciliation.test.js` |
+| Cash, UPI, and outside-society payment rules | `societybites-backend/tests/seller-payment-preference.test.js` |
+| Delivery cash confirmation completes the order | `societybites-backend/tests/delayed-delivery-charge.test.js` |
+| Coupon applies, and cancel reverses it | `societybites-backend/tests/coupons.test.js`, `societybites-backend/tests/coupon_recon.test.js` |
+| Order message is sent and unread | `societybites-backend/tests/order-messages.test.js` |
+| Deleted account cannot sign in again | `societybites-backend/tests/account-deletion.test.js` |
+| Saved society with a dead login asks the buyer to sign in | `test/regression/dead_session_home_test.dart` |
 | Ready → cash paid → completed; buyer and seller GET match | same file |
 | Second complete does not rewrite status | same file |
 | Reject restores stock; buyer sees reason | same file |

@@ -26,6 +26,7 @@ import '../widgets/app_header.dart';
 import '../widgets/confirm_upi_id_dialog.dart';
 import '../widgets/kitchen_hours_sheet.dart';
 import '../widgets/photo_source_sheet.dart';
+import '../widgets/buyer_address_list.dart';
 import '../widgets/profile_menu_tile.dart';
 import '../widgets/seller_avatar.dart';
 import '../widgets/status_banner.dart';
@@ -40,7 +41,9 @@ import 'profile_photo_crop_screen.dart';
 import 'seller_fssai_screen.dart';
 import 'seller_payout_screen.dart';
 import 'seller_settings_screen.dart';
+import 'move_kitchen_screen.dart';
 import 'seller_storefront_settings_screen.dart';
+import 'add_buyer_address_screen.dart';
 import 'seller_staff_access_list_screen.dart';
 import 'seller_terms_screen.dart';
 import '../models/seller_fssai.dart';
@@ -49,7 +52,11 @@ class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
     this.onSelectTab,
+    this.onBuyerPlaceChanged,
     this.fetchProfile,
+    this.fetchBuyerAddresses,
+    this.selectBuyerAddress,
+    this.deleteBuyerAddress,
     this.updateProfile,
     this.saveUpiDetails,
     this.saveFssaiDetails,
@@ -67,8 +74,21 @@ class ProfileScreen extends StatefulWidget {
   /// Switches the main shell tab instead of pushing a new route.
   final ValueChanged<int>? onSelectTab;
 
+  /// Reloads the home feed after the buyer chooses a different place.
+  final VoidCallback? onBuyerPlaceChanged;
+
   /// Test seam. Production uses [ApiService.getMe].
   final Future<Map<String, dynamic>> Function()? fetchProfile;
+
+  /// Test seam. Production uses [ApiService.listBuyerAddresses].
+  /// Widget tests that stub [fetchProfile] skip the network and see no places.
+  final Future<Map<String, dynamic>> Function()? fetchBuyerAddresses;
+
+  /// Test seam. Production uses [ApiService.selectBuyerAddress].
+  final Future<Map<String, dynamic>> Function(String id)? selectBuyerAddress;
+
+  /// Test seam. Production uses [ApiService.deleteBuyerAddress].
+  final Future<Map<String, dynamic>> Function(String id)? deleteBuyerAddress;
 
   /// Test seam. Production uses [ApiService.updateMyProfile].
   final Future<Map<String, dynamic>> Function({
@@ -160,6 +180,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   bool _enableSellingInFlight = false;
   bool _sellerEnableProgressDialogOpen = false;
   final _sellerEnableProgressMessage = ValueNotifier<String?>(null);
+  final _buyerAddressKey = GlobalKey<BuyerAddressListState>();
 
   @override
   void initState() {
@@ -313,7 +334,13 @@ class ProfileScreenState extends State<ProfileScreen> {
         final society = _asStringKeyedMap(profile['society']);
         final flat = _asStringKeyedMap(profile['flat']);
         _societyName = society?['name'] as String? ?? _societyName;
-        _flatNumber = flat?['flatNumber'] as String? ?? _flatNumber;
+        if (profile.containsKey('flat')) {
+          final flatNumber = flat?['flatNumber'] as String?;
+          _flatNumber =
+              flatNumber != null && flatNumber.isNotEmpty ? flatNumber : null;
+        } else {
+          _flatNumber = flat?['flatNumber'] as String? ?? _flatNumber;
+        }
         _sellingReachLevel = parseSellingReachLevel(profile['sellingReachLevel']);
         _sellingReachRadiusKm =
             (profile['sellingReachRadiusKm'] as num?)?.toDouble();
@@ -338,6 +365,75 @@ class ProfileScreenState extends State<ProfileScreen> {
     if (!mounted) return;
     setState(() {});
     _refreshSellerSettings();
+    unawaited(_buyerAddressKey.currentState?.reload() ?? Future<void>.value());
+  }
+
+  Future<Map<String, dynamic>> _loadBuyerAddresses() {
+    if (widget.fetchBuyerAddresses != null) {
+      return widget.fetchBuyerAddresses!();
+    }
+    if (widget.fetchProfile != null) {
+      return Future.value({'addresses': <dynamic>[]});
+    }
+    return ApiService.listBuyerAddresses();
+  }
+
+  Future<void> _openAddBuyerAddress() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const AddBuyerAddressScreen()),
+    );
+    if (saved == true) {
+      await _buyerAddressKey.currentState?.reload();
+    }
+  }
+
+  Future<void> _onBuyerPlaceChanged(Map<String, dynamic> place) async {
+    final society = place['society'] is Map
+        ? Map<String, dynamic>.from(place['society'] as Map)
+        : null;
+    final flat = place['flat'] is Map
+        ? Map<String, dynamic>.from(place['flat'] as Map)
+        : null;
+    final societyId =
+        place['societyId'] as String? ?? society?['id'] as String?;
+    final societyName =
+        society?['name'] as String? ?? _societyName ?? 'Society';
+    final flatNumber = flat?['flatNumber'] as String?;
+    if (societyId != null && societyId.isNotEmpty) {
+      await SessionService.applySelectedPlace(
+        societyId: societyId,
+        societyName: societyName,
+        flatId: place['flatId'] as String? ?? flat?['id'] as String?,
+        flatNumber: flatNumber,
+      );
+    }
+    if (!mounted) return;
+    setState(() {
+      _societyName = societyName;
+      _flatNumber =
+          flatNumber != null && flatNumber.isNotEmpty ? flatNumber : null;
+    });
+    widget.onBuyerPlaceChanged?.call();
+  }
+
+  bool get _canChangeAddress =>
+      _role == 'buyer' || _role == 'admin' || _role == 'super_admin';
+
+  Widget _buyerAddressSection() {
+    if (!_canChangeAddress) return const SizedBox.shrink();
+    return BuyerAddressList(
+      key: _buyerAddressKey,
+      initialSocietyName: _societyName,
+      initialFlatNumber: _flatNumber,
+      loadAddresses: _loadBuyerAddresses,
+      selectAddress:
+          widget.selectBuyerAddress ?? ApiService.selectBuyerAddress,
+      deleteAddress:
+          widget.deleteBuyerAddress ?? ApiService.deleteBuyerAddress,
+      onAdd: _openAddBuyerAddress,
+      onPlaceChanged: _onBuyerPlaceChanged,
+    );
   }
 
   /// Keeps first-time seller setup choices while role is still `buyer` on the server.
@@ -799,6 +895,16 @@ class ProfileScreenState extends State<ProfileScreen> {
               onOpenKitchenWebsite:
                   holdingSetup || !_isSeller ? null : _openKitchenWebsiteSettings,
               onEditFssai: _editFssai,
+              onMoveKitchen: holdingSetup || !_isSeller
+                  ? null
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MoveKitchenScreen(),
+                        ),
+                      );
+                    },
               onSaveAndEnable: holdingSetup ? _saveAndEnableSelling : null,
               saveAndEnableInProgress:
                   holdingSetup ? _enableSellingInFlight : false,
@@ -2356,6 +2462,10 @@ class ProfileScreenState extends State<ProfileScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           identity,
+                          if (_canChangeAddress) ...[
+                            const SizedBox(height: 20),
+                            _buyerAddressSection(),
+                          ],
                           const SizedBox(height: 8),
                           menus,
                           const SizedBox(height: 28),
@@ -2372,6 +2482,10 @@ class ProfileScreenState extends State<ProfileScreen> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               identity,
+                              if (_canChangeAddress) ...[
+                                const SizedBox(height: 20),
+                                _buyerAddressSection(),
+                              ],
                               const SizedBox(height: 20),
                               logout,
                             ],
@@ -2431,6 +2545,10 @@ class ProfileScreenState extends State<ProfileScreen> {
                             photoUrl: _profilePhotoUrl,
                             onEdit: _openProfileEditor,
                           ),
+                          if (_canChangeAddress) ...[
+                            const SizedBox(height: 20),
+                            _buyerAddressSection(),
+                          ],
                           if (_showSellerFssaiComplianceBanner) ...[
                             const SizedBox(height: 16),
                             _buildSellerFssaiComplianceBanner(),

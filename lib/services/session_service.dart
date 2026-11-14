@@ -34,6 +34,8 @@ class SessionService {
   /// storage plugin hangs (common in widget tests / some desktop hosts).
   static String? _memoryJwt;
   static String? _memoryRefresh;
+  /// Last address list for this signed-in session. Cleared on logout.
+  static List<Map<String, dynamic>>? rememberedBuyerAddresses;
   static bool _clearedThisProcess = false;
 
   static void _secureBestEffort(Future<dynamic> future) {
@@ -86,6 +88,29 @@ class SessionService {
     await HomeFeedCache.retainOnly(societyId);
   }
 
+  /// Remembers the buyer's selected place. A place can omit the flat.
+  static Future<void> applySelectedPlace({
+    required String societyId,
+    required String societyName,
+    String? flatId,
+    String? flatNumber,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_societyIdKey, societyId);
+    await prefs.setString(_societyNameKey, societyName);
+    if (flatId != null && flatId.isNotEmpty) {
+      await prefs.setString(_flatIdKey, flatId);
+    } else {
+      await prefs.remove(_flatIdKey);
+    }
+    if (flatNumber != null && flatNumber.isNotEmpty) {
+      await prefs.setString(_flatNumberKey, flatNumber);
+    } else {
+      await prefs.remove(_flatNumberKey);
+    }
+    await HomeFeedCache.retainOnly(societyId);
+  }
+
   static Future<void> saveUserName(String name) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userNameKey, name);
@@ -112,11 +137,21 @@ class SessionService {
     if (profile['societyId'] != null) {
       await prefs.setString(_societyIdKey, profile['societyId'] as String);
     }
-    if (profile['flatId'] != null) {
-      await prefs.setString(_flatIdKey, profile['flatId'] as String);
+    if (profile.containsKey('flatId')) {
+      final flatId = profile['flatId'] as String?;
+      if (flatId != null && flatId.isNotEmpty) {
+        await prefs.setString(_flatIdKey, flatId);
+      } else {
+        await prefs.remove(_flatIdKey);
+      }
     }
-    if (flat?['flatNumber'] != null) {
-      await prefs.setString(_flatNumberKey, flat!['flatNumber'] as String);
+    if (profile.containsKey('flat')) {
+      final flatNumber = flat?['flatNumber'] as String?;
+      if (flatNumber != null && flatNumber.isNotEmpty) {
+        await prefs.setString(_flatNumberKey, flatNumber);
+      } else {
+        await prefs.remove(_flatNumberKey);
+      }
     }
     if (profile['role'] != null) {
       await prefs.setString(_roleKey, profile['role'] as String);
@@ -191,11 +226,7 @@ class SessionService {
   static Future<bool> isOnboarded() async {
     final userId = await getUserId();
     final societyId = await getSocietyId();
-    final flatId = await getFlatId();
-    return userId != null &&
-        societyId != null &&
-        flatId != null &&
-        flatId.isNotEmpty;
+    return userId != null && societyId != null && societyId.isNotEmpty;
   }
 
   static Future<bool> isSignedIn() async {
@@ -318,6 +349,7 @@ class SessionService {
   static Future<void> clear() async {
     MyListingsCache.clear();
     OrderMessageCache.clear();
+    rememberedBuyerAddresses = null;
     _memoryJwt = null;
     _memoryRefresh = null;
     _clearedThisProcess = true;

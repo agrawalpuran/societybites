@@ -52,6 +52,7 @@ String couponReasonMessage(
     'USAGE_LIMIT_REACHED' => 'This coupon has reached its usage limit',
     'BUYER_USAGE_LIMIT_REACHED' => 'You have already used this coupon',
     'NOT_ELIGIBLE' => 'This coupon is not available for your account',
+    'NOT_ELIGIBLE_SOCIETY' => 'This coupon is not available in your society',
     'NOT_ELIGIBLE_SELLER' => 'This coupon is not valid for this kitchen',
     'COUPON_PAUSED' => 'This coupon is paused',
     'COUPON_EXHAUSTED' => 'This coupon is no longer available',
@@ -88,6 +89,8 @@ class AdminCoupon {
     required this.amountUsed,
     this.remainingBudget,
     this.eligibleUserIds = const [],
+    this.eligibleSocietyIds = const [],
+    this.eligibleSocieties = const [],
   });
 
   final String id;
@@ -116,6 +119,8 @@ class AdminCoupon {
   final double amountUsed;
   final double? remainingBudget;
   final List<String> eligibleUserIds;
+  final List<String> eligibleSocietyIds;
+  final List<AdminCouponSocietyScope> eligibleSocieties;
 
   bool get hasRedemptions =>
       totalUsage > 0 || appliedCount > 0 || reversedCount > 0;
@@ -174,6 +179,48 @@ class AdminCoupon {
               ?.map((id) => id.toString())
               .toList() ??
           const [],
+      eligibleSocietyIds: (json['eligibleSocietyIds'] as List?)
+              ?.map((id) => id.toString())
+              .toList() ??
+          const [],
+      eligibleSocieties: (json['eligibleSocieties'] as List?)
+              ?.map(
+                (row) => AdminCouponSocietyScope.fromJson(
+                  Map<String, dynamic>.from(row as Map),
+                ),
+              )
+              .toList() ??
+          const [],
+    );
+  }
+}
+
+class AdminCouponSocietyScope {
+  const AdminCouponSocietyScope({
+    required this.id,
+    this.name,
+    this.city,
+  });
+
+  final String id;
+  final String? name;
+  final String? city;
+
+  String get label {
+    final title = name?.trim();
+    final place = city?.trim();
+    if (title != null && title.isNotEmpty && place != null && place.isNotEmpty) {
+      return '$title · $place';
+    }
+    if (title != null && title.isNotEmpty) return title;
+    return id;
+  }
+
+  factory AdminCouponSocietyScope.fromJson(Map<String, dynamic> json) {
+    return AdminCouponSocietyScope(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString(),
+      city: json['city']?.toString(),
     );
   }
 }

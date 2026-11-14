@@ -6,6 +6,10 @@ void main() {
   test('coupon reason messages are buyer friendly', () {
     expect(couponReasonMessage('COUPON_EXPIRED'), 'This coupon has expired');
     expect(
+      couponReasonMessage('NOT_ELIGIBLE_SOCIETY'),
+      'This coupon is not available in your society',
+    );
+    expect(
       couponReasonMessage('MINIMUM_ORDER_NOT_MET'),
       'Your order does not meet the minimum for this coupon',
     );

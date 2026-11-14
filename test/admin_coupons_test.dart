@@ -74,6 +74,29 @@ void main() {
     expect(coupon.amountUsed, 200);
     expect(coupon.remainingBudget, 9800);
     expect(coupon.fundedBy, 'SOCIETYEATS');
+    final scoped = AdminCoupon.fromJson({
+      'id': 'c2',
+      'code': 'LAUNCH',
+      'name': 'Launch',
+      'discountType': 'FIXED',
+      'discountValue': 50,
+      'minimumOrderValue': 0,
+      'validFrom': '2026-10-05T00:00:00.000Z',
+      'validUntil': '2026-11-04T18:29:59.000Z',
+      'audienceType': 'ALL',
+      'status': 'ACTIVE',
+      'fundedBy': 'SOCIETYEATS',
+      'totalUsage': 0,
+      'appliedCount': 0,
+      'reversedCount': 0,
+      'amountUsed': 0,
+      'eligibleSocieties': [
+        {'id': 's1', 'name': 'Alpha', 'city': 'Pune'},
+        {'id': 's2', 'name': 'Alpha Residency', 'city': 'Pune'},
+      ],
+    });
+    expect(scoped.eligibleSocieties.length, 2);
+    expect(scoped.eligibleSocieties.first.label, 'Alpha · Pune');
     expect(formatRupee(80.5), '₹80.50');
   });
 

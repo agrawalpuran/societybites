@@ -523,78 +523,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   );
                 },
               ),
-            ),
-            const SizedBox(height: 24),
-            if (_showGrowthPanel) const AdminGrowthPanel(),
-            const SizedBox(height: 24),
-            _SectionTitle(title: 'HOME BANNER'),
-            const SizedBox(height: 10),
-            Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const AdminFestivalBannersScreen(),
-                    ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFEAEFED)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(
-                        Icons.celebration_outlined,
-                        size: 22,
-                        color: Color(0xFF0E5A47),
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Festival banners',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: Color(0xFF101617),
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Manage the Home announcement banner',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF6A7774),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: Color(0xFF8A9491),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            _SectionTitle(title: 'ENGAGEMENT'),
-            const SizedBox(height: 10),
-            Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
+              right: _SettingCard(
+                icon: Icons.campaign_outlined,
+                title: 'Marketing push',
+                subtitle: 'One push per week',
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -602,54 +534,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                   );
                 },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFEAEFED)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(
-                        Icons.campaign_outlined,
-                        size: 22,
-                        color: Color(0xFF0E5A47),
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Marketing push',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: Color(0xFF101617),
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'One broadcast notification per week',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF6A7774),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: Color(0xFF8A9491),
-                      ),
-                    ],
-                  ),
-                ),
               ),
             ),
+            const SizedBox(height: 8),
+            _SettingsPair(
+              left: _SettingCard(
+                icon: Icons.celebration_outlined,
+                title: 'Festival banners',
+                subtitle: 'Home announcement',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AdminFestivalBannersScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (_showGrowthPanel) const AdminGrowthPanel(),
             const SizedBox(height: 24),
             _SectionTitle(title: 'USERS'),
             const SizedBox(height: 10),

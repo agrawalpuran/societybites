@@ -90,6 +90,8 @@ model User {
   /// Kitchens this user can oversee (e.g. owner view-only).
   sellerStaffAccess       SellerStaffMembership[] @relation("SellerStaffMember")
   payoutProfile           SellerPayoutProfile?
+  buyerAddresses          BuyerAddress[]
+  kitchenMoves            KitchenMove[]
 }
 
 /// Links a staff user to a seller kitchen. MVP: role=owner is view-only oversight.
@@ -196,6 +198,10 @@ model Society {
   orders            Order[]
   users             User[]
   fssaiAssistance   FssaiAssistanceRequest[]
+  couponEligibilities CouponEligibleSociety[]
+  buyerAddresses    BuyerAddress[]
+  kitchenMovesFrom  KitchenMove[]          @relation("KitchenMoveFrom")
+  kitchenMovesTo    KitchenMove[]          @relation("KitchenMoveTo")
 }
 
 model Block {
@@ -212,10 +218,75 @@ model Flat {
   floor      Int
   unit       String
   societyId  String
-  society    Society @relation(fields: [societyId], references: [id])
-  users      User[]
+  society        Society        @relation(fields: [societyId], references: [id])
+  users          User[]
+  buyerAddresses BuyerAddress[]
+  kitchenMoves   KitchenMove[]
 
   @@unique([societyId, flatNumber])
+}
+
+/// A seller's request to move the kitchen. The live society, listings, and
+/// FSSAI stay put until an admin approves this row.
+model KitchenMove {
+  id                            String    @id @default(uuid())
+  userId                        String
+  /// PENDING | APPROVED | REJECTED | CANCELLED
+  status                        String    @default("PENDING")
+  fromSocietyId                 String
+  fromFlatId                    String?
+  toSocietyId                   String
+  toFlatId                      String?
+  toBlock                       String?
+  toFlatNumber                  String?
+  addressProofUrl               String
+  /// PENDING | OK | FOLLOW_UP. Does not gate the move or FSSAI review.
+  addressProofStatus            String    @default("PENDING")
+  addressProofReviewedAt        DateTime?
+  addressProofReviewedBy        String?
+  fssaiRegistrationNumber       String?
+  fssaiRegisteredName           String?
+  fssaiLicenceExpiry            DateTime?
+  /// Private object path. Not written onto SellerFssai until the move is approved.
+  fssaiDocumentStorageReference String?
+  fssaiDocumentType             String?
+  /// NOT_SUBMITTED | UNDER_REVIEW | APPROVED | REJECTED
+  fssaiStatus                   String    @default("NOT_SUBMITTED")
+  fssaiRejectionReason          String?
+  fssaiReviewedAt               DateTime?
+  fssaiReviewedBy               String?
+  rejectionReason               String?
+  reviewedAt                    DateTime?
+  reviewedBy                    String?
+  createdAt                     DateTime  @default(now())
+  updatedAt                     DateTime  @updatedAt
+  user                          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromSociety                   Society   @relation("KitchenMoveFrom", fields: [fromSocietyId], references: [id])
+  toSociety                     Society   @relation("KitchenMoveTo", fields: [toSocietyId], references: [id])
+  toFlat                        Flat?     @relation(fields: [toFlatId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([userId, status])
+}
+
+/// Saved places for a buyer. The selected row is the society they are browsing from.
+/// Sellers do not use this list.
+model BuyerAddress {
+  id         String   @id @default(uuid())
+  userId     String
+  label      String
+  societyId  String
+  flatId     String?
+  block      String?
+  flatNumber String?
+  selected   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  society    Society  @relation(fields: [societyId], references: [id])
+  flat       Flat?    @relation(fields: [flatId], references: [id], onDelete: SetNull)
+
+  @@index([userId, selected])
 }
 
 model Listing {
@@ -666,10 +737,22 @@ model Coupon {
   updatedAt          DateTime              @updatedAt
   redemptions        CouponRedemption[]
   eligibleUsers      CouponEligibleUser[]
+  eligibleSocieties  CouponEligibleSociety[]
   seller             User?                 @relation("CouponSellerScope", fields: [sellerId], references: [id], onDelete: SetNull)
 
   @@index([status, validUntil])
   @@index([sellerId])
+}
+
+/// When empty, coupon applies in all societies. Rows restrict to listed societies only.
+model CouponEligibleSociety {
+  couponId  String
+  societyId String
+  coupon    Coupon  @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  society   Society @relation(fields: [societyId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, societyId])
+  @@index([societyId])
 }
 
 model CouponEligibleUser {

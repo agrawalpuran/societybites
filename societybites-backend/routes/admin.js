@@ -20,6 +20,7 @@ const {
   updateCoupon,
   setCouponStatus,
   assignEligibleUsers,
+  assignEligibleSocieties,
 } = require("../lib/coupons");
 const { canonicalCityKey } = require("../lib/launchCity");
 const {
@@ -58,6 +59,17 @@ const {
   getAddressProof,
   reviewAddressProof,
 } = require("../lib/addressProofReview");
+const {
+  listKitchenMoves,
+  getKitchenMove,
+  reviewMoveAddressProof,
+  sendMoveFssaiToReview,
+  approveMoveFssai,
+  rejectMoveFssai,
+  approveKitchenMove,
+  rejectKitchenMove,
+  getMoveFssaiDocumentUrl,
+} = require("../lib/kitchenMove");
 const {
   listFestivalBanners,
   getFestivalBanner,
@@ -510,6 +522,99 @@ router.post(
       status: req.body && req.body.status,
     });
     res.json({ record });
+  })
+);
+
+router.get(
+  "/kitchen-moves",
+  asyncHandler(async (req, res) => {
+    const moves = await listKitchenMoves({ status: req.query.status });
+    res.json({ moves });
+  })
+);
+
+router.get(
+  "/kitchen-moves/:id",
+  asyncHandler(async (req, res) => {
+    const move = await getKitchenMove(req.params.id);
+    res.json({ move });
+  })
+);
+
+router.get(
+  "/kitchen-moves/:id/fssai-document-url",
+  asyncHandler(async (req, res) => {
+    const document = await getMoveFssaiDocumentUrl(req.params.id);
+    res.json(document);
+  })
+);
+
+router.post(
+  "/kitchen-moves/:id/address-proof",
+  asyncHandler(async (req, res) => {
+    const move = await reviewMoveAddressProof({
+      adminUser: req.user,
+      id: req.params.id,
+      status: req.body && req.body.status,
+    });
+    res.json({ move });
+  })
+);
+
+router.post(
+  "/kitchen-moves/:id/fssai/needs-review",
+  asyncHandler(async (req, res) => {
+    const move = await sendMoveFssaiToReview({
+      adminUser: req.user,
+      id: req.params.id,
+    });
+    res.json({ move });
+  })
+);
+
+router.post(
+  "/kitchen-moves/:id/fssai/approve",
+  asyncHandler(async (req, res) => {
+    const move = await approveMoveFssai({
+      adminUser: req.user,
+      id: req.params.id,
+    });
+    res.json({ move });
+  })
+);
+
+router.post(
+  "/kitchen-moves/:id/fssai/reject",
+  asyncHandler(async (req, res) => {
+    const move = await rejectMoveFssai({
+      adminUser: req.user,
+      id: req.params.id,
+      reason: req.body && req.body.rejectionReason,
+    });
+    res.json({ move });
+  })
+);
+
+router.post(
+  "/kitchen-moves/:id/approve",
+  asyncHandler(async (req, res) => {
+    const move = await approveKitchenMove({
+      adminUser: req.user,
+      id: req.params.id,
+    });
+    res.json({ move });
+  })
+);
+
+router.post(
+  "/kitchen-moves/:id/reject",
+  asyncHandler(async (req, res) => {
+    const move = await rejectKitchenMove({
+      adminUser: req.user,
+      id: req.params.id,
+      reason: req.body && req.body.rejectionReason,
+    });
+    res.json({ move });
   })
 );
 
@@ -1463,6 +1568,14 @@ router.put(
   "/coupons/:id/eligible-users",
   asyncHandler(async (req, res) => {
     const coupon = await assignEligibleUsers(req.params.id, req.body && req.body.userIds);
+    res.json(coupon);
+  })
+);
+
+router.put(
+  "/coupons/:id/eligible-societies",
+  asyncHandler(async (req, res) => {
+    const coupon = await assignEligibleSocieties(req.params.id, req.body && req.body.societyIds);
     res.json(coupon);
   })
 );

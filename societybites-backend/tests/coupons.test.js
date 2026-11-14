@@ -4,7 +4,15 @@ const http = require("http");
 const express = require("express");
 const prisma = require("../lib/prisma");
 const { signToken } = require("../lib/jwt");
-const { REASONS, validateCoupon, applyCoupon, startOfIstDay, startOfIstWeek, startOfIstMonth } = require("../lib/coupons");
+const {
+  REASONS,
+  validateCoupon,
+  applyCoupon,
+  assignEligibleSocieties,
+  startOfIstDay,
+  startOfIstWeek,
+  startOfIstMonth,
+} = require("../lib/coupons");
 const couponRoutes = require("../routes/coupons");
 const adminRoutes = require("../routes/admin");
 
@@ -217,6 +225,59 @@ async function main() {
     assert(
       (await validateCoupon({ code: fixed.code, userId: buyer.id, orderSubtotal: 500 })).valid,
       "global coupon unchanged without sellerId"
+    );
+
+    const societyA = await prisma.society.create({
+      data: { name: `SocA${stamp}`, city: "TestCity", inviteCode: `SA${stamp}` },
+    });
+    const societyB = await prisma.society.create({
+      data: { name: `SocB${stamp}`, city: "TestCity", inviteCode: `SB${stamp}` },
+    });
+    const societyC = await prisma.society.create({
+      data: { name: `SocC${stamp}`, city: "TestCity", inviteCode: `SC${stamp}` },
+    });
+    await prisma.user.update({ where: { id: buyer.id }, data: { societyId: societyA.id } });
+    await prisma.user.update({ where: { id: other.id }, data: { societyId: societyB.id } });
+    const outsider = await prisma.user.create({
+      data: {
+        phone: `+9177${stamp}12`,
+        name: "Coupon Outsider",
+        role: "buyer",
+        societyId: societyC.id,
+      },
+    });
+
+    const societyCoupon = await makeCoupon(`SOC${stamp}`, { minimumOrderValue: 0 });
+    codes.push(societyCoupon.code);
+    await assignEligibleSocieties(societyCoupon.id, [societyA.id, societyB.id]);
+    assert(
+      (await validateCoupon({ code: societyCoupon.code, userId: buyer.id, orderSubtotal: 500 })).valid,
+      "society-scoped coupon accepts society A"
+    );
+    assert(
+      (await validateCoupon({ code: societyCoupon.code, userId: other.id, orderSubtotal: 500 })).valid,
+      "society-scoped coupon accepts society B"
+    );
+    assert(
+      (await validateCoupon({ code: societyCoupon.code, userId: outsider.id, orderSubtotal: 500 })).reason ===
+        REASONS.NOT_ELIGIBLE_SOCIETY,
+      "society-scoped coupon rejects other society"
+    );
+    assert(
+      (await validateCoupon({ code: fixed.code, userId: outsider.id, orderSubtotal: 500 })).valid,
+      "global coupon unchanged for other society"
+    );
+
+    const societyAdmin = await jsonRequest(server, {
+      method: "PUT",
+      path: `/admin/coupons/${societyCoupon.id}/eligible-societies`,
+      token: signToken(admin),
+      body: { societyIds: [societyA.id, societyB.id, societyC.id] },
+    });
+    assert(societyAdmin.status === 200, `admin can add societies ${societyAdmin.status}`);
+    assert(
+      (await validateCoupon({ code: societyCoupon.code, userId: outsider.id, orderSubtotal: 500 })).valid,
+      "added society becomes eligible"
     );
 
     const small = await makeCoupon(`SMALL${stamp}`, { discountValue: 100, minimumOrderValue: 0 });

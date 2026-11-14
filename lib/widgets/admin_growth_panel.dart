@@ -15,7 +15,7 @@ class AdminGrowthPanel extends StatefulWidget {
 
 class _AdminGrowthPanelState extends State<AdminGrowthPanel> {
   static const _ranges = <String, String>{
-    'day': 'Last 14 days',
+    'day': 'Last 7 days',
     'week': 'Last 8 weeks',
     'month': 'Last 6 months',
     'quarter': 'Last 4 quarters',
@@ -26,7 +26,7 @@ class _AdminGrowthPanelState extends State<AdminGrowthPanel> {
   String get _windowHint {
     switch (_range) {
       case 'day':
-        return 'The three cards are the total for the last 14 days. Use the table for a single day.';
+        return 'The three cards are the total for the last 7 days. Use the table for a single day.';
       case 'week':
         return 'The three cards are the total for the last 8 weeks. Use the table for one week.';
       case 'month':

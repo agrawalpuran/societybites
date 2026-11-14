@@ -41,6 +41,11 @@ async function deleteAuthenticatedAccount(userId) {
 
     await tx.refreshToken.deleteMany({ where: { userId } });
     await tx.deviceToken.deleteMany({ where: { userId } });
+    await tx.buyerAddress.deleteMany({ where: { userId } });
+    await tx.kitchenMove.updateMany({
+      where: { userId, status: "PENDING" },
+      data: { status: "CANCELLED" },
+    });
 
     await tx.listing.updateMany({
       where: { sellerId: userId, campaignId: null },

@@ -52,8 +52,21 @@ const helpCategories = <HelpCategory>[
         id: 'buying-how',
         question: 'How do I buy something?',
         answer:
-            'Open Home, tap a dish or a seller, pick a size if the dish has more than one, add items to your cart, then checkout with UPI or cash. For UPI, use Pay Now on the order after checkout. For cash, pay the seller when you collect the food.',
-        keywords: ['order', 'cart', 'checkout', 'buy', 'purchase', 'size'],
+            'Open Home, tap a dish or a seller, pick a size if the dish has more than one, add items to your cart, then checkout with UPI or cash. You can enter a coupon code on the checkout screen before you place the order. For UPI, use Pay Now on the order after checkout. For cash, pay the seller when you collect the food.',
+        keywords: ['order', 'cart', 'checkout', 'buy', 'purchase', 'size', 'coupon'],
+      ),
+      HelpFaq(
+        id: 'buying-coupons',
+        question: 'How do coupon codes work?',
+        answer:
+            'On checkout, type your code under Coupon code and tap Apply. The discount comes off the food subtotal; any platform fee on the bill is calculated separately. A dish may already show a seller discount on Home — that is separate from a coupon. Coupons are funded by SocietyEats and may only work in certain societies, for certain kitchens, above a minimum food total, or once per buyer. If a code fails, read the message: it may be for another society, below the minimum, expired, or already used.',
+        keywords: [
+          'coupon',
+          'promo',
+          'discount code',
+          'society',
+          'minimum order',
+        ],
       ),
       HelpFaq(
         id: 'buying-sizes',
@@ -301,8 +314,8 @@ const helpCategories = <HelpCategory>[
         id: 'orders-upi',
         question: 'How does UPI payment work?',
         answer:
-            'Choose UPI at checkout, then open Pay Now on the order. Pay the seller in your UPI app using the ID shown, return to SocietyEats, and tap I\'ve paid. The seller confirms they received the money. SocietyEats does not hold your payment — it goes directly to the seller.',
-        keywords: ['upi', 'pay now', 'ive paid', 'payment', 'confirm'],
+            'Choose UPI at checkout, then open Pay Now on the order. Pay the seller in your UPI app using the UPI ID (or scan the QR on web), return to SocietyEats, and tap I\'ve paid. The seller confirms they received the money. SocietyEats does not hold your payment — it goes directly to the seller. If Pay Now fails to load, check you are online and the order is still accepted, then tap Try again.',
+        keywords: ['upi', 'pay now', 'ive paid', 'payment', 'confirm', 'web'],
       ),
       HelpFaq(
         id: 'orders-cancel',
@@ -462,15 +475,39 @@ const helpCategories = <HelpCategory>[
         id: 'profile-pay',
         question: 'How do payments work?',
         answer:
-            'SocietyEats does not process payments or hold your money. You pay the seller directly by UPI (Pay Now on the order, then I\'ve paid after your UPI app) or in cash at pickup. There is no in-app payment gateway.',
-        keywords: ['upi', 'cash', 'gateway', 'razorpay', 'pay'],
+            'SocietyEats does not hold your food payment. You pay the seller directly by UPI (Pay Now on the order, then I\'ve paid after your UPI app) or in cash at pickup. SocietyEats coupons are a separate subsidy and do not reduce what the seller earns on the dish.',
+        keywords: ['upi', 'cash', 'pay', 'coupon'],
       ),
       HelpFaq(
         id: 'profile-society',
         question: 'Can I change my society?',
         answer:
-            'Your society cannot be changed after you join. Email support.societyeats@gmail.com if you have moved and need help.',
-        keywords: ['change society', 'move', 'wrong society'],
+            'When you first join, pick the apartment name that matches your building. Google sometimes lists the same complex under more than one name. After that, buyers can switch where they shop from using saved addresses on Profile — see “Can I save more than one address?” below. Email support.societyeats@gmail.com if a place is wrong in our records and you cannot fix it in the app.',
+        keywords: [
+          'change society',
+          'move',
+          'wrong society',
+          'google',
+          'join',
+          'invite',
+        ],
+      ),
+      HelpFaq(
+        id: 'profile-addresses',
+        question: 'Can I save more than one address?',
+        answer:
+            'Yes, if you buy as a resident. On Profile → Addresses you can save up to eight places such as Home or Office. Each place is tied to a society (and optional block and flat). Tap a place to switch — Home and coupons then use that society. Add a place with Add address and search for the society. You cannot remove the place that is currently selected; choose another one first. Sellers manage one kitchen location in Seller Settings, not this list.',
+        keywords: [
+          'address',
+          'addresses',
+          'home',
+          'office',
+          'saved place',
+          'switch society',
+          'multiple',
+          'flat',
+          'block',
+        ],
       ),
       HelpFaq(
         id: 'profile-fee',
@@ -527,6 +564,27 @@ const helpCategories = <HelpCategory>[
         answer:
             'Email support.societyeats@gmail.com. We typically reply within 24 hours.',
         keywords: ['email', 'help', 'contact', 'support'],
+      ),
+      HelpFaq(
+        id: 'issues-report',
+        question: 'How do I report a problem in the app?',
+        answer:
+            'Go to Profile → Report an Issue. Describe what happened, link an order if it helps, and check back for replies in your report thread. For payment or delivery on a specific order, message the seller from Orders as well.',
+        keywords: ['report', 'issue', 'bug', 'complaint', 'support ticket'],
+      ),
+      HelpFaq(
+        id: 'issues-coupon',
+        question: 'Why did my coupon code not apply?',
+        answer:
+            'Check that the code is spelled correctly and that you tapped Apply on checkout before placing the order. Coupons can be limited to certain societies or kitchens, need a minimum food total, expire on a date, or be one-time per buyer. Draft or paused codes do not work — ask the person who shared the code if it is active. If you joined a different society name for the same complex, you may need the launch code meant for your society listing.',
+        keywords: [
+          'coupon',
+          'promo',
+          'not valid',
+          'not eligible',
+          'minimum',
+          'society',
+        ],
       ),
     ],
   ),

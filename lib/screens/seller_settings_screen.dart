@@ -32,6 +32,7 @@ class SellerSettingsScreen extends StatelessWidget {
     required this.onChangeFulfilment,
     required this.onChangeKitchenHours,
     required this.onEditFssai,
+    this.onMoveKitchen,
     this.onSaveAndEnable,
     this.saveAndEnableInProgress = false,
     this.upiReadyForEnableSelling = true,
@@ -77,6 +78,7 @@ class SellerSettingsScreen extends StatelessWidget {
   final VoidCallback onChangeFulfilment;
   final VoidCallback onChangeKitchenHours;
   final VoidCallback onEditFssai;
+  final VoidCallback? onMoveKitchen;
   final VoidCallback? onSaveAndEnable;
   final bool saveAndEnableInProgress;
   final bool upiReadyForEnableSelling;
@@ -311,6 +313,15 @@ class SellerSettingsScreen extends StatelessWidget {
                         trailingLabel: 'Update',
                         onTap: onEditFssai,
                       ),
+                      if (onMoveKitchen != null)
+                        ProfileMenuTile(
+                          icon: Icons.apartment_rounded,
+                          title: 'Move kitchen',
+                          subtitle:
+                              'Ask to change society. It stays here until an admin approves.',
+                          trailingLabel: 'Request',
+                          onTap: onMoveKitchen!,
+                        ),
                     ],
                   ],
                 ),

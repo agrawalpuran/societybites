@@ -202,6 +202,7 @@ class _AdminCouponsScreenState extends State<AdminCouponsScreen>
                                   ),
                                   subtitle: Text(
                                     '${coupon.statusLabel} · ${formatCouponDate(coupon.validFrom)} – ${formatCouponDate(coupon.validUntil)}\n'
+                                    '${_societyScopeLine(coupon)}'
                                     '${_sellerScopeLine(coupon)}'
                                     '${_usageLine(coupon)}',
                                   ),
@@ -226,6 +227,14 @@ String _statusLabel(String status) => switch (status) {
       'EXHAUSTED' => 'Exhausted',
       _ => status,
     };
+
+String _societyScopeLine(AdminCoupon coupon) {
+  if (coupon.eligibleSocieties.isEmpty) return '';
+  if (coupon.eligibleSocieties.length == 1) {
+    return 'Society: ${coupon.eligibleSocieties.first.label} · ';
+  }
+  return '${coupon.eligibleSocieties.length} societies · ';
+}
 
 String _sellerScopeLine(AdminCoupon coupon) {
   if (coupon.sellerId == null) return 'All kitchens · ';
@@ -266,6 +275,7 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
   final _budget = TextEditingController();
   final _userSearch = TextEditingController();
   final _sellerSearch = TextEditingController();
+  final _societySearch = TextEditingController();
 
   AdminCoupon? _coupon;
   DateTime _validFrom = DateTime.now();
@@ -286,6 +296,9 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
   Timer? _sellerSearchDebounce;
   int _sellerSearchSeq = 0;
   String? _sellerSearchApplied;
+  final Map<String, String> _societies = {};
+  bool _multipleGoogleNames = false;
+  List<Map<String, dynamic>> _allSocieties = const [];
 
   bool get _editing => widget.couponId != null;
   bool get _locked => _coupon?.hasRedemptions == true;
@@ -293,6 +306,7 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
   @override
   void initState() {
     super.initState();
+    _loadSocietyCatalog();
     if (_editing) _load();
   }
 
@@ -309,8 +323,66 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
     _budget.dispose();
     _userSearch.dispose();
     _sellerSearch.dispose();
+    _societySearch.dispose();
     _sellerSearchDebounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadSocietyCatalog() async {
+    try {
+      final rows = await ApiService.getAdminSocieties();
+      if (!mounted) return;
+      setState(() => _allSocieties = rows);
+    } catch (_) {}
+  }
+
+  String _societyLabelFromMap(Map<String, dynamic> society) {
+    final name = society['name']?.toString().trim() ?? '';
+    final city = society['city']?.toString().trim() ?? '';
+    if (name.isNotEmpty && city.isNotEmpty) return '$name · $city';
+    if (name.isNotEmpty) return name;
+    return society['id']?.toString() ?? 'Society';
+  }
+
+  List<Map<String, dynamic>> get _societyHits {
+    final query = _societySearch.text.trim().toLowerCase();
+    if (query.length < 2) return const [];
+    return _allSocieties
+        .where((society) {
+          final haystack = [
+            society['name'],
+            society['city'],
+            society['inviteCode'],
+          ]
+              .map((value) => value?.toString().toLowerCase() ?? '')
+              .join(' ');
+          return haystack.contains(query);
+        })
+        .take(12)
+        .toList();
+  }
+
+  void _addSociety(Map<String, dynamic> society) {
+    final id = society['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    final label = _societyLabelFromMap(society);
+    setState(() {
+      final allowMultiple =
+          _multipleGoogleNames || (_locked && _societies.isNotEmpty);
+      if (!allowMultiple) {
+        _societies
+          ..clear()
+          ..[id] = label;
+      } else {
+        _societies[id] = label;
+      }
+      _societySearch.clear();
+    });
+  }
+
+  bool _canRemoveSociety(String id) {
+    if (!_locked) return true;
+    return false;
   }
 
   String _kitchenDisplayName(Map<String, dynamic> user) {
@@ -361,6 +433,12 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
     _eligible
       ..clear()
       ..addEntries(coupon.eligibleUserIds.map((id) => MapEntry(id, id)));
+    _societies
+      ..clear()
+      ..addEntries(
+        coupon.eligibleSocieties.map((s) => MapEntry(s.id, s.label)),
+      );
+    _multipleGoogleNames = coupon.eligibleSocieties.length > 1;
   }
 
   Future<void> _load() async {
@@ -475,7 +553,11 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
     });
     try {
       if (_editing) {
-        final updated = await ApiService.updateAdminCoupon(widget.couponId!, body);
+        await ApiService.updateAdminCoupon(widget.couponId!, body);
+        final updated = await ApiService.setAdminCouponEligibleSocieties(
+          widget.couponId!,
+          _societies.keys.toList(),
+        );
         if (!mounted) return;
         setState(() => _apply(updated));
         ScaffoldMessenger.of(context).showSnackBar(
@@ -484,13 +566,17 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
         Navigator.pop(context);
       } else {
         final created = await ApiService.createAdminCoupon(body);
+        final updated = await ApiService.setAdminCouponEligibleSocieties(
+          created.id,
+          _societies.keys.toList(),
+        );
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${created.code} created')),
         );
         Navigator.pop(
           context,
-          _audience == 'SELECTED_USERS' ? created.id : null,
+          _audience == 'SELECTED_USERS' ? updated.id : null,
         );
       }
     } catch (error) {
@@ -826,6 +912,78 @@ class _AdminCouponEditorScreenState extends State<AdminCouponEditorScreen> {
                           : 'SocietyEats subsidy cap. Leave blank for no cap.',
                       border: const OutlineInputBorder(),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Society scope (optional)',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _locked && _societies.isNotEmpty
+                        ? 'Society scope is locked after the first use. You can still add another society record.'
+                        : 'Leave empty for all societies. Pick one or more societies for a launch offer.',
+                    style: const TextStyle(color: Color(0xFF5C6B66)),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: _societies.entries
+                        .map(
+                          (entry) => Chip(
+                            label: Text(entry.value),
+                            onDeleted: _canRemoveSociety(entry.key)
+                                ? () => setState(() => _societies.remove(entry.key))
+                                : null,
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _societySearch,
+                    decoration: const InputDecoration(
+                      labelText: 'Find society',
+                      hintText: 'Name, city, or invite code',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  for (final society in _societyHits)
+                    ListTile(
+                      dense: true,
+                      title: Text(society['name']?.toString() ?? 'Society'),
+                      subtitle: Text(
+                        [
+                          society['city']?.toString(),
+                          society['inviteCode']?.toString(),
+                        ].whereType<String>().where((v) => v.isNotEmpty).join(' · '),
+                      ),
+                      onTap: () => _addSociety(society),
+                    ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _multipleGoogleNames,
+                    onChanged: _locked
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _multipleGoogleNames = value ?? false;
+                              if (!_multipleGoogleNames && _societies.length > 1) {
+                                final first = _societies.entries.first;
+                                _societies
+                                  ..clear()
+                                  ..[first.key] = first.value;
+                              }
+                            });
+                          },
+                    title: const Text('Same place, multiple names on Google'),
+                    subtitle: const Text(
+                      'Turn this on to include more society records for the same complex.',
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
                   ),
                   const SizedBox(height: 12),
                   const Text(

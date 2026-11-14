@@ -509,9 +509,12 @@ class _MainShellScreenState extends State<MainShellScreen>
                 )
               : const SizedBox.shrink(),
           _profileMounted
-              ? ProfileScreen(
+              ?               ProfileScreen(
                   key: _profileKey,
                   onSelectTab: _selectTab,
+                  onBuyerPlaceChanged: () {
+                    _homeKey.currentState?.refresh();
+                  },
                 )
               : const SizedBox.shrink(),
         ],

@@ -388,6 +388,15 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  bool _isSignInFailure(Object error) {
+    if (error is TokenExpiredException) return true;
+    final text = error.toString().toLowerCase();
+    return text.contains('authorization') ||
+        text.contains('invalid token') ||
+        text.contains('token expired') ||
+        text.contains('user not found');
+  }
+
   Future<void> _loadListings() async {
     final generation = ++_listingsLoadGeneration;
     var showSpinner = !_hasSuccessfullyLoaded;
@@ -507,7 +516,9 @@ class HomeScreenState extends State<HomeScreen> {
       if (!_hasSuccessfullyLoaded) {
         setState(() {
           _listings = [];
-          _error = 'Unable to load sellers right now.';
+          _error = _isSignInFailure(e)
+              ? 'Sign in again to load sellers.'
+              : 'Unable to load sellers right now.';
           _isLoading = false;
           _homeSlow = false;
         });
@@ -2159,6 +2170,9 @@ class HomeScreenState extends State<HomeScreen> {
       );
     }
     if (_filteredListings.isEmpty) {
+      if (_error != null) {
+        return const SliverToBoxAdapter(child: SizedBox.shrink());
+      }
       return SliverToBoxAdapter(
         child: StatusBanner(
           message: _searchQuery.isNotEmpty

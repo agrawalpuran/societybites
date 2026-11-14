@@ -656,4 +656,7 @@ router.delete(
   })
 );
 
+router.use("/me/addresses", require("./buyerAddresses"));
+router.use("/me/kitchen-move", require("./kitchenMoves"));
+
 module.exports = router;

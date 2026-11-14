@@ -8,6 +8,7 @@ const REASONS = {
   USAGE_LIMIT_REACHED: "USAGE_LIMIT_REACHED",
   BUYER_USAGE_LIMIT_REACHED: "BUYER_USAGE_LIMIT_REACHED",
   NOT_ELIGIBLE: "NOT_ELIGIBLE",
+  NOT_ELIGIBLE_SOCIETY: "NOT_ELIGIBLE_SOCIETY",
   NOT_ELIGIBLE_SELLER: "NOT_ELIGIBLE_SELLER",
   COUPON_PAUSED: "COUPON_PAUSED",
   COUPON_EXHAUSTED: "COUPON_EXHAUSTED",
@@ -144,6 +145,26 @@ function sellerScopeMismatch(coupon, orderSellerId) {
   return false;
 }
 
+async function societyScopeMismatch(db, coupon, userId) {
+  const eligible =
+    coupon.eligibleSocieties ||
+    (await db.couponEligibleSociety.findMany({
+      where: { couponId: coupon.id },
+      select: { societyId: true },
+    }));
+  if (!eligible.length) return false;
+
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { societyId: true },
+  });
+  const buyerSocietyId = user && user.societyId ? String(user.societyId) : null;
+  if (!buyerSocietyId) return true;
+
+  const allowed = new Set(eligible.map((row) => String(row.societyId)));
+  return !allowed.has(buyerSocietyId);
+}
+
 async function validateCoupon({
   code,
   userId,
@@ -157,7 +178,12 @@ async function validateCoupon({
   if (!normalized) return invalid(REASONS.INVALID_COUPON);
   const subtotal = normalizeSubtotal(orderSubtotal);
 
-  const coupon = await db.coupon.findUnique({ where: { code: normalized } });
+  const coupon = await db.coupon.findUnique({
+    where: { code: normalized },
+    include: {
+      eligibleSocieties: { select: { societyId: true } },
+    },
+  });
   if (!coupon || coupon.fundedBy !== "SOCIETYEATS") return invalid(REASONS.INVALID_COUPON);
   if (coupon.status === "PAUSED") return invalid(REASONS.COUPON_PAUSED);
   if (coupon.status === "EXHAUSTED") return invalid(REASONS.COUPON_EXHAUSTED);
@@ -182,6 +208,10 @@ async function validateCoupon({
 
   if (sellerScopeMismatch(coupon, sellerId)) {
     return invalid(REASONS.NOT_ELIGIBLE_SELLER);
+  }
+
+  if (await societyScopeMismatch(db, coupon, userId)) {
+    return invalid(REASONS.NOT_ELIGIBLE_SOCIETY);
   }
 
   const stats = await redeemedStats(db, coupon.id, userId);
@@ -225,6 +255,7 @@ function couponErrorMessage(reason, context = {}) {
       USAGE_LIMIT_REACHED: "This coupon has reached its usage limit",
       BUYER_USAGE_LIMIT_REACHED: "You have already used this coupon",
       NOT_ELIGIBLE: "This coupon is not available for your account",
+      NOT_ELIGIBLE_SOCIETY: "This coupon is not available in your society",
       NOT_ELIGIBLE_SELLER: "This coupon is not valid for this kitchen",
       COUPON_PAUSED: "This coupon is paused",
       COUPON_EXHAUSTED: "This coupon is no longer available",
@@ -332,7 +363,17 @@ function usageSummary(coupon, redemptions) {
   };
 }
 
+function mapEligibleSocieties(coupon) {
+  const rows = Array.isArray(coupon.eligibleSocieties) ? coupon.eligibleSocieties : [];
+  return rows.map((row) => ({
+    id: row.societyId,
+    name: row.society && row.society.name ? row.society.name : null,
+    city: row.society && row.society.city ? row.society.city : null,
+  }));
+}
+
 function serializeCoupon(coupon, summary) {
+  const eligibleSocieties = mapEligibleSocieties(coupon);
   return {
     id: coupon.id,
     code: coupon.code,
@@ -354,6 +395,8 @@ function serializeCoupon(coupon, summary) {
     sellerId: coupon.sellerId ?? null,
     sellerName: coupon.seller && coupon.seller.name ? coupon.seller.name : null,
     sellerPhone: coupon.seller && coupon.seller.phone ? coupon.seller.phone : null,
+    eligibleSocietyIds: eligibleSocieties.map((row) => row.id),
+    eligibleSocieties,
     createdAt: coupon.createdAt,
     updatedAt: coupon.updatedAt,
     ...summary,
@@ -488,9 +531,14 @@ async function loadCouponRow(id) {
 }
 
 async function createCoupon(body) {
-  const data = await parseCouponWrite(body);
+  const source = body && typeof body === "object" ? body : {};
+  const societyIds = source.societyIds;
+  const data = await parseCouponWrite(source);
   try {
     const coupon = await prisma.coupon.create({ data });
+    if (Array.isArray(societyIds) && societyIds.length) {
+      await assignEligibleSocieties(coupon.id, societyIds, { skipReturn: true });
+    }
     const full = await loadCouponRow(coupon.id);
     return withSummary(full || coupon);
   } catch (err) {
@@ -509,6 +557,12 @@ async function listCoupons() {
 
 const couponSellerInclude = {
   seller: { select: { id: true, name: true, phone: true } },
+  eligibleSocieties: {
+    select: {
+      societyId: true,
+      society: { select: { id: true, name: true, city: true } },
+    },
+  },
 };
 
 async function getCoupon(id) {
@@ -521,7 +575,11 @@ async function getCoupon(id) {
   });
   if (!coupon) throw httpError(404, "Coupon not found");
   const summary = await withSummary(coupon);
-  return { ...summary, eligibleUserIds: coupon.eligibleUsers.map((row) => row.userId) };
+  return {
+    ...summary,
+    eligibleUserIds: coupon.eligibleUsers.map((row) => row.userId),
+    eligibleSocietyIds: coupon.eligibleSocieties.map((row) => row.societyId),
+  };
 }
 
 async function updateCoupon(id, body) {
@@ -570,6 +628,58 @@ async function assignEligibleUsers(id, userIds) {
   return getCoupon(id);
 }
 
+async function assignEligibleSocieties(id, societyIds, { skipReturn = false } = {}) {
+  const coupon = await prisma.coupon.findUnique({
+    where: { id },
+    include: {
+      _count: { select: { redemptions: true } },
+      eligibleSocieties: { select: { societyId: true } },
+    },
+  });
+  if (!coupon) throw httpError(404, "Coupon not found");
+
+  const ids = Array.isArray(societyIds)
+    ? [...new Set(societyIds.map((value) => String(value).trim()).filter(Boolean))]
+    : [];
+
+  const existingIds = coupon.eligibleSocieties.map((row) => row.societyId);
+  const hasRedemptions = coupon._count.redemptions > 0;
+
+  if (hasRedemptions && existingIds.length > 0 && ids.length === 0) {
+    throw httpError(400, "Cannot remove society scope after the coupon has been used");
+  }
+  if (hasRedemptions && existingIds.length > 0) {
+    const next = new Set(ids);
+    for (const societyId of existingIds) {
+      if (!next.has(societyId)) {
+        throw httpError(400, "Cannot remove a society after the coupon has been used");
+      }
+    }
+  }
+
+  if (ids.length) {
+    const found = await prisma.society.findMany({
+      where: { id: { in: ids } },
+      select: { id: true },
+    });
+    if (found.length !== ids.length) throw httpError(400, "One or more societies were not found");
+  }
+
+  await prisma.$transaction([
+    prisma.couponEligibleSociety.deleteMany({ where: { couponId: id } }),
+    ...(ids.length
+      ? [
+          prisma.couponEligibleSociety.createMany({
+            data: ids.map((societyId) => ({ couponId: id, societyId })),
+          }),
+        ]
+      : []),
+  ]);
+
+  if (skipReturn) return null;
+  return getCoupon(id);
+}
+
 module.exports = {
   REASONS,
   money,
@@ -591,4 +701,5 @@ module.exports = {
   updateCoupon,
   setCouponStatus,
   assignEligibleUsers,
+  assignEligibleSocieties,
 };

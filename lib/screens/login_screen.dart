@@ -23,6 +23,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final FocusNode _phoneFocusNode = FocusNode();
+  final FocusNode _sendOtpFocusNode = FocusNode();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isSendingOtp = false;
   String _servingLabel = currentServingCity;
@@ -31,6 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _loadServingLabel();
+    _phoneController.addListener(_focusSendOtpWhenComplete);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _phoneFocusNode.requestFocus();
@@ -44,6 +46,18 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted || label.trim().isEmpty || label == _servingLabel) return;
       setState(() => _servingLabel = label.trim());
     } catch (_) {}
+  }
+
+  void _focusSendOtpWhenComplete() {
+    final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 10 || _sendOtpFocusNode.hasFocus || _isSendingOtp) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _sendOtpFocusNode.hasFocus || _isSendingOtp) return;
+      final current = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+      if (current.length == 10) _sendOtpFocusNode.requestFocus();
+    });
   }
 
   String _normalizeIndianNumber(String raw) {
@@ -167,8 +181,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _phoneController.removeListener(_focusSendOtpWhenComplete);
     _phoneController.dispose();
     _phoneFocusNode.dispose();
+    _sendOtpFocusNode.dispose();
     super.dispose();
   }
 
@@ -212,9 +228,11 @@ class _LoginScreenState extends State<LoginScreen> {
               _InputSection(
                 controller: _phoneController,
                 focusNode: _phoneFocusNode,
+                onSubmit: _isSendingOtp ? null : _sendOtp,
               ),
               const SizedBox(height: 22),
               _SendOtpButton(
+                focusNode: _sendOtpFocusNode,
                 isLoading: _isSendingOtp,
                 onTap: _isSendingOtp ? null : _sendOtp,
               ),
@@ -354,9 +372,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         _InputSection(
                           controller: _phoneController,
                           focusNode: _phoneFocusNode,
+                          onSubmit: _isSendingOtp ? null : _sendOtp,
                         ),
                         SizedBox(height: sectionGap),
                         _SendOtpButton(
+                          focusNode: _sendOtpFocusNode,
                           isLoading: _isSendingOtp,
                           onTap: _isSendingOtp ? null : _sendOtp,
                         ),
@@ -442,10 +462,15 @@ class _HeaderSection extends StatelessWidget {
 }
 
 class _InputSection extends StatelessWidget {
-  const _InputSection({required this.controller, required this.focusNode});
+  const _InputSection({
+    required this.controller,
+    required this.focusNode,
+    this.onSubmit,
+  });
 
   final TextEditingController controller;
   final FocusNode focusNode;
+  final VoidCallback? onSubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -496,6 +521,13 @@ class _InputSection extends StatelessWidget {
                   focusNode: focusNode,
                   autofocus: true,
                   keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) {
+                    if (controller.text.replaceAll(RegExp(r'\D'), '').length ==
+                        10) {
+                      onSubmit?.call();
+                    }
+                  },
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(10),
@@ -529,10 +561,15 @@ class _InputSection extends StatelessWidget {
 }
 
 class _SendOtpButton extends StatelessWidget {
-  const _SendOtpButton({required this.onTap, required this.isLoading});
+  const _SendOtpButton({
+    required this.onTap,
+    required this.isLoading,
+    required this.focusNode,
+  });
 
   final VoidCallback? onTap;
   final bool isLoading;
+  final FocusNode focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -540,6 +577,7 @@ class _SendOtpButton extends StatelessWidget {
     return SizedBox(
       height: isIos ? 44 : 48,
       child: ElevatedButton(
+        focusNode: focusNode,
         onPressed: onTap,
         style:
             ElevatedButton.styleFrom(

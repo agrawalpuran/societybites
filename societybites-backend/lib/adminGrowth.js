@@ -120,7 +120,7 @@ function buildBuckets(range, now = new Date()) {
 
   if (range === "day") {
     const todayStart = startOfIstDay(now);
-    for (let i = 13; i >= 0; i -= 1) {
+    for (let i = 6; i >= 0; i -= 1) {
       const start = addIstDays(todayStart, -i);
       const end = addIstDays(start, 1);
       buckets.push({ start, end, label: formatDayLabel(start) });
