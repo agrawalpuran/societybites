@@ -1,3 +1,13 @@
+# SocietyEats
+
+Hyperlocal food marketplace (repository and package name: SocietyBites). The product display name is SocietyEats.
+
+Start with [AGENTS.md](AGENTS.md) and [docs/LATEST_HANDOVER.md](docs/LATEST_HANDOVER.md). Setup is in [docs/ENVIRONMENT_SETUP.md](docs/ENVIRONMENT_SETUP.md). A prompt for a new AI session is in [docs/NEW_AI_SESSION_PROMPT.md](docs/NEW_AI_SESSION_PROMPT.md).
+
+The Flutter app is in `lib/`. The API is in `societybites-backend/`.
+
+---
+
 # societybites
 
 A new Flutter project.

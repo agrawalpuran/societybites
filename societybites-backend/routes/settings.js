@@ -1,9 +1,10 @@
 const express = require("express");
 const { asyncHandler } = require("../utils/asyncHandler");
-const { getPlatformFee } = require("../lib/platformFee");
+const { getPlatformFee, resolvePlatformFee } = require("../lib/platformFee");
 const { getForceUpdateConfig } = require("../lib/appForceUpdate");
 const { refreshServingCities } = require("../lib/servingCities");
 const { servingCityPayload } = require("../lib/launchCity");
+const { requireUser } = require("../middleware/requireUser");
 
 const router = express.Router();
 
@@ -23,6 +24,17 @@ router.get(
       androidUpdateUrl: forceUpdate.androidUpdateUrl,
       ...servingCityPayload(launch),
     });
+  })
+);
+
+router.get(
+  "/platform-fee",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const platformFee = await resolvePlatformFee({
+      societyId: req.user.societyId,
+    });
+    res.json({ platformFee });
   })
 );
 

@@ -218,31 +218,51 @@ const BUYER_WHERE_BASE = {
   ...automatedTestAccountExcludeWhere(),
 };
 
-async function countGrowthForWindow(prisma, start, end) {
+function growthUserScopeWhere(societyIds) {
+  if (societyIds === null || societyIds === undefined) return {};
+  if (!societyIds.length) return { societyId: { in: ["__none__"] } };
+  return { societyId: { in: societyIds } };
+}
+
+function growthSellerUserWhere(societyIds) {
+  const scope = growthUserScopeWhere(societyIds);
+  return {
+    ...automatedTestAccountExcludeWhere(),
+    ...scope,
+  };
+}
+
+async function countGrowthForWindow(prisma, start, end, societyIds = null) {
+  const userScope = growthUserScopeWhere(societyIds);
   const [newAccounts, newBuyers, newSellers] = await Promise.all([
     prisma.user.count({
       where: {
         ...ACCOUNT_WHERE_BASE,
+        ...userScope,
         createdAt: { gte: start, lt: end },
       },
     }),
     prisma.user.count({
       where: {
         ...BUYER_WHERE_BASE,
+        ...userScope,
         createdAt: { gte: start, lt: end },
       },
     }),
     prisma.sellerTermsAcceptance.count({
       where: {
         acceptedAt: { gte: start, lt: end },
-        user: automatedTestAccountExcludeWhere(),
+        user: growthSellerUserWhere(societyIds),
       },
     }),
   ]);
   return { newAccounts, newBuyers, newSellers };
 }
 
-async function getAdminGrowth(prisma, range, now = new Date()) {
+async function getAdminGrowth(prisma, range, options = {}, now = new Date()) {
+  const societyIds =
+    options.societyIds === undefined ? null : options.societyIds;
+  const cityKey = options.cityKey || null;
   const buckets = buildBuckets(range, now);
   if (buckets.length === 0) {
     return {
@@ -263,7 +283,8 @@ async function getAdminGrowth(prisma, range, now = new Date()) {
     const counts = await countGrowthForWindow(
       prisma,
       bucket.start,
-      bucket.end
+      bucket.end,
+      societyIds
     );
     series.push({
       label: bucket.label,
@@ -273,7 +294,12 @@ async function getAdminGrowth(prisma, range, now = new Date()) {
     });
   }
 
-  const summary = await countGrowthForWindow(prisma, rangeStart, rangeEnd);
+  const summary = await countGrowthForWindow(
+    prisma,
+    rangeStart,
+    rangeEnd,
+    societyIds
+  );
 
   // Latest period first (e.g. today on top for daily view).
   series.reverse();
@@ -283,6 +309,7 @@ async function getAdminGrowth(prisma, range, now = new Date()) {
     timezone: "Asia/Kolkata",
     start: rangeStart.toISOString(),
     end: rangeEnd.toISOString(),
+    scope: cityKey ? { cityKey } : { cityKey: null },
     summary,
     series,
   };
@@ -343,11 +370,19 @@ function mapUserContact(user, eventAt, { includeSociety = false } = {}) {
   };
 }
 
-async function listAdminGrowthMembers(prisma, metric, start, end) {
+async function listAdminGrowthMembers(
+  prisma,
+  metric,
+  start,
+  end,
+  societyIds = null
+) {
+  const userScope = growthUserScopeWhere(societyIds);
   if (metric === "accounts") {
     const users = await prisma.user.findMany({
       where: {
         ...ACCOUNT_WHERE_BASE,
+        ...userScope,
         createdAt: { gte: start, lt: end },
       },
       select: USER_CONTACT_SELECT,
@@ -363,6 +398,7 @@ async function listAdminGrowthMembers(prisma, metric, start, end) {
     const users = await prisma.user.findMany({
       where: {
         ...BUYER_WHERE_BASE,
+        ...userScope,
         createdAt: { gte: start, lt: end },
       },
       select: USER_CONTACT_SELECT,
@@ -377,7 +413,7 @@ async function listAdminGrowthMembers(prisma, metric, start, end) {
   const acceptances = await prisma.sellerTermsAcceptance.findMany({
     where: {
       acceptedAt: { gte: start, lt: end },
-      user: automatedTestAccountExcludeWhere(),
+      user: growthSellerUserWhere(societyIds),
     },
     include: { user: { select: USER_CONTACT_SELECT } },
     orderBy: { acceptedAt: "desc" },

@@ -226,7 +226,7 @@ async function getOwnIssue(userId, id) {
   return serializeIssue(row, { includeThread: true });
 }
 
-async function listAdminIssues(status) {
+async function listAdminIssues(status, { societyIds = null } = {}) {
   const where = {};
   if (status && status !== "ALL") {
     const normalized = String(status).trim().toUpperCase();
@@ -234,6 +234,14 @@ async function listAdminIssues(status) {
       throw httpError(400, "Status is invalid");
     }
     where.status = normalized;
+  }
+  if (societyIds !== null && societyIds !== undefined) {
+    Object.assign(
+      where,
+      societyIds.length
+        ? { user: { societyId: { in: societyIds } } }
+        : { user: { societyId: { in: ["__none__"] } } }
+    );
   }
   const rows = await prisma.issueReport.findMany({
     where,

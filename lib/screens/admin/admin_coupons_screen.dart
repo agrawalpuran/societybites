@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../admin/admin_city_scope.dart';
 import '../../models/coupon.dart';
 import '../../services/api_service.dart';
 import '../../web/web_page_frame.dart';
@@ -21,7 +22,7 @@ class AdminCouponsScreen extends StatefulWidget {
 }
 
 class _AdminCouponsScreenState extends State<AdminCouponsScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AdminCityScopeListener<AdminCouponsScreen> {
   static const _filters = [
     'ALL',
     'ACTIVE',
@@ -50,16 +51,26 @@ class _AdminCouponsScreenState extends State<AdminCouponsScreen>
     super.dispose();
   }
 
+  @override
+  void onAdminCityScopeChanged() {
+    _load();
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final load = widget.loadCoupons ?? ApiService.getAdminCoupons;
-      final coupons = await load();
-      if (!mounted) return;
-      setState(() => _coupons = coupons);
+      if (widget.loadCoupons != null) {
+        final coupons = await widget.loadCoupons!();
+        if (!mounted) return;
+        setState(() => _coupons = coupons);
+      } else {
+        final coupons = await ApiService.getAdminCoupons(cityKey: adminCityKey);
+        if (!mounted) return;
+        setState(() => _coupons = coupons);
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = ApiService.userFacingError(error));

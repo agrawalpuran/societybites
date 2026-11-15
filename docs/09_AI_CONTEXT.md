@@ -1,5 +1,7 @@
 # AI Context
 
+**Current instructions live in [AGENTS.md](../AGENTS.md).** The numbered files in this folder (`01` through `17`, plus older audits) are retained history. Where they disagree with the code or with `docs/PROJECT_CONTEXT.md`, `docs/ARCHITECTURE.md`, and `docs/PROJECT_STATUS.md`, follow the code and those newer documents. Several older pages still say pickup-only and single-society. The application now supports delivery, selling reach, and multiple societies.
+
 Before making changes:
 
 - Read all documentation in /docs.

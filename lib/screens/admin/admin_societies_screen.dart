@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../admin/admin_city_scope.dart';
 import '../../services/api_service.dart';
 import '../../widgets/admin_loading_panel.dart';
 
@@ -10,7 +11,8 @@ class AdminSocietiesScreen extends StatefulWidget {
   State<AdminSocietiesScreen> createState() => _AdminSocietiesScreenState();
 }
 
-class _AdminSocietiesScreenState extends State<AdminSocietiesScreen> {
+class _AdminSocietiesScreenState extends State<AdminSocietiesScreen>
+    with AdminCityScopeListener<AdminSocietiesScreen> {
   List<Map<String, dynamic>> _societies = [];
   bool _isLoading = true;
   String? _error;
@@ -21,13 +23,18 @@ class _AdminSocietiesScreenState extends State<AdminSocietiesScreen> {
     _loadSocieties();
   }
 
+  @override
+  void onAdminCityScopeChanged() {
+    _loadSocieties();
+  }
+
   Future<void> _loadSocieties() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
-      final data = await ApiService.getAdminSocieties();
+      final data = await ApiService.getAdminSocieties(cityKey: adminCityKey);
       if (!mounted) return;
       setState(() {
         _societies = data;

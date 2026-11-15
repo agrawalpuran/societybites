@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../admin/admin_city_scope.dart';
 import '../../models/issue_report.dart';
 import '../../services/api_service.dart';
 import '../../web/web_page_frame.dart';
@@ -13,7 +14,8 @@ class AdminIssuesScreen extends StatefulWidget {
   State<AdminIssuesScreen> createState() => _AdminIssuesScreenState();
 }
 
-class _AdminIssuesScreenState extends State<AdminIssuesScreen> {
+class _AdminIssuesScreenState extends State<AdminIssuesScreen>
+    with AdminCityScopeListener<AdminIssuesScreen> {
   static const _filters = ['ALL', 'OPEN', 'UNDER_REVIEW', 'RESOLVED', 'CLOSED'];
 
   List<IssueReport> _issues = const [];
@@ -27,6 +29,11 @@ class _AdminIssuesScreenState extends State<AdminIssuesScreen> {
     _load();
   }
 
+  @override
+  void onAdminCityScopeChanged() {
+    _load();
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -35,6 +42,7 @@ class _AdminIssuesScreenState extends State<AdminIssuesScreen> {
     try {
       final issues = await ApiService.getAdminIssues(
         status: _filter == 'ALL' ? null : _filter,
+        cityKey: adminCityKey,
       );
       if (!mounted) return;
       setState(() => _issues = issues);

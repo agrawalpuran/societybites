@@ -27,6 +27,8 @@ class SessionService {
   static const _authProviderKey = 'auth_provider';
   /// New-user path after OTP: [onboardingIntentBuyer] or [onboardingIntentSeller].
   static const _onboardingIntentKey = 'onboarding_intent';
+  /// Last metro selected in admin city scope (device-local, not secret).
+  static const _adminCityScopeKey = 'admin_city_scope_key';
   static const onboardingIntentBuyer = 'buyer';
   static const onboardingIntentSeller = 'seller';
 
@@ -344,6 +346,20 @@ class SessionService {
   static Future<void> clearOnboardingIntent() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_onboardingIntentKey);
+  }
+
+  static Future<void> saveAdminCityScope(String? cityKey) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (cityKey == null || cityKey.isEmpty) {
+      await prefs.remove(_adminCityScopeKey);
+    } else {
+      await prefs.setString(_adminCityScopeKey, cityKey);
+    }
+  }
+
+  static Future<String?> getAdminCityScope() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_adminCityScopeKey);
   }
 
   static Future<void> clear() async {

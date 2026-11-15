@@ -5,6 +5,7 @@ const {
   endOfIstDay,
   QUALIFYING_SALES_STATUS,
 } = require("./sellerInsights");
+const { resolvePerformanceSocietyFilter } = require("./adminCityDashboard");
 
 const TERMINAL_FAILURE_STATUSES = new Set(["cancelled", "rejected"]);
 const LEADERBOARD_SORT = new Set([
@@ -62,10 +63,16 @@ function resolvePerformanceRange(query = {}) {
   return range;
 }
 
-function buildOrderWhere(range, societyId) {
+function buildOrderWhere(range, societyFilter) {
+  const base = { createdAt: { gte: range.from, lte: range.to } };
+  if (!societyFilter || societyFilter.mode === "all") return base;
+  if (societyFilter.mode === "single") {
+    return { ...base, societyId: societyFilter.societyId };
+  }
+  const ids = societyFilter.societyIds || [];
   return {
-    createdAt: { gte: range.from, lte: range.to },
-    ...(societyId ? { societyId: String(societyId) } : {}),
+    ...base,
+    societyId: ids.length ? { in: ids } : { in: ["__none__"] },
   };
 }
 
@@ -198,9 +205,9 @@ function aggregateOrders(orders) {
   };
 }
 
-async function loadOrdersForRange(prisma, range, societyId) {
+async function loadOrdersForRange(prisma, range, societyFilter) {
   return prisma.order.findMany({
-    where: buildOrderWhere(range, societyId),
+    where: buildOrderWhere(range, societyFilter),
     select: orderSelect,
     orderBy: { createdAt: "desc" },
     take: MAX_EXPORT_ROWS + 1,
@@ -459,8 +466,8 @@ function parsePageLimit(query) {
 
 async function getPerformanceSummary(prisma, query) {
   const range = resolvePerformanceRange(query);
-  const societyId = query.societyId ? String(query.societyId) : null;
-  const orders = await loadOrdersForRange(prisma, range, societyId);
+  const societyFilter = await resolvePerformanceSocietyFilter(prisma, query);
+  const orders = await loadOrdersForRange(prisma, range, societyFilter);
   const truncated = orders.length > MAX_EXPORT_ROWS;
   const slice = truncated ? orders.slice(0, MAX_EXPORT_ROWS) : orders;
   const { summary, paymentStatusCounts, paymentMethodCounts } = aggregateOrders(slice);
@@ -477,7 +484,11 @@ async function getPerformanceSummary(prisma, query) {
       timezone: range.timezone,
       endInclusive: true,
     },
-    filters: { societyId },
+    filters: {
+      societyId:
+        societyFilter.mode === "single" ? societyFilter.societyId : null,
+      cityKey: societyFilter.mode === "city" ? societyFilter.cityKey : null,
+    },
     summary: {
       ...summary,
       ordersCreated: created,
@@ -494,9 +505,9 @@ async function getPerformanceSummary(prisma, query) {
 
 async function getPerformanceLeaderboard(prisma, query) {
   const range = resolvePerformanceRange(query);
-  const societyId = query.societyId ? String(query.societyId) : null;
+  const societyFilter = await resolvePerformanceSocietyFilter(prisma, query);
   const { page, limit, skip } = parsePageLimit(query);
-  const orders = await loadOrdersForRange(prisma, range, societyId);
+  const orders = await loadOrdersForRange(prisma, range, societyFilter);
   const slice = orders.slice(0, MAX_EXPORT_ROWS);
   const { bySeller } = aggregateOrders(slice);
   const rows = sortLeaderboard(
@@ -521,9 +532,10 @@ async function getPerformanceLeaderboard(prisma, query) {
 
 async function getSellerPerformanceDetail(prisma, sellerId, query) {
   const range = resolvePerformanceRange(query);
+  const societyFilter = await resolvePerformanceSocietyFilter(prisma, query);
   const orders = await prisma.order.findMany({
     where: {
-      ...buildOrderWhere(range, query.societyId),
+      ...buildOrderWhere(range, societyFilter),
       items: { some: { listing: { sellerId } } },
     },
     select: orderSelect,
@@ -578,9 +590,10 @@ async function getSellerPerformanceDetail(prisma, sellerId, query) {
 
 async function getSellerPerformanceOrders(prisma, sellerId, query) {
   const range = resolvePerformanceRange(query);
+  const societyFilter = await resolvePerformanceSocietyFilter(prisma, query);
   const { page, limit, skip } = parsePageLimit(query);
   const where = {
-    ...buildOrderWhere(range, query.societyId),
+    ...buildOrderWhere(range, societyFilter),
     items: { some: { listing: { sellerId } } },
   };
 
@@ -661,10 +674,10 @@ function aggregateCampaigns(orders) {
 
 async function getCampaignPerformance(prisma, query) {
   const range = resolvePerformanceRange(query);
-  const societyId = query.societyId ? String(query.societyId) : null;
+  const societyFilter = await resolvePerformanceSocietyFilter(prisma, query);
   const orders = await prisma.order.findMany({
     where: {
-      ...buildOrderWhere(range, societyId),
+      ...buildOrderWhere(range, societyFilter),
       type: "pre_order",
       campaignId: { not: null },
     },
@@ -719,8 +732,8 @@ function buildCsv(rows) {
 
 async function getPerformanceExportCsv(prisma, query) {
   const range = resolvePerformanceRange(query);
-  const societyId = query.societyId ? String(query.societyId) : null;
-  const orders = await loadOrdersForRange(prisma, range, societyId);
+  const societyFilter = await resolvePerformanceSocietyFilter(prisma, query);
+  const orders = await loadOrdersForRange(prisma, range, societyFilter);
   const slice = orders.slice(0, MAX_EXPORT_ROWS);
   const { bySeller } = aggregateOrders(slice);
   const rows = sortLeaderboard(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../admin/admin_city_scope.dart';
 import '../../services/api_service.dart';
 import '../../widgets/admin_loading_panel.dart';
 
@@ -21,7 +22,8 @@ class AdminSellerPerformanceScreen extends StatefulWidget {
 }
 
 class _AdminSellerPerformanceScreenState
-    extends State<AdminSellerPerformanceScreen> {
+    extends State<AdminSellerPerformanceScreen>
+    with AdminCityScopeListener<AdminSellerPerformanceScreen> {
   static const _presets = <String, String>{
     'last_7_days': '7 days',
     'last_30_days': '30 days',
@@ -51,6 +53,11 @@ class _AdminSellerPerformanceScreenState
     _load();
   }
 
+  @override
+  void onAdminCityScopeChanged() {
+    _load();
+  }
+
   Future<void> _load() async {
     if (_preset == 'custom' && (_customFrom == null || _customTo == null)) {
       setState(() {
@@ -72,6 +79,7 @@ class _AdminSellerPerformanceScreenState
           preset: _preset,
           from: _fromYmd,
           to: _toYmd,
+          cityKey: adminCityKey,
         ),
         ApiService.getAdminPerformanceSellers(
           preset: _preset,
@@ -79,11 +87,13 @@ class _AdminSellerPerformanceScreenState
           to: _toYmd,
           sort: _sort,
           limit: 50,
+          cityKey: adminCityKey,
         ),
         ApiService.getAdminPerformanceCampaigns(
           preset: _preset,
           from: _fromYmd,
           to: _toYmd,
+          cityKey: adminCityKey,
         ),
       ]);
       if (!mounted) return;
@@ -136,6 +146,7 @@ class _AdminSellerPerformanceScreenState
         sort: _sort,
         from: _fromYmd,
         to: _toYmd,
+        cityKey: adminCityKey,
       );
       await Clipboard.setData(ClipboardData(text: csv));
       if (!mounted) return;

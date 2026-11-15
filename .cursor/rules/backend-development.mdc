@@ -1,0 +1,19 @@
+---
+description: Express API conventions for SocietyEats
+globs: societybites-backend/**/*.js
+alwaysApply: false
+---
+
+# Backend
+
+Entry point is `societybites-backend/index.js`. Routes live in `routes/`. Business rules live in `lib/`. Use `asyncHandler`.
+
+- Return the existing error shape: `err.statusCode` plus `{ error: message }`. Do not leak stack traces. Unique and missing Prisma errors are already handled globally.
+- Protect routes with `requireUser`. Load the user from the JWT. Compare buyer and seller ids on the server.
+- Non-GET `/admin` routes must stay behind `requireSuperAdmin`. The admin router already enforces this. Do not mount a write route outside it.
+- Keep order transitions in `routes/orders.js`. Do not assign `preparing` or `picked_up`. Rejection stays `POST /orders/:id/reject`.
+- Register static path segments before `/:id`.
+- Call WhatsApp only through `lib/whatsappCloud.js`. Do not await it in a way that fails the HTTP request. Keep `void flushNotification(...)` for FCM.
+- Payment provider values are `direct_upi` and `cashfree` only. Checkout must keep writing `Order.paymentProvider`.
+- Reuse `lib/platformFee.js`, `lib/coupons.js`, and `lib/payments/` instead of a second implementation.
+- Add or extend a test in `societybites-backend/tests/` for behavior you change. `npm run test:unit` does not need a database. Say so if you could not run it.

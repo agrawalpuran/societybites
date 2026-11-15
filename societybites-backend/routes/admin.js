@@ -24,6 +24,15 @@ const {
 } = require("../lib/coupons");
 const { canonicalCityKey } = require("../lib/launchCity");
 const {
+  getAdminDashboardStats,
+  getAdminDashboardCities,
+  resolveAdminCityKey,
+  societyIdsForCityKey,
+  societyRecordWhere,
+  mergeSocietyIdQuery,
+  reviewCityWhere,
+} = require("../lib/adminCityDashboard");
+const {
   listServingCityRows,
   refreshServingCities,
   saveActiveCityKeys,
@@ -94,7 +103,6 @@ const {
   getPerformanceExportCsv,
 } = require("../lib/adminSellerPerformance");
 const { getAdminOrderDetail } = require("../lib/adminOrderDetail");
-const { liveAccountWhere } = require("../lib/accountDeletion");
 const {
   parseStorefrontWrite,
   sellerRequestedSlugChange,
@@ -234,69 +242,21 @@ router.delete(
   })
 );
 
-// GET /admin/dashboard
+// GET /admin/dashboard — optional ?cityKey= for active serving cities only
 router.get(
   "/dashboard",
   asyncHandler(async (req, res) => {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const cityKey = await resolveAdminCityKey(req.query);
+    const payload = await getAdminDashboardStats(prisma, { cityKey });
+    res.json(payload);
+  })
+);
 
-    const [
-      totalUsers,
-      totalSellers,
-      totalBuyers,
-      totalSocieties,
-      activeListings,
-      soldOutListings,
-      totalOrders,
-      todayOrders,
-      pendingOrders,
-      completedOrders,
-      cancelledOrders,
-      totalReviews,
-      ratingAgg,
-      completedFoodSalesAgg,
-    ] = await Promise.all([
-      prisma.user.count({ where: liveAccountWhere }),
-      prisma.user.count({ where: { ...liveAccountWhere, role: "seller" } }),
-      prisma.user.count({ where: { ...liveAccountWhere, role: "buyer" } }),
-      prisma.society.count(),
-      prisma.listing.count({ where: { status: "active" } }),
-      prisma.listing.count({ where: { status: "sold_out" } }),
-      prisma.order.count(),
-      prisma.order.count({ where: { createdAt: { gte: todayStart } } }),
-      prisma.order.count({ where: { status: "pending" } }),
-      prisma.order.count({ where: { status: "completed" } }),
-      prisma.order.count({ where: { status: "cancelled" } }),
-      prisma.review.count(),
-      prisma.review.aggregate({ _avg: { rating: true } }),
-      // Food sales only (subtotal). Excludes deliveryCharge and communityFee.
-      prisma.order.aggregate({
-        where: { status: "completed" },
-        _sum: { subtotal: true },
-      }),
-    ]);
-
-    const totalSales = Math.round(
-      (Number(completedFoodSalesAgg._sum.subtotal) || 0) * 100
-    ) / 100;
-
-    res.json({
-      totalUsers,
-      totalSellers,
-      totalBuyers,
-      totalSocieties,
-      activeListings,
-      soldOutListings,
-      totalOrders,
-      todayOrders,
-      pendingOrders,
-      completedOrders,
-      cancelledOrders,
-      totalSales,
-      totalReviews,
-      avgPlatformRating: ratingAgg._avg.rating || 0,
-    });
+// GET /admin/dashboard/cities — one row per active serving city (7d order metrics)
+router.get(
+  "/dashboard/cities",
+  asyncHandler(async (req, res) => {
+    res.json(await getAdminDashboardCities(prisma));
   })
 );
 
@@ -373,7 +333,14 @@ router.get(
           "Invalid range. Use day, week, month, quarter, half_year, or year.",
       });
     }
-    const payload = await getAdminGrowth(prisma, range);
+    const cityKey = await resolveAdminCityKey(req.query);
+    const societyIds = cityKey
+      ? await societyIdsForCityKey(prisma, cityKey)
+      : null;
+    const payload = await getAdminGrowth(prisma, range, {
+      societyIds,
+      cityKey,
+    });
     res.json(payload);
   })
 );
@@ -394,11 +361,16 @@ router.get(
         error: "Invalid start/end ISO datetimes (end must be after start).",
       });
     }
+    const cityKey = await resolveAdminCityKey(req.query);
+    const societyIds = cityKey
+      ? await societyIdsForCityKey(prisma, cityKey)
+      : null;
     const members = await listAdminGrowthMembers(
       prisma,
       metric,
       window.start,
-      window.end
+      window.end,
+      societyIds
     );
     res.json({
       metric,
@@ -790,7 +762,12 @@ router.patch(
 router.get(
   "/societies",
   asyncHandler(async (req, res) => {
+    const cityKey = await resolveAdminCityKey(req.query);
+    const societyIds = cityKey
+      ? await societyIdsForCityKey(prisma, cityKey)
+      : null;
     const societies = await prisma.society.findMany({
+      where: societyRecordWhere(societyIds),
       include: {
         _count: {
           select: {
@@ -918,8 +895,13 @@ router.get(
     const take = parseInt(limit, 10);
     const skip = (parseInt(page, 10) - 1) * take;
 
+    const cityKey = await resolveAdminCityKey(req.query);
+    const citySocietyIds = cityKey
+      ? await societyIdsForCityKey(prisma, cityKey)
+      : null;
+
     const where = {
-      ...(societyId && { societyId: String(societyId) }),
+      ...mergeSocietyIdQuery(societyId, citySocietyIds),
       ...(sellerId && { sellerId: String(sellerId) }),
       ...(status && { status: String(status) }),
       ...(search && {
@@ -984,8 +966,13 @@ router.get(
     const take = parseInt(limit, 10);
     const skip = (parseInt(page, 10) - 1) * take;
 
+    const cityKey = await resolveAdminCityKey(req.query);
+    const citySocietyIds = cityKey
+      ? await societyIdsForCityKey(prisma, cityKey)
+      : null;
+
     const where = {
-      ...(societyId && { societyId: String(societyId) }),
+      ...mergeSocietyIdQuery(societyId, citySocietyIds),
       ...(buyerId && { buyerId: String(buyerId) }),
       ...(status && { status: String(status) }),
       ...(sellerId && {
@@ -1048,8 +1035,14 @@ router.get(
     const take = parseInt(limit, 10);
     const skip = (parseInt(page, 10) - 1) * take;
 
+    const cityKey = await resolveAdminCityKey(req.query);
+    const citySocietyIds = cityKey
+      ? await societyIdsForCityKey(prisma, cityKey)
+      : null;
+
     const where = {
       ...(listingId && { listingId: String(listingId) }),
+      ...reviewCityWhere(citySocietyIds),
     };
 
     const [reviews, total] = await Promise.all([
@@ -1263,20 +1256,21 @@ router.get(
   })
 );
 
-// GET /admin/settings
+// GET /admin/settings — optional ?cityKey= for platform fee override context
 router.get(
   "/settings",
-  asyncHandler(async (_req, res) => {
-    const { getPlatformFee } = require("../lib/platformFee");
+  asyncHandler(async (req, res) => {
+    const { getAdminPlatformFeePayload } = require("../lib/platformFee");
     const { getForceUpdateConfig } = require("../lib/appForceUpdate");
-    const platformFee = await getPlatformFee();
+    const cityKey = await resolveAdminCityKey(req.query);
+    const feePayload = await getAdminPlatformFeePayload(cityKey);
     const fssaiSellingRequirement = await isFssaiSellingRequirementEnabled();
     const whatsappOrderNotifications =
       await isWhatsAppOrderNotificationsEnabled();
     const paymentProvider = await getPaymentProvider();
     const forceUpdate = await getForceUpdateConfig({ bypassCache: true });
     res.json({
-      platformFee,
+      ...feePayload,
       fssaiSellingRequirement,
       whatsappOrderNotifications,
       paymentProvider,
@@ -1292,7 +1286,12 @@ router.get(
 router.patch(
   "/settings",
   asyncHandler(async (req, res) => {
-    const { setPlatformFee } = require("../lib/platformFee");
+    const {
+      setPlatformFee,
+      setCityPlatformFeeOverride,
+      clearCityPlatformFeeOverride,
+      getAdminPlatformFeePayload,
+    } = require("../lib/platformFee");
     const { setForceUpdateConfig, getForceUpdateConfig } = require(
       "../lib/appForceUpdate"
     );
@@ -1305,12 +1304,28 @@ router.patch(
       minAndroidBuild,
       iosUpdateUrl,
       androidUpdateUrl,
+      useGlobalPlatformFee,
     } = req.body;
+
+    const settingsCityKey = await resolveAdminCityKey(req.query);
 
     const updates = {};
     let whatsappOrderNotificationsPrevious;
-    if (platformFee !== undefined && platformFee !== null) {
-      updates.platformFee = await setPlatformFee(platformFee);
+    if (useGlobalPlatformFee === true && settingsCityKey) {
+      await clearCityPlatformFeeOverride(settingsCityKey, req.query);
+      updates.platformFeeClearedForCity = settingsCityKey;
+    } else if (platformFee !== undefined && platformFee !== null) {
+      if (settingsCityKey) {
+        const row = await setCityPlatformFeeOverride(
+          settingsCityKey,
+          platformFee,
+          req.query
+        );
+        updates.platformFee = row.platformFee;
+        updates.cityPlatformFeeOverride = row.platformFee;
+      } else {
+        updates.platformFee = await setPlatformFee(platformFee);
+      }
     }
     if (fssaiSellingRequirement !== undefined) {
       updates.fssaiSellingRequirement = await setFssaiSellingRequirement(
@@ -1368,10 +1383,10 @@ router.patch(
     });
 
     const forceUpdate = await getForceUpdateConfig({ bypassCache: true });
+    const feePayload = await getAdminPlatformFeePayload(settingsCityKey);
     res.json({
-      platformFee:
-        updates.platformFee ??
-        (await require("../lib/platformFee").getPlatformFee()),
+      ...feePayload,
+      platformFee: updates.platformFee ?? feePayload.platformFee,
       fssaiSellingRequirement:
         updates.fssaiSellingRequirement ??
         (await isFssaiSellingRequirementEnabled()),
@@ -1483,7 +1498,11 @@ router.put(
 router.get(
   "/issues",
   asyncHandler(async (req, res) => {
-    const issues = await listAdminIssues(req.query.status);
+    const cityKey = await resolveAdminCityKey(req.query);
+    const societyIds = cityKey
+      ? await societyIdsForCityKey(prisma, cityKey)
+      : null;
+    const issues = await listAdminIssues(req.query.status, { societyIds });
     res.json({ issues });
   })
 );
@@ -1527,7 +1546,11 @@ router.post(
 router.get(
   "/coupons",
   asyncHandler(async (req, res) => {
-    const coupons = await listCoupons();
+    const cityKey = await resolveAdminCityKey(req.query);
+    const societyIds = cityKey
+      ? await societyIdsForCityKey(prisma, cityKey)
+      : null;
+    const coupons = await listCoupons({ societyIds });
     res.json({ coupons });
   })
 );

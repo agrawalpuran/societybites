@@ -1,0 +1,17 @@
+---
+description: Prisma and Postgres rules for SocietyEats
+globs: societybites-backend/prisma/**/*
+alwaysApply: false
+---
+
+# Database
+
+Schema: `societybites-backend/prisma/schema.prisma`. Runtime URL is `DATABASE_URL` (pooler). Migrations use `DIRECT_URL`.
+
+- Change the schema with a new Prisma migration. Do not edit an applied migration.
+- Most statuses are strings. Coupon fields are the only Prisma enums. If you add a status, update the route or library that allows it, and document the value in `docs/DATABASE_REFERENCE.md`.
+- Keep foreign keys. `ListingLike.listingId` is intentionally not a foreign key. `Flat.block` is a string and is not a `Block` id. Do not "fix" either without an approved data migration.
+- `User.societyId` is the current society, not a permanent one. Buyer address selection updates it. Seller society changes go through `KitchenMove`.
+- Do not delete or rewrite production rows from a script unless the owner asks. Cleanup scripts in `societybites-backend/scripts/` are for test data.
+- `npm start` runs migrations. `npm run dev` does not.
+- After a schema change, update `docs/DATABASE_REFERENCE.md` and `docs/PROJECT_STATUS.md`.

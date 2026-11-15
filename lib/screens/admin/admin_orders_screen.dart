@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../admin/admin_city_scope.dart';
 import '../../services/api_service.dart';
 import '../../widgets/admin_loading_panel.dart';
 import '../../widgets/screen_loading_note.dart';
@@ -64,7 +65,8 @@ class AdminOrdersScreen extends StatefulWidget {
   State<AdminOrdersScreen> createState() => _AdminOrdersScreenState();
 }
 
-class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
+class _AdminOrdersScreenState extends State<AdminOrdersScreen>
+    with AdminCityScopeListener<AdminOrdersScreen> {
   String _statusFilter = '';
   String _datePreset = 'all';
   DateTime? _customFrom;
@@ -78,6 +80,11 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   @override
   void initState() {
     super.initState();
+    _loadOrders();
+  }
+
+  @override
+  void onAdminCityScopeChanged() {
     _loadOrders();
   }
 
@@ -101,6 +108,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         dateFrom: range.from,
         dateTo: range.to,
         page: _page,
+        cityKey: adminCityKey,
       );
       if (!mounted) return;
       setState(() {

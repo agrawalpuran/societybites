@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../admin/admin_city_scope.dart';
 import '../../services/session_service.dart';
 import '../../web/admin_content_frame.dart';
+import '../../widgets/admin_city_scope_bar.dart';
 import '../../widgets/admin_loading_panel.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_societies_screen.dart';
@@ -31,6 +33,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   int _selectedIndex = 0;
   bool _isSuperAdmin = false;
   bool _roleLoaded = false;
+  final AdminCityScopeController _cityScope = AdminCityScopeController();
 
   static const _baseNavItems = <_NavItem>[
     _NavItem(icon: Icons.dashboard_rounded, label: 'Dashboard'),
@@ -65,6 +68,13 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   void initState() {
     super.initState();
     unawaited(_loadRole());
+    unawaited(_cityScope.bootstrap());
+  }
+
+  @override
+  void dispose() {
+    _cityScope.dispose();
+    super.dispose();
   }
 
   Future<void> _loadRole() async {
@@ -139,6 +149,41 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_roleLoaded && adminShellTabUsesCityScope(_selectedIndex))
+          ListenableBuilder(
+            listenable: _cityScope,
+            builder: (context, _) {
+              return Material(
+                color: Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_cityScope.selectedCityKey != null &&
+                          _cityScope.selectedDisplayName != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            'Filtered to ${_cityScope.selectedDisplayName} '
+                            '— lists and metrics on this tab match this city.',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6A7774),
+                            ),
+                          ),
+                        ),
+                      AdminCityScopeBar(
+                        activeCities: _cityScope.activeCities,
+                        selectedCityKey: _cityScope.selectedCityKey,
+                        onSelected: (key) => _cityScope.selectCity(key),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
         if (_roleLoaded && !_isSuperAdmin) // view-only: consoleAdmin or legacy admin role
           const Material(
             color: Color(0xFFE8F5EE),
@@ -175,8 +220,10 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   Widget build(BuildContext context) {
     final navItems = _navItems;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
+        return AdminCityScope(
+      controller: _cityScope,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 800;
 
         if (isWide) {
@@ -255,6 +302,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           ),
         );
       },
+      ),
     );
   }
 }

@@ -7,7 +7,9 @@ import '../services/api_service.dart';
 
 /// Read-only signup / seller-enable trends for admin console (super + view-only).
 class AdminGrowthPanel extends StatefulWidget {
-  const AdminGrowthPanel({super.key});
+  const AdminGrowthPanel({super.key, this.cityKey});
+
+  final String? cityKey;
 
   @override
   State<AdminGrowthPanel> createState() => _AdminGrowthPanelState();
@@ -53,13 +55,24 @@ class _AdminGrowthPanelState extends State<AdminGrowthPanel> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(covariant AdminGrowthPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.cityKey != widget.cityKey) {
+      _load();
+    }
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final data = await ApiService.getAdminGrowth(range: _range);
+      final data = await ApiService.getAdminGrowth(
+        range: _range,
+        cityKey: widget.cityKey,
+      );
       if (!mounted) return;
       setState(() {
         _data = data;
@@ -173,6 +186,7 @@ class _AdminGrowthPanelState extends State<AdminGrowthPanel> {
           _GrowthBody(
             data: _data!,
             windowLabel: _ranges[_range] ?? 'Selected range',
+            cityKey: widget.cityKey,
           ),
       ],
     );
@@ -195,6 +209,7 @@ Future<void> _showGrowthMembersSheet({
   required String periodLabel,
   required String start,
   required String end,
+  String? cityKey,
 }) async {
   await showModalBottomSheet<void>(
     context: context,
@@ -213,6 +228,7 @@ Future<void> _showGrowthMembersSheet({
           periodLabel: periodLabel,
           start: start,
           end: end,
+          cityKey: cityKey,
         ),
       );
     },
@@ -226,6 +242,7 @@ class _GrowthMembersSheet extends StatefulWidget {
     required this.periodLabel,
     required this.start,
     required this.end,
+    this.cityKey,
   });
 
   final String metric;
@@ -233,6 +250,7 @@ class _GrowthMembersSheet extends StatefulWidget {
   final String periodLabel;
   final String start;
   final String end;
+  final String? cityKey;
 
   @override
   State<_GrowthMembersSheet> createState() => _GrowthMembersSheetState();
@@ -259,6 +277,7 @@ class _GrowthMembersSheetState extends State<_GrowthMembersSheet> {
         metric: widget.metric,
         start: widget.start,
         end: widget.end,
+        cityKey: widget.cityKey,
       );
       if (!mounted) return;
       setState(() {
@@ -459,10 +478,15 @@ class _GrowthMembersSheetState extends State<_GrowthMembersSheet> {
 }
 
 class _GrowthBody extends StatelessWidget {
-  const _GrowthBody({required this.data, required this.windowLabel});
+  const _GrowthBody({
+    required this.data,
+    required this.windowLabel,
+    this.cityKey,
+  });
 
   final Map<String, dynamic> data;
   final String windowLabel;
+  final String? cityKey;
 
   @override
   Widget build(BuildContext context) {
@@ -488,6 +512,7 @@ class _GrowthBody extends StatelessWidget {
                 periodLabel: windowLabel,
                 start: rangeStart,
                 end: rangeEnd,
+                cityKey: cityKey,
               ),
             ),
             const SizedBox(width: 8),
@@ -501,6 +526,7 @@ class _GrowthBody extends StatelessWidget {
                 periodLabel: windowLabel,
                 start: rangeStart,
                 end: rangeEnd,
+                cityKey: cityKey,
               ),
             ),
             const SizedBox(width: 8),
@@ -514,6 +540,7 @@ class _GrowthBody extends StatelessWidget {
                 periodLabel: windowLabel,
                 start: rangeStart,
                 end: rangeEnd,
+                cityKey: cityKey,
               ),
             ),
           ],
@@ -623,6 +650,7 @@ class _GrowthBody extends StatelessWidget {
                                     row['label']?.toString() ?? 'Period',
                                 start: row['start']?.toString(),
                                 end: row['end']?.toString(),
+                                cityKey: cityKey,
                               ),
                             ),
                             Expanded(
@@ -636,6 +664,7 @@ class _GrowthBody extends StatelessWidget {
                                     row['label']?.toString() ?? 'Period',
                                 start: row['start']?.toString(),
                                 end: row['end']?.toString(),
+                                cityKey: cityKey,
                               ),
                             ),
                             Expanded(
@@ -649,6 +678,7 @@ class _GrowthBody extends StatelessWidget {
                                     row['label']?.toString() ?? 'Period',
                                 start: row['start']?.toString(),
                                 end: row['end']?.toString(),
+                                cityKey: cityKey,
                                 accent: true,
                               ),
                             ),
@@ -675,6 +705,7 @@ class _GrowthCountCell extends StatelessWidget {
     required this.periodLabel,
     required this.start,
     required this.end,
+    this.cityKey,
     this.accent = false,
   });
 
@@ -684,6 +715,7 @@ class _GrowthCountCell extends StatelessWidget {
   final String periodLabel;
   final String? start;
   final String? end;
+  final String? cityKey;
   final bool accent;
 
   bool get _canOpen =>
@@ -718,6 +750,7 @@ class _GrowthCountCell extends StatelessWidget {
           periodLabel: periodLabel,
           start: start!,
           end: end!,
+          cityKey: cityKey,
         ),
         borderRadius: BorderRadius.circular(6),
         child: Padding(
@@ -739,6 +772,7 @@ class _SummaryTile extends StatelessWidget {
     required this.periodLabel,
     required this.start,
     required this.end,
+    this.cityKey,
   });
 
   final String label;
@@ -749,6 +783,7 @@ class _SummaryTile extends StatelessWidget {
   final String periodLabel;
   final String? start;
   final String? end;
+  final String? cityKey;
 
   bool get _canOpen =>
       value > 0 &&
@@ -804,6 +839,7 @@ class _SummaryTile extends StatelessWidget {
                 periodLabel: periodLabel,
                 start: start!,
                 end: end!,
+                cityKey: cityKey,
               )
             : null,
         borderRadius: BorderRadius.circular(14),

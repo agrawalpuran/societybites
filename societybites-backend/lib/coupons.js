@@ -547,12 +547,23 @@ async function createCoupon(body) {
   }
 }
 
-async function listCoupons() {
+function filterCouponsForCityScope(coupons, societyIds) {
+  if (societyIds === null || societyIds === undefined) return coupons;
+  const set = new Set(societyIds);
+  return coupons.filter((coupon) => {
+    const ids = coupon.eligibleSocietyIds || [];
+    if (ids.length === 0) return true;
+    return ids.some((id) => set.has(id));
+  });
+}
+
+async function listCoupons({ societyIds = null } = {}) {
   const coupons = await prisma.coupon.findMany({
     orderBy: { createdAt: "desc" },
     include: couponSellerInclude,
   });
-  return Promise.all(coupons.map(withSummary));
+  const rows = await Promise.all(coupons.map(withSummary));
+  return filterCouponsForCityScope(rows, societyIds);
 }
 
 const couponSellerInclude = {
@@ -697,6 +708,7 @@ module.exports = {
   startOfIstMonth,
   createCoupon,
   listCoupons,
+  filterCouponsForCityScope,
   getCoupon,
   updateCoupon,
   setCouponStatus,

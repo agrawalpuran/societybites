@@ -1,0 +1,16 @@
+---
+description: Payments, WhatsApp, Firebase, and secret handling
+globs: "{societybites-backend/lib/whatsappCloud.js,societybites-backend/lib/whatsappSetting.js,societybites-backend/lib/firebase.js,societybites-backend/lib/twoFactor.js,societybites-backend/lib/payments/**,societybites-backend/routes/payments.js,societybites-backend/routes/paymentWebhooks.js,societybites-backend/lib/placesGoogle.js,societybites-backend/lib/objectStorage.js,lib/services/upi_payment_service.dart}"
+alwaysApply: false
+---
+
+# Integrations and security
+
+- Direct UPI is the default. Do not set `payment_provider` to `cashfree` or add Razorpay, PayU, or Twilio unless the owner approves.
+- Cashfree webhooks must keep signature checks (`x-webhook-signature`, raw body). Manual mark-paid stays rejected when `paymentProvider` is `cashfree`.
+- WhatsApp stays in `whatsappCloud.js`. Missing credentials, admin off, and `WHATSAPP_ENABLED=false` skip the send. Errors are logged and swallowed.
+- FCM stays in `utils/notifications.js`. Do not couple it to WhatsApp success.
+- Google Places and the Supabase service role key are server-only. Never put them in Flutter.
+- Firebase client files may stay in the app. Do not add Admin private keys, Cashfree secrets, or WhatsApp tokens to the repo. `Apple key/Firebase/*.p8` is a known leaked key. Do not copy it.
+- `TEST_OTP_ENABLED` stays false for real users. Do not return OTP values from the API.
+- Do not log phones, tokens, or PAN numbers while debugging.

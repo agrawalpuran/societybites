@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../admin/admin_city_scope.dart';
 import '../../services/api_service.dart';
 import '../../widgets/admin_loading_panel.dart';
 import '../../widgets/screen_loading_note.dart';
@@ -11,7 +12,8 @@ class AdminReviewsScreen extends StatefulWidget {
   State<AdminReviewsScreen> createState() => _AdminReviewsScreenState();
 }
 
-class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
+class _AdminReviewsScreenState extends State<AdminReviewsScreen>
+    with AdminCityScopeListener<AdminReviewsScreen> {
   List<Map<String, dynamic>> _reviews = [];
   bool _isLoading = true;
   String? _error;
@@ -24,6 +26,11 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
     _loadReviews();
   }
 
+  @override
+  void onAdminCityScopeChanged() {
+    _loadReviews();
+  }
+
   Future<void> _loadReviews({bool reset = true}) async {
     if (reset) {
       setState(() {
@@ -33,7 +40,10 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
       });
     }
     try {
-      final data = await ApiService.getAdminReviews(page: _page);
+      final data = await ApiService.getAdminReviews(
+        page: _page,
+        cityKey: adminCityKey,
+      );
       if (!mounted) return;
       setState(() {
         if (reset) {

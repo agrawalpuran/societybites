@@ -67,6 +67,7 @@ async function saveActiveCityKeys(keys) {
   const config = configForActiveKeys(normalized);
   applyLaunchCityConfig(config);
   cachedAt = Date.now();
+  require("./adminCityDashboard").clearSocietyCityMapCache();
   return config;
 }
 

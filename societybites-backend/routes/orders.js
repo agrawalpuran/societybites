@@ -31,7 +31,7 @@ const {
   orderInclude: reconciliationOrderInclude,
 } = require("../lib/sellerPaymentReconciliation");
 const { notifyPaymentReminder } = require("../utils/notifications");
-const { getPlatformFee } = require("../lib/platformFee");
+const { resolvePlatformFee } = require("../lib/platformFee");
 const { expireListingIfDue } = require("../utils/listingExpiry");
 const {
   assertMadeToOrderCapacity,
@@ -1162,7 +1162,7 @@ router.post(
       (sum, { unitPrice, quantity }) => sum + unitPrice * quantity,
       0
     );
-    const platformFee = await getPlatformFee();
+    const platformFee = await resolvePlatformFee({ societyId });
     const preCouponTotal = subtotal + platformFee + deliveryCharge;
     const couponCode =
       typeof req.body.couponCode === "string" ? req.body.couponCode.trim() : "";

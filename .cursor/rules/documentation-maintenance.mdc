@@ -1,0 +1,22 @@
+---
+description: Keep the SocietyEats knowledge base aligned with the code
+globs: "{AGENTS.md,docs/**/*.md,.cursor/rules/**/*.mdc}"
+alwaysApply: false
+---
+
+# Documentation maintenance
+
+The maintained knowledge base is `AGENTS.md` and the unsuffixed files in `docs/` listed there. `docs/01` through `docs/17` are archives. Do not delete them. If you change a fact they state, put the current fact in the newer doc and leave a short pointer rather than rewriting history in place.
+
+After a significant change, update the pages that changed:
+
+1. `docs/PROJECT_STATUS.md`
+2. `docs/ARCHITECTURE.md` when structure or a vendor changes
+3. `docs/DATABASE_REFERENCE.md` when Prisma changes
+4. `docs/API_REFERENCE.md` when a route changes
+5. `docs/DECISION_LOG.md` when a decision is made
+6. `docs/KNOWN_ISSUES.md` when an issue is found or fixed
+7. `docs/LATEST_HANDOVER.md`
+8. `docs/ROADMAP.md` when priorities change
+
+Write what the code does. Mark anything you did not run or did not see in production. Never paste secrets. Do not document a planned endpoint as if it is mounted.

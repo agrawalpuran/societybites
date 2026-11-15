@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../admin/admin_city_scope.dart';
 import '../../services/api_service.dart';
+import '../../widgets/admin_dashboard_cities_table.dart';
 import '../../widgets/admin_growth_panel.dart';
 import '../../widgets/admin_loading_panel.dart';
 import 'admin_city_reach_screen.dart';
@@ -25,9 +27,15 @@ class AdminDashboardScreen extends StatefulWidget {
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
-class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+class _AdminDashboardScreenState extends State<AdminDashboardScreen>
+    with AdminCityScopeListener<AdminDashboardScreen> {
   Map<String, dynamic>? _stats;
+  List<Map<String, dynamic>> _cityRows = const [];
+  Map<String, dynamic>? _cityTotals;
+  int _cityPeriodDays = 7;
   double _platformFee = 0;
+  double _platformFeeGlobal = 0;
+  bool _usesGlobalPlatformFee = true;
   bool _whatsappOrderNotifications = false;
   String _paymentProvider = 'direct_upi';
   int _minIosBuild = 0;
@@ -52,21 +60,60 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
   }
 
-  Future<void> _loadStats() async {
+  @override
+  void onAdminCityScopeChanged() {
+    _loadStats(keepCitiesTable: true);
+  }
+
+  Future<void> _loadStats({bool keepCitiesTable = false}) async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        ApiService.getAdminDashboard(),
-        ApiService.getAdminSettings(),
-      ]);
+      final futures = <Future<dynamic>>[
+        ApiService.getAdminDashboard(cityKey: adminCityKey),
+        ApiService.getAdminSettings(cityKey: adminCityKey),
+      ];
+      if (!keepCitiesTable) {
+        futures.add(ApiService.getAdminDashboardCities());
+      }
+      final results = await Future.wait(futures);
       if (!mounted) return;
       final settings = results[1] as Map<String, dynamic>;
+      final stats = results[0] as Map<String, dynamic>;
+      Map<String, dynamic>? citiesPayload;
+      if (!keepCitiesTable && results.length > 2) {
+        citiesPayload = results[2] as Map<String, dynamic>;
+      }
+
+      var cityRows = _cityRows;
+      var cityTotals = _cityTotals;
+      var periodDays = _cityPeriodDays;
+      if (citiesPayload != null) {
+        final rawRows = citiesPayload['rows'];
+        if (rawRows is List) {
+          cityRows = rawRows
+              .whereType<Map>()
+              .map((row) => Map<String, dynamic>.from(row))
+              .toList();
+        }
+        final totals = citiesPayload['totals'];
+        if (totals is Map) {
+          cityTotals = Map<String, dynamic>.from(totals);
+        }
+        periodDays = (citiesPayload['periodDays'] as num?)?.toInt() ?? 7;
+      }
+
       setState(() {
-        _stats = results[0] as Map<String, dynamic>;
+        _stats = stats;
+        _cityRows = cityRows;
+        _cityTotals = cityTotals;
+        _cityPeriodDays = periodDays;
         _platformFee = (settings['platformFee'] as num?)?.toDouble() ?? 0;
+        _platformFeeGlobal =
+            (settings['platformFeeGlobal'] as num?)?.toDouble() ?? _platformFee;
+        _usesGlobalPlatformFee = settings['usesGlobalPlatformFee'] != false;
         _whatsappOrderNotifications =
             settings['whatsappOrderNotifications'] == true;
         _paymentProvider =
@@ -202,7 +249,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  void _applyPlatformFeeSettings(Map<String, dynamic> settings) {
+    _platformFee = (settings['platformFee'] as num?)?.toDouble() ?? 0;
+    _platformFeeGlobal =
+        (settings['platformFeeGlobal'] as num?)?.toDouble() ?? _platformFee;
+    _usesGlobalPlatformFee = settings['usesGlobalPlatformFee'] != false;
+  }
+
+  String get _platformFeeCardSubtitle {
+    final amount = '₹${_platformFee.toStringAsFixed(0)} at checkout';
+    final cityKey = adminCityKey;
+    if (cityKey == null || cityKey.isEmpty) {
+      return '$amount · app-wide default';
+    }
+    if (_usesGlobalPlatformFee) {
+      return '$amount · uses global (₹${_platformFeeGlobal.toStringAsFixed(0)})';
+    }
+    final name = AdminCityScope.maybeOf(context)?.selectedDisplayName ?? cityKey;
+    return '$amount · $name override';
+  }
+
   Future<void> _editPlatformFee() async {
+    final cityKey = adminCityKey;
+    final scope = AdminCityScope.maybeOf(context);
+    final cityLabel = scope?.selectedDisplayName ?? cityKey;
     final controller = TextEditingController(
       text: _platformFee.toStringAsFixed(
         _platformFee == _platformFee.roundToDouble() ? 0 : 2,
@@ -211,17 +281,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final saved = await showDialog<double>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Platform Fee'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Amount (₹)',
-            hintText: '0',
-          ),
-          autofocus: true,
+        title: Text(cityKey == null ? 'Platform fee (global)' : 'Platform fee'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (cityKey != null) ...[
+              Text(
+                'City: $cityLabel. Checkout in this city uses the amount below '
+                'unless you revert to the global default '
+                '(₹${_platformFeeGlobal.toStringAsFixed(0)}).',
+                style: Theme.of(ctx).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+            ],
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Amount (₹)',
+                hintText: '0',
+              ),
+              autofocus: true,
+            ),
+          ],
         ),
         actions: [
+          if (cityKey != null && !_usesGlobalPlatformFee)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, -1),
+              child: const Text('Use global default'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
@@ -241,12 +331,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (saved == null || !mounted) return;
 
     try {
-      final updated = await ApiService.updateAdminPlatformFee(saved);
+      if (saved == -1 && cityKey != null) {
+        final updated = await ApiService.useGlobalAdminPlatformFee(cityKey: cityKey);
+        if (!mounted) return;
+        setState(() => _applyPlatformFeeSettings(updated));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Platform fee for $cityLabel uses global '
+              '₹${_platformFeeGlobal.toStringAsFixed(0)}',
+            ),
+          ),
+        );
+        return;
+      }
+      final updated = await ApiService.updateAdminPlatformFee(
+        saved,
+        cityKey: cityKey,
+      );
       if (!mounted) return;
-      setState(() => _platformFee = updated);
+      setState(() => _applyPlatformFeeSettings(updated));
+      final label = cityKey == null ? 'Global platform fee' : 'City platform fee';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Platform fee set to ₹${updated.toStringAsFixed(0)}'),
+          content: Text(
+            '$label set to ₹${_platformFee.toStringAsFixed(0)}',
+          ),
         ),
       );
     } catch (e) {
@@ -345,6 +455,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
 
     final stats = _stats!;
+    final orderWindowDays =
+        (stats['orderWindowDays'] as num?)?.toInt() ?? _cityPeriodDays;
+    final recent = stats['ordersRecent'] is Map
+        ? Map<String, dynamic>.from(stats['ordersRecent'] as Map)
+        : <String, dynamic>{};
 
     return RefreshIndicator(
       color: const Color(0xFF0E5A47),
@@ -362,6 +477,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 fontWeight: FontWeight.w800,
                 color: Color(0xFF101617),
               ),
+            ),
+            const SizedBox(height: 16),
+            AdminDashboardCitiesTable(
+              rows: _cityRows,
+              totals: _cityTotals,
+              periodDays: _cityPeriodDays,
+              selectedCityKey: adminCityKey,
+              onSelectCity: (key) =>
+                  AdminCityScope.maybeOf(context)?.selectCity(key),
             ),
             const SizedBox(height: 20),
             _SectionTitle(title: 'FSSAI'),
@@ -435,12 +559,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
             const SizedBox(height: 20),
             _SectionTitle(title: 'SETTINGS'),
+            if (adminCityKey != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Payment and alerts below are app-wide. Platform fee follows the '
+                'selected city when you change it.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  height: 1.35,
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             _SettingsPair(
               left: _SettingCard(
                 icon: Icons.payments_outlined,
                 title: 'Platform fee',
-                subtitle: '₹${_platformFee.toStringAsFixed(0)} at checkout',
+                subtitle: _platformFeeCardSubtitle,
                 onTap: _editPlatformFee,
               ),
               right: _SettingCard(
@@ -500,12 +636,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 icon: Icons.location_city_outlined,
                 title: 'Serving cities',
                 subtitle: 'Who can join',
-                onTap: () {
-                  Navigator.of(context).push(
+                onTap: () async {
+                  await Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const AdminServingCitiesScreen(),
                     ),
                   );
+                  if (mounted) {
+                    await AdminCityScope.maybeOf(context)?.reloadActiveCities();
+                    await _loadStats();
+                  }
                 },
               ),
             ),
@@ -552,7 +692,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            if (_showGrowthPanel) const AdminGrowthPanel(),
+            if (_showGrowthPanel)
+              AdminGrowthPanel(
+                key: ValueKey(adminCityKey ?? 'all'),
+                cityKey: adminCityKey,
+              ),
             const SizedBox(height: 24),
             _SectionTitle(title: 'USERS'),
             const SizedBox(height: 10),
@@ -596,41 +740,75 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             ]),
             const SizedBox(height: 24),
-            _SectionTitle(title: 'ORDERS'),
+            _SectionTitle(title: 'ORDERS — LAST $orderWindowDays DAYS'),
             const SizedBox(height: 10),
             _StatsGrid(cards: [
               _StatCard(
-                label: 'Total Orders',
-                value: '${stats['totalOrders'] ?? 0}',
+                label: 'Orders placed',
+                value: '${recent['orders'] ?? 0}',
                 icon: Icons.shopping_bag_rounded,
               ),
               _StatCard(
-                label: 'Today',
+                label: 'Completed',
+                value: '${recent['completed'] ?? 0}',
+                icon: Icons.check_circle_rounded,
+                color: const Color(0xFF2E7D32),
+              ),
+              _StatCard(
+                label: 'Cancelled',
+                value: '${recent['cancelled'] ?? 0}',
+                icon: Icons.cancel_rounded,
+                color: const Color(0xFFC62828),
+              ),
+              _StatCard(
+                label: 'Still pending',
+                value: '${recent['pending'] ?? 0}',
+                icon: Icons.hourglass_bottom_rounded,
+                color: const Color(0xFFF57C00),
+              ),
+              _StatCard(
+                label: 'Food GMV',
+                value: _formatTotalSales(recent['foodGmv']),
+                icon: Icons.currency_rupee_rounded,
+                color: const Color(0xFF0E5A47),
+              ),
+            ]),
+            const SizedBox(height: 24),
+            _SectionTitle(title: 'ORDERS — ALL TIME'),
+            const SizedBox(height: 10),
+            _StatsGrid(cards: [
+              _StatCard(
+                label: 'Total placed',
+                value: '${stats['totalOrders'] ?? 0}',
+                icon: Icons.inventory_2_outlined,
+              ),
+              _StatCard(
+                label: 'Placed today',
                 value:
                     '${stats['todayOrders'] ?? stats['ordersToday'] ?? 0}',
                 icon: Icons.today_rounded,
                 color: const Color(0xFF1565C0),
               ),
               _StatCard(
-                label: 'Pending',
+                label: 'Pending now',
                 value: '${stats['pendingOrders'] ?? 0}',
                 icon: Icons.hourglass_bottom_rounded,
                 color: const Color(0xFFF57C00),
               ),
               _StatCard(
-                label: 'Completed',
+                label: 'Completed (lifetime)',
                 value: '${stats['completedOrders'] ?? 0}',
-                icon: Icons.check_circle_rounded,
+                icon: Icons.check_circle_outline_rounded,
                 color: const Color(0xFF2E7D32),
               ),
               _StatCard(
-                label: 'Cancelled',
+                label: 'Cancelled (lifetime)',
                 value: '${stats['cancelledOrders'] ?? 0}',
-                icon: Icons.cancel_rounded,
+                icon: Icons.cancel_outlined,
                 color: const Color(0xFFC62828),
               ),
               _StatCard(
-                label: 'Total Sales',
+                label: 'Food GMV (lifetime)',
                 value: _formatTotalSales(stats['totalSales']),
                 icon: Icons.currency_rupee_rounded,
                 color: const Color(0xFF0E5A47),

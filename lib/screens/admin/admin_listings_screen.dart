@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../admin/admin_city_scope.dart';
 import '../../services/api_service.dart';
 import '../../widgets/admin_loading_panel.dart';
 import '../../widgets/screen_loading_note.dart';
@@ -11,7 +12,8 @@ class AdminListingsScreen extends StatefulWidget {
   State<AdminListingsScreen> createState() => _AdminListingsScreenState();
 }
 
-class _AdminListingsScreenState extends State<AdminListingsScreen> {
+class _AdminListingsScreenState extends State<AdminListingsScreen>
+    with AdminCityScopeListener<AdminListingsScreen> {
   final _searchController = TextEditingController();
   List<Map<String, dynamic>> _listings = [];
   bool _isLoading = true;
@@ -31,6 +33,11 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
     super.dispose();
   }
 
+  @override
+  void onAdminCityScopeChanged() {
+    _loadListings();
+  }
+
   Future<void> _loadListings({bool reset = true}) async {
     if (reset) {
       setState(() {
@@ -45,6 +52,7 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
             ? _searchController.text.trim()
             : null,
         page: _page,
+        cityKey: adminCityKey,
       );
       if (!mounted) return;
       setState(() {
