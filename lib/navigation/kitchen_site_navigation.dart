@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../screens/main_shell_screen.dart';
 import '../screens/onboarding_intent_screen.dart';
 import '../screens/seller_kitchen_site_screen.dart';
+import '../services/deep_link_service.dart';
 import '../services/storefront_host.dart';
 
 /// Keeps branded kitchen hosts on the seller site after login, checkout, etc.
@@ -23,22 +25,43 @@ class KitchenSiteNavigation {
     }
   }
 
+  /// Drops seller ids or other values that were wrongly saved as kitchen slugs.
+  static Future<void> purgeInvalidHeldSlug() async {
+    final held = _heldSlug?.trim();
+    if (held == null || held.isEmpty) return;
+    if (StorefrontHost.normalizeKitchenSlug(held) != null) return;
+    await clearKitchenSiteContext();
+  }
+
+  static Future<void> clearKitchenSiteContext() async {
+    _heldSlug = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsKey);
+  }
+
   static Future<void> holdKitchenSlug(String slug) async {
-    final normalized = slug.trim().toLowerCase();
-    if (normalized.isEmpty) return;
+    final normalized = StorefrontHost.normalizeKitchenSlug(slug);
+    if (normalized == null) return;
     _heldSlug = normalized;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefsKey, normalized);
   }
 
-  static String? activeKitchenSlug() {
-    final fromUri = StorefrontHost.kitchenSlugFromUri(Uri.base);
+  static String? activeKitchenSlug({Uri? uri}) {
+    final effective = uri ?? (kIsWeb ? Uri.base : Uri());
+    if (kIsWeb && DeepLinkService.parseUri(effective) != null) {
+      return null;
+    }
+
+    final fromUri = StorefrontHost.kitchenSlugFromUri(effective);
     if (fromUri != null && fromUri.isNotEmpty) {
       _heldSlug = fromUri;
       return fromUri;
     }
     final held = _heldSlug?.trim();
-    if (held != null && held.isNotEmpty) return held;
+    if (held == null || held.isEmpty) return null;
+    final normalized = StorefrontHost.normalizeKitchenSlug(held);
+    if (normalized != null) return normalized;
     return null;
   }
 

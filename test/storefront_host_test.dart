@@ -29,4 +29,33 @@ void main() {
     );
     expect(slug, 'puran');
   });
+
+  test('normalizeKitchenSlug rejects seller user ids', () {
+    expect(
+      StorefrontHost.normalizeKitchenSlug(
+        '1a33632e-7d58-4691-99a1-7b2f22a6cc75',
+      ),
+      isNull,
+    );
+    expect(StorefrontHost.normalizeKitchenSlug('puran'), 'puran');
+  });
+
+  test('ignores /s/:sellerId paths for kitchen slug', () {
+    final slug = StorefrontHost.kitchenSlugFromUri(
+      Uri.parse(
+        'https://societyeats.vercel.app/s/1a33632e-7d58-4691-99a1-7b2f22a6cc75',
+      ),
+    );
+    expect(slug, isNull);
+  });
+
+  test('does not treat societyeats.vercel.app as a kitchen subdomain', () {
+    final slug = StorefrontHost.kitchenSlugFromUri(
+      Uri.parse(
+        'https://societyeats.vercel.app/s/1a33632e-7d58-4691-99a1-7b2f22a6cc75',
+      ),
+    );
+    expect(slug, isNot('societyeats'));
+    expect(slug, isNull);
+  });
 }

@@ -22,6 +22,7 @@ No production password or token was copied into this knowledge base.
 
 | Issue | Evidence | Label |
 |---|---|---|
+| Seller `/s/{id}` share links needed web-only routing fixes | Flutter web used to treat a saved seller id like a branded `/kitchen/{slug}` and called `GET /public/kitchens/:slug` | Fixed in web startup and `DeepLinkNavigation`: `/s/...` opens guest storefront via `GET /listings/guest-kitchens/:id`. Redeploy Vercel to ship |
 | Wildcard kitchen host is not configured | `vercel.json` redirects only `puran.societyeats.com`. Admin users screen text says wildcard `*.societyeats.com` is not live | Verified in repo. DNS itself was not queried |
 | `preparing` and `picked_up` still exist for old rows | `RETIRED_STATUSES` in `routes/orders.js` | By design. Do not assign them to new orders |
 | Seller staff cannot be revoked through the API | Comment on `SellerStaffMembership` and the absence of a revoke route | Verified |

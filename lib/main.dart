@@ -31,9 +31,15 @@ void main() async {
   if (kIsWeb) {
     usePathUrlStrategy();
     await KitchenSiteNavigation.warmHeldSlug();
-    _initialWebKitchenSlug = KitchenSiteNavigation.activeKitchenSlug();
-    if (_initialWebKitchenSlug != null) {
-      await KitchenSiteNavigation.holdKitchenSlug(_initialWebKitchenSlug!);
+    await KitchenSiteNavigation.purgeInvalidHeldSlug();
+    if (DeepLinkService.parseUri(Uri.base) != null) {
+      await KitchenSiteNavigation.clearKitchenSiteContext();
+      _initialWebKitchenSlug = null;
+    } else {
+      _initialWebKitchenSlug = KitchenSiteNavigation.activeKitchenSlug();
+      if (_initialWebKitchenSlug != null) {
+        await KitchenSiteNavigation.holdKitchenSlug(_initialWebKitchenSlug!);
+      }
     }
   }
 

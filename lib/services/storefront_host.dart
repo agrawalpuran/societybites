@@ -80,12 +80,7 @@ class StorefrontHost {
       return _normalizeSlug(leaf);
     }
 
-    final parts = lower.split('.');
-    if (parts.length < 3) return null;
-
-    final sub = parts.first;
-    if (_reservedSubdomains.contains(sub)) return null;
-    return _normalizeSlug(sub);
+    return null;
   }
 
   /// Production-style host for a kitchen slug, e.g. `puran.societyeats.com`.
@@ -96,6 +91,9 @@ class StorefrontHost {
     if (apex.isEmpty) return null;
     return '$normalized.$apex';
   }
+
+  /// Public kitchen links only (`puran`, not a seller user id).
+  static String? normalizeKitchenSlug(String raw) => _normalizeSlug(raw);
 
   static String? _normalizeSlug(String raw) {
     final slug = raw.trim().toLowerCase();

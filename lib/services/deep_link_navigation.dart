@@ -29,6 +29,15 @@ class DeepLinkNavigation {
     final pending = await DeepLinkService.peekPending();
     if (pending == null || !context.mounted) return;
 
+    if (pending.kind == DeepLinkKind.seller) {
+      final onboarded =
+          await _isSignedIn() && await SessionService.isOnboarded();
+      if (!onboarded) {
+        await _consumeAndOpen(context);
+        return;
+      }
+    }
+
     final signedIn = await _isSignedIn();
     if (!signedIn) {
       if (!context.mounted) return;
@@ -84,6 +93,16 @@ class DeepLinkNavigation {
         );
         return;
       case DeepLinkKind.seller:
+        final onboarded =
+            await _isSignedIn() && await SessionService.isOnboarded();
+        if (!onboarded) {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => _guestSellerStorefrontScreen(target.id),
+            ),
+          );
+          return;
+        }
         final seller = _placeholderSeller(target.id);
         await Navigator.of(context).push(
           MaterialPageRoute(
@@ -119,6 +138,24 @@ class DeepLinkNavigation {
 
   static Seller placeholderSeller(String sellerId) =>
       _placeholderSeller(sellerId);
+
+  static Widget _guestSellerStorefrontScreen(String sellerId) {
+    final seller = _placeholderSeller(sellerId);
+    return SellerStorefrontScreen(
+      seller: seller,
+      guestBrowse: true,
+      fetchListings: () async {
+        final raw = await ApiService.getGuestKitchenStorefront(sellerId);
+        final listings = raw['listings'];
+        if (listings is! List) return <Map<String, dynamic>>[];
+        return listings
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      },
+      fetchCampaigns: () async => const [],
+    );
+  }
 
   static Seller _placeholderSeller(String sellerId) {
     final hash = sellerId.hashCode.abs();
