@@ -9,6 +9,7 @@ import '../services/auth_config.dart';
 import '../services/serving_city_label.dart';
 import '../web/web_auth_aside.dart';
 import '../web/web_breakpoints.dart';
+import '../web/web_footer.dart';
 import '../widgets/app_header.dart';
 
 bool get _isIosLayout => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
@@ -747,16 +748,7 @@ class _FooterLinks extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
-            '© 2026 SOCIETYEATS. ALL RIGHTS RESERVED.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFFA4AEAB),
-              fontSize: 11,
-              letterSpacing: 0.6,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          const WebFooterLegalNotice(),
         ],
       ),
     );

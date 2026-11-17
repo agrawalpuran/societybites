@@ -31,48 +31,107 @@ class WebFooter extends StatelessWidget {
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: webLine)),
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final stacked = constraints.maxWidth < 860;
-          final columns = [
-            const _BrandColumn(),
-            _LinkColumn(
-              title: 'Marketplace',
-              links: [
-                _FooterLink('Explore', onExplore),
-                _FooterLink('Orders', onOrders),
-                _FooterLink('My Kitchen', onKitchen),
-                _FooterLink('Profile', onProfile),
-              ],
-            ),
-            _LinkColumn(
-              title: 'Support',
-              links: [
-                _FooterLink('Help Center', onHelp),
-                _FooterLink('Privacy Policy', onPrivacy),
-                _FooterLink('Terms of Service', onTerms),
-              ],
-            ),
-          ];
-          if (stacked) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final column in columns) ...[
-                  column,
-                  const SizedBox(height: 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stacked = constraints.maxWidth < 860;
+              final columns = [
+                const _BrandColumn(),
+                _LinkColumn(
+                  title: 'Marketplace',
+                  links: [
+                    _FooterLink('Explore', onExplore),
+                    _FooterLink('Orders', onOrders),
+                    _FooterLink('My Kitchen', onKitchen),
+                    _FooterLink('Profile', onProfile),
+                  ],
+                ),
+                _LinkColumn(
+                  title: 'Support',
+                  links: [
+                    _FooterLink('Help Center', onHelp),
+                    _FooterLink('Privacy Policy', onPrivacy),
+                    _FooterLink('Terms of Service', onTerms),
+                  ],
+                ),
+              ];
+              if (stacked) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final column in columns) ...[
+                      column,
+                      const SizedBox(height: 22),
+                    ],
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < columns.length; i++)
+                    Expanded(child: columns[i]),
                 ],
-              ],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var i = 0; i < columns.length; i++)
-                Expanded(child: columns[i]),
-            ],
-          );
-        },
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+          const WebFooterLegalNotice(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Copyright and ownership line shared by [WebFooter] and web auth footers.
+class WebFooterLegalNotice extends StatelessWidget {
+  const WebFooterLegalNotice({super.key});
+
+  static const _copyright =
+      '© 2026 SocietyEats. All rights reserved.';
+  static const _brandDisclosure =
+      'SocietyEats is a brand of P2A2 Ventures.';
+
+  @override
+  Widget build(BuildContext context) {
+    final stacked = MediaQuery.sizeOf(context).width < 860;
+    final textAlign = stacked ? TextAlign.center : TextAlign.start;
+    final align = stacked ? CrossAxisAlignment.center : CrossAxisAlignment.start;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 16),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: webLine)),
+      ),
+      child: Column(
+        crossAxisAlignment: align,
+        children: [
+          Text(
+            _copyright,
+            textAlign: textAlign,
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.4,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.35,
+              color: webMuted,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _brandDisclosure,
+            textAlign: textAlign,
+            style: const TextStyle(
+              fontSize: 11,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+              color: webMuted,
+            ),
+          ),
+        ],
       ),
     );
   }
