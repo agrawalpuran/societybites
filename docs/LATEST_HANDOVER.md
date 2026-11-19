@@ -1,5 +1,9 @@
 # Latest handover
 
+## 19 November 2026 — Incentive SQL scripts are documented
+
+[INCENTIVE_SCHEMA.md](INCENTIVE_SCHEMA.md) copies the six migration files in run order: foundation, event processing, referral code pin, referral attribution, `Listing.firstPublishedAt`, and the ledger guard. The hosted database was not changed. Local `127.0.0.1:5432/societybites_incentive_integration_v2` already has these objects, so the scripts must not be run there again.
+
 ## 19 November 2026 — Incentive work is on its own branch
 
 The incentive and referral code is committed on `feature/incentive-referral-engine` at `54c4a4e` and pushed to GitHub. `main` stays at `407e2ae`. No pull request was opened. Switches stay off. No campaign was activated.
