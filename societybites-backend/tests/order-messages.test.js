@@ -292,6 +292,31 @@ async function main() {
     if (listingIds.length) {
       await prisma.listing.deleteMany({ where: { id: { in: listingIds } } });
     }
+    const fixtureUsers = await prisma.user.findMany({
+      where: { phone: { in: [OTHER_SELLER_PHONE, OTHER_BUYER_PHONE] } },
+      select: { id: true },
+    });
+    const fixtureUserIds = fixtureUsers.map((user) => user.id);
+    if (fixtureUserIds.length) {
+      const leftoverOrders = await prisma.order.findMany({
+        where: { buyerId: { in: fixtureUserIds } },
+        select: { id: true },
+      });
+      const leftoverOrderIds = leftoverOrders.map((order) => order.id);
+      if (leftoverOrderIds.length) {
+        await prisma.review.deleteMany({ where: { orderId: { in: leftoverOrderIds } } });
+        await prisma.message.deleteMany({ where: { orderId: { in: leftoverOrderIds } } });
+        await prisma.orderItem.deleteMany({ where: { orderId: { in: leftoverOrderIds } } });
+        await prisma.order.deleteMany({ where: { id: { in: leftoverOrderIds } } });
+      }
+      await prisma.review.deleteMany({
+        where: { listing: { sellerId: { in: fixtureUserIds } } },
+      });
+      await prisma.orderItem.deleteMany({
+        where: { listing: { sellerId: { in: fixtureUserIds } } },
+      });
+      await prisma.listing.deleteMany({ where: { sellerId: { in: fixtureUserIds } } });
+    }
     await prisma.user.deleteMany({
       where: { phone: { in: [OTHER_SELLER_PHONE, OTHER_BUYER_PHONE] } },
     });

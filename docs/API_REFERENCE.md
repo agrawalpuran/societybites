@@ -201,6 +201,87 @@ Webhook, file `routes/paymentWebhooks.js`:
 | GET | `/festival-banners/active` | Public | `festivalBanners.js` | |
 | GET | `/public/kitchens/:slug` | Public | `public.js` | Branded kitchen |
 
+## Incentive engine
+
+File: `modules/incentive-engine/`. Prefix `/incentive`. Every switch is off when its `IncentiveSetting` row is missing or is not exactly `true`. The master switch forces the others off. Buyer and seller referral also require the referral switch. A database error on the read returns the same all-off payload. `GET /incentive/flags` also returns `stored`, the saved on/off value before the master and referral gates. `PUT /incentive/admin/flags` is super-admin only and accepts `{ key, enabled }` for `master`, `referral`, `buyerReferral`, or `sellerReferral`. `enabled` must be a boolean. `true` stores the text `true`. `false` stores the text `false`. Issuance, redemption, and promotional campaigns have no writer. A console admin receives 403. A missing incentive table returns 503 `INCENTIVE_TABLES_MISSING`. A change writes one `FLAG_CHANGED` audit row. The Flutter admin Settings tab is shown only to a super admin. Reward responses include `rewardType` from `IncentiveRewardDefinition` for the reward's version and slot.
+
+Campaign routes are configuration only. They do not create coupons, rewards, ledger rows, or referral attributions. Stored triggers are marked `processor: "NOT_IMPLEMENTED"` on the campaign snapshot. Phase 2C can ingest and evaluate those event types from `/incentive/admin/events`. It does not hook registration, orders, payments, listings, or reviews, and it does not issue rewards.
+
+Phase 2D-1 adds referral code creation and retrieval. `GET` and `POST /incentive/referral-codes` use the JWT user id and ignore any user id in the body. `POST` returns 201 for a new code and 200 for the same caller's existing code. The code is pinned to the published campaign version, and its expiry is stored once. A later campaign edit does not change that row. `GET /incentive/referral-codes/preview?code=` is public, limited to 30 requests per minute per IP, and returns only `{ valid, audience, expiresAt }`. `url` is an absolute link only when `REFERRAL_LINK_BASE_URL` is an HTTPS origin with no path, query, or credentials. Otherwise `url` is null. These routes do not attribute a referral. Referral categories cannot activate until the snapshot has a valid `referralPolicy`. `BUYER_ACQUISITION` and `REFERRAL` require `buyer.maxAccountAgeHours`. A code also needs `codeExpiresInDays` or a campaign end.
+
+Statuses are `DRAFT`, `SCHEDULED`, `ACTIVE`, `PAUSED`, `COMPLETED`, `EXPIRED`, and `TERMINATED`. Create always returns `DRAFT`. A draft edits its current unpublished version. Editing a scheduled, active, or paused campaign forks a new version and returns the campaign to `DRAFT`. Finished campaigns stay readable and reject edits. There is no delete route.
+
+`POST /incentive/admin/campaigns/:id/activate` requires the master switch. Referral categories also require the referral switch. `PROMOTIONAL` and `FESTIVE` also require the promotional switch. While those switches are off the route returns 403 `ENGINE_DISABLED`, `REFERRAL_DISABLED`, or `PROMOTIONAL_DISABLED` and does not change the campaign. Pause, terminate, complete, and expire do not issue rewards. Expire requires the end date to be in the past.
+
+A draft may omit its audience, eligibility policy, trigger, reward definition, or budget. Activation rejects that incomplete snapshot with 400 and a code such as `AUDIENCE_REQUIRED`, `ELIGIBILITY_REQUIRED`, `RULES_REQUIRED`, `TRIGGER_REQUIRED`, `REWARD_REQUIRED`, or `BUDGET_REQUIRED`. An empty audience does not mean every user. `ALL_USERS` is the explicit every-user audience and cannot be combined with another kind. The eligibility policy is stored on the version snapshot as `RULES` or `AUDIENCE_AND_TRIGGER_ONLY`. `RULES` requires a non-empty rule tree. `AUDIENCE_AND_TRIGGER_ONLY` requires an audience and a trigger and stores no rule tree. A missing policy does not make the campaign eligible.
+
+Simulation uses the same readiness check as activation. An incomplete campaign returns `passed: false`, `matchesEveryone: false`, and a reason. `matchesEveryone: true` is returned only when the campaign is ready and its audience is exactly `ALL_USERS`, with the reason `Explicit all-user audience`. The response still shows the configured reward with `issued: false` and the budget with `consumed: false`. It does not write. Event processing calls `assessCampaign` in `modules/incentive-engine/campaign/readiness.js`.
+
+Event routes accept the eight configured event types. The server builds `eventId`. One order can have only one of `ORDER_QUALIFIED`, `ORDER_CANCELLED`, or `ORDER_REJECTED`. A duplicate of the same event returns the stored row and does not add an audit row. While the master switch is off, `POST /incentive/admin/events/process-due` returns 403 `ENGINE_DISABLED` and leaves valid events `PENDING`. The claim itself is one `UPDATE` that requires `master_enabled` to be exactly `true` after `btrim`. A claim that already committed may finish. Each claim stores a new `claimToken`. A later outcome write must match that token, so an expired worker cannot replace a newer result. Retry delay starts at 30 seconds and doubles, up to one hour. The eighth failure is `DEAD`. Replay is super-admin only and accepts `FAILED`, `DEAD`, or `SKIPPED`. Replay keeps `attempts`. The next claim increments that count, so a repeated outcome gets a new audit row. Replaying a dead event allows one more claim. If that claim fails, the event is dead again. There is no scheduler.
+
+| Method | Path | Auth | Result |
+|---|---|---|---|
+| GET | `/incentive/flags` | User | Effective booleans plus `stored` for the same keys. A missing row is off |
+| PUT | `/incentive/admin/flags` | Super admin | `{ key, enabled }` for `master`, `referral`, `buyerReferral`, or `sellerReferral`. Other keys are 400 `FLAG_NOT_WRITABLE`. Does not issue a reward |
+| GET | `/incentive/admin/campaigns` | Portal read | Campaign headers |
+| POST | `/incentive/admin/campaigns` | Super admin | Creates a `DRAFT` |
+| GET | `/incentive/admin/campaigns/:id` | Portal read | Campaign plus current version snapshot |
+| PATCH | `/incentive/admin/campaigns/:id` | Super admin | Edits a draft, or forks a published campaign |
+| GET | `/incentive/admin/campaigns/:id/versions` | Portal read | Version list |
+| GET | `/incentive/admin/campaigns/:id/versions/:versionId` | Portal read | Frozen snapshot |
+| PUT | `/incentive/admin/campaigns/:id/audience` | Super admin | `{ audiences: [{ kind, payload? }] }` |
+| PUT | `/incentive/admin/campaigns/:id/triggers` | Super admin | `{ triggers: [eventType] }`. Stored only |
+| PUT | `/incentive/admin/campaigns/:id/rules` | Super admin | `{ eligibility, rules? }`. `eligibility` is `RULES` or `AUDIENCE_AND_TRIGGER_ONLY` |
+| PUT | `/incentive/admin/campaigns/:id/rewards` | Super admin | Reward definitions. Nothing is issued |
+| PUT | `/incentive/admin/campaigns/:id/budget` | Super admin | Cap and limits. `issuedAmount` stays `0.00` |
+| PUT | `/incentive/admin/campaigns/:id/referral-policy` | Super admin | Stores `referralPolicy` on a referral-category draft. It does not issue a code |
+| POST | `/incentive/admin/campaigns/:id/simulate` | Super admin | Explanation only. No writes |
+| POST | `/incentive/admin/campaigns/:id/duplicate` | Super admin | Copy configuration into a new `DRAFT`. Requires a different name. Does not copy issued rewards, events, referrals, or consumed budget |
+| GET | `/incentive/admin/campaigns/:id/performance` | Portal read | Stored referral, reward, budget, schedule, daily series, and status timeline |
+| GET | `/incentive/admin/referral-analytics` | Portal read | Funnel, buyer and seller comparison, recorded failure reasons, and a name-only leaderboard |
+| GET | `/incentive/admin/referral-leaderboard` | Portal read | Qualified referrers. Display name, count, and user id. No phone |
+| GET | `/incentive/admin/reward-report` | Portal read | Status counts, credit and points balances, expiry rows, ledger timeline, and recorded exceptions |
+| GET | `/incentive/admin/audit` | Portal read | Sanitised audit page. Query `campaignId`, `action`, `from`, `to`, `cursor` |
+| GET | `/incentive/admin/risk` | Portal read | Review indicators. `automaticAction` is `none`. No phone |
+| POST | `/incentive/admin/campaigns/:id/activate` | Super admin | Blocked while the master switch is off |
+| POST | `/incentive/admin/campaigns/:id/pause` | Super admin | `PAUSED` |
+| POST | `/incentive/admin/campaigns/:id/terminate` | Super admin | `TERMINATED`. History remains |
+| POST | `/incentive/admin/campaigns/:id/complete` | Super admin | `COMPLETED` |
+| POST | `/incentive/admin/campaigns/:id/expire` | Super admin | `EXPIRED` after the end date |
+| POST | `/incentive/admin/events` | Super admin | Ingest one event. `201` when created, `200` when it already exists |
+| POST | `/incentive/admin/events/backfill` | Super admin | Rebuilds missing seller, listing, and qualifying-order events from stored source timestamps. A listing without `firstPublishedAt` is reported and not invented |
+| GET | `/incentive/admin/events` | Portal read | Recent events. Optional `status` |
+| GET | `/incentive/admin/events/reconciliation` | Portal read | Expired claims, dead letters, due failures, and stale pending rows |
+| POST | `/incentive/admin/events/reconciliation/recover` | Super admin | Fence expired claims. Records the super-admin actor |
+| POST | `/incentive/admin/events/process-due` | Super admin | Process a batch. `403` `ENGINE_DISABLED` when the master switch is off |
+| GET | `/incentive/admin/events/:id` | Portal read | One event. The claim token is not returned |
+| POST | `/incentive/admin/events/:id/replay` | Super admin | Requeue `FAILED`, `DEAD`, or `SKIPPED` |
+| GET | `/incentive/referral-codes` | User | The caller's codes. 403 `REFERRAL_DISABLED` when master or referral is off |
+| POST | `/incentive/referral-codes` | User | `{ audience, campaignId }`. 201 new, 200 existing. Does not accept a trusted user id |
+| GET | `/incentive/referral-codes/preview?code=` | Public, rate limited | `{ valid, audience, expiresAt }` only |
+| GET | `/incentive/referrals` | User | The caller's referral rows. Names only, no phone or user id. Includes `qualificationNote` |
+| GET | `/incentive/referrals/leaderboard` | User | Top display names and qualified counts when referral is on. Ignores a query user id. No phone or user id |
+| POST | `/incentive/referrals` | User | `{ code, acquisitionKind }`. 201 new, 200 same claim. The body user id is ignored |
+| GET | `/incentive/admin/referrals` | Portal read | Referral rows with ids and milestone times |
+| GET | `/incentive/admin/referrals/:id` | Portal read | One referral |
+| POST | `/incentive/admin/referrals/:id/approve` | Super admin | `PENDING_REVIEW` to `QUALIFIED` |
+| POST | `/incentive/admin/referrals/:id/reject` | Super admin | `PENDING_REVIEW` to `DISQUALIFIED` |
+| POST | `/incentive/admin/referrals/:id/disqualify` | Super admin | Fraud or admin reversal |
+| POST | `/incentive/admin/referrals/expire-due` | Super admin | Expires open rows whose window has ended |
+| POST | `/incentive/admin/referrals/reconcile` | Super admin | Re-reads stored orders and reverses qualification when `qualifyOrder` fails |
+| GET | `/incentive/admin/overview` | Portal read | Counts for campaigns, referrals, issued rewards by type, and the eight most recent events |
+| GET | `/incentive/admin/ledger` | Portal read | Ledger page. Query `limit` (max 50), `cursor`, `entryType`, `rewardId`, `userId`, `rewardType`. Read-only |
+| GET | `/incentive/offers` | User | Active published offers for the JWT role. Buyers do not receive seller listing or seller-acquisition campaigns. Sellers do not receive the other categories. The body omits budget, rules, audience payloads, and `createdBy`. While the master switch is off the list is empty and `reason` is `ENGINE_OFF` |
+| GET | `/incentive/rewards` | User | The caller's rewards and credit/points balances. `recipientUserId` and `userId` query values are ignored |
+| GET | `/incentive/rewards/history` | User | The caller's ledger page. Same ignored user-id query values. Query `limit`, `cursor`, `entryType`, `rewardType` |
+| GET | `/incentive/admin/rewards` | Portal read | Reward rows, including `rewardType`. No phone, flat, or society |
+| GET | `/incentive/admin/rewards/reconciliation` | Portal read | Query `campaignId`. Configured cap, reserved amount, remainder, reward counts, and signed ledger totals. It does not write |
+| GET | `/incentive/admin/rewards/:id` | Portal read | One reward and its ledger entries |
+| POST | `/incentive/admin/rewards/:id/approve` | Super admin | `PENDING_APPROVAL` to `ISSUED` only when `issuance_enabled` trims to exactly `true`. Otherwise `403 ISSUANCE_DISABLED`. A repeat of an already issued reward returns that row |
+| POST | `/incentive/admin/rewards/:id/reject` | Super admin | `PENDING_APPROVAL` to `REJECTED` and releases that reward's reserved budget once. A percentage coupon releases `maxDiscount`. A missing snapshot returns `409 REWARD_DEFINITION_MISSING` and does not change the budget. A later event for that reward is skipped as `REWARD_CLOSED` |
+| POST | `/incentive/admin/rewards/:id/redeem` | Super admin | Debits promotional credit or points when redemption is on. Does not change checkout. `409 REWARD_EXPIRED` when `expiresAt` has passed. `409 COUPON_REDEMPTION_UNCHANGED` for a coupon reward. The same idempotency key with another amount returns `409 IDEMPOTENCY_CONFLICT`. An `orderId` must be that recipient's order, or the response is `404 ORDER_NOT_FOUND` or `409 REWARD_ORDER_MISMATCH` |
+| POST | `/incentive/admin/rewards/expire-due` | Super admin | Expires due credit and posts the remaining balance. Re-reads the reward under its row lock, so a redemption that already committed is left as `REDEEMED` |
+
 ## Admin
 
 File: `routes/admin.js`. Prefix `/admin`. Portal user required. Non-GET requires super admin. `GET /admin/console-admins` is super admin even though it is a GET.

@@ -67,8 +67,15 @@ const {
 } = require("../lib/listingVariants");
 const {
   resolveCreateListingStatus,
+  withCreatePublication,
   draftIdsToPublish,
+  publishDraftListings,
 } = require("../lib/listingPublish");
+const {
+  afterCommit,
+  emitPublishedListings,
+  recordCreatedPublications,
+} = require("../modules/incentive-engine/events/productHooks");
 const { authorizeListingForBuyer } = require("../lib/crossSocietyOrder");
 const {
   parseDiscountCreateFields,
@@ -116,6 +123,12 @@ const listingInclude = {
     include: { flat: true },
   },
 };
+
+function omitUndefined(data) {
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined)
+  );
+}
 
 async function rejectCommittedCampaignProductMutation(listing, res) {
   if (!listing.campaignId || !(await campaignHasOrders(listing.campaignId))) {
@@ -516,6 +529,7 @@ router.post(
     if (variantPayload) {
       const variantGroupId = newVariantGroupId();
       const created = await prisma.$transaction(async (tx) => {
+        const publishedAt = new Date();
         const start =
           parsedCatalogType === "REGULAR"
             ? await allocateFrontDisplayOrders(
@@ -527,46 +541,63 @@ router.post(
         return Promise.all(
           variantPayload.rows.map((row, index) =>
             tx.listing.create({
-              data: {
-                ...sharedData,
-                displayOrder: start == null ? null : start + index,
-                price: row.price,
-                quantity: row.quantity,
-                weightUnit: row.weightUnit,
-                weightValue: row.weightValue,
-                variantGroupId,
-                variantLabel: row.variantLabel,
-                variantInventoryMode: row.variantInventoryMode,
-                portionUnits: row.portionUnits,
-              },
+              data: omitUndefined(
+                withCreatePublication(
+                {
+                  ...sharedData,
+                  displayOrder: start == null ? null : start + index,
+                  price: row.price,
+                  quantity: row.quantity,
+                  weightUnit: row.weightUnit,
+                  weightValue: row.weightValue,
+                  variantGroupId,
+                  variantLabel: row.variantLabel,
+                  variantInventoryMode: row.variantInventoryMode,
+                  portionUnits: row.portionUnits,
+                },
+                createStatus,
+                publishedAt
+              )
+              ),
               include: listingInclude,
             })
           )
         );
       });
       const primary = sortVariantSiblings(created)[0];
-      return res.status(201).json(await jsonListing(primary, req.user.id));
+      const body = await jsonListing(primary, req.user.id);
+      const response = await recordCreatedPublications(prisma, body, created);
+      return res.status(201).json(response);
     }
 
     const listing = await prisma.$transaction(async (tx) => {
+      const publishedAt = new Date();
       const displayOrder =
         parsedCatalogType === "REGULAR"
           ? await allocateFrontDisplayOrders(tx, req.user.id, 1)
           : null;
       return tx.listing.create({
-        data: {
-          ...sharedData,
-          displayOrder,
-          price: parseFloat(price),
-          quantity: storedQuantity,
-          weightUnit: weightUnit || null,
-          weightValue: weightValue || null,
-        },
+        data: omitUndefined(
+          withCreatePublication(
+          {
+            ...sharedData,
+            displayOrder,
+            price: parseFloat(price),
+            quantity: storedQuantity,
+            weightUnit: weightUnit || null,
+            weightValue: weightValue || null,
+          },
+          createStatus,
+          publishedAt
+        )
+        ),
         include: listingInclude,
       });
     });
 
-    res.status(201).json(await jsonListing(listing, req.user.id));
+    const body = await jsonListing(listing, req.user.id);
+    const response = await recordCreatedPublications(prisma, body, [listing]);
+    res.status(201).json(response);
   })
 );
 
@@ -855,12 +886,13 @@ router.patch(
       });
     }
 
-    const result = await prisma.listing.updateMany({
-      where: { id: { in: drafts.map((row) => row.id) }, sellerId },
-      data: { status: "active" },
+    const publication = await publishDraftListings(prisma, {
+      sellerId,
+      ids: drafts.map((row) => row.id),
     });
+    await afterCommit(publication, () => emitPublishedListings(prisma, publication.stamped));
 
-    res.json({ publishedCount: result.count });
+    res.json({ publishedCount: publication.publishedCount });
   })
 );
 
@@ -992,10 +1024,8 @@ router.patch(
     }
 
     const ids = await draftIdsToPublish(prisma, listing);
-    await prisma.listing.updateMany({
-      where: { id: { in: ids }, sellerId: req.user.id },
-      data: { status: "active" },
-    });
+    const publication = await publishDraftListings(prisma, { sellerId: req.user.id, ids });
+    await afterCommit(publication, () => emitPublishedListings(prisma, publication.stamped));
 
     const updated = await prisma.listing.findUnique({
       where: { id: listing.id },

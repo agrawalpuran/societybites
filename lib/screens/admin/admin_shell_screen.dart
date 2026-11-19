@@ -17,6 +17,7 @@ import 'admin_orders_screen.dart';
 import 'admin_reviews_screen.dart';
 import 'admin_issues_screen.dart';
 import 'admin_coupons_screen.dart';
+import 'admin_incentives_screen.dart';
 import 'admin_audit_screen.dart';
 import 'admin_console_access_screen.dart';
 import 'admin_users_screen.dart';
@@ -47,6 +48,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     _NavItem(icon: Icons.star_rounded, label: 'Reviews'),
     _NavItem(icon: Icons.flag_outlined, label: 'Issues'),
     _NavItem(icon: Icons.confirmation_number_outlined, label: 'Coupons'),
+    _NavItem(icon: Icons.card_giftcard_rounded, label: 'Incentives & Rewards'),
     _NavItem(icon: Icons.history_rounded, label: 'Audit Log'),
   ];
 
@@ -123,6 +125,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       case 10:
         return const AdminCouponsScreen();
       case 11:
+        return AdminIncentivesScreen(isSuperAdmin: _isSuperAdmin);
+      case 12:
         return const AdminAuditScreen();
       default:
         return const AdminDashboardScreen();

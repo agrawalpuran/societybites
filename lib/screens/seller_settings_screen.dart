@@ -9,6 +9,7 @@ import '../widgets/app_header.dart';
 import '../widgets/kitchen_hours_sheet.dart';
 import '../widgets/profile_menu_tile.dart';
 import '../widgets/seller_first_time_setup_form.dart';
+import 'incentive/incentive_account_screen.dart';
 import 'seller_owner_access_screen.dart';
 
 /// Navigation container for seller settings. Save behaviour stays on Profile —
@@ -160,6 +161,20 @@ class SellerSettingsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    ProfileMenuTile(
+                      icon: Icons.group_add_outlined,
+                      title: 'Seller referrals',
+                      subtitle: 'Share your seller code and track milestones',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const IncentiveAccountScreen(audience: 'SELLER'),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     if (inlineSetup) ...[
                       const _SectionLabel('FOOD & COMPLIANCE'),
                       const SizedBox(height: 6),

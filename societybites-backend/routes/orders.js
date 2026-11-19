@@ -31,6 +31,7 @@ const {
   orderInclude: reconciliationOrderInclude,
 } = require("../lib/sellerPaymentReconciliation");
 const { notifyPaymentReminder } = require("../utils/notifications");
+const { afterCommit, emitOrderQualifiedIfReady } = require("../modules/incentive-engine/events/productHooks");
 const { resolvePlatformFee } = require("../lib/platformFee");
 const { expireListingIfDue } = require("../utils/listingExpiry");
 const {
@@ -1553,6 +1554,10 @@ router.patch(
       void flushNotification(notifyStatusChange(reloaded, status));
       dispatchWhatsAppStatusNotification(reloaded, status);
       return res.json(serializeOrderForUser(reloaded, req.user.id));
+    }
+
+    if (status === "completed") {
+      await afterCommit(updated, () => emitOrderQualifiedIfReady(prisma, order.id));
     }
 
     res.json(serializeOrderStatusPatch(updated));

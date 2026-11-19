@@ -3,6 +3,7 @@ const { upiPayableAmountForOrder } = require("../delayedDeliveryCharge");
 const { CASHFREE, DIRECT_UPI, httpError } = require("./providers");
 const { getPaymentProvider } = require("./paymentSetting");
 const { sellerShareAmount, isEligibleBalanceError } = require("./sellerShare");
+const { afterCommit, emitOrderQualifiedIfReady } = require("../../modules/incentive-engine/events/productHooks");
 const {
   cashfreeConfig,
   cashfreeReturnUrl,
@@ -291,6 +292,7 @@ async function applyCashfreeWebhook(payload) {
     });
   }
   const split = await attemptSplit(current);
+  await afterCommit(split, () => emitOrderQualifiedIfReady(prisma, split.id));
   return { order: split, paidNow };
 }
 

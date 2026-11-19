@@ -399,6 +399,60 @@ async function broadcastMarketing({ title, body }) {
   return { sent, failed, tokenCount: tokens.length };
 }
 
+async function sendIncentive(userId, { title, body, notificationType }) {
+  if (!userId || !notificationType) return;
+  const tokens = await prisma.deviceToken.findMany({
+    where: { userId, active: true },
+    select: { id: true, token: true },
+  });
+  if (tokens.length === 0) return;
+  const messaging = getMessaging();
+  const data = { type: "incentive_update", notificationType: String(notificationType) };
+  const staleIds = [];
+  for (const { id, token } of tokens) {
+    try {
+      await messaging.send(buildFcmMessage(token, { title, body, data }));
+    } catch (err) {
+      const code = err && err.code ? err.code : "";
+      if (INVALID_TOKEN_CODES.has(code)) staleIds.push(id);
+      else logger.warn("notify", "Incentive notification failed", { notificationType });
+    }
+  }
+  if (staleIds.length > 0) {
+    await prisma.deviceToken.updateMany({
+      where: { id: { in: staleIds } },
+      data: { active: false },
+    });
+  }
+}
+
+function notifyIncentiveReward(reward, kind) {
+  if (!reward || !reward.recipientUserId) return Promise.resolve();
+  const coupon = kind === "coupon" || (!kind && reward.couponId && reward.status === "ISSUED");
+  const pending = !kind && reward.status === "PENDING_APPROVAL";
+  let title = "Reward confirmed";
+  let body = "SocietyEats confirmed a reward on your account. It is not cash.";
+  let notificationType = "incentive_reward_issued";
+  if (pending) {
+    title = "Reward awaiting approval";
+    body = "SocietyEats recorded a reward. An administrator still has to approve it.";
+    notificationType = "incentive_reward_pending";
+  } else if (coupon) {
+    title = "Coupon issued";
+    body = "SocietyEats issued a coupon on your account.";
+    notificationType = "incentive_coupon_issued";
+  } else if (kind === "rejected") {
+    title = "Reward not approved";
+    body = "SocietyEats did not approve a pending reward.";
+    notificationType = "incentive_reward_rejected";
+  } else if (kind === "redeemed") {
+    title = "Reward redeemed";
+    body = "SocietyEats recorded a redemption on your reward. It is not cash.";
+    notificationType = "incentive_reward_redeemed";
+  }
+  return notifyAsync(() => sendIncentive(reward.recipientUserId, { title, body, notificationType }));
+}
+
 module.exports = {
   ANDROID_CHANNEL_ID,
   ANDROID_NEW_ORDER_CHANNEL_ID,
@@ -407,6 +461,7 @@ module.exports = {
   flushNotification,
   sendToUser,
   broadcastMarketing,
+  notifyIncentiveReward,
   buildFcmMessage,
   notifyOrderCreated,
   notifyStatusChange,

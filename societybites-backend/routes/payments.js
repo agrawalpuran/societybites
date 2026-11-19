@@ -21,6 +21,7 @@ const {
   assertCanCompleteOrder,
 } = require("../lib/delayedDeliveryCharge");
 const { CASHFREE } = require("../lib/payments/providers");
+const { afterCommit, emitOrderQualifiedIfReady } = require("../modules/incentive-engine/events/productHooks");
 const {
   beginCheckout,
   savePayoutProfile,
@@ -194,6 +195,7 @@ router.post(
 
     console.log(`[PAYMENT] Confirmed for ${order.orderNumber} by seller ${req.user.phone}`);
 
+    await afterCommit(updated, () => emitOrderQualifiedIfReady(prisma, updated.id));
     res.json(serializeOrderStatusPatch(updated));
 
     void flushNotification(notifyPaymentConfirmed(updated));
@@ -243,6 +245,7 @@ router.post(
 
     // Idempotent: already paid → return current order, keep original timestamp.
     if (order.paymentStatus === "paid") {
+      await afterCommit(order, () => emitOrderQualifiedIfReady(prisma, order.id));
       return res.json(serializeOrderStatusPatch(order));
     }
 
@@ -274,6 +277,7 @@ router.post(
       `[PAYMENT] Cash confirmed for ${order.orderNumber} by seller ${req.user.phone}`
     );
 
+    await afterCommit(updated, () => emitOrderQualifiedIfReady(prisma, updated.id));
     res.json(serializeOrderStatusPatch(updated));
 
     void flushNotification(notifyPaymentConfirmed(updated));
@@ -316,6 +320,7 @@ router.post(
     }
 
     if (order.deliveryCashConfirmedAt) {
+      await afterCommit(order, () => emitOrderQualifiedIfReady(prisma, order.id));
       return res.json(serializeOrderStatusPatch(order));
     }
 
@@ -353,6 +358,7 @@ router.post(
       `[PAYMENT] Delivery cash confirmed for ${order.orderNumber} by seller ${req.user.phone}`
     );
 
+    await afterCommit(updated, () => emitOrderQualifiedIfReady(prisma, updated.id));
     res.json(serializeOrderStatusPatch(updated));
 
     if (updated.status === "completed") {

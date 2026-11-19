@@ -31,6 +31,7 @@ import '../widgets/profile_menu_tile.dart';
 import '../widgets/seller_avatar.dart';
 import '../widgets/status_banner.dart';
 import 'admin/admin_shell_screen.dart';
+import 'incentive/incentive_account_screen.dart';
 import 'guest_landing_screen.dart';
 import 'main_shell_screen.dart';
 import 'help_center_screen.dart';
@@ -2304,7 +2305,34 @@ class ProfileScreenState extends State<ProfileScreen> {
               );
             },
           ),
+        ProfileMenuTile(
+          icon: Icons.card_giftcard_outlined,
+          title: 'Referrals & rewards',
+          subtitle: 'Your code, referrals, and reward status',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const IncentiveAccountScreen(audience: 'BUYER'),
+              ),
+            );
+          },
+        ),
       ],
+      if (!(_role == 'buyer' || _role == null || _canOpenAdminPortal))
+        ProfileMenuTile(
+          icon: Icons.card_giftcard_outlined,
+          title: 'Referrals & rewards',
+          subtitle: 'Your code, referrals, and reward status',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const IncentiveAccountScreen(audience: 'BUYER'),
+              ),
+            );
+          },
+        ),
       if (_isSeller) ...[
         if (_showSellerFssaiComplianceBanner) ...[
           _buildSellerFssaiComplianceBanner(),
@@ -2318,6 +2346,19 @@ class ProfileScreenState extends State<ProfileScreen> {
               ? 'Complete FSSAI to continue selling'
               : 'Manage payments, fulfilment & FSSAI',
           onTap: _openSellerSettings,
+        ),
+        ProfileMenuTile(
+          icon: Icons.group_add_outlined,
+          title: 'Seller referrals',
+          subtitle: 'Share your seller code and track milestones',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const IncentiveAccountScreen(audience: 'SELLER'),
+              ),
+            );
+          },
         ),
       ],
       const _WebSectionLabel('OVERSIGHT'),
@@ -2378,7 +2419,7 @@ class ProfileScreenState extends State<ProfileScreen> {
         icon: Icons.delete_outline_rounded,
         title: 'Delete Account',
         subtitle:
-            'Permanently delete your SocietyBites account and associated personal data.',
+            'Permanently delete your SocietyEats account and associated personal data.',
         destructive: true,
         onTap: _deletingAccount ? () {} : _confirmDeleteAccount,
       ),
@@ -2591,7 +2632,34 @@ class ProfileScreenState extends State<ProfileScreen> {
                                   );
                                 },
                               ),
+                            ProfileMenuTile(
+                              icon: Icons.card_giftcard_outlined,
+                              title: 'Referrals & rewards',
+                              subtitle: 'Your code, referrals, and reward status',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const IncentiveAccountScreen(audience: 'BUYER'),
+                                  ),
+                                );
+                              },
+                            ),
                           ],
+                          if (!(_role == 'buyer' || _role == null || _canOpenAdminPortal))
+                            ProfileMenuTile(
+                              icon: Icons.card_giftcard_outlined,
+                              title: 'Referrals & rewards',
+                              subtitle: 'Your code, referrals, and reward status',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const IncentiveAccountScreen(audience: 'BUYER'),
+                                  ),
+                                );
+                              },
+                            ),
                           if (_isSeller) ...[
                             const SizedBox(height: 20),
                             const Text(
@@ -2611,6 +2679,19 @@ class ProfileScreenState extends State<ProfileScreen> {
                                   ? 'Complete FSSAI to continue selling'
                                   : 'Manage payments, fulfilment & FSSAI',
                               onTap: _openSellerSettings,
+                            ),
+                            ProfileMenuTile(
+                              icon: Icons.group_add_outlined,
+                              title: 'Seller referrals',
+                              subtitle: 'Share your seller code and track milestones',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const IncentiveAccountScreen(audience: 'SELLER'),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                           const SizedBox(height: 20),
@@ -2713,7 +2794,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                             icon: Icons.delete_outline_rounded,
                             title: 'Delete Account',
                             subtitle:
-                                'Permanently delete your SocietyBites account and associated personal data.',
+                                'Permanently delete your SocietyEats account and associated personal data.',
                             destructive: true,
                             onTap: _deletingAccount
                                 ? () {}

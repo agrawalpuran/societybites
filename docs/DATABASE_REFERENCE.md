@@ -291,10 +291,76 @@ Discount amount and status. `order` set null if the order row is removed. Coupon
 
 `name`, optional title, subtitle, image, `placement` default `BELOW_SEARCH` or `BELOW_CATEGORIES`, status `DRAFT`, `ACTIVE`, `INACTIVE`, optional window. Index `(status, startsAt, endsAt)`.
 
+### Incentive engine tables
+
+Added in `prisma/migrations/20261117120000_incentive_engine_foundation`. Phase 2C adds `prisma/migrations/20261117183000_incentive_event_processing`. Phase 2D-1 adds `prisma/migrations/20261117203000_incentive_referral_code_pin`. Phase 2D-2 adds `prisma/migrations/20261117213000_incentive_referral_attribution`. Both were applied with `psql` only to local `societybites_incentive_foundation`. They were not applied to Supabase. Phase 2D-4 adds nullable `Listing.firstPublishedAt` in `prisma/migrations/20261117223000_listing_first_published_at`. That migration is not applied. These tables have no foreign keys to `User`, `Order`, `Listing`, `Coupon`, or `AppSetting`. `IncentiveAuditLog.incentiveEventId` references `IncentiveEvent` only. Money columns are `DECIMAL(12,2)`.
+
+| Model | Role |
+|---|---|
+| `IncentiveSetting` | Switch key and value. Missing row means off. Exact value `true` is the only on value. A super admin can store `true` or `false` for master, referral, buyer referral, and seller referral. The other keys have no writer |
+| `IncentiveCampaign` | Campaign header. Status default `DRAFT` |
+| `IncentiveCampaignVersion` | Immutable snapshot. Unique `(campaignId, versionNumber)`. Delete is restricted |
+| `IncentiveAudience` | Audience rows for one version |
+| `IncentiveTrigger` | Unique `(versionId, eventType)` |
+| `IncentiveRule` | Versioned condition tree. `AND` or `OR` groups, leaf field and operator |
+| `IncentiveRewardDefinition` | Reward slot on a version. Unique `(versionId, slot)` |
+| `IncentiveBudget` | One budget per version. `issuedAmount` starts at 0. Maximum reward count and maximum reward amount are stored in the version snapshot, not as extra columns |
+| `IncentiveEvent` | Unique `eventId`. Status default `PENDING`. Phase 2C adds nullable `claimedAt`, `claimedBy`, and `claimToken`. A claim increments `attempts` and does not reset that count on replay. A partial unique index allows one terminal order event per `entityId` |
+| `IncentiveReferralCode` | Unique `code`. Unique `(userId, audience, scopeKey)`. `scopeKey` is the campaign id for a Phase 2D-1 code, or `default` for an older row that is not tied to one campaign. Phase 2D-1, applied with `psql` only on local `societybites_incentive_foundation`, adds nullable `expiresAt` and `campaignVersionId`. `campaignVersionId` is text and has no foreign key |
+| `IncentiveReferral` | Unique `(referredUserId, acquisitionKind)`, so one referrer per acquisition kind. Phase 2D-2, applied with `psql` only on local `societybites_incentive_foundation`, adds nullable milestone columns, `campaignVersionId`, and a check that the referrer and referred user differ |
+| `IncentiveReward` | Unique idempotency key and unique `(campaignVersionId, sourceEventId, recipientUserId, rewardSlot)`. `couponId` is text, not a coupon foreign key |
+| `IncentiveLedgerEntry` | Unique idempotency key. No `updatedAt`. `entryType` is text. `20261117233000_incentive_ledger_guard` rejects `UPDATE` and `DELETE`. Its insert trigger locks `IncentiveReward`, allows only a positive `ISSUE` or a negative `REDEEM` or `EXPIRE`, then rejects a negative balance. Applied with `psql` only on local `societybites_incentive_foundation` |
+| `IncentiveRedemption` | Ledger redemption. `orderId` is text, not an order foreign key |
+| `IncentiveRiskEvaluation` | Review signal record |
+| `IncentiveApproval` | Manual approval or adjustment |
+| `IncentiveAuditLog` | Admin and processing record. Phase 2C adds nullable `incentiveEventId` and `attemptNumber`. Processing outcomes are unique per event, action, and attempt |
+
+Campaign version children other than rewards cascade with the version. Rewards, ledger rows, redemptions, approvals, and referrals restrict deletes so history cannot be removed by deleting a parent.
+
+### Rollback
+
+Do not run this against production until the owner approves the migration. `npm start` runs `prisma migrate deploy`. `npm run dev` does not.
+
+Before it is applied, rollback is deleting the unapplied directory `20261117120000_incentive_engine_foundation` and the `Incentive*` models from `schema.prisma`, and removing the `/incentive` mount.
+
+After it is applied:
+
+1. Leave every `IncentiveSetting` value unset or set to something other than `true`.
+2. Remove the `/incentive` mount if the module must disappear from the process.
+3. Add a new migration that drops only `Incentive*` tables, children first: `IncentiveAuditLog`, `IncentiveApproval`, `IncentiveRiskEvaluation`, `IncentiveRedemption`, `IncentiveLedgerEntry`, `IncentiveReward`, `IncentiveReferral`, `IncentiveReferralCode`, `IncentiveEvent`, `IncentiveBudget`, `IncentiveRewardDefinition`, `IncentiveRule`, `IncentiveTrigger`, `IncentiveAudience`, `IncentiveCampaignVersion`, `IncentiveCampaign`, `IncentiveSetting`.
+4. Do not edit the applied migration file. Do not drop or rewrite `Coupon` rows. Do not drop `User`, `Order`, `Listing`, or `AppSetting`.
+
+### Ledger guard, local foundation only
+
+The statements below are in `prisma/migrations/20261117233000_incentive_ledger_guard/migration.sql`. The same file also replaces `incentive_ledger_guard_insert`. It rejects an entry type other than `ISSUE`, `REDEEM`, or `EXPIRE`, requires `ISSUE` to be positive and the other two to be negative, then locks `IncentiveReward` with `SELECT "id" FROM "IncentiveReward" WHERE "id" = NEW."rewardId" FOR UPDATE` before it sums the balance. The function is `VOLATILE`. Under PostgreSQL `READ COMMITTED`, the sum starts only after that lock wait, so it sees ledger rows committed by the transaction that held the reward row. The owner applied this file with `psql` to local `societybites_incentive_foundation` only. It is not in Prisma migration history and it is not on Supabase. It does not change `Coupon`, `Order`, `User`, `Listing`, or `AppSetting`.
+
+```sql
+CREATE OR REPLACE FUNCTION incentive_ledger_reject_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'IncentiveLedgerEntry is append-only';
+END;
+$$;
+
+CREATE TRIGGER incentive_ledger_no_update
+BEFORE UPDATE ON "IncentiveLedgerEntry"
+FOR EACH ROW
+EXECUTE FUNCTION incentive_ledger_reject_mutation();
+
+CREATE TRIGGER incentive_ledger_no_delete
+BEFORE DELETE ON "IncentiveLedgerEntry"
+FOR EACH ROW
+EXECUTE FUNCTION incentive_ledger_reject_mutation();
+```
+
+Apply it only with a separate approval, and only after the foundation migration itself has been approved and applied. `EXECUTE FUNCTION` matches current PostgreSQL. A database that still expects `EXECUTE PROCEDURE` needs that older keyword instead. Revoking `UPDATE` and `DELETE` from the application role can sit beside the trigger. The table owner can still disable a trigger, so the revoke matters.
+
 ## Migrations
 
-48 migration directories under `societybites-backend/prisma/migrations/`, from `20260822110000_add_preorder_campaign_cover_image` through `20261114153000_kitchen_moves`. The Git initial commit is 16 June 2026, before the first migration folder. Schema changes before 22 August 2026 were not reconstructed from migration SQL.
+50 migration directories under `societybites-backend/prisma/migrations/`, from `20260822110000_add_preorder_campaign_cover_image` through `20261117183000_incentive_event_processing`. The two incentive migrations are present and were not applied. The Git initial commit is 16 June 2026, before the first migration folder. Schema changes before 22 August 2026 were not reconstructed from migration SQL.
 
-Later migrations, in chronological order, add: pre-order cover and fulfilment notes, Google place fields on societies, food type, selling reach and city reach, seller fulfilment, listing catalog type and source listing, listing categories, seller payment preference, availability mode, order messages, requested ready time, seller FSSAI fields, recurring availability, delivery charges by reach, seller terms, COD-in-society default, kitchen hours, issue reports and messages, coupons, address proof, order cancel reason, address proof review, order idempotency, FSSAI framework, name and expiry, deferred details, hide flat number, listing display order, outside delivery cash, festival banners, listing variants, seller staff, reach radius, variant inventory modes, payment reminder time, listing discount, FSSAI assistance notes, listing likes, UPI account type, coupon seller scope, storefront slug, payment provider, coupon society scope, buyer addresses, and kitchen moves.
+Later migrations, in chronological order, add: pre-order cover and fulfilment notes, Google place fields on societies, food type, selling reach and city reach, seller fulfilment, listing catalog type and source listing, listing categories, seller payment preference, availability mode, order messages, requested ready time, seller FSSAI fields, recurring availability, delivery charges by reach, seller terms, COD-in-society default, kitchen hours, issue reports and messages, coupons, address proof, order cancel reason, address proof review, order idempotency, FSSAI framework, name and expiry, deferred details, hide flat number, listing display order, outside delivery cash, festival banners, listing variants, seller staff, reach radius, variant inventory modes, payment reminder time, listing discount, FSSAI assistance notes, listing likes, UPI account type, coupon seller scope, storefront slug, payment provider, coupon society scope, buyer addresses, kitchen moves, and the unapplied incentive-engine tables.
 
 Apply with Prisma migrate. `npm start` runs `scripts/ensure-db-migrations.js` unless `SKIP_DB_MIGRATE=true`. Do not hand-edit production data from the app boot path.

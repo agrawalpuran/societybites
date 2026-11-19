@@ -530,6 +530,30 @@ async function loadCouponRow(id) {
   });
 }
 
+/**
+ * Creates one user-scoped coupon through the existing coupon parser.
+ * Checkout validation and redemption are unchanged. Pass the transaction
+ * client when the coupon must commit with the incentive reward.
+ */
+async function createAssignedCoupon(client, body) {
+  const db = client || prisma;
+  const source = body && typeof body === "object" ? body : {};
+  const userIds = [...new Set((Array.isArray(source.userIds) ? source.userIds : []).map((value) => String(value).trim()).filter(Boolean))];
+  const data = await parseCouponWrite({ ...source, userIds: undefined });
+  try {
+    const coupon = await db.coupon.create({ data });
+    if (data.audienceType === "SELECTED_USERS" && userIds.length && db.couponEligibleUser) {
+      await db.couponEligibleUser.createMany({
+        data: userIds.map((userId) => ({ couponId: coupon.id, userId })),
+      });
+    }
+    return coupon;
+  } catch (err) {
+    if (err.code === "P2002") throw httpError(409, "Coupon code already exists");
+    throw err;
+  }
+}
+
 async function createCoupon(body) {
   const source = body && typeof body === "object" ? body : {};
   const societyIds = source.societyIds;
@@ -706,6 +730,7 @@ module.exports = {
   startOfIstDay,
   startOfIstWeek,
   startOfIstMonth,
+  createAssignedCoupon,
   createCoupon,
   listCoupons,
   filterCouponsForCityScope,

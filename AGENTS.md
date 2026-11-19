@@ -42,6 +42,9 @@ A local Cursor skill named `societybites-development-guide` may also describe th
 | Prisma schema | `societybites-backend/prisma/schema.prisma` |
 | Backend tests | `societybites-backend/tests/` |
 | Flutter tests | `test/` |
+| Incentive engine | `societybites-backend/modules/incentive-engine/` |
+
+The incentive engine is mounted at `/incentive` and is off unless `IncentiveSetting` rows are the exact value `true`. Campaign admin routes configure drafts only. Do not turn the switches on, activate a campaign, or issue a reward without the owner's approval. The module does not replace coupons, orders, or payments.
 
 Flutter UI should stay thin. Backend route handlers should stay thin and call `societybites-backend/lib/`. Database access goes through Prisma.
 

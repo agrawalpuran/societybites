@@ -351,6 +351,8 @@ model Listing {
   discountPercent        Float?
   discountStartsAt       DateTime?
   discountEndsAt         DateTime?
+  /// Set once when a draft first becomes active. Later resume or renew does not change it.
+  firstPublishedAt       DateTime?
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
   seller                 User              @relation(fields: [sellerId], references: [id])
@@ -804,4 +806,314 @@ model FestivalBanner {
   updatedAt DateTime  @updatedAt
 
   @@index([status, startsAt, endsAt])
+}
+
+/// Isolated incentive, referral, and rewards tables.
+/// No foreign keys to User, Order, Listing, Coupon, or AppSetting.
+/// A missing IncentiveSetting row means that switch is off.
+
+model IncentiveSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model IncentiveCampaign {
+  id               String                     @id @default(uuid())
+  name             String
+  description      String?
+  category         String
+  /// DRAFT | SCHEDULED | ACTIVE | PAUSED | COMPLETED | EXPIRED | TERMINATED
+  status           String                     @default("DRAFT")
+  priority         Int                        @default(0)
+  stackingMode     String                     @default("STACK")
+  startsAt         DateTime?
+  endsAt           DateTime?
+  /// IncentiveCampaignVersion.id. Stored as text to avoid a delete cycle.
+  currentVersionId String?
+  createdBy        String?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  versions         IncentiveCampaignVersion[]
+  referralCodes    IncentiveReferralCode[]
+  referrals        IncentiveReferral[]
+
+  @@index([status, startsAt])
+  @@index([category])
+}
+
+model IncentiveCampaignVersion {
+  id                String                      @id @default(uuid())
+  campaignId        String
+  versionNumber     Int
+  /// Frozen configuration used for evaluation and historical rewards.
+  snapshot          Json
+  publishedAt       DateTime?
+  publishedBy       String?
+  createdAt         DateTime                    @default(now())
+  campaign          IncentiveCampaign           @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  audiences         IncentiveAudience[]
+  triggers          IncentiveTrigger[]
+  rules             IncentiveRule[]
+  rewardDefinitions IncentiveRewardDefinition[]
+  budget            IncentiveBudget?
+  rewards           IncentiveReward[]
+
+  @@unique([campaignId, versionNumber])
+  @@index([campaignId])
+}
+
+model IncentiveAudience {
+  id        String                   @id @default(uuid())
+  versionId String
+  kind      String
+  payload   Json                     @default("{}")
+  version   IncentiveCampaignVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId])
+}
+
+model IncentiveTrigger {
+  id        String                   @id @default(uuid())
+  versionId String
+  eventType String
+  version   IncentiveCampaignVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, eventType])
+  @@index([eventType])
+}
+
+model IncentiveRule {
+  id             String                   @id @default(uuid())
+  versionId      String
+  groupKey       String
+  parentGroupKey String?
+  /// AND | OR. Null on a leaf condition.
+  combinator     String?
+  field          String?
+  operator       String?
+  value          Json?
+  sortOrder      Int                      @default(0)
+  version        IncentiveCampaignVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId, sortOrder])
+}
+
+model IncentiveRewardDefinition {
+  id            String                   @id @default(uuid())
+  versionId     String
+  slot          String
+  recipientRole String
+  rewardType    String
+  amount        Decimal                  @db.Decimal(12, 2)
+  maxDiscount   Decimal?                 @db.Decimal(12, 2)
+  minOrder      Decimal?                 @db.Decimal(12, 2)
+  expiryDays    Int?
+  usageLimit    Int?
+  stackingMode  String?
+  config        Json                     @default("{}")
+  version       IncentiveCampaignVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, slot])
+}
+
+model IncentiveBudget {
+  id           String                   @id @default(uuid())
+  versionId    String                   @unique
+  currency     String                   @default("INR")
+  amountCap    Decimal                  @db.Decimal(12, 2)
+  issuedAmount Decimal                  @default(0) @db.Decimal(12, 2)
+  version      IncentiveCampaignVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+}
+
+model IncentiveEvent {
+  id            String    @id @default(uuid())
+  eventId       String    @unique
+  schemaVersion Int       @default(1)
+  type          String
+  entityType    String
+  entityId      String
+  userId        String?
+  occurredAt    DateTime
+  payload       Json
+  /// PENDING | PROCESSING | PROCESSED | FAILED | SKIPPED | DEAD
+  status        String    @default("PENDING")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime?
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  processedAt   DateTime?
+  /// Set only while a worker owns the row. Cleared when the outcome is saved.
+  claimedAt     DateTime?
+  claimedBy     String?
+  /// New UUID on every claim. Outcome writes must match this token.
+  claimToken    String?
+  audits        IncentiveAuditLog[]
+
+  @@index([status, nextAttemptAt])
+  @@index([type, entityId])
+  @@index([userId])
+}
+
+model IncentiveReferralCode {
+  id         String              @id @default(uuid())
+  userId     String
+  /// BUYER | SELLER | ANY
+  audience   String
+  code       String              @unique
+  campaignId String?
+  /// Campaign id, or "default" when the code is not tied to one campaign.
+  scopeKey   String              @default("default")
+  active     Boolean             @default(true)
+  /// Calculated once from the pinned version. Later campaign edits do not rewrite it.
+  expiresAt  DateTime?
+  /// IncentiveCampaignVersion.id copied at issue time. No foreign key, matching currentVersionId.
+  campaignVersionId String?
+  createdAt  DateTime            @default(now())
+  campaign   IncentiveCampaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  referrals  IncentiveReferral[]
+
+  @@unique([userId, audience, scopeKey])
+  @@index([userId])
+  @@index([campaignId])
+}
+
+model IncentiveReferral {
+  id              String                @id @default(uuid())
+  codeId          String
+  campaignId      String?
+  referrerUserId  String
+  referredUserId  String
+  /// BUYER_ACQUISITION | SELLER_ACQUISITION
+  acquisitionKind String
+  channel         String?
+  attributedAt    DateTime              @default(now())
+  windowEndsAt    DateTime?
+  /// ATTRIBUTED | PENDING_REVIEW | QUALIFIED | DISQUALIFIED | EXPIRED
+  status          String                @default("ATTRIBUTED")
+  /// Copied from the referral code. Text, with no foreign key.
+  campaignVersionId String?
+  sellerEnabledAt DateTime?
+  listingId       String?
+  listingPublishedAt DateTime?
+  qualifyingOrderId String?
+  qualifyingOrderAt DateTime?
+  qualifiedAt     DateTime?
+  disqualifyReason String?
+  /// referrerUserId and referredUserId must differ. Enforced by the referral migration check.
+  code            IncentiveReferralCode @relation(fields: [codeId], references: [id], onDelete: Restrict)
+  campaign        IncentiveCampaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  rewards         IncentiveReward[]
+
+  @@unique([referredUserId, acquisitionKind])
+  @@index([referrerUserId])
+  @@index([referrerUserId, campaignVersionId, acquisitionKind])
+  @@index([codeId])
+  @@index([status])
+  @@index([campaignId])
+}
+
+model IncentiveReward {
+  id                String                   @id @default(uuid())
+  campaignVersionId String
+  rewardSlot        String
+  recipientUserId   String
+  sourceEventId     String
+  referralId        String?
+  /// Coupon.id when a coupon reward is issued. No relation, so Coupon is unchanged.
+  couponId          String?
+  /// CREATED | PENDING | APPROVED | ISSUED | PARTIALLY_REDEEMED | REDEEMED | EXPIRED | REJECTED | REVERSED
+  status            String                   @default("CREATED")
+  amount            Decimal                  @db.Decimal(12, 2)
+  currency          String                   @default("INR")
+  expiresAt         DateTime?
+  idempotencyKey    String                   @unique
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  campaignVersion   IncentiveCampaignVersion @relation(fields: [campaignVersionId], references: [id], onDelete: Restrict)
+  referral          IncentiveReferral?       @relation(fields: [referralId], references: [id], onDelete: SetNull)
+  ledgerEntries     IncentiveLedgerEntry[]
+  redemptions       IncentiveRedemption[]
+  approvals         IncentiveApproval[]
+
+  @@unique([campaignVersionId, sourceEventId, recipientUserId, rewardSlot])
+  @@index([recipientUserId, status])
+  @@index([status])
+  @@index([couponId])
+  @@index([sourceEventId])
+}
+
+model IncentiveLedgerEntry {
+  id             String          @id @default(uuid())
+  rewardId       String
+  /// ISSUE is positive. REDEEM and EXPIRE are negative. Other types are rejected. Posted rows are append-only.
+  /// PostgreSQL triggers in 20261117233000_incentive_ledger_guard reject UPDATE and DELETE.
+  /// The insert trigger locks IncentiveReward before it sums the balance.
+  entryType      String
+  amount         Decimal         @db.Decimal(12, 2)
+  currency       String          @default("INR")
+  actorId        String?
+  reason         String?
+  idempotencyKey String          @unique
+  createdAt      DateTime        @default(now())
+  reward         IncentiveReward @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+
+  @@index([rewardId, createdAt])
+}
+
+model IncentiveRedemption {
+  id        String          @id @default(uuid())
+  rewardId  String
+  orderId   String?
+  amount    Decimal         @db.Decimal(12, 2)
+  status    String
+  createdAt DateTime        @default(now())
+  reward    IncentiveReward @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+
+  @@index([rewardId])
+  @@index([orderId])
+}
+
+model IncentiveRiskEvaluation {
+  id          String   @id @default(uuid())
+  subjectType String
+  subjectId   String
+  score       Int?
+  signals     Json
+  /// ALLOW | REVIEW | BLOCK
+  decision    String
+  createdAt   DateTime @default(now())
+
+  @@index([subjectType, subjectId, createdAt])
+}
+
+model IncentiveApproval {
+  id          String          @id @default(uuid())
+  rewardId    String
+  action      String
+  requestedBy String
+  decidedBy   String?
+  decision    String
+  reason      String?
+  createdAt   DateTime        @default(now())
+  reward      IncentiveReward @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+
+  @@index([rewardId, createdAt])
+}
+
+model IncentiveAuditLog {
+  id               String          @id @default(uuid())
+  actorId          String
+  action           String
+  campaignId       String?
+  before           Json?
+  after            Json?
+  createdAt        DateTime        @default(now())
+  incentiveEventId String?
+  attemptNumber    Int?
+  incentiveEvent   IncentiveEvent? @relation(fields: [incentiveEventId], references: [id], onDelete: Restrict)
+
+  @@index([campaignId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([incentiveEventId])
 }

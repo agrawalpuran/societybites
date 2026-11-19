@@ -29,6 +29,7 @@ These are in the source and wired through the API. Detail and limits are in [PRO
 - Verify the production API host and write the answer into this file and [ARCHITECTURE.md](ARCHITECTURE.md).
 - Rotate the tracked APNs private key.
 - Keep WhatsApp and Cashfree off until the owner explicitly enables them.
+- Incentive engine Phases 2A through 2F are implemented and left off. Do not enable the switches. Local PostgreSQL checks on `societybites_incentive_foundation` passed for events, referral concurrency, the rewards ledger guard, and a read-only reporting harness. Reporting pages were empty, `performance()` was not called, and leaderboard names stay blocked. Phase 3A passed coupon rollback and concurrent approval once on `societybites_incentive_integration_v2` and was not rerun. Caller offers, completed-order qualification, budget reconciliation, and post-commit reward notifications are in the working tree. Buyer and seller journeys against a live API are unverified, and reward reversal is not implemented. Do not apply incentive migrations to Supabase until the owner names that database. Flutter screens read the incentive routes. Do not turn a switch on.
 
 ## Medium-term features
 

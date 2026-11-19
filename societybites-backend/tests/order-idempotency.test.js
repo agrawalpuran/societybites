@@ -302,10 +302,17 @@ async function main() {
   } finally {
     server.close();
     if (listingIds.length) {
-      await prisma.orderItem.deleteMany({ where: { listingId: { in: listingIds } } });
-      await prisma.order.deleteMany({
+      const linkedOrders = await prisma.order.findMany({
         where: { items: { some: { listingId: { in: listingIds } } } },
+        select: { id: true },
       });
+      const linkedOrderIds = linkedOrders.map((order) => order.id);
+      if (linkedOrderIds.length) {
+        await prisma.review.deleteMany({ where: { orderId: { in: linkedOrderIds } } });
+        await prisma.message.deleteMany({ where: { orderId: { in: linkedOrderIds } } });
+        await prisma.orderItem.deleteMany({ where: { orderId: { in: linkedOrderIds } } });
+        await prisma.order.deleteMany({ where: { id: { in: linkedOrderIds } } });
+      }
       await prisma.listing.deleteMany({ where: { id: { in: listingIds } } });
     }
     await prisma.orderIdempotency.deleteMany({

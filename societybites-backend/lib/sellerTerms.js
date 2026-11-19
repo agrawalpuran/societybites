@@ -5,6 +5,7 @@ const { assertSellingReachDecreaseAllowed } = require("./sellerReachDecrease");
 const { assertSellerFulfilmentUpdate } = require("./sellerFulfilment");
 const { assertSellerPaymentPreferenceUpdate, DEFAULT_PAYMENT_PREFERENCE } = require("./sellerPaymentPreference");
 const { normalizeUpiAccountType } = require("./upiAccountType");
+const { afterCommit, recordSellerBecameSeller } = require("../modules/incentive-engine/events/productHooks");
 
 // Framework / Draft — Legal Review Required.
 // Not legally approved or counsel approved. Qualified Indian legal counsel
@@ -15,6 +16,10 @@ function httpError(statusCode, message) {
   const err = new Error(message);
   err.statusCode = statusCode;
   return err;
+}
+
+function isBecomingSeller(user) {
+  return Boolean(user) && user.role !== "seller" && user.role !== "super_admin";
 }
 
 function assertSellerTermsVersion(version) {
@@ -54,7 +59,7 @@ async function acceptSellerTermsAndEnable({ prisma, user, body }) {
   const termsVersion = assertSellerTermsVersion(body.termsVersion);
 
   const enablingRole = user.role === "super_admin" ? "super_admin" : "seller";
-  const becomingSeller = user.role !== "seller" && user.role !== "super_admin";
+  const becomingSeller = isBecomingSeller(user);
   if (becomingSeller) {
     await assertSellerFssaiForEnableSelling(user.id);
   }
@@ -179,7 +184,7 @@ async function acceptSellerTermsAndEnable({ prisma, user, body }) {
     data.paymentPreference = DEFAULT_PAYMENT_PREFERENCE;
   }
   const acceptedAt = new Date();
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const existing = await tx.sellerTermsAcceptance.findUnique({
       where: {
         userId_termsVersion: { userId: user.id, termsVersion },
@@ -206,10 +211,18 @@ async function acceptSellerTermsAndEnable({ prisma, user, body }) {
         });
     return { user: updated, acceptance };
   });
+  if (!becomingSeller) return result;
+  return afterCommit(result, () =>
+    recordSellerBecameSeller(prisma, {
+      userId: user.id,
+      occurredAt: result.acceptance && result.acceptance.acceptedAt,
+    })
+  );
 }
 
 module.exports = {
   SELLER_TERMS_VERSION,
   assertSellerTermsVersion,
   acceptSellerTermsAndEnable,
+  isBecomingSeller,
 };

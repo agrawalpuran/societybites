@@ -107,6 +107,34 @@ Each entry says whether the decision is confirmed in code, only discussed, or su
 - **Status:** Confirmed by the middleware installed on the admin router.
 - **Can it change:** Yes, if the owner wants a finer permission model. Do not give console admins write access by accident.
 
+### Incentive reward reversal stays unimplemented
+
+- **Decision:** Phase 3B does not add a `REVERSED` reward writer. The ledger guard accepts only `ISSUE`, `REDEEM`, and `EXPIRE`.
+- **Reason:** Cancelling an issued coupon, releasing budget, and posting a new ledger type are one product choice. The schema comment names `REVERSED`, but no route writes it.
+- **Status:** Recorded on 19 November 2026. Flags stay off.
+- **Can it change:** Yes, with a separate approval that names the coupon, budget, and ledger effect.
+
+### Incentive engine is additive and off
+
+- **Decision:** Referral and rewards live in `societybites-backend/modules/incentive-engine/` and `Incentive*` tables. Switches default off. Missing setting rows stay off. The engine does not add columns to `User`, `Order`, `Listing`, `Coupon`, or `AppSetting`, and it does not take a foreign key to `Coupon`. `couponId` on a future reward is a plain string.
+- **Reason:** The owner approved an isolated engine on 17 November 2026 and withheld activation.
+- **Status:** Phases 2A through 2F are in the source on `feature/incentive-engine-foundation`. Phase 2E issues coupons and promotional credit only when the issuance switch is exactly `true`. That switch is off. Phase 2F adds Flutter screens in the existing admin shell, buyer profile, and seller settings. Those screens do not add routes and do not turn a switch on. `Listing.firstPublishedAt` is not applied. The ledger guard was applied with `psql` only to local `societybites_incentive_foundation`. Later local runs passed for events, referral concurrency, the rewards guard, and empty read-only reporting. Phase 3A later passed coupon rollback and concurrent approval on `societybites_incentive_integration_v2`. Buyer and seller journeys remain unverified.
+- **Can it change:** Activation, issuance, and redemption require a separate owner approval. Do not set those setting values to `true` as part of development. A flag write API was reviewed on 17 November 2026 and not added. On 19 November 2026 the owner approved a super-admin write for four switches, recorded below. Campaign performance, referral analytics, the reward report, audit, and risk are read models. They do not turn a switch on or issue a reward.
+
+### Super admin can switch referral codes
+
+- **Decision:** A super admin can turn Master, Referral, Buyer referral, and Seller referral on or off from Incentives & Rewards → Settings. The control asks before either change. A console admin does not see that tab. The server accepts only those four keys and stores the exact text `true` or `false`. A missing row stays off. Issuance, redemption, and promotional campaigns stay without a writer.
+- **Reason:** The owner asked for a super-admin toggle, with the programme off until someone turns it on.
+- **Status:** Added on 19 November 2026. No switch was set to `true` in this change. The hosted database still has no `IncentiveSetting` table, so the save returns 503 there.
+- **Can it change:** Yes. Turning a switch on in a database still needs the owner to do it. Do not add a writer for issuance from this control.
+
+### Ledger append-only needs a database guard before issuance
+
+- **Decision:** Phase 2B does not change the ledger. `IncentiveLedgerEntry` has no `updatedAt` and no update route. That is convention only. Before Phase 2E writes ledger rows, add a new migration that rejects `UPDATE` and `DELETE`. Do not put that statement in the unapplied foundation migration.
+- **Reason:** A later bug or a direct database session could rewrite a posted amount if the database still allows it.
+- **Status:** The statement is in `prisma/migrations/20261117233000_incentive_ledger_guard/migration.sql`. The insert guard checks entry type and sign, locks `IncentiveReward` before the balance sum, and rejects a negative result. The owner applied that file with `psql` to local `societybites_incentive_foundation` only. It is not in Prisma migration history and it is not on Supabase.
+- **Can it change:** Apply it only to a database the owner names, before issuance is enabled.
+
 ## Discussed, not confirmed as a shipped product
 
 ### Twilio or another WhatsApp vendor

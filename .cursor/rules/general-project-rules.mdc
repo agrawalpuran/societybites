@@ -17,3 +17,4 @@ SocietyEats is the product. The repo and `societybites-backend` still use the So
 - Never write secrets into source, docs, or chat.
 - Do not claim tests passed unless you ran them.
 - After a significant change, update `docs/PROJECT_STATUS.md` and `docs/LATEST_HANDOVER.md`, plus any architecture, schema, API, decision, issue, or roadmap page the change affects.
+- Flutter screens stay Flutter-specific. On a wide Chrome window, center content in the existing web frame (`webFrameMaxWidth` 1180, seller tools 840). Do not stretch phone layouts, cards, forms, or switches to the browser edges, and do not show a stretched desktop mockup.

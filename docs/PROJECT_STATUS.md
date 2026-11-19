@@ -1,6 +1,6 @@
 # SocietyEats project status
 
-Status comes from reading the source on 15 November 2026. The full test suite was not executed. `admin-city-dashboard.test.js` and `platform-fee-city.test.js` were run and passed. "Tests exist" means a test file is in the repo.
+Status comes from reading the source on 15 November 2026. On 19 November 2026, `npm run test:regression` passed on local `127.0.0.1:5432/societybites_incentive_integration_v2` only. That run is not production acceptance. `admin-city-dashboard.test.js` and `platform-fee-city.test.js` were run earlier and passed. "Tests exist" means a test file is in the repo.
 
 Statuses:
 
@@ -77,6 +77,7 @@ Payment status values used in `routes/payments.js` include `pending`, `buyer_mar
 | Admin city scope | PARTIALLY COMPLETE | `lib/adminCityDashboard.js`, `lib/admin/admin_city_scope.dart`, `lib/widgets/admin_city_scope_bar.dart`, `lib/widgets/admin_dashboard_cities_table.dart`, admin list screens, `api_service.dart`, `session_service.dart` | Optional `?cityKey=` on dashboard, growth, societies, listings, orders, reviews, issues, coupons, settings, and performance GETs. `GET /admin/dashboard/cities` | `Society.city` grouped by `canonicalCityKey`. No new table | Chips on Dashboard, Societies, Listings, Orders, Performance, Reviews, Issues, Coupons. Choice saved in `admin_city_scope_key`. Unknown city returns 400 `INVALID_CITY_KEY`. Unit test passed on 15 Nov 2026. Browser pass not done | Click through the chips. Full behavior is in [LATEST_HANDOVER.md](LATEST_HANDOVER.md) |
 | Marketing push | COMPLETE in code | `lib/marketingPush.js` | `GET/POST /admin/marketing-push` | `AppSetting.marketing_push_last_sent_at` | Super admin POST | — |
 | Audit log | COMPLETE | admin routes | `GET /admin/audit-log` | `AuditLog` | Not a full security audit trail of every table | — |
+| Incentive screens | PARTIALLY COMPLETE | Admin incentives, campaign form, rule builder, insights, account screen, and the super-admin Settings switches | `/incentive` admin reports, duplicate, events, audit, caller rewards, `GET /incentive/offers`, and `PUT /incentive/admin/flags` | Incentive tables | Master, referral, buyer referral, and seller referral can be saved by a super admin. They stay off until that save. Issuance, redemption, and promotional campaigns have no writer. Offers are empty while the master switch is off. No new migration | The hosted database has no incentive tables, so the switch returns 503 there. Do not turn issuance on. Buyer and seller journeys against a live API are still unverified. Reward reversal is not implemented |
 
 ## Explicitly not implemented
 

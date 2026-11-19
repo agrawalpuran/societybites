@@ -4,8 +4,15 @@
  */
 const challenges = new Map();
 
+function envNumber(name, fallback) {
+  const raw = process.env[name];
+  if (raw == null || String(raw).trim() === "") return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 const OTP_TTL_MS = Number(process.env.OTP_TTL_MS) || 10 * 60 * 1000;
-const RESEND_COOLDOWN_MS = Number(process.env.OTP_RESEND_COOLDOWN_MS) || 60 * 1000;
+const RESEND_COOLDOWN_MS = envNumber("OTP_RESEND_COOLDOWN_MS", 60 * 1000);
 const MAX_SENDS_PER_HOUR = Number(process.env.OTP_MAX_SENDS_PER_HOUR) || 5;
 const MAX_VERIFY_ATTEMPTS = Number(process.env.OTP_MAX_VERIFY_ATTEMPTS) || 5;
 

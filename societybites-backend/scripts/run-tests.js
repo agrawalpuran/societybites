@@ -35,6 +35,15 @@ const UNIT = [
   "whatsapp-cloud",
   "upi-account-type",
   "payment-provider",
+  "incentive-flags",
+  "incentive-campaigns",
+  "incentive-events",
+  "incentive-referrals-codes",
+  "incentive-referrals-lifecycle",
+  "incentive-product-events",
+  "incentive-rewards",
+  "incentive-read",
+  "incentive-analytics",
 ];
 
 /**

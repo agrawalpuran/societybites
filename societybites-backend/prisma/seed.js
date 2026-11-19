@@ -71,6 +71,23 @@ async function ensureSociety({ id, name, city, inviteCode, unitLabel, blockNames
 }
 
 async function main() {
+  if (process.env.SOCIETYBITES_V2_SEED === "1") {
+    const value = process.env.DATABASE_URL || "";
+    const lowered = value.toLowerCase();
+    if (lowered.includes("supabase") || lowered.includes("pooler")) {
+      throw new Error("Refusing to seed Supabase");
+    }
+    let parsed;
+    try {
+      parsed = new URL(value);
+    } catch (error) {
+      throw new Error("Refusing to seed without a local database URL");
+    }
+    const database = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
+    if (parsed.hostname !== "127.0.0.1" || parsed.port !== "5432" || database !== "societybites_incentive_integration_v2") {
+      throw new Error("Refusing to seed a database other than 127.0.0.1:5432/societybites_incentive_integration_v2");
+    }
+  }
   const pickupTime = new Date();
   pickupTime.setHours(19, 0, 0, 0);
 
@@ -126,6 +143,7 @@ async function main() {
       upiId: "anita.sharma@oksbi",
       upiDisplayName: "Anita Sharma",
       paymentEnabled: true,
+      paymentPreference: "UPI_AND_COD",
     },
     create: {
       phone: SELLER_PHONE,
@@ -136,6 +154,7 @@ async function main() {
       upiId: "anita.sharma@oksbi",
       upiDisplayName: "Anita Sharma",
       paymentEnabled: true,
+      paymentPreference: "UPI_AND_COD",
     },
   });
 

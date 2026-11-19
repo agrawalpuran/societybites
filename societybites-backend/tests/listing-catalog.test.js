@@ -97,9 +97,17 @@ async function main() {
   app.use("/preorder-campaigns", campaignRoutes);
   app.use((err, _req, res, _next) => {
     const statusCode = err.statusCode || 500;
+    const detail =
+      err && err.message
+        ? String(err.message).replace(/postgresql:\/\/\S+/gi, "[redacted]").slice(0, 700)
+        : "";
+    if (statusCode >= 500) {
+      console.error("listing-catalog request failed", err && err.code ? err.code : "", detail);
+    }
     res.status(statusCode).json({
       error: statusCode === 500 ? "Internal server error" : err.message,
       code: err.code,
+      ...(statusCode >= 500 && detail ? { detail } : {}),
     });
   });
 
@@ -558,7 +566,7 @@ async function main() {
       data: {
         sellerId: nearbySeller.id,
         societyId: nearbySociety.id,
-        name: `Nearby regular ${stamp}`,
+        name: `Street thali ${stamp}`,
         price: 70,
         quantity: 2,
         status: "active",
@@ -571,7 +579,7 @@ async function main() {
       data: {
         sellerId: nearbySeller.id,
         societyId: nearbySociety.id,
-        name: `Nearby preorder ${stamp}`,
+        name: `Street booking ${stamp}`,
         price: 70,
         quantity: 2,
         status: "active",

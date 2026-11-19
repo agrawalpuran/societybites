@@ -97,9 +97,20 @@ async function main() {
     });
     assert(unauthCampaigns.status === 401, "unauthenticated campaign GET must be 401");
 
+    const otherSeller = await prisma.user.create({
+      data: {
+        phone: `+9196${String(Date.now()).slice(-8)}`,
+        name: "Other society catalog seller",
+        role: "seller",
+        societyId: OTHER_SOCIETY_ID,
+        upiId: "other-society@upi",
+        paymentEnabled: true,
+      },
+    });
+    created.userIds.push(otherSeller.id);
     const otherListing = await prisma.listing.create({
       data: {
-        sellerId: buyer.id,
+        sellerId: otherSeller.id,
         societyId: OTHER_SOCIETY_ID,
         name: `Other-society catalog ${Date.now()}`,
         price: 99,

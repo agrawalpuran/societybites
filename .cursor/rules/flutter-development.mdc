@@ -14,5 +14,6 @@ The app starts at `lib/main.dart`. Buyer and seller UI is `MainShellScreen`. Adm
 - Kitchen hosts go through `lib/services/storefront_host.dart` and `SellerKitchenSiteScreen`. Do not add a second slug parser.
 - Show loading, empty, and error states on screens you change.
 - Match the existing style: small widgets, `SessionService` for auth, no new state-management package.
+- Keep each screen Flutter-specific. A phone-width column stays a column. On web at 768px and wider, wrap the page in `lib/web/` and cap it at `webFrameMaxWidth` (1180) or `webSellerContentMaxWidth` (840) for seller tools. Center that frame. Do not let lists, forms, cards, or switches stretch across the browser. Previews use that same frame.
 - `cloud_firestore` is unused. Do not start storing product data in Firestore.
 - Run `flutter test` for logic you change. For a UI flow, exercise it in the running app when a browser or device is available, and say what you could not run.

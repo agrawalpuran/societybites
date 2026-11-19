@@ -22,7 +22,7 @@ function rateLimit({ windowMs = 60000, max = 100 } = {}) {
   };
 }
 
-setInterval(() => {
+const sweep = setInterval(() => {
   const cutoff = Date.now() - 300000;
   for (const [key, timestamps] of requests.entries()) {
     const filtered = timestamps.filter((t) => t > cutoff);
@@ -30,5 +30,6 @@ setInterval(() => {
     else requests.set(key, filtered);
   }
 }, 300000);
+if (typeof sweep.unref === "function") sweep.unref();
 
 module.exports = { rateLimit };
