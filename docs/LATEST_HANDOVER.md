@@ -2,7 +2,7 @@
 
 ## 19 November 2026 — Incentive work is on its own branch
 
-The uncommitted incentive and referral code is committed on `feature/incentive-referral-engine`. `main` stays at `407e2ae`. Switches stay off. No campaign was activated. The branch was not pushed.
+The incentive and referral code is committed on `feature/incentive-referral-engine` at `54c4a4e` and pushed to GitHub. `main` stays at `407e2ae`. No pull request was opened. Switches stay off. No campaign was activated.
 
 ## 19 November 2026 — Local super admin and local API
 
