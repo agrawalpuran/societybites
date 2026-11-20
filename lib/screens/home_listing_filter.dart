@@ -357,8 +357,12 @@ int homeSearchMatchScore(FoodItem food, String searchQuery) {
   return 4;
 }
 
-/// Home "All Items" first-screen cap. Remaining listings open via See all.
+/// Home "All Items" first-screen cap used by the fair ranking fill.
+/// Remaining listings open via See all.
 const homeAllItemsPreviewCount = 12;
+
+/// Collapsed All Items row. A random subset, then See all for the rest.
+const homeAllItemsRandomPreviewCount = 5;
 
 /// Horizontal reach-section preview on Home.
 const homeReachPreviewCount = 6;

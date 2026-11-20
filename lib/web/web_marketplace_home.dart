@@ -77,6 +77,7 @@ class WebMarketplaceHome extends StatefulWidget {
     this.kitchenHeroTitle,
     this.kitchenHeroSubtitle,
     this.kitchenBannerUrl,
+    this.footer,
   });
 
   final bool isInitialLoading;
@@ -135,6 +136,9 @@ class WebMarketplaceHome extends StatefulWidget {
   final String? kitchenHeroTitle;
   final String? kitchenHeroSubtitle;
   final String? kitchenBannerUrl;
+
+  /// Logged-in nomination card under the marketplace sections.
+  final Widget? footer;
 
   @override
   State<WebMarketplaceHome> createState() => _WebMarketplaceHomeState();
@@ -211,6 +215,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           _hero(width),
           const SizedBox(height: 22),
           _emptySociety(),
+          _huntFooter(),
           const SizedBox(height: 28),
           const WebTrustBand(),
           const SizedBox(height: 8),
@@ -273,6 +278,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
               onSeller: (food) => widget.onOpenSeller(sellerFromListing(food)),
             ),
         ],
+        _huntFooter(),
         const SizedBox(height: 36),
         const WebTrustBand(),
         _footer(),
@@ -755,6 +761,22 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
       return 'No listings in ${widget.selectedCategory} yet.';
     }
     return 'No listings yet. Be the first to add food from the seller dashboard.';
+  }
+
+  Widget _huntFooter() {
+    final footer = widget.footer;
+    if (footer == null || widget.kitchenSiteMode) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 28),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: footer,
+        ),
+      ),
+    );
   }
 
   Widget _footer() {

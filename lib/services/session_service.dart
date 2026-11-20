@@ -40,9 +40,9 @@ class SessionService {
   static List<Map<String, dynamic>>? rememberedBuyerAddresses;
   static bool _clearedThisProcess = false;
 
-  static void _secureBestEffort(Future<dynamic> future) {
+  static void _secureBestEffort(Future<dynamic> Function() action) {
     if (_skipSecureStoragePlugin) return;
-    future.then((_) {}, onError: (_) {});
+    action().then((_) {}, onError: (_) {});
   }
 
   static bool get _skipSecureStoragePlugin {
@@ -241,7 +241,7 @@ class SessionService {
     _clearedThisProcess = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_jwtKey);
-    _secureBestEffort(_secureStorage.write(key: _jwtKey, value: token));
+    _secureBestEffort(() => _secureStorage.write(key: _jwtKey, value: token));
   }
 
   /// Loads Keychain tokens once so later API calls avoid repeated secure reads.
@@ -264,7 +264,9 @@ class SessionService {
     final legacyToken = prefs.getString(_jwtKey);
     if (legacyToken != null && legacyToken.isNotEmpty) {
       _memoryJwt = legacyToken;
-      _secureBestEffort(_secureStorage.write(key: _jwtKey, value: legacyToken));
+      _secureBestEffort(
+        () => _secureStorage.write(key: _jwtKey, value: legacyToken),
+      );
       await prefs.remove(_jwtKey);
     }
     return legacyToken;
@@ -274,7 +276,7 @@ class SessionService {
     _memoryRefresh = token;
     _clearedThisProcess = false;
     _secureBestEffort(
-      _secureStorage.write(key: _refreshTokenKey, value: token),
+      () => _secureStorage.write(key: _refreshTokenKey, value: token),
     );
   }
 
@@ -311,7 +313,7 @@ class SessionService {
       await saveRefreshToken(refreshToken);
     } else {
       _memoryRefresh = null;
-      _secureBestEffort(_secureStorage.delete(key: _refreshTokenKey));
+      _secureBestEffort(() => _secureStorage.delete(key: _refreshTokenKey));
     }
   }
 
@@ -376,7 +378,7 @@ class SessionService {
     if (pendingDeepLink != null && pendingDeepLink.isNotEmpty) {
       await prefs.setString(DeepLinkService.prefsKey, pendingDeepLink);
     }
-    _secureBestEffort(_secureStorage.delete(key: _jwtKey));
-    _secureBestEffort(_secureStorage.delete(key: _refreshTokenKey));
+    _secureBestEffort(() => _secureStorage.delete(key: _jwtKey));
+    _secureBestEffort(() => _secureStorage.delete(key: _refreshTokenKey));
   }
 }

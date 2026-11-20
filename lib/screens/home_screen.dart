@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -49,6 +50,8 @@ import '../widgets/seller_avatar.dart';
 import '../widgets/feed_refresh_bar.dart';
 import '../utils/listing_image_precache.dart';
 import '../utils/listing_portion_label.dart';
+import '../home/chef_hunt_card.dart';
+import '../home/marketplace_metrics.dart';
 import '../web/web_breakpoints.dart';
 import '../web/web_marketplace_home.dart';
 import '../preview/festival_banner_preview.dart';
@@ -66,7 +69,11 @@ class HomeScreen extends StatefulWidget {
     this.onStartSelling,
     this.onExploreNearby,
     this.onSelectTab,
+    this.onMarketplaceMetrics,
     this.initialCategory,
+    this.showChefHunt = false,
+    this.chefWing = 'your wing',
+    this.chefSocietyName,
   });
 
   /// Fired once after the first successful listings load so MainShell can
@@ -82,7 +89,15 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onStartSelling;
   final VoidCallback? onExploreNearby;
   final ValueChanged<int>? onSelectTab;
+
+  /// Fired after a successful listings load. Does not run for a failed load.
+  final ValueChanged<BuyerMarketplaceSnapshot>? onMarketplaceMetrics;
   final String? initialCategory;
+
+  /// Logged-in nomination card, on every home state.
+  final bool showChefHunt;
+  final String chefWing;
+  final String? chefSocietyName;
 
   @override
   HomeScreenState createState() => HomeScreenState();
@@ -109,6 +124,8 @@ class HomeScreenState extends State<HomeScreen> {
   String? _selectedFoodType;
   bool _didNotifyInitialSuccess = false;
   bool _showAllItems = false;
+  String _randomAllItemKey = '';
+  List<String> _randomAllItemIds = const [];
   String? _buyerSocietyId;
   HomeListingReach? _expandedReach;
   SellingReach _cityReach = const SellingReach();
@@ -125,6 +142,14 @@ class HomeScreenState extends State<HomeScreen> {
 
   bool get isLoadInProgress => _isLoading;
   bool get hasSuccessfullyLoaded => _hasSuccessfullyLoaded;
+
+  @override
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.onMarketplaceMetrics != widget.onMarketplaceMetrics) {
+      _publishMarketplaceMetrics();
+    }
+  }
 
   @override
   void initState() {
@@ -183,6 +208,7 @@ class HomeScreenState extends State<HomeScreen> {
     });
     _notifyInitialLoadSuccess();
     _scheduleListingImagePrecache(listings);
+    _publishMarketplaceMetrics();
   }
 
   void _scheduleListingImagePrecache(List<FoodItem> listings) {
@@ -193,11 +219,28 @@ class HomeScreenState extends State<HomeScreen> {
         precacheHomeListingImages(
           context,
           listings,
+          priority: _firstScreenFoods(),
           buyerSocietyId: _buyerSocietyId,
           warmedUrls: _homePrecachedImageUrls,
         ),
       );
     });
+  }
+
+  /// Dishes whose photos are on the first screen. Order matches the layout.
+  List<FoodItem> _firstScreenFoods() {
+    if (useWebMarketplaceLayout(context)) {
+      final width = MediaQuery.sizeOf(context).width;
+      return [
+        ..._webHeroFoods(),
+        ..._webReadyNow.take(webReadyNowPreviewCount(width)),
+      ];
+    }
+    return [
+      ..._mobileListingsForReach(HomeListingReach.inSociety)
+          .take(homeReachPreviewCount),
+      ..._visibleAvailable,
+    ];
   }
 
   Future<void> _persistHomeFeedCache(
@@ -365,6 +408,7 @@ class HomeScreenState extends State<HomeScreen> {
       _notifyInitialLoadSuccess();
       await _syncBuyerSocietyId();
     }
+    _publishMarketplaceMetrics();
     _scheduleListingImagePrecache(listings);
     unawaited(_persistHomeFeedCache(raw, cityReach));
   }
@@ -532,6 +576,20 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _publishMarketplaceMetrics() {
+    final callback = widget.onMarketplaceMetrics;
+    if (callback == null || !_hasSuccessfullyLoaded) return;
+    final snapshot = buyerMarketplaceSnapshot(
+      _listings,
+      buyerSocietyId: _buyerSocietyId,
+      cityReach: _cityReach,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      callback(snapshot);
+    });
+  }
+
   void _notifyInitialLoadSuccess() {
     if (_didNotifyInitialSuccess) return;
     _didNotifyInitialSuccess = true;
@@ -565,11 +623,29 @@ class HomeScreenState extends State<HomeScreen> {
   bool get _shouldPreviewAllItems =>
       !_showAllItems &&
       _isBrowsingUnfiltered &&
-      _available.length > homeAllItemsPreviewCount;
+      _available.length > homeAllItemsRandomPreviewCount;
 
   List<FoodItem> get _visibleAvailable {
     if (!_shouldPreviewAllItems) return _available;
-    return _available.take(homeAllItemsPreviewCount).toList();
+    return _randomAllItemsPreview();
+  }
+
+  List<FoodItem> _randomAllItemsPreview() {
+    final available = _available;
+    final key = available.map((food) => food.id).join('\u0001');
+    if (key != _randomAllItemKey) {
+      final shuffled = List<FoodItem>.of(available)..shuffle(Random());
+      _randomAllItemIds = shuffled
+          .take(homeAllItemsRandomPreviewCount)
+          .map((food) => food.id)
+          .toList();
+      _randomAllItemKey = key;
+    }
+    final byId = {for (final food in available) food.id: food};
+    return [
+      for (final id in _randomAllItemIds)
+        if (byId[id] != null) byId[id]!,
+    ];
   }
 
   Future<void> _loadGuestMarketplace() async {
@@ -595,6 +671,7 @@ class HomeScreenState extends State<HomeScreen> {
         _error = null;
       });
       _notifyInitialLoadSuccess();
+      _publishMarketplaceMetrics();
     } catch (_) {
       if (!mounted) return;
       _stopHomeSlowTimer();
@@ -1094,6 +1171,7 @@ class HomeScreenState extends State<HomeScreen> {
       onStartSelling: _startSellingFromHome,
       onExploreNearby: _openExploreNearby,
       onSelectTab: (index) => widget.onSelectTab?.call(index),
+      footer: widget.showChefHunt ? _chefHuntCard() : null,
     );
   }
 
@@ -1146,6 +1224,8 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
               ] else if (_showEmptySocietyState) ...[
                 SliverToBoxAdapter(child: _buildEmptySocietyState()),
+                if (widget.showChefHunt)
+                  SliverToBoxAdapter(child: _chefHuntCard()),
               ] else ...[
                 if (_error != null)
                   SliverToBoxAdapter(
@@ -1216,7 +1296,7 @@ class HomeScreenState extends State<HomeScreen> {
                         FestivalBannerPlacement.belowCategories,
                       )!,
                     ),
-                  SliverToBoxAdapter(child: _buildHomeDiscoverySections()),
+                  ..._homeDiscoverySlivers(),
                 ] else if (_listingType == HomeListingType.preOrder) ...[
                   SliverToBoxAdapter(child: _buildPreorderSearchResults()),
                 ],
@@ -1229,6 +1309,8 @@ class HomeScreenState extends State<HomeScreen> {
                   if (_shouldPreviewAllItems)
                     SliverToBoxAdapter(child: _buildSeeAllItemsButton()),
                 ],
+                if (widget.showChefHunt)
+                  SliverToBoxAdapter(child: _chefHuntCard()),
                 SliverToBoxAdapter(
                   child: SizedBox(height: _cart.isEmpty ? 24 : 88),
                 ),
@@ -1759,20 +1841,22 @@ class HomeScreenState extends State<HomeScreen> {
         sort: HomeSellerSort.distance,
       );
 
-  Widget _buildHomeDiscoverySections() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSellerReachCarousel(
+  List<Widget> _homeDiscoverySlivers() {
+    return [
+      SliverToBoxAdapter(
+        child: _buildSellerReachCarousel(
           key: const Key('home-sellers-in-society'),
           title: 'Top Sellers in Your Society',
           sellers: sellersFromListings(
             _sellerPresenceForReach(HomeListingReach.inSociety),
           ),
         ),
-        _buildSpecialsSection(),
-        if (_showPreorderSections) _buildPreOrdersSection(),
-        _buildSellerReachCarousel(
+      ),
+      SliverToBoxAdapter(child: _buildSpecialsSection()),
+      if (_showPreorderSections)
+        SliverToBoxAdapter(child: _buildPreOrdersSection()),
+      SliverToBoxAdapter(
+        child: _buildSellerReachCarousel(
           key: const Key('home-sellers-beyond'),
           title: 'Beyond your society',
           subtitle: _cityReach.maxSellerRadiusKm == null
@@ -1781,17 +1865,21 @@ class HomeScreenState extends State<HomeScreen> {
           sellers: _beyondSellers,
           showDistance: true,
         ),
-        _buildReachSection(
+      ),
+      SliverToBoxAdapter(
+        child: _buildReachSection(
           reach: HomeListingReach.beyondSociety,
           listings: _mobileListingsForReach(HomeListingReach.beyondSociety),
         ),
-        if (_showPreorderSections)
-          _buildPreOrderReachCarousel(
+      ),
+      if (_showPreorderSections)
+        SliverToBoxAdapter(
+          child: _buildPreOrderReachCarousel(
             title: 'Pre-orders beyond your society',
             campaigns: _mobileCampaignsForReach(HomeListingReach.beyondSociety),
           ),
-      ],
-    );
+        ),
+    ];
   }
 
   Widget _buildSellerReachCarousel({
@@ -2084,8 +2172,15 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _chefHuntCard() {
+    return ChefHuntCard(
+      wingLabel: widget.chefWing,
+      societyName: widget.chefSocietyName,
+    );
+  }
+
   Widget _buildSeeAllItemsButton() {
-    final remaining = _available.length - homeAllItemsPreviewCount;
+    final remaining = _available.length - _visibleAvailable.length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
       child: SizedBox(
@@ -2738,36 +2833,41 @@ class _AvailableItemTile extends StatelessWidget {
                     children: [
                       if (showListingScheduleChipOnHomeCard(food)) ...[
                         Flexible(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8F5EE),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.schedule_rounded,
-                                  size: 13,
-                                  color: Color(0xFF0E5A47),
-                                ),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    listingScheduleCaption(food),
-                                    softWrap: true,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      height: 1.25,
-                                      color: Color(0xFF0E5A47),
-                                      fontWeight: FontWeight.w600,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F5EE),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.schedule_rounded,
+                                    size: 13,
+                                    color: Color(0xFF0E5A47),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      listingScheduleCaption(food),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        height: 1.25,
+                                        color: Color(0xFF0E5A47),
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),

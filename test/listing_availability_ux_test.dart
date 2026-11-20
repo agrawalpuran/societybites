@@ -10,6 +10,13 @@ import 'package:societybites/screens/my_listings_screen.dart';
 import 'package:societybites/services/my_listings_cache.dart';
 import 'package:societybites/widgets/listing_purchase_slot.dart';
 
+Finder _allItemCards() {
+  return find.byWidgetPredicate((widget) {
+    final key = widget.key;
+    return key is ValueKey<String> && key.value.startsWith('home-all-item-');
+  });
+}
+
 Map<String, dynamic> _listingJson({
   required String name,
   String status = 'active',
@@ -173,7 +180,7 @@ void main() {
     expect(ordered.map((item) => item.name), ['Dal', 'Sold Dosa']);
   });
 
-  testWidgets('home All Items previews 12 rows then See all expands', (
+  testWidgets('home All Items previews 5 random rows then See all expands', (
     tester,
   ) async {
     _ignoreOverflow();
@@ -189,11 +196,13 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('home-see-all-items')), findsOneWidget);
+    expect(_allItemCards(), findsNWidgets(5));
 
     await tester.tap(find.byKey(const Key('home-see-all-items')));
     await tester.pump();
 
     expect(find.byKey(const Key('home-see-all-items')), findsNothing);
+    expect(_allItemCards().evaluate().length, greaterThan(5));
   });
 
   testWidgets('beyond-society listings SEE ALL expands and SHOW LESS collapses', (

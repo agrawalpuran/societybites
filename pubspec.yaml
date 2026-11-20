@@ -101,6 +101,7 @@ flutter:
     - assets/images/made_to_order.jpg
     - assets/images/pre_order.jpg
     - assets/images/guest/
+    - assets/images/discovery/
     - assets/images/preview/
 
   # An image asset can refer to one or more resolution-specific "variants", see

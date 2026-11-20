@@ -16,6 +16,7 @@ import '../web/web_cart_dock.dart';
 import '../web/web_shell_header.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/seller_incoming_order_alert.dart';
+import '../home/adaptive_home.dart';
 import 'home_screen.dart';
 import 'orders_screen.dart';
 import 'profile_screen.dart';
@@ -44,6 +45,7 @@ class _MainShellScreenState extends State<MainShellScreen>
     with WidgetsBindingObserver {
   late int _navIndex;
   final _homeKey = GlobalKey<HomeScreenState>();
+  final _adaptiveHomeKey = GlobalKey<AdaptiveHomeState>();
   final _ordersKey = GlobalKey<OrdersScreenState>();
   final _dashboardKey = GlobalKey<SellerDashboardScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
@@ -424,6 +426,7 @@ class _MainShellScreenState extends State<MainShellScreen>
 
     switch (index) {
       case 0:
+        _adaptiveHomeKey.currentState?.refreshSellerInvite();
         final home = _homeKey.currentState;
         if (home != null &&
             shouldFetchOnTabSelect(
@@ -463,6 +466,8 @@ class _MainShellScreenState extends State<MainShellScreen>
   Future<void> _onMarketplaceStartSelling() async {
     try {
       final enabled = await SellerOnboarding.startSelling(context);
+      if (!mounted) return;
+      await _adaptiveHomeKey.currentState?.refreshSellerInvite();
       if (!enabled || !mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
       _selectTab(3);
@@ -482,8 +487,9 @@ class _MainShellScreenState extends State<MainShellScreen>
     final pages = IndexedStack(
       index: _navIndex,
       children: [
-          HomeScreen(
-            key: _homeKey,
+          AdaptiveHome(
+            key: _adaptiveHomeKey,
+            homeKey: _homeKey,
             onInitialLoadSuccess: _onHomeReady,
             onStartSelling: _onMarketplaceStartSelling,
             onSelectTab: _selectTab,
