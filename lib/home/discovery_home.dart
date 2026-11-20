@@ -47,6 +47,11 @@ const discoveryFoodCategories = <DiscoveryFoodCategory>[
 
 const discoveryNearbyPreviewCount = 8;
 
+/// "First" stays until a neighbour in this society has published a dish.
+String discoveryChefButtonLabel({required bool neighbourHasListed}) {
+  return neighbourHasListed ? 'Become the Chef' : 'Become the First Chef';
+}
+
 /// Why this screen is empty. [radiusKm] is the city's configured reach.
 String discoveryEmptyKitchenLine(double? radiusKm) {
   if (radiusKm == null || radiusKm <= 0) {
@@ -65,6 +70,7 @@ class DiscoveryHome extends StatelessWidget {
     this.onDiscoverNearby,
     this.onRefresh,
     this.neighbourhoodRadiusKm,
+    this.neighbourHasListed = false,
     this.showCookInvite = true,
     this.showChefHunt = false,
     this.chefWing = 'your wing',
@@ -74,6 +80,9 @@ class DiscoveryHome extends StatelessWidget {
 
   final List<FoodItem> nearbyListings;
   final double? neighbourhoodRadiusKm;
+
+  /// True once any dish from this society is already in the loaded feed.
+  final bool neighbourHasListed;
   final VoidCallback? onStartSelling;
   final VoidCallback? onDiscoverNearby;
   final VoidCallback? onRefresh;
@@ -255,8 +264,11 @@ class _DiscoveryHero extends StatelessWidget {
                                   height: 1.2,
                                 ),
                               ),
-                              child: const Text(
-                                'Become the First Chef',
+                              child: Text(
+                                discoveryChefButtonLabel(
+                                  neighbourHasListed:
+                                      home?.neighbourHasListed ?? false,
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                             ),

@@ -80,7 +80,7 @@ void main() {
     expect(find.text('Delete Account'), findsOneWidget);
     expect(find.text('ACCOUNT & SECURITY'), findsOneWidget);
     expect(
-      find.textContaining('Permanently delete your SocietyBites account'),
+      find.textContaining('Permanently delete your SocietyEats account'),
       findsOneWidget,
     );
   });

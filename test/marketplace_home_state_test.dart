@@ -134,6 +134,29 @@ void main() {
     expect(snapshot.ownSociety.activeSellerCount, 1);
     expect(snapshot.nearbyListings.map((food) => food.id), ['near']);
     expect(snapshot.neighbourhoodRadiusKm, 10);
+    expect(snapshot.neighbourHasListed, isTrue);
+    expect(
+      societyHasListedDish(
+        [_food('old', 'seller-1', status: 'expired')],
+        buyerSocietyId: 'society-1',
+      ),
+      isTrue,
+    );
+    expect(
+      societyHasListedDish(
+        [_food('near', 'seller-9', societyId: 'society-2')],
+        buyerSocietyId: 'society-1',
+      ),
+      isFalse,
+    );
+    expect(
+      discoveryChefButtonLabel(neighbourHasListed: false),
+      'Become the First Chef',
+    );
+    expect(
+      discoveryChefButtonLabel(neighbourHasListed: true),
+      'Become the Chef',
+    );
   });
 
   testWidgets('an empty loaded feed selects the Discovery placeholder', (

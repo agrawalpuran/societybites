@@ -199,7 +199,8 @@ class AdaptiveHomeState extends State<AdaptiveHome> {
         _snapshot?.ownSociety.availableListingCount ==
             snapshot.ownSociety.availableListingCount &&
         previousNearby == nextNearby &&
-        _snapshot?.neighbourhoodRadiusKm == snapshot.neighbourhoodRadiusKm) {
+        _snapshot?.neighbourhoodRadiusKm == snapshot.neighbourhoodRadiusKm &&
+        _snapshot?.neighbourHasListed == snapshot.neighbourHasListed) {
       return;
     }
     setState(() {
@@ -235,6 +236,7 @@ class AdaptiveHomeState extends State<AdaptiveHome> {
     final cover = DiscoveryHome(
       nearbyListings: snapshot.nearbyListings,
       neighbourhoodRadiusKm: snapshot.neighbourhoodRadiusKm,
+      neighbourHasListed: snapshot.neighbourHasListed,
       showCookInvite: _showCookInvite,
       showChefHunt: _showChefHunt,
       chefWing: _chefWing,

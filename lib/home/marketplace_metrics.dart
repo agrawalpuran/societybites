@@ -9,6 +9,7 @@ class BuyerMarketplaceSnapshot {
     required this.ownSociety,
     required this.nearbyListings,
     this.neighbourhoodRadiusKm,
+    this.neighbourHasListed = false,
   });
 
   final MarketplaceMetrics ownSociety;
@@ -16,6 +17,30 @@ class BuyerMarketplaceSnapshot {
 
   /// City reach cap, in kilometres. Null when the city has no reach config.
   final double? neighbourhoodRadiusKm;
+
+  /// A dish from this society is in the loaded feed, even if it cannot be ordered.
+  final bool neighbourHasListed;
+}
+
+/// True when this society's feed already contains a regular dish.
+bool societyHasListedDish(
+  Iterable<FoodItem> listings, {
+  required String? buyerSocietyId,
+}) {
+  final societyId = buyerSocietyId?.trim();
+  for (final food in listings) {
+    if (food.isPreOrder || food.isPreOrderCatalog) continue;
+    final listedSociety = food.societyId?.trim();
+    if (societyId != null &&
+        societyId.isNotEmpty &&
+        listedSociety != null &&
+        listedSociety.isNotEmpty &&
+        listedSociety != societyId) {
+      continue;
+    }
+    return true;
+  }
+  return false;
 }
 
 bool _eligibleHomeListing(FoodItem food) {
@@ -65,5 +90,9 @@ BuyerMarketplaceSnapshot buyerMarketplaceSnapshot(
     ),
     nearbyListings: nearby,
     neighbourhoodRadiusKm: homeDistanceCapKm(cityReach),
+    neighbourHasListed: societyHasListedDish(
+      listings,
+      buyerSocietyId: buyerSocietyId,
+    ),
   );
 }

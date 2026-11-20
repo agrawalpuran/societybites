@@ -2378,7 +2378,7 @@ class ProfileScreenState extends State<ProfileScreen> {
         icon: Icons.delete_outline_rounded,
         title: 'Delete Account',
         subtitle:
-            'Permanently delete your SocietyBites account and associated personal data.',
+            'Permanently delete your SocietyEats account and associated personal data.',
         destructive: true,
         onTap: _deletingAccount ? () {} : _confirmDeleteAccount,
       ),
@@ -2713,7 +2713,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                             icon: Icons.delete_outline_rounded,
                             title: 'Delete Account',
                             subtitle:
-                                'Permanently delete your SocietyBites account and associated personal data.',
+                                'Permanently delete your SocietyEats account and associated personal data.',
                             destructive: true,
                             onTap: _deletingAccount
                                 ? () {}
