@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:societybites/models/data.dart';
 import 'package:societybites/widgets/listing_like_button.dart';
 
@@ -42,5 +43,16 @@ void main() {
     );
     expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
     expect(find.text('12'), findsOneWidget);
+  });
+
+  testWidgets('like without a session asks you to sign in', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: ListingLikeButton(food: _food()))),
+    );
+    await tester.tap(find.byIcon(Icons.favorite_border_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign in to like this dish.'), findsOneWidget);
+    expect(find.textContaining('Could not update like'), findsNothing);
   });
 }

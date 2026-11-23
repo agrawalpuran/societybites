@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../services/session_service.dart';
+import 'guest_order_auth.dart';
 
 class BuyerAddressList extends StatefulWidget {
   const BuyerAddressList({
@@ -32,6 +33,7 @@ class BuyerAddressListState extends State<BuyerAddressList> {
   late bool _loading;
   String? _savingId;
   String? _error;
+  bool _needsSignIn = false;
   Future<void>? _reloadInFlight;
 
   @override
@@ -85,7 +87,24 @@ class BuyerAddressListState extends State<BuyerAddressList> {
     });
   }
 
+  Future<void> _promptSignIn() {
+    return showGuestOrderAuthDialog(
+      context,
+      message: 'Sign in to see and manage your addresses.',
+    );
+  }
+
   Future<void> _reload() async {
+    final token = await ApiService.ensureAccessToken();
+    if (!mounted) return;
+    if (token == null || token.isEmpty) {
+      setState(() {
+        _loading = false;
+        _error = null;
+        _needsSignIn = true;
+      });
+      return;
+    }
     try {
       final payload = await widget.loadAddresses();
       if (!mounted) return;
@@ -97,12 +116,15 @@ class BuyerAddressListState extends State<BuyerAddressList> {
         _addresses = rows;
         _loading = false;
         _error = null;
+        _needsSignIn = false;
       });
     } catch (error) {
       if (!mounted) return;
+      final signedOut = ApiService.isMissingSessionError(error);
       setState(() {
         _loading = false;
-        _error = ApiService.userFacingError(error);
+        _needsSignIn = signedOut;
+        _error = signedOut ? null : ApiService.userFacingError(error);
       });
     }
   }
@@ -258,7 +280,22 @@ class BuyerAddressListState extends State<BuyerAddressList> {
               onSelect: () => _select(row),
               onDelete: row['selected'] == true ? null : () => _delete(row),
             ),
-        if (_error != null) ...[
+        if (_needsSignIn) ...[
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              key: const Key('buyer-address-sign-in'),
+              onPressed: _promptSignIn,
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF0E5A47),
+                padding: EdgeInsets.zero,
+                textStyle: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              child: const Text('Sign in to manage addresses'),
+            ),
+          ),
+        ] else if (_error != null) ...[
           const SizedBox(height: 8),
           Text(
             _error!,
@@ -273,7 +310,11 @@ class BuyerAddressListState extends State<BuyerAddressList> {
         const SizedBox(height: 4),
         TextButton.icon(
           key: const Key('buyer-address-add'),
-          onPressed: _savingId == null ? widget.onAdd : null,
+          onPressed: _savingId != null
+              ? null
+              : _needsSignIn
+              ? _promptSignIn
+              : widget.onAdd,
           icon: const Icon(Icons.add_rounded, size: 18),
           label: const Text('Add address'),
           style: TextButton.styleFrom(

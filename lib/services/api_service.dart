@@ -207,6 +207,19 @@ class ApiService {
     } catch (_) {}
   }
 
+  /// Access token for a signed-in call. Refreshes when the access token was
+  /// lost but a refresh token is still stored. Does not clear the session
+  /// when there is nothing to refresh.
+  static Future<String?> ensureAccessToken() async {
+    final existing = await SessionService.getToken();
+    if (existing != null && existing.isNotEmpty) return existing;
+    final refresh = await SessionService.getRefreshToken();
+    if (refresh == null || refresh.isEmpty) return null;
+    final refreshed = await _refreshAccessToken(notifyOnFailure: false);
+    if (!refreshed) return null;
+    return SessionService.getToken();
+  }
+
   static Future<Map<String, String>> _authHeaders({
     String? idempotencyKey,
   }) async {
@@ -251,10 +264,22 @@ class ApiService {
         lower.contains('clientexception')) {
       return 'Could not reach the server. Please try again.';
     }
+    if (isMissingSessionError(error)) {
+      return 'Please sign in again to continue.';
+    }
     if (message.isEmpty) {
       return 'Something went wrong. Please try again.';
     }
     return message;
+  }
+
+  /// The server rejected the call because no usable login token was sent.
+  static bool isMissingSessionError(Object error) {
+    final raw = error.toString().toLowerCase();
+    return raw.contains('authorization header') ||
+        raw.contains('invalid token') ||
+        raw.contains('token expired') ||
+        raw.contains('user not found');
   }
 
   static Never _throwFromResponse(http_client.Response response) {

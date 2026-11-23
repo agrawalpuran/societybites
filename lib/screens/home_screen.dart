@@ -1099,10 +1099,14 @@ class HomeScreenState extends State<HomeScreen> {
     return _distanceFiltered.take(1).toList();
   }
 
-  String? _webBeyondSubtitle() {
-    final km = _cityReach.maxSellerRadiusKm;
+  String _beyondReachSubtitle() {
+    final distance = _effectiveDistance;
+    if (distance.societyOnly) return 'Your society only';
+    final km = distance.isExtended
+        ? homeDistanceCapKm(_cityReach)
+        : distance.maxKm;
     if (km == null) return 'Closest kitchens first';
-    return 'Closest first · up to ~${formatReachRadiusKm(km)} km';
+    return 'Closest first · up to ${formatBuyerDistanceKm(km)}';
   }
 
   String? _webNearbySubtitle() {
@@ -1137,7 +1141,7 @@ class HomeScreenState extends State<HomeScreen> {
       madeToOrder: _webMadeToOrder,
       nearbyListings: _webRegularFor(HomeListingReach.beyondSociety),
       nearbySellers: _beyondSellers,
-      nearbySubtitle: _webBeyondSubtitle(),
+      nearbySubtitle: _beyondReachSubtitle(),
       extendedListings: const [],
       extendedSellers: const [],
       extendedSubtitle: null,
@@ -1859,9 +1863,7 @@ class HomeScreenState extends State<HomeScreen> {
         child: _buildSellerReachCarousel(
           key: const Key('home-sellers-beyond'),
           title: 'Beyond your society',
-          subtitle: _cityReach.maxSellerRadiusKm == null
-              ? 'Closest kitchens first'
-              : 'Closest first · up to ~${formatReachRadiusKm(_cityReach.maxSellerRadiusKm!)} km',
+          subtitle: _beyondReachSubtitle(),
           sellers: _beyondSellers,
           showDistance: true,
         ),
@@ -2016,8 +2018,11 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   List<FoodItem> _listingsForReach(HomeListingReach reach) {
+    // Same distance list as the "Up to" count. Web Nearby kitchens used to
+    // read the unfiltered feed, so a 1 km chip could say 0 dishes while
+    // cards at 3 km and 6 km stayed on screen.
     return listingsForHomeReach(
-      _filteredListings,
+      _distanceFiltered,
       reach: reach,
       buyerSocietyId: _buyerSocietyId,
       nearbyRadiusKm: _cityReach.nearbyRadiusKm,

@@ -240,7 +240,13 @@ class SessionService {
     _memoryJwt = token;
     _clearedThisProcess = false;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_jwtKey);
+    // Web secure storage does not survive a reload reliably. SharedPreferences
+    // does, and on web it is the same browser storage the secure plugin uses.
+    if (kIsWeb) {
+      await prefs.setString(_jwtKey, token);
+    } else {
+      await prefs.remove(_jwtKey);
+    }
     _secureBestEffort(() => _secureStorage.write(key: _jwtKey, value: token));
   }
 
@@ -252,6 +258,15 @@ class SessionService {
   static Future<String?> getToken() async {
     if (_memoryJwt != null && _memoryJwt!.isNotEmpty) return _memoryJwt;
     if (_clearedThisProcess) return null;
+
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getString(_jwtKey);
+      if (stored != null && stored.isNotEmpty) {
+        _memoryJwt = stored;
+        return stored;
+      }
+    }
 
     final secureToken = await _secureRead(_jwtKey);
     if (secureToken != null && secureToken.isNotEmpty) {
@@ -275,6 +290,10 @@ class SessionService {
   static Future<void> saveRefreshToken(String token) async {
     _memoryRefresh = token;
     _clearedThisProcess = false;
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_refreshTokenKey, token);
+    }
     _secureBestEffort(
       () => _secureStorage.write(key: _refreshTokenKey, value: token),
     );
@@ -285,6 +304,14 @@ class SessionService {
       return _memoryRefresh;
     }
     if (_clearedThisProcess) return null;
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getString(_refreshTokenKey);
+      if (stored != null && stored.isNotEmpty) {
+        _memoryRefresh = stored;
+        return stored;
+      }
+    }
     final token = await _secureRead(_refreshTokenKey);
     if (token != null && token.isNotEmpty) {
       _memoryRefresh = token;

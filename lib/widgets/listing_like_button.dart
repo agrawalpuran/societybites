@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import '../services/api_service.dart';
-import '../services/session_service.dart';
+import 'guest_order_auth.dart';
 
 /// Heart and count. Buyers never see who liked the dish.
 class ListingLikeButton extends StatefulWidget {
@@ -48,11 +48,12 @@ class _ListingLikeButtonState extends State<ListingLikeButton> {
 
   Future<void> _toggle() async {
     if (_busy) return;
-    final userId = await SessionService.getUserId();
+    final token = await ApiService.ensureAccessToken();
     if (!mounted) return;
-    if (userId == null || userId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sign in to like this dish')),
+    if (token == null || token.isEmpty) {
+      await showGuestOrderAuthDialog(
+        context,
+        message: 'Sign in to like this dish.',
       );
       return;
     }
@@ -69,7 +70,13 @@ class _ListingLikeButtonState extends State<ListingLikeButton> {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update like: $e')),
+        SnackBar(
+          content: Text(
+            ApiService.isMissingSessionError(e)
+                ? 'Please sign in again to like this dish.'
+                : 'Could not update like: ${ApiService.userFacingError(e)}',
+          ),
+        ),
       );
     }
   }

@@ -30,16 +30,20 @@ Future<bool> handleGuestKitchenAddToCart(BuildContext context) async {
   return false;
 }
 
-Future<void> showGuestOrderAuthDialog(BuildContext context) {
+Future<void> showGuestOrderAuthDialog(
+  BuildContext context, {
+  String? message,
+}) {
   final onKitchenSite = KitchenSiteNavigation.isKitchenSiteContext;
   return showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
       title: const Text('Ready to order?'),
       content: Text(
-        onKitchenSite
-            ? 'Sign in or join your society to order from this kitchen.'
-            : 'Sign in or join SocietyBites to add items to your cart and place an order.',
+        message ??
+            (onKitchenSite
+                ? 'Sign in or join your society to order from this kitchen.'
+                : 'Sign in or join SocietyBites to add items to your cart and place an order.'),
       ),
       actions: [
         TextButton(

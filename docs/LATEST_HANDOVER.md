@@ -1,5 +1,17 @@
 # Latest handover
 
+## 23 November 2026 — A missing login token does not show the server sentence
+
+Profile still shows the saved name and society when the web login token is gone. The address list no longer calls the server in that case, and it no longer prints "Missing or invalid Authorization header". It keeps the place already on screen and offers "Sign in to manage addresses". Other screens that use `userFacingError` say "Please sign in again to continue." Not committed.
+
+## 23 November 2026 — Web like needs a stored login token
+
+Liking a dish calls `POST /listings/:id/like` with the bearer token. The button used to treat a saved user id as signed in, then send the request with no Authorization header. The server answered "Missing or invalid Authorization header". On web, the access token and refresh token are now also kept in browser preferences, because secure storage was empty after a reload while the user id remained. If neither token is available, the heart asks the buyer to sign in instead of showing that server error. Not committed.
+
+## 23 November 2026 — Web Nearby kitchens follows the Up to chip
+
+The dish count and category chips already used the selected distance. Web Nearby kitchens was still built from the feed before that filter, so "0 dishes within 1 km" could sit above cards at 3 km and 6 km. That section now uses the same distance list as the count, which the phone home already did. The section subtitle uses the selected distance. Own-society dishes stay visible at any chip. Not committed.
+
 ## 23 November 2026 — UPI type removed from the app
 
 Seller Settings, first-time setup, the UPI edit sheet, and the admin order screen no longer ask or show Personal vs Merchant UPI. Checkout still uses the UPI ID and display name. QR, copying the ID, and opening a UPI app are unchanged. `User.upiAccountType` stays in the database with default `PERSONAL`. The server still stores the value when an older app sends it, so the build already in review does not fail on save. The current app does not send the field. No migration. Not committed.
