@@ -75,7 +75,7 @@ Identity, seller kitchen settings, and the buyer's current society.
 | `role` | String | Default `buyer`. Also `seller`, `super_admin`, legacy `admin` |
 | `profilePhotoUrl` | String? | |
 | `upiId`, `upiDisplayName` | String? | Direct UPI |
-| `upiAccountType` | String | Default `PERSONAL`. Also `MERCHANT` |
+| `upiAccountType` | String | Default `PERSONAL`. Also `MERCHANT`. The current app does not collect or display this. The column stays so older builds can still save it |
 | `paymentEnabled` | Boolean | Default false |
 | `sellingReachLevel` | String | Default `MY_SOCIETY`. Also `BEYOND_SOCIETY`. Legacy `NEARBY`, `EXTENDED` |
 | `sellingReachRadiusKm` | Float? | Used when reach is beyond the society |

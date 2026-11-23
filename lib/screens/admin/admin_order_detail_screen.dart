@@ -322,7 +322,6 @@ class _PartySection extends StatelessWidget {
           if (seller) ...[
             _Field('UPI ID', _text(party!['upiId'])),
             _Field('UPI name', _text(party!['upiDisplayName'])),
-            _Field('UPI type', _text(party!['upiAccountType'])),
             _Field(
               'Fulfilment mode',
               _fulfilmentModeLabel(party!['fulfilmentMode']?.toString()),

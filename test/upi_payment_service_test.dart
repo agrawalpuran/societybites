@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:societybites/models/upi_account_type.dart';
 import 'package:societybites/services/upi_payment_service.dart';
 
 void main() {
@@ -60,19 +59,7 @@ void main() {
       isFalse,
     );
     expect(
-      shouldOfferUpiIntent(
-        isWeb: false,
-        platform: TargetPlatform.android,
-        accountType: UpiAccountType.merchant,
-      ),
-      isFalse,
-    );
-    expect(
-      shouldOfferUpiIntent(
-        isWeb: false,
-        platform: TargetPlatform.iOS,
-        accountType: UpiAccountType.merchant,
-      ),
+      shouldOfferUpiIntent(isWeb: false, platform: TargetPlatform.iOS),
       isFalse,
     );
   });
@@ -177,7 +164,6 @@ void main() {
     final noted = buildUpiAppLaunchUri(
       upiPayUri: upi,
       target: target,
-      accountType: UpiAccountType.merchant,
       transactionNote: 'SB-1023',
     );
     expect(noted.queryParameters.keys.toSet(), {'pa', 'pn', 'cu', 'tn'});
@@ -185,10 +171,10 @@ void main() {
     expect(noted.queryParameters.containsKey('am'), isFalse);
     expect(noted.queryParameters.containsKey('tr'), isFalse);
     expect(upiLaunchString(noted), isNot(contains('am=')));
-    expect(shouldHandoffUpiCollect(
-      platform: TargetPlatform.android,
-      accountType: UpiAccountType.merchant,
-    ), isTrue);
+    expect(
+      shouldHandoffUpiCollect(platform: TargetPlatform.android),
+      isTrue,
+    );
   });
 
   test('GPay, PhonePe, and Paytm open with no pay intent', () async {
@@ -205,7 +191,6 @@ void main() {
       canLaunch: (_) async => true,
       isWeb: false,
       platform: TargetPlatform.android,
-      accountType: UpiAccountType.merchant,
     );
     expect(apps.map((app) => app.id), ['gpay', 'phonepe', 'paytm', 'bhim']);
     expect(upiLaunchString(apps[0].resolvedLaunchUri!), 'gpay://');

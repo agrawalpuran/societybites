@@ -3,11 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
 import '../models/selling_reach.dart';
-import '../models/upi_account_type.dart';
 import 'selling_reach_radius_slider.dart';
 import 'kitchen_hours_inline_editor.dart';
 import 'kitchen_hours_sheet.dart';
-import 'upi_account_type_selector.dart';
 
 class SellerFirstTimeSetupForm extends StatefulWidget {
   const SellerFirstTimeSetupForm({
@@ -16,7 +14,6 @@ class SellerFirstTimeSetupForm extends StatefulWidget {
     required this.onPaymentChanged,
     required this.upiId,
     required this.upiDisplayName,
-    required this.upiAccountType,
     required this.onUpiChanged,
     this.onUpiConfirmed,
     this.onUpiConfirmationInvalidated,
@@ -36,12 +33,7 @@ class SellerFirstTimeSetupForm extends StatefulWidget {
   final ValueChanged<SellerPaymentPreference> onPaymentChanged;
   final String? upiId;
   final String? upiDisplayName;
-  final UpiAccountType upiAccountType;
-  final void Function(
-    String upiId,
-    String displayName,
-    UpiAccountType accountType,
-  ) onUpiChanged;
+  final void Function(String upiId, String displayName) onUpiChanged;
   final VoidCallback? onUpiConfirmed;
   final VoidCallback? onUpiConfirmationInvalidated;
   final bool upiIdConfirmed;
@@ -124,20 +116,11 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
         : amount.toString();
   }
 
-  void _syncUpiDraftToParent({UpiAccountType? accountType}) {
+  void _syncUpiDraftToParent() {
     widget.onUpiChanged(
       _upiController.text.trim(),
       _upiNameController.text.trim(),
-      accountType ?? widget.upiAccountType,
     );
-  }
-
-  void _handleAccountTypeChanged(UpiAccountType accountType) {
-    if (widget.upiIdConfirmed) {
-      widget.onUpiConfirmationInvalidated?.call();
-    }
-    _syncUpiDraftToParent(accountType: accountType);
-    setState(() {});
   }
 
   void _handleUpiTextChanged(String _) {
@@ -247,11 +230,6 @@ class _SellerFirstTimeSetupFormState extends State<SellerFirstTimeSetupForm> {
             hint: 'Name shown to buyers',
             required: true,
           ),
-        ),
-        const SizedBox(height: 14),
-        UpiAccountTypeSelector(
-          value: widget.upiAccountType,
-          onChanged: _handleAccountTypeChanged,
         ),
         const SizedBox(height: 24),
         const _SectionLabel('SELLING'),

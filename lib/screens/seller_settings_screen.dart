@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../models/seller_fulfilment.dart';
 import '../models/seller_payment_preference.dart';
 import '../models/selling_reach.dart';
-import '../models/upi_account_type.dart';
 import '../web/web_page_frame.dart';
 import '../widgets/app_header.dart';
 import '../widgets/kitchen_hours_sheet.dart';
@@ -42,7 +41,6 @@ class SellerSettingsScreen extends StatelessWidget {
     this.onPaymentPreferenceChanged,
     this.upiId,
     this.upiDisplayName,
-    this.upiAccountType = defaultUpiAccountType,
     this.onUpiDetailsChanged,
     this.onUpiConfirmed,
     this.onUpiConfirmationInvalidated,
@@ -89,12 +87,7 @@ class SellerSettingsScreen extends StatelessWidget {
   final ValueChanged<SellerPaymentPreference>? onPaymentPreferenceChanged;
   final String? upiId;
   final String? upiDisplayName;
-  final UpiAccountType upiAccountType;
-  final void Function(
-    String upiId,
-    String displayName,
-    UpiAccountType accountType,
-  )? onUpiDetailsChanged;
+  final void Function(String upiId, String displayName)? onUpiDetailsChanged;
   final VoidCallback? onUpiConfirmed;
   final VoidCallback? onUpiConfirmationInvalidated;
   final SellerReachPreference? sellingReachPreference;
@@ -189,7 +182,6 @@ class SellerSettingsScreen extends StatelessWidget {
                         onPaymentChanged: onPaymentPreferenceChanged!,
                         upiId: upiId,
                         upiDisplayName: upiDisplayName,
-                        upiAccountType: upiAccountType,
                         onUpiChanged: onUpiDetailsChanged!,
                         onUpiConfirmed: onUpiConfirmed,
                         onUpiConfirmationInvalidated:

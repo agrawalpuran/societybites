@@ -10,7 +10,6 @@ import 'package:url_launcher_platform_interface/url_launcher_platform_interface.
 
 import '../models/data.dart';
 import '../models/order_lifecycle.dart';
-import '../models/upi_account_type.dart';
 import '../services/api_service.dart';
 import '../services/upi_payment_service.dart';
 import '../widgets/upi_app_brand_icon.dart';
@@ -91,7 +90,6 @@ class _PaymentScreenState extends State<PaymentScreen>
   bool _isLeavingForProgress = false;
   String? _sellerUpiId;
   String? _sellerUpiDisplayName;
-  UpiAccountType _sellerUpiAccountType = defaultUpiAccountType;
   String? _loadError;
   String? _upiLaunchError;
   String? _upiHandoffHint;
@@ -125,12 +123,10 @@ class _PaymentScreenState extends State<PaymentScreen>
   bool get _showUpiIntentButton => shouldOfferUpiIntent(
         isWeb: kIsWeb,
         platform: defaultTargetPlatform,
-        accountType: _sellerUpiAccountType,
       );
 
   bool get _useUpiHandoff => shouldHandoffUpiCollect(
         platform: defaultTargetPlatform,
-        accountType: _sellerUpiAccountType,
       );
 
   String get _sellerName {
@@ -207,9 +203,6 @@ class _PaymentScreenState extends State<PaymentScreen>
           _sellerUpiId = apiUpi.trim();
         }
         _sellerUpiDisplayName = paymentData['sellerUpiDisplayName'] as String?;
-        _sellerUpiAccountType = parseUpiAccountType(
-          paymentData['sellerUpiAccountType'],
-        );
         _isLoadingUpi = false;
         _gatewayError = null;
       });
@@ -403,9 +396,6 @@ class _PaymentScreenState extends State<PaymentScreen>
           _sellerUpiId = apiUpi.trim();
         }
         _sellerUpiDisplayName = data['sellerUpiDisplayName'] as String?;
-        _sellerUpiAccountType = parseUpiAccountType(
-          data['sellerUpiAccountType'],
-        );
         _isLoadingUpi = false;
       });
       _scheduleUpiAppProbe();
@@ -477,7 +467,6 @@ class _PaymentScreenState extends State<PaymentScreen>
       canLaunch: _canLaunchUpiUri,
       isWeb: kIsWeb,
       platform: defaultTargetPlatform,
-      accountType: _sellerUpiAccountType,
     );
     if (!mounted) return;
     setState(() => _availableApps = apps);
@@ -491,7 +480,6 @@ class _PaymentScreenState extends State<PaymentScreen>
     // final launchUri = buildUpiAppLaunchUri(
     //   upiPayUri: _upiPaymentUri,
     //   target: launchTargetFromUri(resolved),
-    //   accountType: _sellerUpiAccountType,
     //   transactionNote: _order.orderId,
     // );
     final launchUri = resolved;

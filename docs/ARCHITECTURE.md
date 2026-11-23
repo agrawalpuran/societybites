@@ -242,7 +242,7 @@ flowchart TD
 
 `getPaymentProvider()` returns `direct_upi` when the setting is missing. Allowed values are `direct_upi` and `cashfree`. Any other stored value is normalized back to `direct_upi` on read. Checkout writes `Order.paymentProvider` and later setting changes do not rewrite it.
 
-Direct UPI uses the seller's `upiId`. Buyers are not sent an in-app UPI intent for either `PERSONAL` or `MERCHANT` account types, because the comment on `User.upiAccountType` says neither type is an NPCI-verified merchant flag. The app can still build a UPI URI or QR (`lib/services/upi_payment_service.dart`, `qr_flutter`).
+Direct UPI uses the seller's `upiId` and display name. The app no longer asks the seller to choose Personal or Merchant UPI. `User.upiAccountType` stays in the database, and the server still accepts it when an older app sends it. Checkout ignores it. Buyers are not sent an in-app UPI pay intent. The app can still build a UPI URI or QR (`lib/services/upi_payment_service.dart`, `qr_flutter`).
 
 Seller payment preference controls new checkouts: `UPI_ONLY`, `UPI_AND_COD`, or `COD_IN_SOCIETY_UPI_OUTSIDE` (the column default).
 

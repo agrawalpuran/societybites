@@ -47,7 +47,6 @@ Future<void> _pumpProfile(
   Future<void> Function({
     required String upiId,
     String? upiDisplayName,
-    String? upiAccountType,
   })? saveUpiDetails,
   Future<Map<String, dynamic>> Function({
     String? sellingReachLevel,
@@ -209,7 +208,7 @@ void main() {
     await _pumpProfile(
       tester,
       profile: _sellerProfile(),
-      saveUpiDetails: ({required upiId, upiDisplayName, upiAccountType}) async {
+      saveUpiDetails: ({required upiId, upiDisplayName}) async {
         saved += 1;
       },
     );
@@ -231,7 +230,7 @@ void main() {
     await _pumpProfile(
       tester,
       profile: _sellerProfile(),
-      saveUpiDetails: ({required upiId, upiDisplayName, upiAccountType}) async {
+      saveUpiDetails: ({required upiId, upiDisplayName}) async {
         saved += 1;
       },
     );
@@ -264,7 +263,7 @@ void main() {
     await _pumpProfile(
       tester,
       profile: _sellerProfile(),
-      saveUpiDetails: ({required upiId, upiDisplayName, upiAccountType}) async {
+      saveUpiDetails: ({required upiId, upiDisplayName}) async {
         savedUpi = upiId;
       },
     );
@@ -287,7 +286,7 @@ void main() {
     await _pumpProfile(
       tester,
       profile: _sellerProfile(upiId: 'old@oksbi'),
-      saveUpiDetails: ({required upiId, upiDisplayName, upiAccountType}) async {
+      saveUpiDetails: ({required upiId, upiDisplayName}) async {
         saved.add(upiId);
       },
     );

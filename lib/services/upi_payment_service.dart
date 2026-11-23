@@ -1,16 +1,13 @@
 import 'package:flutter/foundation.dart';
 
-import '../models/upi_account_type.dart';
-
 /// In-app pay links are UPI initiation mode 04. NPCI requires UPI apps to
 /// refuse mode 04 and 05 for person-to-person payments and for offline
 /// merchants that are not verified. Every seller UPI ID stored here is a
-/// direct VPA, so [isWeb], [platform], and [accountType] do not enable it.
-/// Buyers scan the QR (mode 01) or paste the UPI ID inside the UPI app.
+/// direct VPA, so [isWeb] and [platform] do not enable it. Buyers scan the
+/// QR (mode 01) or paste the UPI ID inside the UPI app.
 bool shouldOfferUpiIntent({
   required bool isWeb,
   required TargetPlatform platform,
-  UpiAccountType accountType = defaultUpiAccountType,
 }) {
   return false;
 }
@@ -27,7 +24,6 @@ bool shouldOfferUpiAppShortcuts({
 /// SocietyEats is blocked for a direct seller UPI ID.
 bool shouldHandoffUpiCollect({
   required TargetPlatform platform,
-  UpiAccountType accountType = defaultUpiAccountType,
 }) {
   return platform == TargetPlatform.iOS || platform == TargetPlatform.android;
 }
@@ -169,7 +165,6 @@ String buildUpiPayQuery({
 Uri buildUpiAppLaunchUri({
   required Uri upiPayUri,
   required UpiAppLaunchTarget target,
-  UpiAccountType accountType = defaultUpiAccountType,
   bool includeAmount = false,
   String? transactionNote,
 }) {
@@ -196,12 +191,8 @@ UpiAppLaunchTarget launchTargetFromUri(Uri uri) {
 List<UpiAppLaunchTarget> launchTargetsFor(
   UpiAppOption app, {
   required TargetPlatform platform,
-  UpiAccountType accountType = defaultUpiAccountType,
 }) {
-  if (shouldHandoffUpiCollect(
-    platform: platform,
-    accountType: accountType,
-  )) {
+  if (shouldHandoffUpiCollect(platform: platform)) {
     if (app.id == 'gpay') {
       if (platform == TargetPlatform.iOS) {
         return const [
@@ -236,16 +227,11 @@ List<UpiAppLaunchTarget> launchTargetsFor(
 List<UpiAppLaunchTarget> handoffProbeTargetsFor(
   UpiAppOption app, {
   required TargetPlatform platform,
-  UpiAccountType accountType = defaultUpiAccountType,
 }) {
   final seen = <String>{};
   return [
     for (final target in [
-      ...launchTargetsFor(
-        app,
-        platform: platform,
-        accountType: accountType,
-      ),
+      ...launchTargetsFor(app, platform: platform),
       ...app.launchTargets,
     ])
       if (seen.add(target.baseUrl)) target,
@@ -305,28 +291,16 @@ Future<List<UpiAppOption>> getAvailableUpiApps(
   required Future<bool> Function(Uri uri) canLaunch,
   required bool isWeb,
   required TargetPlatform platform,
-  UpiAccountType accountType = defaultUpiAccountType,
 }) async {
   if (!shouldOfferUpiAppShortcuts(isWeb: isWeb, platform: platform)) {
     return const [];
   }
 
-  final handoff = shouldHandoffUpiCollect(
-    platform: platform,
-    accountType: accountType,
-  );
+  final handoff = shouldHandoffUpiCollect(platform: platform);
   final probes = configuredUpiApps.map((app) async {
     final targets = handoff
-        ? handoffProbeTargetsFor(
-            app,
-            platform: platform,
-            accountType: accountType,
-          )
-        : launchTargetsFor(
-            app,
-            platform: platform,
-            accountType: accountType,
-          );
+        ? handoffProbeTargetsFor(app, platform: platform)
+        : launchTargetsFor(app, platform: platform);
     final uris = targets
         .map(
           (target) => handoff
@@ -334,7 +308,6 @@ Future<List<UpiAppOption>> getAvailableUpiApps(
               : buildUpiAppLaunchUri(
                   upiPayUri: upiPayUri,
                   target: target,
-                  accountType: accountType,
                 ),
         )
         .toList();
