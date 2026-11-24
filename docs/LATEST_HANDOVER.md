@@ -1,5 +1,9 @@
 # Latest handover
 
+## 24 November 2026 — Phase-1 regression failures
+
+The 23 November push failed the Flutter job on two tests. The address test now includes a login token, because a saved profile without a token no longer loads places. The home test expects "Closest first · up to 15 km", which is the Beyond your society subtitle for that city's reach. `whatsapp-settings` and `payment-provider` read Postgres, so they are regression suites. The unit job has no database and was failing on `DATABASE_URL`. Not committed.
+
 ## 23 November 2026 — A missing login token does not show the server sentence
 
 Profile still shows the saved name and society when the web login token is gone. The address list no longer calls the server in that case, and it no longer prints "Missing or invalid Authorization header". It keeps the place already on screen and offers "Sign in to manage addresses". Other screens that use `userFacingError` say "Please sign in again to continue." Not committed.

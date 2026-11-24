@@ -39,6 +39,7 @@ void main() {
       'society_name': 'Palm Meadows',
       'flat_id': 'flat-home',
       'flat_number': '3062',
+      'auth_token': 'test-token',
     });
     await tester.binding.setSurfaceSize(const Size(400, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));

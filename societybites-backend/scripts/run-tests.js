@@ -13,7 +13,7 @@ const root = path.resolve(__dirname, "..");
 const testsDir = path.join(root, "tests");
 const timeoutMs = Number(process.env.TEST_TIMEOUT_MS || 120000);
 
-/** Fast / no-server (or tiny) checks. Keep this list quick for local loops. */
+/** Fast checks with no database. Postgres suites stay in REGRESSION. */
 const UNIT = [
   "order-number",
   "admin-order-detail",
@@ -31,10 +31,8 @@ const UNIT = [
   "test-accounts",
   "notifications-payload",
   "marketing-push",
-  "whatsapp-settings",
   "whatsapp-cloud",
   "upi-account-type",
-  "payment-provider",
 ];
 
 /**
@@ -45,6 +43,7 @@ const REGRESSION = [
   "notifications-payload",
   "whatsapp-cloud",
   "whatsapp-settings",
+  "payment-provider",
   "regression-whatsapp-orders",
   "console-admins",
   "regression-order-journeys",

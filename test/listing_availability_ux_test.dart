@@ -421,7 +421,7 @@ void main() {
       expect(find.text('Top Sellers in Your Society'), findsOneWidget);
       expect(find.text("Today's Specials in Your Society"), findsOneWidget);
       expect(find.text('Beyond your society'), findsOneWidget);
-      expect(find.textContaining('Closest kitchens first'), findsOneWidget);
+      expect(find.textContaining('Closest first · up to 15 km'), findsOneWidget);
       expect(find.text('Top Rated Sellers'), findsNothing);
       expect(find.text('In Your Society'), findsNothing);
       expect(find.text("Today's Specials"), findsNothing);
