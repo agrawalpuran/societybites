@@ -24,6 +24,7 @@ const {
   isSharedVariantInventory,
   orderableQuantity,
 } = require("../lib/listingVariants");
+const { serializeDelivery } = require("../lib/delivery/deliveryService");
 
 const ORDER_ENDED_WITHOUT_FOOD = new Set(["rejected", "cancelled"]);
 
@@ -238,6 +239,24 @@ function roundKm(value) {
   return Math.round(value * 10) / 10;
 }
 
+function listingSellerId(order) {
+  const listing =
+    order &&
+    order.items &&
+    order.items[0] &&
+    order.items[0].listing;
+  if (!listing) return null;
+  return listing.sellerId || (listing.seller && listing.seller.id) || null;
+}
+
+function serializeOrderDelivery(order, viewerUserId) {
+  return serializeDelivery(order.deliveryTask, {
+    viewerUserId,
+    buyerId: order.buyerId,
+    sellerId: listingSellerId(order),
+  });
+}
+
 function serializeOrder(order, options = {}) {
   const viewerUserId = options.viewerUserId || null;
   const orderContext = {
@@ -339,6 +358,8 @@ function serializeOrder(order, options = {}) {
     campaignId: order.campaignId || null,
     fulfilmentMethod: order.fulfilmentMethod || null,
     deliveryCharge: order.deliveryCharge || 0,
+    deliveryProvider: order.deliveryProvider || null,
+    delivery: serializeOrderDelivery(order, viewerUserId),
     deliveryChargePending: isDeliveryChargePending(order),
     upiPayableAmount: upiPayableAmountForOrder(order),
     upiFoodCashDeliverySplit: isUpiFoodCashDeliverySplit(order),
@@ -364,7 +385,8 @@ function serializeOrder(order, options = {}) {
 }
 
 /** Small PATCH /orders/:id/status payload — client merges onto the cached order. */
-function serializeOrderStatusPatch(order) {
+function serializeOrderStatusPatch(order, options = {}) {
+  const viewerUserId = options.viewerUserId || null;
   const activeCoupon = Array.isArray(order.couponRedemptions)
     ? order.couponRedemptions[0]
     : null;
@@ -379,6 +401,8 @@ function serializeOrderStatusPatch(order) {
     communityFee: order.communityFee,
     total: order.total,
     deliveryCharge: order.deliveryCharge || 0,
+    deliveryProvider: order.deliveryProvider || null,
+    delivery: serializeOrderDelivery(order, viewerUserId),
     deliveryChargePending: isDeliveryChargePending(order),
     upiPayableAmount: upiPayableAmountForOrder(order),
     upiFoodCashDeliverySplit: isUpiFoodCashDeliverySplit(order),

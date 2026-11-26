@@ -122,6 +122,7 @@ app.use("/preorder-campaigns", preorderCampaignRoutes);
 app.use("/orders", orderRoutes);
 app.use("/payments", paymentRoutes);
 app.use("/webhooks", require("./routes/paymentWebhooks"));
+app.use("/webhooks", require("./routes/deliveryWebhooks"));
 app.use("/reviews", reviewRoutes);
 app.use("/media", mediaRoutes);
 app.use("/admin", adminRoutes);

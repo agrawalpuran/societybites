@@ -194,7 +194,7 @@ router.post(
 
     console.log(`[PAYMENT] Confirmed for ${order.orderNumber} by seller ${req.user.phone}`);
 
-    res.json(serializeOrderStatusPatch(updated));
+    res.json(serializeOrderStatusPatch(updated, { viewerUserId: req.user.id }));
 
     void flushNotification(notifyPaymentConfirmed(updated));
     if (Object.prototype.hasOwnProperty.call(readyPatch, "expectedReadyAt")) {
@@ -243,7 +243,7 @@ router.post(
 
     // Idempotent: already paid → return current order, keep original timestamp.
     if (order.paymentStatus === "paid") {
-      return res.json(serializeOrderStatusPatch(order));
+      return res.json(serializeOrderStatusPatch(order, { viewerUserId: req.user.id }));
     }
 
     if (!["ready", "picked_up"].includes(order.status)) {
@@ -274,7 +274,7 @@ router.post(
       `[PAYMENT] Cash confirmed for ${order.orderNumber} by seller ${req.user.phone}`
     );
 
-    res.json(serializeOrderStatusPatch(updated));
+    res.json(serializeOrderStatusPatch(updated, { viewerUserId: req.user.id }));
 
     void flushNotification(notifyPaymentConfirmed(updated));
   })
@@ -316,7 +316,7 @@ router.post(
     }
 
     if (order.deliveryCashConfirmedAt) {
-      return res.json(serializeOrderStatusPatch(order));
+      return res.json(serializeOrderStatusPatch(order, { viewerUserId: req.user.id }));
     }
 
     const charge = Number(order.deliveryCharge || 0);
@@ -353,7 +353,7 @@ router.post(
       `[PAYMENT] Delivery cash confirmed for ${order.orderNumber} by seller ${req.user.phone}`
     );
 
-    res.json(serializeOrderStatusPatch(updated));
+    res.json(serializeOrderStatusPatch(updated, { viewerUserId: req.user.id }));
 
     if (updated.status === "completed") {
       void flushNotification(notifyStatusChange(updated, "completed"));

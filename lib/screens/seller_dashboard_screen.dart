@@ -8,6 +8,7 @@ import '../widgets/app_header.dart';
 import '../widgets/listing_image.dart';
 import '../widgets/order_items_list.dart';
 import '../widgets/order_fulfilment_banner.dart';
+import '../widgets/partner_delivery_card.dart';
 import '../models/data.dart';
 import '../models/kitchen_order_category.dart';
 import '../models/order_lifecycle.dart';
@@ -111,6 +112,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
   Timer? _ordersSlowTimer;
   Timer? _preOrdersSlowTimer;
   Timer? _ordersBackgroundRefreshTimer;
+  Timer? _partnerStatusPoll;
   bool _didNotifyInitialSettle = false;
   int _ordersLoadGen = 0;
   final _pullRefresh = PullRefreshGate();
@@ -160,6 +162,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     _ordersSlowTimer?.cancel();
     _preOrdersSlowTimer?.cancel();
     _ordersBackgroundRefreshTimer?.cancel();
+    _partnerStatusPoll?.cancel();
     super.dispose();
   }
 
@@ -745,6 +748,21 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
     } catch (_) {}
   }
 
+  void _syncPartnerStatusPoll() {
+    final waiting = _activeOrders.any(
+      (order) => order.partnerDelivery?.isInFlight == true,
+    );
+    if (!waiting) {
+      _partnerStatusPoll?.cancel();
+      _partnerStatusPoll = null;
+      return;
+    }
+    _partnerStatusPoll ??= Timer.periodic(const Duration(seconds: 12), (_) {
+      if (!mounted || _ordersRefreshInFlight) return;
+      unawaited(_loadOrders());
+    });
+  }
+
   Future<void> _loadOrders() async {
     final gen = ++_ordersLoadGen;
     final showSpinner = !_hasSuccessfullyLoaded;
@@ -862,6 +880,7 @@ class SellerDashboardScreenState extends State<SellerDashboardScreen> {
       OrderPushCoordinator.clearHintsReconciled([...active, ...past]);
       _applyPendingPushHints();
       unawaited(_retryMissingPushOrders());
+      _syncPartnerStatusPoll();
     } catch (e) {
       if (!mounted || gen != _ordersLoadGen) return;
 
@@ -2745,7 +2764,8 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     if (_isUpdating) return;
     double? deliveryCharge;
     String? deliveryCollectBy;
-    if (widget.order.deliveryChargePending) {
+    if (widget.order.deliveryChargePending &&
+        !widget.order.isPartnerDelivery) {
       final readyDetails = await _showActualDeliveryChargeDialog();
       if (readyDetails == null || !mounted) return;
       deliveryCharge = readyDetails.charge;
@@ -3046,12 +3066,15 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     final deliveryCashOk =
         !isUpiSplit || order.deliveryCharge <= 0 || order.deliveryCashConfirmed;
     final foodUpiOk = !isUpiSplit || order.foodUpiConfirmed;
+    final partnerInFlight = order.isPartnerDelivery &&
+        order.partnerDelivery?.isInFlight == true;
     final canComplete = canOperate &&
         !isRejected &&
         lifecycle.showComplete &&
         (!isCash || cashPaid) &&
         foodUpiOk &&
-        deliveryCashOk;
+        deliveryCashOk &&
+        !partnerInFlight;
     final hasSellerAction = canOperate &&
         !isRejected &&
         (lifecycle.showAccept || payment.showMarkReady || canComplete);
@@ -3067,7 +3090,10 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
     // Accepted and Buyer paid chips already say this. The extra headline
     // and "buyer marked paid" banner only repeat those chips.
     final showStatusCopy =
-        !isRejected && lifecycle.headline != null && !lifecycle.showMarkReady;
+        !isRejected &&
+        lifecycle.headline != null &&
+        !lifecycle.showMarkReady &&
+        !order.isPartnerDelivery;
     final showUpiPaymentPending = !isRejected &&
         payment.showPaymentPending &&
         order.paymentStatus != 'buyer_marked_paid';
@@ -3178,8 +3204,15 @@ class _SellerActiveOrderCardState extends State<SellerActiveOrderCard> {
                     isSellerView: true,
                   ),
                 ],
-                if (order.fulfilmentMethod != null &&
-                    order.fulfilmentMethod!.isNotEmpty) ...[
+                if (order.partnerDelivery != null) ...[
+                  const SizedBox(height: 8),
+                  PartnerDeliveryCard.fromOrder(
+                    order: order,
+                    isSellerView: true,
+                  ),
+                ] else if (order.isPartnerDelivery ||
+                    (order.fulfilmentMethod != null &&
+                        order.fulfilmentMethod!.isNotEmpty)) ...[
                   const SizedBox(height: 8),
                   OrderFulfilmentBanner(
                     order: order,
@@ -3876,8 +3909,15 @@ class SellerPastOrderCard extends StatelessWidget {
                     isSellerView: true,
                   ),
                 ],
-                if (order.fulfilmentMethod != null &&
-                    order.fulfilmentMethod!.isNotEmpty) ...[
+                if (order.partnerDelivery != null) ...[
+                  const SizedBox(height: 8),
+                  PartnerDeliveryCard.fromOrder(
+                    order: order,
+                    isSellerView: true,
+                  ),
+                ] else if (order.isPartnerDelivery ||
+                    (order.fulfilmentMethod != null &&
+                        order.fulfilmentMethod!.isNotEmpty)) ...[
                   const SizedBox(height: 8),
                   OrderFulfilmentBanner(
                     order: order,

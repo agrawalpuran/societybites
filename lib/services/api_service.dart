@@ -1265,6 +1265,31 @@ class ApiService {
     _throwFromResponse(response);
   }
 
+  static Future<bool> getPartnerDeliveryPreview({
+    required String listingId,
+    String? paymentMethod,
+    String? fulfilmentMethod,
+  }) async {
+    final uri = Uri.parse('$baseUrl/listings/$listingId/partner-delivery')
+        .replace(
+      queryParameters: {
+        if (paymentMethod != null && paymentMethod.isNotEmpty)
+          'paymentMethod': paymentMethod,
+        if (fulfilmentMethod != null && fulfilmentMethod.isNotEmpty)
+          'fulfilmentMethod': fulfilmentMethod,
+      },
+    );
+    final response = await http
+        .get(uri, headers: await _authHeaders())
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode == 200) {
+      final data = _decodeResponse(response);
+      if (data is Map && data['eligible'] == true) return true;
+      return false;
+    }
+    return false;
+  }
+
   static Future<Map<String, dynamic>> getListing(String listingId) async {
     final response = await http
         .get(
@@ -2781,6 +2806,28 @@ class ApiService {
       final data = Map<String, dynamic>.from(_decodeResponse(response) as Map);
       final rows = data['splits'] as List? ?? const [];
       return rows.map((row) => Map<String, dynamic>.from(row as Map)).toList();
+    }
+    _throwFromResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateAdminDeliverySettings({
+    String? deliveryProvider,
+    List<String>? deliveryAllowlist,
+  }) async {
+    final body = <String, dynamic>{};
+    if (deliveryProvider != null) {
+      body['deliveryProvider'] = deliveryProvider;
+    }
+    if (deliveryAllowlist != null) {
+      body['deliveryAllowlist'] = deliveryAllowlist;
+    }
+    final response = await http.patch(
+      Uri.parse('$baseUrl/admin/settings'),
+      headers: await _authHeaders(),
+      body: jsonEncode(body),
+    );
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(_decodeResponse(response) as Map);
     }
     _throwFromResponse(response);
   }

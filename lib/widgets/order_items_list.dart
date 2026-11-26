@@ -113,7 +113,9 @@ List<Widget> _deliveryBelowItems({
   required bool enabled,
   required int itemCount,
 }) {
-  if (!enabled || order == null || itemCount != 1) return const [];
+  if (!enabled || order == null || itemCount != 1 || order.isPartnerDelivery) {
+    return const [];
+  }
 
   const amountStyle = TextStyle(
     fontSize: 15,
@@ -253,7 +255,7 @@ class OrderTotalRow extends StatelessWidget {
               ],
             ),
           ],
-          if (order.deliveryChargePending) ...[
+          if (order.deliveryChargePending && !order.isPartnerDelivery) ...[
             const SizedBox(height: 4),
             const Row(
               children: [
@@ -281,9 +283,11 @@ class OrderTotalRow extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                const Text(
-                  'Seller delivery',
-                  style: TextStyle(
+                Text(
+                  order.isPartnerDelivery
+                      ? 'Partner delivery'
+                      : 'Seller delivery',
+                  style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF6A7774),
                     fontWeight: FontWeight.w500,
@@ -291,7 +295,7 @@ class OrderTotalRow extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  '₹${order.deliveryCharge.toStringAsFixed(0)}',
+                  formatRupee(order.deliveryCharge),
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -301,6 +305,32 @@ class OrderTotalRow extends StatelessWidget {
               ],
             ),
           ],
+          const SizedBox(height: 8),
+        ],
+        if (order.items.length <= 1 &&
+            order.isPartnerDelivery &&
+            order.deliveryCharge > 0) ...[
+          Row(
+            children: [
+              const Text(
+                'Partner delivery',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF6A7774),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                formatRupee(order.deliveryCharge),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3A4644),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
         ],
         Row(

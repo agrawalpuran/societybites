@@ -29,6 +29,7 @@ These are in the source and wired through the API. Detail and limits are in [PRO
 - Verify the production API host and write the answer into this file and [ARCHITECTURE.md](ARCHITECTURE.md).
 - Rotate the tracked APNs private key.
 - Keep WhatsApp and Cashfree off until the owner explicitly enables them.
+- Partner delivery through Prorouting is in source behind a kill switch ([PARTNER_DELIVERY_POC.md](PARTNER_DELIVERY_POC.md)). Default off. Empty allowlist books nobody. Migration not applied. uEngage is not in that POC.
 
 ## Medium-term features
 
@@ -61,6 +62,7 @@ Not a vision item: replacing Flutter, Express, Prisma, or Supabase.
 |---|---|
 | Another serving city | A new entry in `lib/launchCity.js`, then the admin serving-city setting |
 | Cashfree in production | Owner approval, Cashfree account, Easy Split, seller payout profiles, webhook URL, `CASHFREE_ENV` |
+| Prorouting POC | Apply the additive migration on a chosen database. Env keys. Public callback URL. Phone allowlist. Do not run `npm start` against production until migrate is accepted |
 | WhatsApp in production | Owner approval, credentials, approved templates, admin toggle |
 | More than one API instance | A shared store for OTP challenges and rate limits. In-memory maps will not do |
 | Kitchen subdomains | DNS and Vercel host config, not only the Flutter slug |

@@ -8,6 +8,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
+import '../models/coupon.dart';
 import '../models/data.dart';
 import '../models/order_lifecycle.dart';
 import '../services/api_service.dart';
@@ -137,6 +138,34 @@ class _PaymentScreenState extends State<PaymentScreen>
   }
 
   String get _amount => _order.upiPaymentAmount.toStringAsFixed(2);
+
+  Widget _summaryLine(String label, String value, {bool emphasized = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: emphasized ? 16 : 13,
+            color: emphasized
+                ? const Color(0xFF101617)
+                : const Color(0xFF6A7774),
+            fontWeight: emphasized ? FontWeight.w700 : FontWeight.w600,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: emphasized ? 22 : 15,
+            color: emphasized
+                ? const Color(0xFF0E5A47)
+                : const Color(0xFF101617),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
 
   /// QR contents. App buttons do not launch this link; scanning it is a
   /// QR payment (mode 01), while opening it from the app would be an intent.
@@ -822,7 +851,35 @@ class _PaymentScreenState extends State<PaymentScreen>
             ],
           ),
           const Divider(height: 28, color: Color(0xFFEAEFED)),
-          Row(
+          if (_order.isPartnerDelivery && _order.deliveryCharge > 0) ...[
+            _summaryLine('Food', formatRupee(_order.subtotal)),
+            const SizedBox(height: 8),
+            _summaryLine(
+              'Platform fee',
+              formatRupee(_order.communityFee),
+            ),
+            if ((_order.couponDiscount ?? 0) > 0) ...[
+              const SizedBox(height: 8),
+              _summaryLine(
+                _order.couponCode == null
+                    ? 'Coupon'
+                    : 'Coupon (${_order.couponCode})',
+                '-${formatRupee(_order.couponDiscount!)}',
+              ),
+            ],
+            const SizedBox(height: 8),
+            _summaryLine(
+              'Partner delivery',
+              formatRupee(_order.deliveryCharge),
+            ),
+            const SizedBox(height: 8),
+            _summaryLine(
+              'Pay to seller',
+              '₹$_amount',
+              emphasized: true,
+            ),
+          ] else
+            Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(

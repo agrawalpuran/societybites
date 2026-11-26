@@ -7,6 +7,7 @@ import 'listing_categories.dart';
 import 'listing_discount.dart';
 import 'order_lifecycle.dart';
 import 'recurring_availability.dart';
+import 'partner_delivery.dart';
 import 'seller_fulfilment.dart';
 import 'seller_payment_preference.dart';
 import 'selling_reach.dart';
@@ -850,6 +851,9 @@ class Order {
   final String? sellerSocietyName;
   final double? distanceKm;
   final int unreadMessageCount;
+  /// Null unless this order was locked to partner delivery at create.
+  final String? deliveryProvider;
+  final PartnerDelivery? partnerDelivery;
 
   const Order({
     required this.id,
@@ -906,6 +910,8 @@ class Order {
     this.sellerSocietyName,
     this.distanceKm,
     this.unreadMessageCount = 0,
+    this.deliveryProvider,
+    this.partnerDelivery,
   });
 
   bool get buyerHasPaid =>
@@ -1043,8 +1049,14 @@ class Order {
     return items.any((item) => item.food.sellerId == userId);
   }
 
+  bool get isPartnerDelivery =>
+      (deliveryProvider ?? '').toLowerCase() == 'prorouting' ||
+      partnerDelivery != null;
+
   bool get isOutsideSellerDelivery =>
-      isCrossSociety && (fulfilmentMethod?.trim() == 'seller_delivery');
+      !isPartnerDelivery &&
+      isCrossSociety &&
+      (fulfilmentMethod?.trim() == 'seller_delivery');
 
   bool get buyerShowsDeliveryCollectGuidance =>
       isOutsideSellerDelivery &&
@@ -1224,6 +1236,8 @@ class Order {
       sellerSocietyName: sellerSocietyName,
       distanceKm: distanceKm,
       unreadMessageCount: unreadMessageCount,
+      deliveryProvider: deliveryProvider,
+      partnerDelivery: partnerDelivery,
     );
   }
 
@@ -1278,6 +1292,8 @@ class Order {
       sellerSocietyName: sellerSocietyName,
       distanceKm: distanceKm,
       unreadMessageCount: count,
+      deliveryProvider: deliveryProvider,
+      partnerDelivery: partnerDelivery,
     );
   }
 
@@ -1374,6 +1390,10 @@ class Order {
       sellerSocietyName: json['sellerSocietyName'] as String?,
       distanceKm: (json['distanceKm'] as num?)?.toDouble(),
       unreadMessageCount: (json['unreadMessageCount'] as num?)?.toInt() ?? 0,
+      deliveryProvider: json['deliveryProvider'] as String?,
+      partnerDelivery: json['delivery'] is Map
+          ? PartnerDelivery.fromJson(json['delivery'])
+          : null,
     );
   }
 
@@ -1482,6 +1502,8 @@ class Order {
       sellerSocietyName: updated.sellerSocietyName ?? prior.sellerSocietyName,
       distanceKm: updated.distanceKm ?? prior.distanceKm,
       unreadMessageCount: updated.unreadMessageCount,
+      deliveryProvider: updated.deliveryProvider ?? prior.deliveryProvider,
+      partnerDelivery: updated.partnerDelivery ?? prior.partnerDelivery,
     );
   }
 
@@ -1576,6 +1598,10 @@ class Order {
       sellerSocietyName: prior.sellerSocietyName,
       distanceKm: prior.distanceKm,
       unreadMessageCount: prior.unreadMessageCount,
+      deliveryProvider: json['deliveryProvider'] as String? ?? prior.deliveryProvider,
+      partnerDelivery: json['delivery'] is Map
+          ? PartnerDelivery.fromJson(json['delivery'])
+          : prior.partnerDelivery,
     );
     return mergePreservingDetails(prior, patched);
   }

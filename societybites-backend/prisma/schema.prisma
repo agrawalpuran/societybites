@@ -451,6 +451,10 @@ model Order {
   completedAt           DateTime?
   cancelledAt           DateTime?
   paymentStatus         String             @default("pending")
+  /// Locked at create for partner-delivery POC. null = today's seller path.
+  /// prorouting when the kill switch and allowlist matched at checkout.
+  deliveryProvider      String?
+  deliveryTask          DeliveryTask?
   /// Locked when checkout starts. null until then. direct_upi | cashfree.
   /// A later admin switch does not change an order that already has a value.
   paymentProvider       String?
@@ -485,6 +489,33 @@ model Order {
   @@index([societyId, status])
   @@index([campaignId])
   @@index([type])
+}
+
+/// Partner rider task. Order.status is unchanged; rider progress lives here.
+model DeliveryTask {
+  id          String   @id @default(uuid())
+  orderId     String   @unique
+  provider    String
+  /// quoted | booked | searching | retrying | assigned | at_pickup | picked_up | at_delivery | delivered | cancelled | rto | failed | seller_fallback
+  state       String
+  externalId  String?
+  lspName     String?
+  riderName   String?
+  riderPhone  String?
+  trackingUrl String?
+  pickupOtp   String?
+  dropOtp     String?
+  quotedFare  Float?
+  billedFare  Float?
+  lastPayload String?
+  lastError   String?
+  retryCount  Int      @default(0)
+  bookedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([externalId])
 }
 
 model OrderItem {

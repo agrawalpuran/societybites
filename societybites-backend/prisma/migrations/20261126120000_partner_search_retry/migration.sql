@@ -1,0 +1,2 @@
+ALTER TABLE "DeliveryTask" ADD COLUMN "retryCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "DeliveryTask" ADD COLUMN "bookedAt" TIMESTAMP(3);

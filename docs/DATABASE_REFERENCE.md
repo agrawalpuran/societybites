@@ -217,6 +217,7 @@ Indexes: `(societyId, status)`, `sellerId`, `campaignId`, `sourceListingId`, `va
 | timestamps | DateTime? | `acceptedAt`, `preparingAt`, `readyAt`, `expectedReadyAt`, `requestedReadyAt`, `pickedUpAt`, `completedAt`, `cancelledAt` |
 | `paymentStatus` | String | Default `pending` |
 | `paymentProvider` | String? | Null until checkout. `direct_upi` or `cashfree` |
+| `deliveryProvider` | String? | Null = today's seller delivery. `prorouting` when the POC lock matched at create |
 | `gatewayAmount`, `gatewayPaymentId`, `gatewayUpiLink`, `gatewayQrPayload` | | Cashfree session |
 | `splitStatus` | String? | `pending`, `created`, `failed`, `not_required` |
 | `splitError` | String? | |
@@ -226,6 +227,20 @@ Indexes: `(societyId, status)`, `sellerId`, `campaignId`, `sourceListingId`, `va
 | `cancelReason` | String? | |
 
 Indexes: `(buyerId, createdAt)`, `(societyId, status)`, `campaignId`, `type`.
+
+### DeliveryTask
+
+Partner rider row. `Order.status` does not change for rider progress. Missing when the kill switch did not lock the order.
+
+| Field | Type | Notes |
+|---|---|---|
+| `orderId` | String unique | FK to Order, cascade delete |
+| `provider` | String | `prorouting` |
+| `state` | String | `quoted` through `delivered`, plus `retrying`, `cancelled`, `rto`, `failed`, `seller_fallback` |
+| `externalId` | String? | Prorouting order id |
+| `retryCount` | Int | Auto re-book at most once |
+| `bookedAt` | DateTime? | First successful `createasync` |
+| rider / OTP / tracking / fares | | Optional until a webhook fills them |
 
 ### OrderItem
 

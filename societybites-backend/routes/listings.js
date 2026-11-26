@@ -31,6 +31,9 @@ const {
   getGuestKitchenStorefront,
 } = require("../lib/guestDiscovery");
 const {
+  previewPartnerDeliveryForListing,
+} = require("../lib/delivery/deliveryService");
+const {
   parseListingCategories,
   categoryWriteFields,
   categoryQueryFilter,
@@ -357,6 +360,37 @@ router.get(
       include: listingInclude,
     });
     res.json(await jsonListings(sortVariantSiblings(siblings), req.user.id));
+  })
+);
+
+router.get(
+  "/:id/partner-delivery",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const societyId = requireJoinedSociety(req, res);
+    if (!societyId) return;
+
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        societyId: true,
+        sellerId: true,
+        catalogType: true,
+        campaignId: true,
+        status: true,
+      },
+    });
+    if (!listing || !(await buyerCanViewListing(req, listing))) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+    const preview = await previewPartnerDeliveryForListing({
+      listingId: listing.id,
+      buyerId: req.user.id,
+      fulfilmentMethod: req.query.fulfilmentMethod,
+      paymentMethod: req.query.paymentMethod,
+    });
+    res.json({ eligible: preview.eligible === true });
   })
 );
 

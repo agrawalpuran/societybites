@@ -1,5 +1,53 @@
 # Latest handover
 
+## 26 November 2026 — Partner search auto-retry once
+
+If a partner task stays UnFulfilled / finding a rider for 15 minutes (from `DeliveryTask.bookedAt`), the API cancels that Prorouting booking and `createasync` once. The card shows **Trying another rider**, then **Finding a rider**. `Order.status` stays `ready`. After 60 minutes still hunting, cancel partner, `seller_fallback`, seller can Complete. Override minutes with `PARTNER_SEARCH_RETRY_MINUTES` and `PARTNER_SEARCH_FALLBACK_MINUTES`. Triggered on order GET/list live-status (and webhook). Apply migration `20261126120000_partner_search_retry`. Not committed.
+
+## 26 November 2026 — Cart hides actuals line for partner
+
+Checkout no longer shows Delivery charge “Confirmed when ready” when this buyer+listing is partner-eligible (toggle, allowlist, UPI, cross-society seller delivery). The quote still appears after place-order on payment. Cash and non-allowlisted carts keep today’s actuals line. Not committed.
+
+## 26 November 2026 — Partner trip steps on kitchen and orders
+
+The partner card for buyers and sellers shows Rider → Pickup → En route → Nearby → Done from `DeliveryTask.state`. Headline copy matches the current Prorouting step (on the way, at delivery, delivered). Failed or cancelled trips hide the track. Not committed.
+
+## 26 November 2026 — Partner delivered completes the order
+
+Prorouting `Order-delivered` (webhook or list/GET live `/status`) sets `Order.status` to `completed` when the order is `ready` or legacy `picked_up` and `assertCanCompleteOrder` passes. No new order status. Kitchen Complete is hidden while the rider is in flight; it remains a fallback if the partner trip fails, is cancelled, or RTO. FCM/WhatsApp on that complete still cannot fail the webhook. Not committed.
+
+## 25 November 2026 — Partner LSP name and live status on order GET
+
+Opening `GET /orders/:id` re-reads Prorouting `/status` for in-flight partner tasks and stores LSP name, rider, and `tracking_url`. The Flutter card shows the LSP even before a rider name, and **Track rider** when that URL exists. Not committed.
+
+## 25 November 2026 — Partner delivery quote on seller UPI
+
+Eligible seller-delivery UPI orders now call Prorouting `/partner/estimate` before lock. The payment screen shows Food and Partner delivery separately; the UPI amount is the clubbed total to the seller. Estimate failure skips lock (today’s path). Toggle off / empty allowlist / pickup / cash / pre-order still never estimate. Ready books with `estimated_price` when the estimate id is still stored, else `fastest_agent`. Not committed.
+
+## 25 November 2026 — Partner delivery migration applied
+
+`npx prisma migrate deploy` applied `20261125140000_partner_delivery_task` on the database in local `.env` (live Supabase). `Order.deliveryProvider` is nullable; `DeliveryTask` is empty. AppSetting toggle still defaults off. Code is not checked in; production DigitalOcean still runs the old API. A Render UAT API was deferred. Not committed.
+
+## 25 November 2026 — Prorouting Postman collection checked
+
+Public doc: https://documenter.getpostman.com/view/30345080/2sA3Qv8B13 (collection `Prorouting Logistics Gateway API`). Header is `x-pro-api-key`. Preprod host in the intro is `https://preprod.logistics-buyer.prorouting.in`. Status callbacks use `order.tracking_url` (not only `url`). LSP cancel can send `UnFulfilled` again before pickup; that is now applied instead of dropped as stale. JSON `status: 0` is treated as failure. Estimate, issue tickets, and track-location callbacks are in their suite and not used in this POC. Not committed.
+
+## 25 November 2026 — Prorouting confirmed createasync workflow
+
+Vendor instruction matches the POC: book with `createasync` only when food is ready, handle the status callback, cancel if the SocietyEats order is no longer needed, and use `/track` only if live location is needed. Happy path states: UnFulfilled → Agent-assigned → At-pickup → Order-picked-up → At-delivery → Order-delivered. The API key belongs only in local `.env` as `PROROUTING_API_KEY` (gitignored). Do not put it in source or docs. They did not send a base URL or webhook token in that note; preprod host stays the documented default until they confirm otherwise. Not committed.
+
+## 25 November 2026 — Partner delivery Flutter + OTP split
+
+Order JSON `delivery` now hides pickup OTP from the buyer and drop OTP from the seller. Ready attaches the latest `DeliveryTask` onto the status patch. The app shows a partner card on the fulfilment banner, skips the actuals-charge dialog for partner orders, and the admin dashboard has the Prorouting switch plus an allowlist editor. Migration still not applied. Not committed.
+
+## 25 November 2026 — Prorouting POC first backend slice
+
+Kill switch and empty allowlist are in code. `lib/delivery/` plus webhook, admin settings, and order create/Ready/cancel hooks. Unit tests `delivery-prorouting.test.js`. Additive migration `20261125140000_partner_delivery_task` is in the repo but was **not applied** from this session. `npm start` would migrate; use `npm run dev` or `SKIP_DB_MIGRATE=true` until you want that. Toggle still defaults off. No Flutter UI yet. Not committed.
+
+## 25 November 2026 — Prorouting partner delivery design (no code)
+
+Owner chose Prorouting for a delivery POC and rejected uEngage for this pass because of the onboarding fee. Kill switch: `delivery_provider` missing or `seller` means today’s seller-delivery path, including after a future deploy. `prorouting` plus a **non-empty** phone allowlist is required before any booking; an empty allowlist still books nobody. Food stays direct UPI. Platform wallet pays the rider. No new order statuses. Fare is not folded into `Order.total` in the POC. Full write-up: [PARTNER_DELIVERY_POC.md](PARTNER_DELIVERY_POC.md). **No application code, no migration, not committed.** Next: owner must ask for implementation.
+
 ## 24 November 2026 — Phase-1 regression failures
 
 The 23 November push failed the Flutter job on two tests. The address test now includes a login token, because a saved profile without a token no longer loads places. The home test expects "Closest first · up to 15 km", which is the Beyond your society subtitle for that city's reach. `whatsapp-settings` and `payment-provider` read Postgres, so they are regression suites. The unit job has no database and was failing on `DATABASE_URL`. Not committed.

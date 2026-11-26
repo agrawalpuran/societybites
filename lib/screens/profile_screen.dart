@@ -1298,16 +1298,13 @@ class ProfileScreenState extends State<ProfileScreen> {
       },
     );
 
-    if (saved != true || !mounted) {
-      upiController.dispose();
-      nameController.dispose();
-      return;
-    }
-
     final upi = upiController.text.trim();
     final displayName = nameController.text.trim();
-    upiController.dispose();
-    nameController.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      upiController.dispose();
+      nameController.dispose();
+    });
+    if (saved != true || !mounted) return;
     if (displayName.isEmpty) return;
 
     final pending = _pendingSellerEnable;

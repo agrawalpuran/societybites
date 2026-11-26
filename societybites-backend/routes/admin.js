@@ -61,6 +61,11 @@ const {
   getPaymentProvider,
   setPaymentProvider,
 } = require("../lib/payments/paymentSetting");
+const {
+  getDeliveryAdminPayload,
+  setDeliveryProvider,
+  setDeliveryAllowlist,
+} = require("../lib/delivery/deliverySetting");
 const { sellerShareAmount } = require("../lib/payments/sellerShare");
 const { listCouponSellerPayouts } = require("../lib/couponRecon");
 const {
@@ -1268,12 +1273,14 @@ router.get(
     const whatsappOrderNotifications =
       await isWhatsAppOrderNotificationsEnabled();
     const paymentProvider = await getPaymentProvider();
+    const delivery = await getDeliveryAdminPayload();
     const forceUpdate = await getForceUpdateConfig({ bypassCache: true });
     res.json({
       ...feePayload,
       fssaiSellingRequirement,
       whatsappOrderNotifications,
       paymentProvider,
+      ...delivery,
       minIosBuild: forceUpdate.minIosBuild,
       minAndroidBuild: forceUpdate.minAndroidBuild,
       iosUpdateUrl: forceUpdate.iosUpdateUrl,
@@ -1300,6 +1307,8 @@ router.patch(
       fssaiSellingRequirement,
       whatsappOrderNotifications,
       paymentProvider,
+      deliveryProvider,
+      deliveryAllowlist,
       minIosBuild,
       minAndroidBuild,
       iosUpdateUrl,
@@ -1341,6 +1350,13 @@ router.patch(
     }
     if (paymentProvider !== undefined) {
       updates.paymentProvider = await setPaymentProvider(paymentProvider);
+    }
+    if (deliveryProvider !== undefined) {
+      updates.deliveryProvider = await setDeliveryProvider(deliveryProvider);
+    }
+    if (deliveryAllowlist !== undefined) {
+      const phones = await setDeliveryAllowlist(deliveryAllowlist);
+      updates.deliveryAllowlistCount = phones.length;
     }
     const forceUpdates = await setForceUpdateConfig({
       minIosBuild,
@@ -1395,6 +1411,7 @@ router.patch(
         (await isWhatsAppOrderNotificationsEnabled()),
       paymentProvider:
         updates.paymentProvider ?? (await getPaymentProvider()),
+      ...(await getDeliveryAdminPayload()),
       minIosBuild: forceUpdate.minIosBuild,
       minAndroidBuild: forceUpdate.minAndroidBuild,
       iosUpdateUrl: forceUpdate.iosUpdateUrl,

@@ -117,6 +117,13 @@ Discussed because Meta verification and tax eligibility were obstacles. No Twili
 
 Named in historical evaluation and in tests as values that must not be accepted as the payment provider. They are not integrations.
 
+### Prorouting partner delivery POC (toggle default off)
+
+- **Decision:** Optional hyperlocal riders go through Prorouting only. The kill switch is `AppSetting.delivery_provider` (`seller` when missing). An empty phone allowlist means no bookings even if the provider is `prorouting`. uEngage is not in this POC. Food stays direct UPI. The platform wallet pays Prorouting. No new `Order.status`. Until split payment exists, a successful estimate is shown as a separate line and **clubbed into the seller UPI total**.
+- **Reason:** Prove real booking and webhooks without changing today’s seller-delivery path for everyone, and without uEngage’s onboarding fee. Buyers should see delivery like Swiggy without a second UPI.
+- **Status:** In source (default off). Estimate-at-lock, clubbed seller UPI, and auto-complete on partner delivered are in source. Not committed.
+- **Can it change:** Yes. Split payment should later send delivery to the platform instead of the seller.
+
 ### A standalone WhatsApp microservice
 
 The requirement was independence from order creation. That requirement is met inside the API process. A separate deployable was not built. Do not split it out unless the owner asks.

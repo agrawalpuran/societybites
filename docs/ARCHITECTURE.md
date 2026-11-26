@@ -113,7 +113,7 @@ PostgreSQL through Prisma. The runtime connection is expected to be the Supabase
 
 Most lifecycle fields are strings, not Prisma enums. Coupon fields are the exception and use Prisma enums. Changing a string status is an application change in the route or library that interprets it, plus a data migration if old rows must move.
 
-`AppSetting` is the key-value store for platform fee, payment provider, WhatsApp toggle, serving cities, FSSAI enforcement, force-update builds, and the last marketing push time.
+`AppSetting` is the key-value store for platform fee, payment provider, WhatsApp toggle, serving cities, FSSAI enforcement, force-update builds, and the last marketing push time. A partner-delivery provider key is **designed**, not shipped; see [PARTNER_DELIVERY_POC.md](PARTNER_DELIVERY_POC.md).
 
 ## Authentication
 
@@ -219,6 +219,8 @@ Ready-now regular orders skip the seller accept step and are inserted as `accept
 
 `POST /payments/:orderId/confirm-delivery-cash` can set `completed` when the order is an outside-society UPI food plus cash delivery fee order, the order is `ready` or legacy `picked_up`, and completion checks pass.
 
+Partner Prorouting `Order-delivered` (webhook or live `/status` refresh) also sets `completed` on that same transition, using `assertCanCompleteOrder`. Rider progress stays on `DeliveryTask.state`. The seller Complete action is blocked while the partner trip is still in flight.
+
 ## Notifications
 
 `utils/notifications.js` sends FCM through Firebase Admin and records failures in logs. Call sites use `void flushNotification(...)`, so the HTTP response is not tied to push delivery.
@@ -261,6 +263,7 @@ The platform fee is `AppSetting` key `platform_fee`, cached for 60 seconds and s
 | Google Places | Required for live society discovery | Database society search still exists beside it |
 | WhatsApp Cloud API | Optional, default off | Skipped or logged. Order still succeeds |
 | Cashfree | Optional, default direct UPI | Used only when the setting and the order say so |
+| Prorouting | Optional, default off (`delivery_provider` missing or `seller`) | Eligibility and HTTP errors are swallowed. Empty allowlist books nobody |
 
 ## Infrastructure and deployment
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/data.dart';
 import 'buyer_delivery_collect_hint.dart';
+import 'partner_delivery_card.dart';
 
 class OrderFulfilmentBanner extends StatelessWidget {
   const OrderFulfilmentBanner({
@@ -16,20 +17,30 @@ class OrderFulfilmentBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final method = order.fulfilmentMethod?.trim() ?? '';
+    final partner = order.isPartnerDelivery;
     final delivery = method == 'seller_delivery';
     // Buyer pickup is the default. Cross-society orders snapshot "pickup";
     // same-society orders often omit the field. Either way the banner is the
     // single place we list where to collect.
-    if (isSellerView && method.isEmpty) return const SizedBox.shrink();
+    if (isSellerView && method.isEmpty && !partner) {
+      return const SizedBox.shrink();
+    }
     final charge = order.deliveryCharge;
     final chargeLabel = charge == charge.roundToDouble()
         ? charge.toInt().toString()
         : charge.toString();
 
+    if (order.partnerDelivery != null) {
+      return PartnerDeliveryCard.fromOrder(
+        order: order,
+        isSellerView: isSellerView,
+      );
+    }
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: const Color(0xFFF0F7F4),
         borderRadius: BorderRadius.circular(14),
@@ -39,10 +50,18 @@ class OrderFulfilmentBanner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            delivery ? '🛵 SELLER DELIVERY' : '🏠 BUYER PICKUP',
+            partner
+                ? '🛵 PARTNER DELIVERY'
+                : delivery
+                    ? '🛵 SELLER DELIVERY'
+                    : '🏠 BUYER PICKUP',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: Color(0xFF0E5A47),
               fontWeight: FontWeight.w800,
+              fontSize: 12,
+              height: 1.2,
             ),
           ),
           if (isSellerView) ...[
@@ -52,12 +71,13 @@ class OrderFulfilmentBanner extends StatelessWidget {
                 _buyerDeliveryAddress(order),
                 order.approxDistanceLabel,
               ),
-              Text(
-                order.deliveryChargePending
-                    ? 'Delivery charge: On actuals'
-                    : 'Delivery charge: ₹$chargeLabel',
-                style: const TextStyle(color: Color(0xFF3A4644)),
-              ),
+              if (!partner)
+                Text(
+                  order.deliveryChargePending
+                      ? 'Delivery charge: On actuals'
+                      : 'Delivery charge: ₹$chargeLabel',
+                  style: const TextStyle(color: Color(0xFF3A4644)),
+                ),
             ] else if (order.buyerSocietyName != null &&
                 order.buyerSocietyName!.isNotEmpty) ...[
               const SizedBox(height: 6),
@@ -95,7 +115,7 @@ class OrderFulfilmentBanner extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Color(0xFF3A4644)),
                 ),
-              if (order.buyerShowsDeliveryCollectGuidance) ...[
+              if (!partner && order.buyerShowsDeliveryCollectGuidance) ...[
                 const SizedBox(height: 6),
                 BuyerDeliveryCollectHint(order: order),
               ],

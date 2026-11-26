@@ -1,5 +1,6 @@
 const { parseDeliveryCharge } = require("./sellerFulfilment");
 const { money: couponMoney } = require("./coupons");
+const { isPartnerDeliveryOrder } = require("./delivery/eligibility");
 
 const PENDING_STATUSES = new Set(["pending", "accepted", "preparing"]);
 
@@ -22,6 +23,7 @@ function orderIsCrossSociety(order) {
 
 function isOutsideSellerDeliveryOrder(order) {
   if (!order || (order.type || "regular") !== "regular") return false;
+  if (isPartnerDeliveryOrder(order)) return false;
   if (!orderIsCrossSociety(order)) return false;
   return String(order.fulfilmentMethod || "").toLowerCase() === "seller_delivery";
 }

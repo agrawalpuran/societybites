@@ -67,6 +67,7 @@ class OrdersScreenState extends State<OrdersScreen>
   bool _didNotifyInitialSettle = false;
   bool _ordersSlow = false;
   Timer? _ordersSlowTimer;
+  Timer? _partnerStatusPoll;
 
   /// Keeps mark-paid ahead of stale GET /orders until the server catches up.
   Order? _paymentStatusPatch;
@@ -448,6 +449,7 @@ class OrdersScreenState extends State<OrdersScreen>
       });
       OrderPushCoordinator.clearHintsReconciled(parsed);
       _applyPendingPushHints();
+      _syncPartnerStatusPoll();
     } catch (e) {
       if (!mounted) return;
 
@@ -481,6 +483,21 @@ class OrdersScreenState extends State<OrdersScreen>
     });
   }
 
+  void _syncPartnerStatusPoll() {
+    final waiting = _buyer.active.any(
+      (order) => order.partnerDelivery?.isInFlight == true,
+    );
+    if (!waiting) {
+      _partnerStatusPoll?.cancel();
+      _partnerStatusPoll = null;
+      return;
+    }
+    _partnerStatusPoll ??= Timer.periodic(const Duration(seconds: 12), (_) {
+      if (!mounted) return;
+      unawaited(_loadOrders(fetchCampaignMetadata: false));
+    });
+  }
+
   void _stopSlowTimer() {
     _ordersSlowTimer?.cancel();
     _ordersSlow = false;
@@ -499,6 +516,7 @@ class OrdersScreenState extends State<OrdersScreen>
   @override
   void dispose() {
     _ordersSlowTimer?.cancel();
+    _partnerStatusPoll?.cancel();
     _activeOrdersScroll.dispose();
     _tabController.dispose();
     super.dispose();

@@ -240,7 +240,18 @@ async function restoreReservedInventory(tx, items) {
   }
 }
 
+const {
+  lockPartnerDeliveryIfEligible,
+  bookOnReady,
+  cancelPartnerDelivery,
+  refreshPartnerLiveStatus,
+  refreshPartnerLiveStatusMany,
+  isPartnerDeliveryOrder,
+  partnerTaskAllowsSellerComplete,
+} = require("../lib/delivery/deliveryService");
+
 const orderInclude = {
+  deliveryTask: true,
   buyer: {
     include: {
       flat: true,
@@ -267,6 +278,7 @@ const orderInclude = {
 
 /** Same shape as [orderInclude] but skips per-listing review aggregates on create. */
 const orderIncludeForCreate = {
+  deliveryTask: true,
   buyer: orderInclude.buyer,
   items: {
     include: {
@@ -320,10 +332,11 @@ router.get(
           limit: req.query.limit,
           include: orderInclude,
         });
+        const liveOrders = await refreshPartnerLiveStatusMany(page.orders);
         return res.json({
           orders: await attachUnreadCounts(
             prisma,
-            page.orders.map((order) => serializeOrderForUser(order, req.user.id)),
+            liveOrders.map((order) => serializeOrderForUser(order, req.user.id)),
             req.user.id
           ),
           hasMore: page.hasMore,
@@ -346,8 +359,9 @@ router.get(
         orderBy: { createdAt: "desc" },
       });
 
+      const liveOrders = await refreshPartnerLiveStatusMany(orders);
       return res.json(
-        await attachUnreadCounts(prisma, orders.map((order) => serializeOrderForUser(order, req.user.id)), req.user.id)
+        await attachUnreadCounts(prisma, liveOrders.map((order) => serializeOrderForUser(order, req.user.id)), req.user.id)
       );
     }
 
@@ -360,8 +374,9 @@ router.get(
       orderBy: { createdAt: "desc" },
     });
 
+    const liveOrders = await refreshPartnerLiveStatusMany(orders);
     res.json(
-      await attachUnreadCounts(prisma, orders.map((order) => serializeOrderForUser(order, req.user.id)), req.user.id)
+      await attachUnreadCounts(prisma, liveOrders.map((order) => serializeOrderForUser(order, req.user.id)), req.user.id)
     );
   })
 );
@@ -760,8 +775,9 @@ router.get(
       return res.status(403).json({ error: "Not allowed to view this order" });
     }
 
+    const live = await refreshPartnerLiveStatus(order);
     res.json(
-      await attachUnreadCounts(prisma, [serializeOrderForUser(order, req.user.id)], req.user.id).then(
+      await attachUnreadCounts(prisma, [serializeOrderForUser(live, req.user.id)], req.user.id).then(
         (rows) => rows[0]
       )
     );
@@ -1311,6 +1327,7 @@ router.post(
     }
 
     if (!idempotentReplay) {
+      order = await lockPartnerDeliveryIfEligible(order);
       logger.info("order", `Created ${order.orderNumber} by ${req.user.phone}`);
       void flushNotification(notifyOrderCreated(order));
       void sendWhatsAppOrderNotification(order);
@@ -1384,6 +1401,17 @@ router.patch(
     }
 
     if (status === "completed") {
+      if (
+        isPartnerDeliveryOrder(order) &&
+        !partnerTaskAllowsSellerComplete(
+          order.deliveryTask && order.deliveryTask.state
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            "This order completes when the rider delivers. You can complete it if the partner trip fails.",
+        });
+      }
       try {
         assertCanCompleteOrder(order);
       } catch (err) {
@@ -1533,6 +1561,7 @@ router.patch(
         logger.info("order", `Cancelled ${order.orderNumber} — inventory restored`);
       });
       updated = { ...order, ...written };
+      void cancelPartnerDelivery(order);
     } else {
       await updateOrderIfCurrentStatus(prisma, {
         id: order.id,
@@ -1545,6 +1574,10 @@ router.patch(
       logger.info("order", `${order.orderNumber} → ${status}`);
     }
 
+    if (status === "ready") {
+      updated = await bookOnReady(updated, req);
+    }
+
     if (status === "ready" && eligibleDelayed) {
       const reloaded = await prisma.order.findUnique({
         where: { id: order.id },
@@ -1555,7 +1588,7 @@ router.patch(
       return res.json(serializeOrderForUser(reloaded, req.user.id));
     }
 
-    res.json(serializeOrderStatusPatch(updated));
+    res.json(serializeOrderStatusPatch(updated, { viewerUserId: req.user.id }));
 
     void flushNotification(notifyStatusChange(updated, status));
     dispatchWhatsAppStatusNotification(updated, status);

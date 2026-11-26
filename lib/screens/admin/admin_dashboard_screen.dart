@@ -12,6 +12,30 @@ import 'admin_festival_banners_screen.dart';
 import 'admin_marketing_push_screen.dart';
 import 'admin_payment_splits_screen.dart';
 
+String? _canonicalIndianPhone(String raw) {
+  final digits = raw.replaceAll(RegExp(r'\D'), '');
+  if (digits.isEmpty) return null;
+  var ten = digits;
+  if (digits.length == 12 && digits.startsWith('91')) {
+    ten = digits.substring(2);
+  } else if (digits.length == 11 && digits.startsWith('0')) {
+    ten = digits.substring(1);
+  } else if (digits.length > 10) {
+    ten = digits.substring(digits.length - 10);
+  }
+  if (ten.length != 10) return null;
+  return '+91$ten';
+}
+
+List<String> _uniquePhones(Iterable<String> phones) {
+  final out = <String>[];
+  final seen = <String>{};
+  for (final phone in phones) {
+    if (seen.add(phone)) out.add(phone);
+  }
+  return out;
+}
+
 String _formatTotalSales(Object? raw) {
   final amount = raw is num ? raw.toDouble() : double.tryParse('$raw') ?? 0;
   if (amount == amount.roundToDouble()) {
@@ -38,6 +62,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   bool _usesGlobalPlatformFee = true;
   bool _whatsappOrderNotifications = false;
   String _paymentProvider = 'direct_upi';
+  String _deliveryProvider = 'seller';
+  List<String> _deliveryAllowlist = const [];
   int _minIosBuild = 0;
   int _minAndroidBuild = 0;
   String _iosUpdateUrl = '';
@@ -118,6 +144,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             settings['whatsappOrderNotifications'] == true;
         _paymentProvider =
             settings['paymentProvider']?.toString() ?? 'direct_upi';
+        _applyDeliverySettings(settings);
         _minIosBuild = (settings['minIosBuild'] as num?)?.toInt() ?? 0;
         _minAndroidBuild = (settings['minAndroidBuild'] as num?)?.toInt() ?? 0;
         _iosUpdateUrl = settings['iosUpdateUrl']?.toString() ?? '';
@@ -367,6 +394,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     }
   }
 
+  void _applyDeliverySettings(Map<String, dynamic> settings) {
+    _deliveryProvider =
+        settings['deliveryProvider']?.toString() ?? 'seller';
+    final raw = settings['deliveryAllowlist'];
+    if (raw is List) {
+      _deliveryAllowlist = raw
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+  }
+
   Future<void> _togglePaymentProvider(bool cashfree) async {
     final previous = _paymentProvider;
     final next = cashfree ? 'cashfree' : 'direct_upi';
@@ -389,6 +428,72 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       setState(() => _paymentProvider = previous);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update payments: $e')),
+      );
+    }
+  }
+
+  Future<void> _toggleDeliveryProvider(bool prorouting) async {
+    final previous = _deliveryProvider;
+    final next = prorouting ? 'prorouting' : 'seller';
+    setState(() => _deliveryProvider = next);
+    try {
+      final saved = await ApiService.updateAdminDeliverySettings(
+        deliveryProvider: next,
+      );
+      if (!mounted) return;
+      setState(() => _applyDeliverySettings(saved));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _deliveryProvider == 'prorouting'
+                ? 'Partner delivery on for allowlisted phones'
+                : 'Partner delivery off — sellers deliver as today',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deliveryProvider = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update partner delivery: $e')),
+      );
+    }
+  }
+
+  Future<void> _editDeliveryAllowlist() async {
+    final draft = _uniquePhones(
+      _deliveryAllowlist
+          .map(_canonicalIndianPhone)
+          .whereType<String>(),
+    );
+    final confirmed = await showDialog<List<String>>(
+      context: context,
+      builder: (ctx) => _DeliveryAllowlistDialog(initialPhones: draft),
+    );
+    if (confirmed == null || !mounted) return;
+    try {
+      final saved = await ApiService.updateAdminDeliverySettings(
+        deliveryAllowlist: confirmed,
+      );
+      if (!mounted) return;
+      setState(() => _applyDeliverySettings(saved));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _deliveryAllowlist.isEmpty
+                ? 'Allowlist cleared — no partner bookings'
+                : 'Allowlist saved (${_deliveryAllowlist.length} phone${_deliveryAllowlist.length == 1 ? '' : 's'})',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not update allowlist: ${ApiService.userFacingError(e)}',
+          ),
+        ),
       );
     }
   }
@@ -620,6 +725,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     ),
                   );
                 },
+              ),
+            ),
+            const SizedBox(height: 8),
+            _SettingsPair(
+              left: _SettingCard(
+                icon: Icons.delivery_dining_outlined,
+                title: 'Partner delivery',
+                subtitle: _deliveryProvider == 'prorouting'
+                    ? 'Prorouting for allowlisted phones'
+                    : 'Off — seller delivery as today',
+                onTap: () =>
+                    _toggleDeliveryProvider(_deliveryProvider != 'prorouting'),
+                trailing: Switch.adaptive(
+                  value: _deliveryProvider == 'prorouting',
+                  onChanged: _toggleDeliveryProvider,
+                ),
+              ),
+              right: _SettingCard(
+                icon: Icons.phone_android_outlined,
+                title: 'Delivery allowlist',
+                subtitle: _deliveryAllowlist.isEmpty
+                    ? 'Empty — nobody is booked'
+                    : '${_deliveryAllowlist.length} phone${_deliveryAllowlist.length == 1 ? '' : 's'}',
+                onTap: _editDeliveryAllowlist,
               ),
             ),
             const SizedBox(height: 8),
@@ -1053,6 +1182,135 @@ class _StatCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DeliveryAllowlistDialog extends StatefulWidget {
+  const _DeliveryAllowlistDialog({required this.initialPhones});
+
+  final List<String> initialPhones;
+
+  @override
+  State<_DeliveryAllowlistDialog> createState() =>
+      _DeliveryAllowlistDialogState();
+}
+
+class _DeliveryAllowlistDialogState extends State<_DeliveryAllowlistDialog> {
+  late final TextEditingController _addController;
+  late List<String> _draft;
+  String? _fieldError;
+
+  @override
+  void initState() {
+    super.initState();
+    _addController = TextEditingController();
+    _draft = List<String>.from(widget.initialPhones);
+  }
+
+  @override
+  void dispose() {
+    _addController.dispose();
+    super.dispose();
+  }
+
+  void _addFromField() {
+    final tokens = _addController.text
+        .split(RegExp(r'[\n\r,;]+'))
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty);
+    if (tokens.isEmpty) return;
+    final next = List<String>.from(_draft);
+    for (final token in tokens) {
+      final phone = _canonicalIndianPhone(token);
+      if (phone == null) {
+        setState(() => _fieldError = 'Use a 10-digit number');
+        return;
+      }
+      if (!next.contains(phone)) next.add(phone);
+    }
+    setState(() {
+      _draft = next;
+      _fieldError = null;
+      _addController.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Partner delivery allowlist'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Add the buyer phone and the seller phone. The same number is stored once. Empty list books nobody.',
+              ),
+              const SizedBox(height: 12),
+              if (_draft.isEmpty)
+                const Text(
+                  'Nobody is listed — partner delivery will not book.',
+                )
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final phone in _draft)
+                      InputChip(
+                        label: Text(phone),
+                        onDeleted: () {
+                          setState(() {
+                            _draft = _draft
+                                .where((item) => item != phone)
+                                .toList();
+                          });
+                        },
+                      ),
+                  ],
+                ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _addController,
+                autofocus: true,
+                keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _addFromField(),
+                decoration: InputDecoration(
+                  labelText: 'Add phone',
+                  hintText: '9876543210',
+                  errorText: _fieldError,
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    onPressed: _addFromField,
+                    icon: const Icon(Icons.add),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_addController.text.trim().isNotEmpty) {
+              _addFromField();
+              if (_addController.text.trim().isNotEmpty) return;
+            }
+            Navigator.pop(context, List<String>.from(_draft));
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

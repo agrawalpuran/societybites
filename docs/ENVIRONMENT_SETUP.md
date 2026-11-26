@@ -160,6 +160,11 @@ Names and purpose only. Required means the feature fails without them. The proce
 | `WHATSAPP_TEMPLATE_NAME`, `WHATSAPP_TEMPLATE_READY`, `WHATSAPP_TEMPLATE_COMPLETED`, `WHATSAPP_TEMPLATE_LANGUAGE` | No | Template names. Buyer ready and completed sends are skipped when unset |
 | `CASHFREE_CLIENT_ID`, `CASHFREE_CLIENT_SECRET` | Yes only if provider is Cashfree | Gateway |
 | `CASHFREE_ENV` | No | `sandbox` until set to `production` |
+| `PROROUTING_API_KEY`, `PROROUTING_BASE_URL` | Yes only if `delivery_provider` is `prorouting` | Partner delivery POC. Missing env keeps today's path |
+| `PROROUTING_WEBHOOK_TOKEN` | Yes for live callbacks | Path secret on `/webhooks/prorouting/:token` |
+| `PROROUTING_CALLBACK_BASE_URL` | No | Public origin (no trailing slash) used as the webhook host when Ready runs from localhost |
+| `PARTNER_SEARCH_RETRY_MINUTES` | No | Default 15. One auto re-book while still UnFulfilled |
+| `PARTNER_SEARCH_FALLBACK_MINUTES` | No | Default 60 from first book. Cancel partner, `seller_fallback`, unlock Complete |
 | `GOOGLE_PLACES_API_KEY` | Yes for live place search | Server only |
 | `GOOGLE_PLACES_REGION_CODE` | No | Defaults from launch country |
 | `SOCIETY_LAUNCH_CITY`, `SOCIETY_LAUNCH_STATE`, `SOCIETY_LAUNCH_COUNTRY` | No | Example Bengaluru, Karnataka, IN. Overridden when `serving_cities` is stored |

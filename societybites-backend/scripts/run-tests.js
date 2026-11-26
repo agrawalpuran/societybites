@@ -33,6 +33,7 @@ const UNIT = [
   "marketing-push",
   "whatsapp-cloud",
   "upi-account-type",
+  "delivery-prorouting",
 ];
 
 /**

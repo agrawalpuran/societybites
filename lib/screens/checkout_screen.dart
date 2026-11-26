@@ -76,6 +76,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   DateTime? _needBy;
   CouponQuote? _couponQuote;
   String? _cachedSocietyId;
+  bool _partnerDeliveryEligible = false;
 
   @override
   void initState() {
@@ -91,6 +92,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _applyDefaultPaymentMethod();
     _applyDefaultFulfilmentMethod();
     _inferCrossSocietyFromCart();
+    _loadPartnerEligibility();
   }
 
   Future<void> _warmCheckoutSession() async {
@@ -135,6 +137,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _applyDefaultFulfilmentMethod();
       _applyDefaultPaymentMethod();
     });
+    _loadPartnerEligibility();
+  }
+
+  Future<void> _loadPartnerEligibility() async {
+    if (_items.isEmpty ||
+        !_isCrossSociety ||
+        _fulfilmentMethod != 'seller_delivery') {
+      if (mounted && _partnerDeliveryEligible) {
+        setState(() => _partnerDeliveryEligible = false);
+      }
+      return;
+    }
+    try {
+      final eligible = await ApiService.getPartnerDeliveryPreview(
+        listingId: _items.first.food.id,
+        paymentMethod: _payment == PaymentMethod.upi ? 'upi' : 'cash',
+        fulfilmentMethod: _fulfilmentMethod,
+      );
+      if (!mounted) return;
+      if (eligible != _partnerDeliveryEligible) {
+        setState(() => _partnerDeliveryEligible = eligible);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      if (_partnerDeliveryEligible) {
+        setState(() => _partnerDeliveryEligible = false);
+      }
+    }
   }
 
   Future<void> _loadPlatformFee() async {
@@ -184,6 +214,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   bool get _usesDelayedDeliveryCharge =>
       _isCrossSociety && _fulfilmentMethod == 'seller_delivery';
+
+  bool get _usesPartnerDeliveryQuote =>
+      _partnerDeliveryEligible &&
+      _usesDelayedDeliveryCharge &&
+      _payment == PaymentMethod.upi;
 
   double get _deliveryCharge {
     if (_fulfilmentMethod != 'seller_delivery') return 0;
@@ -786,6 +821,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   String _sellerDeliverySubtitle(SellerFulfilment fulfilment) {
+    if (_usesPartnerDeliveryQuote) {
+      return 'Partner delivery. Food and delivery are quoted when you place the order, then paid to the seller by UPI.';
+    }
     if (_usesDelayedDeliveryCharge) {
       if (_payment == PaymentMethod.upi) {
         return 'Pay for food via UPI after the seller accepts. Outside delivery is on actuals (cash at handover).';
@@ -879,7 +917,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }) {
     final selected = _fulfilmentMethod == value;
     return InkWell(
-      onTap: () => setState(() => _fulfilmentMethod = value),
+      onTap: () {
+        setState(() => _fulfilmentMethod = value);
+        _loadPartnerEligibility();
+      },
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: double.infinity,
@@ -990,7 +1031,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             title: 'UPI',
             subtitle: "Instant transfer to seller's wallet",
             isSelected: _payment == PaymentMethod.upi,
-            onTap: () => setState(() => _payment = PaymentMethod.upi),
+            onTap: () {
+              setState(() => _payment = PaymentMethod.upi);
+              _loadPartnerEligibility();
+            },
           ),
         if (_allowsCash) ...[
           if (_allowsUpi) const SizedBox(height: 10),
@@ -1001,7 +1045,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             title: 'Cash on Delivery',
             subtitle: _cashSubtitle,
             isSelected: _payment == PaymentMethod.cash,
-            onTap: () => setState(() => _payment = PaymentMethod.cash),
+            onTap: () {
+              setState(() => _payment = PaymentMethod.cash);
+              _loadPartnerEligibility();
+            },
           ),
         ],
       ],
@@ -1047,7 +1094,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ],
           ),
-          if (_usesDelayedDeliveryCharge) ...[
+          if (!_usesPartnerDeliveryQuote && _usesDelayedDeliveryCharge) ...[
             const SizedBox(height: 10),
             const _BillRow(
               label: 'Delivery charge',

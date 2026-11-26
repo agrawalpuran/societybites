@@ -92,6 +92,7 @@ File: `routes/listings.js`.
 | POST | `/listings/:id/like` | User | |
 | GET | `/listings/:id/likes` | User | |
 | GET | `/listings/:id/variants` | User | |
+| GET | `/listings/:id/partner-delivery` | User | `{ eligible }` for this buyer and listing. Query `paymentMethod`, `fulfilmentMethod`. Does not return the allowlist |
 | GET | `/listings/:id` | User | |
 | POST | `/listings` | User | Creates a draft. Seller is the JWT user |
 | PUT | `/listings/catalog-order` | User | Seller sort order |
@@ -130,7 +131,7 @@ File: `routes/orders.js`. All listed routes use `requireUser`. Buyer and seller 
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/orders` | Orders for the signed-in buyer or seller |
+| GET | `/orders` | Orders for the signed-in buyer or seller. Optional `deliveryProvider` and `delivery`. Buyer sees drop OTP only; seller sees pickup OTP and fare |
 | GET | `/orders/seller/stats` | |
 | GET | `/orders/seller/insights` | |
 | GET | `/orders/seller/reconciliation/summary` | |
@@ -141,8 +142,8 @@ File: `routes/orders.js`. All listed routes use `requireUser`. Buyer and seller 
 | POST | `/orders/:id/buyer-contact` | |
 | POST | `/orders/:id/seller-contact` | |
 | GET | `/orders/:id` | |
-| POST | `/orders` | Creates the order. Optional header `Idempotency-Key`. Optional coupon. 409 when stock is insufficient, with `availableQuantity` |
-| PATCH | `/orders/:id/status` | Body `{ status, reason fields, deliveryCharge when marking ready }`. See transitions in [ARCHITECTURE.md](ARCHITECTURE.md) |
+| POST | `/orders` | Creates the order. Optional header `Idempotency-Key`. Optional coupon. 409 when stock is insufficient, with `availableQuantity`. Eligible partner-delivery UPI orders may include a Prorouting estimate in `deliveryCharge` / `total`; otherwise those fields match today’s path |
+| PATCH | `/orders/:id/status` | Body `{ status, reason fields, deliveryCharge when marking ready }`. Partner-delivery orders skip the charge field. Partner `completed` is blocked while the rider is in flight; `Order-delivered` auto-completes. Status patch may include `delivery`. See transitions in [ARCHITECTURE.md](ARCHITECTURE.md) |
 | POST | `/orders/:id/reject` | Seller decline with a required reason |
 | PATCH | `/orders/:id/ready-time` | Informational ready-by estimate |
 
@@ -262,8 +263,9 @@ File: `routes/admin.js`. Prefix `/admin`. Portal user required. Non-GET requires
 | GET | `/admin/audit-log` | |
 | GET | `/admin/search` | |
 | GET | `/admin/payment-splits` | Cashfree split view |
-| GET | `/admin/settings` | Includes fee, WhatsApp, payment provider, FSSAI requirement. optional `?cityKey=` adds `platformFeeGlobal`, `platformFee` (effective), `cityPlatformFeeOverride`, `usesGlobalPlatformFee`, and `cityPlatformFeeOverrides` |
-| PATCH | `/admin/settings` | Super admin. Same settings. `?cityKey=` plus `platformFee` writes `city_platform_fees` for that city. No `cityKey` still writes global `platform_fee`. Body `useGlobalPlatformFee: true` with `cityKey` deletes that city's override |
+| GET | `/admin/settings` | Includes fee, WhatsApp, payment provider, FSSAI requirement, `deliveryProvider`, `deliveryAllowlist`. optional `?cityKey=` adds `platformFeeGlobal`, `platformFee` (effective), `cityPlatformFeeOverride`, `usesGlobalPlatformFee`, and `cityPlatformFeeOverrides` |
+| PATCH | `/admin/settings` | Super admin. Same settings plus `deliveryProvider` (`seller` \| `prorouting`) and `deliveryAllowlist` (phone array). `?cityKey=` plus `platformFee` writes `city_platform_fees` for that city. No `cityKey` still writes global `platform_fee`. Body `useGlobalPlatformFee: true` with `cityKey` deletes that city's override |
+| POST | `/webhooks/prorouting/:token` | Prorouting callbacks. Token must match `PROROUTING_WEBHOOK_TOKEN`. Always 200 after auth. `Order-delivered` completes the SocietyEats order (`completed`) when payment rules pass |
 | GET | `/admin/city-reach-configs` | |
 | PUT | `/admin/city-reach-configs/:cityKey` | |
 | GET | `/admin/serving-cities` | |

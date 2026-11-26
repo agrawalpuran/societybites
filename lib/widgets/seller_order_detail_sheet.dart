@@ -279,8 +279,9 @@ class _SellerOrderDetailSheetState extends State<SellerOrderDetailSheet> {
                   ),
               ],
             ),
-            if (order.fulfilmentMethod != null &&
-                order.fulfilmentMethod!.isNotEmpty) ...[
+            if (order.isPartnerDelivery ||
+                (order.fulfilmentMethod != null &&
+                    order.fulfilmentMethod!.isNotEmpty)) ...[
               const SizedBox(height: 16),
               OrderFulfilmentBanner(order: order, isSellerView: true),
             ],
